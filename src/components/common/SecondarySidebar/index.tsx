@@ -1,0 +1,58 @@
+"use client";
+// import contentMenuItems from "@/constants/contentMenuItems";
+import { Flex } from "antd";
+import Sider from "antd/es/layout/Sider";
+import { usePathname, useRouter } from "next/navigation";
+import React, { useCallback, useState } from "react";
+
+interface menuTypeProps {
+  key: string;
+  icon: React.ReactNode | React.ReactNode[];
+  selectedIcon: React.ReactNode | React.ReactNode[];
+  label: string;
+  route: string;
+}
+interface ContentSidebarProps {
+  menuItems: menuTypeProps[];
+  heading?: string;
+}
+const SecondarySidebar = ({ menuItems, heading = "Content" }: ContentSidebarProps) => {
+  const { push } = useRouter();
+  const [isCollapsed] = useState<boolean>(false);
+  const path = usePathname();
+
+  const isSelected = useCallback(
+    (route: string) => {
+      return path.includes(route);
+    },
+    [path],
+  );
+
+  return (
+    <Sider
+      width={260}
+      collapsedWidth={80}
+      collapsible
+      collapsed={isCollapsed}
+      className="hidden lg:block p-[18px] min-h-screen bg-white border-b border-r border-Gray200"
+    >
+      <Flex vertical className="h-full">
+        <h1 className="text-lg font-helvetica-700 text-Gray900">{heading}</h1>
+        <Flex vertical className="flex-1 mt-5" gap={1}>
+          {menuItems?.map(({ label, icon: Icon, selectedIcon, route }: menuTypeProps, index: number) => (
+            <div
+              key={index}
+              onClick={() => push(route)}
+              className={`w-full flex flex-row items-center p-2 gap-2 cursor-pointer border border-transparent hover:bg-Primary50 hover:border-Primary900  rounded-lg ${isSelected(route) && "!bg-Primary50 !border-Primary900"}`}
+            >
+              {isSelected(route) ? selectedIcon : Icon}
+              {!isCollapsed && <p className={`${isSelected(route) ? "text-Primary1000 font-PoppinsSemiBold" : "text-Gray600"}`}>{label}</p>}
+            </div>
+          ))}
+        </Flex>
+      </Flex>
+    </Sider>
+  );
+};
+
+export default SecondarySidebar;
