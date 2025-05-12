@@ -1,0 +1,26 @@
+.input {
+  width: 100%;
+  background-color: transparent !important; /* Consistent background */
+  box-shadow: none !important;
+  padding: 0px;
+  margin: 0px;
+  line-height: 48.97px;
+  text-align: left;
+  text-underline-position: from-font;
+  text-decoration-skip-ink: none;
+  outline: none;
+  border: none;
+  border-radius: 0px !important;
+  /* color: var(--color-gray-600); */
+  box-sizing: border-box;
+}
+
+/* Focus styles */
+.input:focus {
+  border-bottom: 1px solid var(--color-gray-600);
+}
+
+/* Placeholder styling */
+.input::placeholder {
+  color: var(--color-gray-600);
+}

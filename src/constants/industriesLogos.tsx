@@ -1,0 +1,15 @@
+export const industriesLogos = [
+  "/industry-1.svg",
+  "/industry-2.svg",
+  "/industry-3.svg",
+  "/industry-4.svg",
+  "/industry-5.svg",
+  "/industry-6.svg",
+  "/industry-7.svg",
+  "/industry-8.svg",
+  "/industry-9.svg",
+  "/industry-10.svg",
+  "/industry-11.svg",
+  "/industry-12.svg",
+  "/industry-13.svg",
+];
