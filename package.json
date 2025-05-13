@@ -1,0 +1,53 @@
+{
+  "name": "algoricum-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prepare": "husky",
+    "format": "prettier --ignore-path .prettierignore --check . --ext .js,.jsx,.ts,.tsx",
+    "format:fix": "prettier --ignore-path .prettierignore --write . --ext .js,.jsx,.ts,.tsx"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.5.2",
+    "@reduxjs/toolkit": "^2.3.0",
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.49.4",
+    "antd": "^5.22.2",
+    "axios": "^1.7.7",
+    "cookies-next": "^4.3.0",
+    "dayjs": "^1.11.13",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "lodash": "^4.17.21",
+    "next": "14.2.18",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-infinite-logo-slider": "^1.1.4",
+    "react-otp-input": "^3.1.1",
+    "react-query": "^3.39.3",
+    "react-quill": "^2.0.0",
+    "react-redux": "^9.1.2",
+    "react-toastify": "^10.0.6",
+    "redux-persist": "^6.0.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@babel/eslint-parser": "^7.25.9",
+    "@types/lodash": "^4.17.13",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.18",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "postcss": "^8",
+    "prettier": "^3.3.3",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}
