@@ -78,7 +78,7 @@ export default {
           primary800: "var(--color-brand-primary-800)",
           primary900: "var(--color-brand-primary-900)",
           primary1000: "var(--color-brand-primary-1000)",
-          secondary: "#0A3F30", // Darker shade for hover states
+          secondary: "#26046e", // Darker shade for hover states
           light: "#E6F2EF", // Light shade for backgrounds
           accent: "#1A8870", // Accent color for highlights
         },
