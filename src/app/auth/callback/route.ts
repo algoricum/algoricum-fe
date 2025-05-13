@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   // if "next" is in param, use it as the redirect URL
   const next = searchParams.get('next') ?? '/'
   if (code) {
-    const supabase = await createClient(cookies())
+    const supabase = await createClient(await cookies())
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer

@@ -61,9 +61,7 @@ const Sidebar = () => {
       className="hidden md:block p-[18px] min-h-screen bg-white border-b border-r border-Gray400"
     >
       <Flex vertical className="h-full">
-        <a onClick={e => e.preventDefault()}>
           <Logo isSidebar={true} isCollapsed={isCollapsed} />
-        </a>
 
         {(!path.includes("content") || !path.includes("settings")) && (
           <Flex

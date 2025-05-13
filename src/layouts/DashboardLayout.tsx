@@ -17,18 +17,18 @@ const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
   const path = usePathname();
   const { user } = useSupabaseAuth();
 
-  useEffect(() => {
-    if (window.BOTSDK && user) {
-      window.BOTSDK.initialize({
-        apiKey:
-          "1d10bb50-6c2b-4e20-8152-a832dc08e4ab.a6ZSYfSRvy8Lwx6937nvKVNP8l7eoqQC9Vl62DzBhJPcPPDosEk8mfC8ep35SyT0Ea7TGVuc2-8uEr_B-W5p5w",
-        name: user.name,
-        userId: user.id,
-      });
-    } else {
-      console.error("BOTSDK is not defined");
-    }
-  }, [user]);
+  // useEffect(() => {
+  //   if (window.BOTSDK && user) {
+  //     window.BOTSDK.initialize({
+  //       apiKey:
+  //         "1d10bb50-6c2b-4e20-8152-a832dc08e4ab.a6ZSYfSRvy8Lwx6937nvKVNP8l7eoqQC9Vl62DzBhJPcPPDosEk8mfC8ep35SyT0Ea7TGVuc2-8uEr_B-W5p5w",
+  //       name: user.name,
+  //       userId: user.id,
+  //     });
+  //   } else {
+  //     console.error("BOTSDK is not defined");
+  //   }
+  // }, [user]);
   return (
     <div className="min-h-screen">
       <Layout className="h-screen flex flex-row overflow-x-hidden">

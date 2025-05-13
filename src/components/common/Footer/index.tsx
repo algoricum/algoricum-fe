@@ -7,7 +7,7 @@ import React from "react";
 
 const Footer = () => {
   interface SocialButtonProps {
-    icon: React.ReactElement; // Expecting a React element
+    icon: React.ReactElement<any>; // Expecting a React element
     className?: string;
   }
   const SocialButton = ({ icon, className = "" }: SocialButtonProps) => (

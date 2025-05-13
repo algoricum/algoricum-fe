@@ -138,8 +138,8 @@ export const defaultTheme = {
 
 export const COLORS = {
   brand: {
-    primary: "#0F5C46", // Emerald green primary color
-    secondary: "#0A3F30", // Darker shade for hover states
+    primary: "#591cdd", // Emerald green primary color
+    secondary: "#26046e", // Darker shade for hover states
     light: "#E6F2EF", // Light shade for backgrounds
     accent: "#1A8870", // Accent color for highlights
   },
