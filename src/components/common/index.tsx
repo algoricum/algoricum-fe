@@ -14,7 +14,6 @@ import Modal from "./Modal";
 import ProfilePicture from "./ProfilePicture";
 import SecondaryMenusMobile from "./SecondaryMenusMobile";
 import SecondarySidebar from "./SecondarySidebar";
-import SecretModal from "./SecretModal";
 import Sidebar from "./Sidebar";
 import SocialButton from "./SocialButton";
 import TextArea from "./TextArea";
@@ -38,7 +37,6 @@ export {
   ProfilePicture,
   SecondaryMenusMobile,
   SecondarySidebar,
-  SecretModal,
   Sidebar,
   SocialButton,
   TextArea,

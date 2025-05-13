@@ -1,6 +1,6 @@
 "use client";
 import { Header } from "@/components/common";
-import ClinicSettingsPage from "@/components/screens/Settings/Clinic/ClinicSettingsPage";
+import ClinicSettingsPage from "@/components/screens/Settings/Clinic/clinicSettingsPage";
 import DashboardLayout from "@/layouts/DashboardLayout";
 
 const Page = () => {

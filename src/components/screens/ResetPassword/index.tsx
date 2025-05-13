@@ -4,7 +4,7 @@ import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { PasswordIcon } from "@/icons";
 import { ResetPasswordProps } from "@/interfaces/services_type";
-import authService from "@/services/auth";
+import { resendOtp } from "@/services/auth";
 import { Flex, Form, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -32,7 +32,7 @@ const ResetPasswordPage = () => {
     checkResetSession();
   }, [push]);
 
-  const { mutate, isLoading } = useMutation((data: ResetPasswordProps) => authService.resetPassword(data), {
+  const { mutate, isLoading } = useMutation((data: ResetPasswordProps) => resendOtp("email"), {
     onSuccess: () => {
       SuccessToast("Password reset successfully");
       push("/login");
