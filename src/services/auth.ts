@@ -349,7 +349,6 @@ export const resetPassword = async (password: string): Promise<void> => {
 };
 
 export const logoutUser = async (): Promise<void> => {
-  console.log("inside logout user")
   try {
     const { error } = await supabase.auth.signOut();
     if (error) {

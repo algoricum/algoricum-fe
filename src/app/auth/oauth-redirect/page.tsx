@@ -36,7 +36,6 @@ export default function OAuthRedirectPage() {
 
         // If user exists in our user table, they're a returning user
         if (existingUser) {
-          console.log('Existing user detected, redirecting to dashboard');
           SuccessToast('Welcome back! You\'re now logged in.');
           router.push('/dashboard');
           return;
@@ -52,7 +51,6 @@ export default function OAuthRedirectPage() {
           .single();
           
         if (emailUser) {
-          console.log('User with this email already exists');
           // This is a special case - user exists with this email but different auth provider
           // You might want to handle this differently or just log them in
           SuccessToast('Account found with this email. Logging you in.');
@@ -84,7 +82,6 @@ export default function OAuthRedirectPage() {
           // Handle unique constraint violation - this shouldn't happen with our checks,
           // but good to have as a fallback
           if (insertError.code === '23505') {
-            console.log('Race condition: user record already exists');
             SuccessToast('Login successful!');
             router.push('/dashboard');
             return;
