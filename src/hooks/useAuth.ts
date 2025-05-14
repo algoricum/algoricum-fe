@@ -118,16 +118,25 @@ export const useAuth = () => {
   }, [dispatch, router]);
 
   // Logout handler
-  const logout = useCallback(async () => {
+const logout = useCallback(async () => {
+  try {
+    
+    // First ensure the Supabase signOut succeeds
+    await logoutUser();    
+    // Then clear local storage data
+    clearAll();    
+    return true;
+  } catch (error) {
+    console.error("Detailed logout error:", error);
+    // Try to clear data anyway in case of partial logout
     try {
-      clearAll()
-      await logoutUser();
-      router.push('/login');
-      return true;
-    } catch (error) {
-      return false;
+      clearAll();
+    } catch (clearError) {
+      console.error("Failed to clear storage:", clearError);
     }
-  }, [dispatch]);
+    return false;
+  }
+}, []);
 
   // Clear error state
   const clearAuthError = useCallback(() => {

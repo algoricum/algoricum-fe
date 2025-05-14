@@ -3,7 +3,7 @@ import { Button } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { ResendOtpProps, VerifyOtpProps } from "@/interfaces/services_type";
 import { getUser } from "@/redux/accessors/user.accessors";
-import {resendOtp, verifyOtp} from "@/services/auth";
+import {getUserData, resendOtp, verifyOtp} from "@/services/auth";
 import { Flex, Form, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -21,7 +21,7 @@ const VerifyOTPPage = () => {
 
   useEffect(() => {
     (async () => {
-      const currentUser = await getUser();
+      const currentUser = await getUserData();
       setUser(currentUser);
     })();
   }, []);
@@ -96,7 +96,7 @@ const VerifyOTPPage = () => {
 
         <Button
           loading={verifyLoading}
-          className="w-full"
+          className="w-full  bg-brand-primary hover:!bg-brand-secondary text-white"
           type="primary"
           onClick={handleVerify}
         >

@@ -6,15 +6,16 @@ import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { MailIcon, PasswordIcon } from "@/icons";
 import { SignupProps } from "@/interfaces/services_type";
 import { saveUser } from "@/redux/accessors/user.accessors";
-import { signupUser } from "@/services/auth";
+import { setUserData, signupUser } from "@/services/auth";
 import { createClient } from "@/utils/supabase/client";
 import { Flex, Form, Typography } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "react-query";
+import { useDispatch } from "react-redux";
 const { Text } = Typography;
-
 const SignupPage = () => {
+  const dispatch = useDispatch(); 
   const { push } = useRouter();
   const [form] = Form.useForm();
 
@@ -22,6 +23,7 @@ const SignupPage = () => {
     onSuccess: (data: any) => {
       if (!data?.user) return;
       saveUser(data.user);
+      setUserData(data.user)
       push("/verify-otp");
       SuccessToast("OTP sent successfully. Please verify your email");
     },

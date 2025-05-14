@@ -75,7 +75,7 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
               onChange={handleFileChange}
               beforeUpload={() => false}
               maxCount={1}
-              className="bg-white border-dashed border-2 border-gray-300 rounded-md"
+              className="bg-white rounded-md"
             >
               <p className="flex justify-center mb-2">
                 <FileTextOutlined size={24} className="text-gray-400" />
