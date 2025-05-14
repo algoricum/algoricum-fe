@@ -48,18 +48,18 @@ const Step2ContactInfo: React.FC<Step2Props> = ({ formData, updateFormData, onNe
           <h2 className="text-lg font-extrabold mb-4">Primary Contact</h2>
 
           <Form.Item
-            label="Full Name"
+            label="Full Name (optional)"
             name="fullName"
-            rules={[{ required: true, message: "Please enter the contact's full name" }]}
+            rules={[{ required: false, message: "Please enter the contact's full name" }]}
           >
             <Input placeholder="Type here" className="rounded-md py-2 px-3 bg-gray-50" />
           </Form.Item>
 
           <Form.Item
-            label="Email Address"
+            label="Email Address (optional)"
             name="emailAddress"
             rules={[
-              { required: true, message: "Please enter an email address" },
+              { required: false, message: "Please enter an email address" },
               { type: "email", message: "Please enter a valid email address" },
             ]}
           >
@@ -67,14 +67,14 @@ const Step2ContactInfo: React.FC<Step2Props> = ({ formData, updateFormData, onNe
           </Form.Item>
 
           <Form.Item
-            label="Phone Number"
+            label="Phone Number (optional)"
             name="phoneNumber"
-            rules={[{ required: true, message: "Please enter a phone number" }]}
+            rules={[{ required: false, message: "Please enter a phone number" }]}
           >
             <Input placeholder="Type here" className="rounded-md py-2 px-3 bg-gray-50" />
           </Form.Item>
 
-          <Form.Item label="Calendly Link" name="calendlyLink">
+          <Form.Item label="Calendly Link (optional)" name="calendlyLink">
             <Input
               placeholder="Enter your Calendly URL"
               className="rounded-md py-2 px-3 bg-gray-50"

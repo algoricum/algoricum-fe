@@ -198,6 +198,18 @@ export const loginUser = async (email: string, password: string): Promise<{ user
 
 export const signupUser = async (name: string, email: string, password: string): Promise<{ user: SupabaseUser | null; session: Session | null; }> => {
   try {
+    const { data: existingUserData, error: checkError } = await supabase.auth.signInWithPassword({
+      email,
+      password: 'temp-password-to-check-existence', // This will fail if user exists but with wrong password
+    });
+    if (checkError) {
+      if (checkError.message?.includes('Invalid login credentials')) {
+        throw new Error('ACCOUNT_EXISTS');
+      }
+      if (!checkError.message?.includes('user not found')) {
+        throw checkError;
+      }
+    }
     const { data, error } = await supabase.auth.signUp({
       email,
       password
@@ -235,6 +247,11 @@ export const signupUser = async (name: string, email: string, password: string):
     return data
   } catch (error: any) {
     console.error('Signup error:', error.message);
+    if (error.message === 'ACCOUNT_EXISTS') {
+      const customError = new Error('An account with this email already exists. Please login instead.');
+      customError.name = 'ACCOUNT_EXISTS';
+      throw customError;
+    }
     throw error;
   }
 };
@@ -242,22 +259,22 @@ export const signupUser = async (name: string, email: string, password: string):
 export const resendOtp = async (email: string): Promise<void> => {
   try {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     // Create date in UTC and add 120 minutes
     const now = new Date();
     const otpExpiresAt = new Date(now.getTime() + 120 * 60000);
-    
+
     // Store as ISO string
     const { error } = await supabase
       .from('user')
-      .update({ 
-        otp, 
-        otp_expires_at: otpExpiresAt.toISOString() 
+      .update({
+        otp,
+        otp_expires_at: otpExpiresAt.toISOString()
       })
       .eq('email', email);
-      
+
     if (error) throw error;
-    
+
   } catch (error: any) {
     console.error('Resend OTP error:', error.message);
     throw error;
@@ -272,31 +289,31 @@ export const verifyOtp = async (email: string, otp: string): Promise<void> => {
       .eq('email', email)
       .eq('otp', otp)
       .single();
-      
+
     if (fetchError || !userData) {
       throw new Error('Invalid OTP');
     }
-    
+
     // Parse the ISO string to create a date object
     const otpExpiresAt = new Date(userData.otp_expires_at);
     const now = new Date();
-    
+
     if (otpExpiresAt < now) {
       throw new Error('OTP has expired');
     }
-    
+
     // Update user as verified
     const { error: updateError } = await supabase
       .from('user')
-      .update({ 
-        is_email_verified: true, 
-        otp: null, 
-        otp_expires_at: null 
+      .update({
+        is_email_verified: true,
+        otp: null,
+        otp_expires_at: null
       })
       .eq('email', email);
-      
+
     if (updateError) throw updateError;
-    
+
   } catch (error: any) {
     console.error('OTP verification error:', error.message);
     throw error;
@@ -332,6 +349,7 @@ export const resetPassword = async (password: string): Promise<void> => {
 };
 
 export const logoutUser = async (): Promise<void> => {
+  console.log("inside logout user")
   try {
     const { error } = await supabase.auth.signOut();
     if (error) {

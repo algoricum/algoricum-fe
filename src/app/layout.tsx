@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: ReactNode[] | React
   return (
     <html lang="en">
       <head>
-      <script src="http://localhost:9000/hash-sdk.js"></script>
+      {/* <script src="http://localhost:9000/hash-sdk.js"></script> */}
   </head>
       <body>
         <Providers>{children}</Providers>
