@@ -65,7 +65,6 @@ export const getUserData = async (): Promise<User | null> => {
       }
     }
   }
-
   // If not in localStorage or parsing failed, get from Supabase
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -196,82 +195,58 @@ export const loginUser = async (email: string, password: string): Promise<{ user
   }
 };
 
-export const signupUser = async (name: string, email: string, password: string): Promise<{ user: SupabaseUser | null; session: Session | null; }> => {
+export const signupUser = async (
+  name: string,
+  email: string,
+  password: string
+): Promise<{ user: SupabaseUser | null; session: Session | null }> => {
   try {
-    const { data: existingUserData, error: checkError } = await supabase.auth.signInWithPassword({
-      email,
-      password: 'temp-password-to-check-existence', // This will fail if user exists but with wrong password
-    });
-    if (checkError) {
-      if (checkError.message?.includes('Invalid login credentials')) {
-        throw new Error('ACCOUNT_EXISTS');
-      }
-      if (!checkError.message?.includes('user not found')) {
-        throw checkError;
-      }
-    }
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    if (!data.user) {
-      throw new Error('Signup failed');
-    }
-
-    // Generate OTP for email verification
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const now = new Date();
-    const otpExpiresAt = new Date(now.getTime() + 120 * 60000);
-    // Create user record in user table
-    const { error: userError } = await supabase
+    // Check if user exists in the `user` table (you can also use auth.users via Admin API if needed)
+    const { data: existingUser, error: userCheckError } = await supabase
       .from('user')
-      .insert([{
-        id: data.user.id,
-        name,
-        email,
-        is_email_verified: false,
-        otp,
-        otp_expires_at: otpExpiresAt.toISOString()
-      }]);
+      .select('id')
+      .eq('email', email)
+      .single();
 
-    if (userError) {
-      throw userError;
-    }
-
-    // In a real app, you would send the OTP via email here
-    return data
-  } catch (error: any) {
-    console.error('Signup error:', error.message);
-    if (error.message === 'ACCOUNT_EXISTS') {
+    if (userCheckError === null && existingUser) {
       const customError = new Error('An account with this email already exists. Please login instead.');
       customError.name = 'ACCOUNT_EXISTS';
       throw customError;
     }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) throw error;
+    if (!data.user) throw new Error('Signup failed');
+
+    // Insert user profile in your user table
+    const { error: insertError } = await supabase.from('user').insert([
+      {
+        id: data.user.id,
+        name,
+        email,
+        is_email_verified: false,
+      },
+    ]);
+
+    if (insertError) throw insertError;
+    return data;
+  } catch (error: any) {
+    console.error('Signup error:', error.message);
     throw error;
   }
 };
 
+
 export const resendOtp = async (email: string): Promise<void> => {
   try {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Create date in UTC and add 120 minutes
-    const now = new Date();
-    const otpExpiresAt = new Date(now.getTime() + 120 * 60000);
-
-    // Store as ISO string
-    const { error } = await supabase
-      .from('user')
-      .update({
-        otp,
-        otp_expires_at: otpExpiresAt.toISOString()
-      })
-      .eq('email', email);
+   const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+    });
 
     if (error) throw error;
 
@@ -283,37 +258,14 @@ export const resendOtp = async (email: string): Promise<void> => {
 
 export const verifyOtp = async (email: string, otp: string): Promise<void> => {
   try {
-    const { data: userData, error: fetchError } = await supabase
-      .from('user')
-      .select('*')
-      .eq('email', email)
-      .eq('otp', otp)
-      .single();
-
-    if (fetchError || !userData) {
-      throw new Error('Invalid OTP');
-    }
-
-    // Parse the ISO string to create a date object
-    const otpExpiresAt = new Date(userData.otp_expires_at);
-    const now = new Date();
-
-    if (otpExpiresAt < now) {
-      throw new Error('OTP has expired');
-    }
-
-    // Update user as verified
-    const { error: updateError } = await supabase
-      .from('user')
-      .update({
-        is_email_verified: true,
-        otp: null,
-        otp_expires_at: null
-      })
-      .eq('email', email);
-
-    if (updateError) throw updateError;
-
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.verifyOtp({
+      email: email,
+      token: otp,
+      type: 'email',
+    })
   } catch (error: any) {
     console.error('OTP verification error:', error.message);
     throw error;

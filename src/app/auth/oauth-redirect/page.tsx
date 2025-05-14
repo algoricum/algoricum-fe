@@ -62,20 +62,13 @@ export default function OAuthRedirectPage() {
         // Proceed with creating new user record
         const name = user.user_metadata.full_name || user.user_metadata.name || 'Unknown';
         const email = user.email;
-
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const now = new Date();
-        const otpExpiresAt = new Date(now.getTime() + 120 * 60000);
-
         const { error: insertError } = await supabase
           .from('user')
           .insert([{
             id: user.id,
             name,
             email,
-            is_email_verified: true, // Email is verified via OAuth
-            otp,
-            otp_expires_at: otpExpiresAt.toISOString()
+            is_email_verified: true,
           }]);
 
         if (insertError) {
