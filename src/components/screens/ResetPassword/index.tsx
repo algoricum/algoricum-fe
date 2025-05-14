@@ -4,12 +4,12 @@ import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { PasswordIcon } from "@/icons";
 import { ResetPasswordProps } from "@/interfaces/services_type";
-import { resendOtp } from "@/services/auth";
 import { Flex, Form, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useMutation } from "react-query";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/config/client";
+import { resendOtp } from "@/utils/supabase/auth-helper";
 
 const { Title, Text } = Typography;
 

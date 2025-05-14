@@ -6,8 +6,9 @@ import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { MailIcon, PasswordIcon } from "@/icons";
 import { SignupProps } from "@/interfaces/services_type";
 import { saveUser } from "@/redux/accessors/user.accessors";
-import { setUserData, signupUser } from "@/services/auth";
-import { createClient } from "@/utils/supabase/client";
+import { signUp } from "@/utils/supabase/auth-helper";
+import { createClient } from "@/utils/supabase/config/client";
+import { setUserData } from "@/utils/supabase/user-helper";
 import { Flex, Form, Typography } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,7 +20,7 @@ const SignupPage = () => {
   const { push } = useRouter();
   const [form] = Form.useForm();
 
-  const { mutate, isLoading } = useMutation((data: SignupProps) => signupUser(data.name, data.email, data.password), {
+  const { mutate, isLoading } = useMutation((data: SignupProps) => signUp(data.name, data.email, data.password), {
     onSuccess: (data: any) => {
       if (!data?.user) return;
       saveUser(data.user);

@@ -1,5 +1,5 @@
 //auth/callback/route.ts
-import { createClient } from '@/utils/supabase/server'
+import { createClient } from '@/utils/supabase/config/server'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 // The client you created from the Server-Side Auth instructions

@@ -2,7 +2,6 @@ import { SecondaryMenusMobile, SecondarySidebar, Sidebar } from "@/components/co
 import MobileFooter from "@/components/common/MobileFooter";
 import contentMenuItems from "@/constants/contentMenuItems";
 import settingMenuItems from "@/constants/settingMenu";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Flex, Layout, LayoutProps } from "antd";
 import { usePathname } from "next/navigation";
 import { ReactNode, useEffect } from "react";
@@ -15,7 +14,6 @@ interface DashboardLayoutProps extends LayoutProps {
 
 const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
   const path = usePathname();
-  const { user } = useSupabaseAuth();
 
   // useEffect(() => {
   //   if (window.BOTSDK && user) {

@@ -3,7 +3,7 @@ import { Button, Input } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { MailIcon } from "@/icons";
 import { ForgotProps } from "@/interfaces/services_type";
-import { forgotPassword } from "@/services/auth";
+import { resetPasswordRequest } from "@/utils/supabase/auth-helper";
 import { Flex, Form, Typography } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ const ForgotPasswordPage = () => {
   const { push } = useRouter();
   const [form] = Form.useForm();
 
-  const { mutate, isLoading } = useMutation((data: ForgotProps) => forgotPassword(data.email), {
+  const { mutate, isLoading } = useMutation((data: ForgotProps) => resetPasswordRequest(data.email), {
     onSuccess: () => {
       SuccessToast("Password reset instructions sent to your email");
       push("/login");

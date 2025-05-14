@@ -4,15 +4,16 @@ import PasswordInput from "@/components/elements/PasswordInput"
 import { ErrorToast } from "@/helpers/toast"
 import { MailIcon, PasswordIcon } from "@/icons"
 import type { LoginProps } from "@/interfaces/services_type"
-import { saveUser } from "@/redux/accessors/user.accessors"
-import { loginUser, setClinicData } from "@/services/auth"
 import { Flex, Form, Typography } from "antd"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useMutation } from "react-query"
-import { createClient } from "@/utils/supabase/client"
+import { createClient } from "@/utils/supabase/config/client"
 import { AuthSeparator, SocialButton } from "@/components/common"
-import { useClinicCheck } from "@/services/clinic"
+import { signInWithPassword } from "@/utils/supabase/auth-helper"
+import { useClinicCheck } from "@/hooks/useClinicCheck"
+import { setClinicData } from "@/utils/supabase/clinic-helper"
+import { setUserData } from "@/utils/supabase/user-helper"
 
 const { Text } = Typography
 
@@ -22,9 +23,9 @@ const LoginPage = () => {
   const redirectUrl = searchParams.get("redirectUrl") || "/dashboard"
   const [form] = Form.useForm()
   const { checkAndRedirectIfNoClinic } = useClinicCheck();
-  const { mutate, isLoading } = useMutation((data: LoginProps) => loginUser(data.email, data.password), {
+  const { mutate, isLoading } = useMutation((data: LoginProps) => signInWithPassword(data.email, data.password), {
     onSuccess: (data: any) => {
-      saveUser(data?.user)
+      setUserData(data?.user)
 
       // Check if email is verified
       if (!data?.user?.is_email_verified) {

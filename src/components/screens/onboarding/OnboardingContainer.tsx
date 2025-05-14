@@ -7,11 +7,12 @@ import OnboardingLayout from "./OnboardingLayout"
 import Step1ClinicInfo from "./Step1ClinicInfo"
 import Step2ContactInfo from "./Step2ContactInfo"
 import Step3BrandConfig from "./Step3BrandConfig"
-import { getUser } from "@/redux/accessors/user.accessors"
 import { ErrorToast, SuccessToast } from "@/helpers/toast"
-import clinicService from "@/services/clinic"
 import apiKeyService from "@/services/apiKey"
 import { BusinessHours } from "@/interfaces/services_type"
+import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads"
+import { createClinic } from "@/utils/supabase/clinic-helper"
+import { getUserData } from "@/utils/supabase/user-helper"
 
 
 export interface OnboardingData {
@@ -88,7 +89,7 @@ const OnboardingContainer = () => {
         setIsSubmitting(true);
         
         // Get current user
-        const user = await getUser();
+        const user = await getUserData();
         if (!user) {
           ErrorToast("User not found. Please log in again.");
           return;
@@ -97,7 +98,7 @@ const OnboardingContainer = () => {
         // First, upload the logo if provided
         let logoUrl = undefined;
         if (formData.logo) {
-          logoUrl = await clinicService.uploadLogo(user.id, formData.logo);
+          logoUrl = await uploadClinicLogo(user.id, formData.logo);
         }
         
         // Prepare clinic data according to new schema
@@ -133,7 +134,7 @@ const OnboardingContainer = () => {
         };
         
         // Create clinic (this will also create the clinic-user relationship)
-        const clinic = await clinicService.create(clinicData);
+        const clinic = await createClinic(clinicData);
         
         // Generate API key for the clinic
         const apiKeyName = `${formData.legalBusinessName} Primary Key`;

@@ -2,13 +2,13 @@
 import { Button } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { ResendOtpProps, VerifyOtpProps } from "@/interfaces/services_type";
-import { getUser } from "@/redux/accessors/user.accessors";
-import {getUserData, resendOtp, verifyOtp} from "@/services/auth";
 import { Flex, Form, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useMutation } from "react-query";
 import OtpInput from 'react-otp-input';
+import { getUserData } from "@/utils/supabase/user-helper";
+import { resendOtp, verifyOtp } from "@/utils/supabase/auth-helper";
 
 const { Title, Text } = Typography;
 

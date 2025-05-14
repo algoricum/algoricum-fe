@@ -1,12 +1,9 @@
 // src/redux/slices/clinicSlice.ts
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { 
-  getClinicData, 
-  setClinicData, 
-  clearClinicData 
-} from "@/services/auth";
 import { createClient } from '@supabase/supabase-js';
 import { Clinic, CreateClinicProps, UpdateClinicProps } from "@/interfaces/services_type";
+import { setClinicData } from "@/utils/supabase/clinic-helper";
+import { clearClinicData } from "@/helpers/storage-helper";
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
