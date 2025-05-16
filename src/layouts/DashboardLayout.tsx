@@ -6,7 +6,17 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Flex, Layout, LayoutProps } from "antd";
 import { usePathname } from "next/navigation";
 import { ReactNode, useEffect } from "react";
-
+declare global {
+  interface Window {
+    BOTSDK?: {
+      initialize: (options: {
+        apiKey: string;
+        name: string;
+        userId: string;
+      }) => void;
+    };
+  }
+}
 const { Content } = Layout;
 
 interface DashboardLayoutProps extends LayoutProps {
@@ -17,18 +27,17 @@ const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
   const path = usePathname();
   const { user } = useSupabaseAuth();
 
-  // useEffect(() => {
-  //   if (window.BOTSDK && user) {
-  //     window.BOTSDK.initialize({
-  //       apiKey:
-  //         "1d10bb50-6c2b-4e20-8152-a832dc08e4ab.a6ZSYfSRvy8Lwx6937nvKVNP8l7eoqQC9Vl62DzBhJPcPPDosEk8mfC8ep35SyT0Ea7TGVuc2-8uEr_B-W5p5w",
-  //       name: user.name,
-  //       userId: user.id,
-  //     });
-  //   } else {
-  //     console.error("BOTSDK is not defined");
-  //   }
-  // }, [user]);
+   useEffect(() => {
+    if (window.BOTSDK) {
+      window.BOTSDK.initialize({
+        apiKey: '3d2f8dc7ff0d42164f00e9040c8931904fbbb524a19241a12ee7dbfa72e55691',
+        name: 'Hassan Shahzad',
+        userId: '6af9e11b-4108-404f-92cb-8cf151d9b847',
+      });
+    } else {
+      console.error("BOTSDK is not defined");
+    }
+  }, []);
   return (
     <div className="min-h-screen">
       <Layout className="h-screen flex flex-row overflow-x-hidden">

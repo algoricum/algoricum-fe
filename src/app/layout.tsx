@@ -13,8 +13,8 @@ export default function RootLayout({ children }: { children: ReactNode[] | React
   return (
     <html lang="en">
       <head>
-      {/* <script src="http://localhost:9000/hash-sdk.js"></script> */}
-  </head>
+      <script src="https://algoricum-widget.vercel.app/hash-sdk.js"></script>
+      <script src="https://unpkg.com/react@18/umd/react.development.js"></script>  </head>
       <body>
         <Providers>{children}</Providers>
       </body>
