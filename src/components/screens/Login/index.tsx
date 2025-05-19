@@ -132,7 +132,7 @@ const LoginPage = () => {
         </Flex>
       </Form>
       <AuthSeparator />
-      <Flex gap={12} className="flex-col justify-center sm:flex-row w-full">
+      <Flex gap={12} className="flex-col justify-center items-center sm:flex-row w-full">
         <SocialButton
         isGoogle={true}
         label="Continue With Google"

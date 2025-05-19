@@ -96,7 +96,9 @@ export const signUp = async (
  */
 export const signOut = async (): Promise<boolean> => {
   try {
+    console.log("control before signout healper supabase")
     const { error } = await supabase.auth.signOut();
+    console.log("control after signout healper supabase")
     if (error) throw error;
     clearAll();
     return true

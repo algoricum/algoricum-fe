@@ -10,7 +10,7 @@ const Page = () => {
       header={
         <Header
           title="Widget Settings"
-          description="Customize the design and settings of your widget to match your brand’s look and feel."
+          description="Customize the design and settings of your widget."
         />
       }
     >
