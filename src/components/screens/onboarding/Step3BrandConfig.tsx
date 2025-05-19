@@ -20,13 +20,21 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
   const [form] = Form.useForm()
   const [fileList, setFileList] = useState<any[]>([])
 
-  const handleSubmit = (values: any) => {
-    updateFormData({
-      toneSelector: values.toneSelector,
-      sentenceLength: values.sentenceLength,
-      formalityLevel: values.formalityLevel,
-    })
-    onComplete()
+ const handleSubmit = () => {
+    onComplete();
+  }
+
+  // Handle dropdown changes
+  const handleToneChange = (value: string) => {
+    updateFormData({ toneSelector: value });
+  }
+
+  const handleSentenceLengthChange = (value: string) => {
+    updateFormData({ sentenceLength: value });
+  }
+
+  const handleFormalityLevelChange = (value: string) => {
+    updateFormData({ formalityLevel: value });
   }
 
   const normFile = (e: any) => {
@@ -95,6 +103,7 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
             <Select
               placeholder="Type here"
               className="w-full"
+              onChange={handleToneChange}
               options={[
                 { value: "friendly", label: "Friendly" },
                 { value: "professional", label: "Professional" },
@@ -112,6 +121,7 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
             <Select
               placeholder="Type here"
               className="w-full"
+              onChange={handleSentenceLengthChange}
               options={[
                 { value: "short", label: "Short" },
                 { value: "medium", label: "Medium" },
@@ -129,6 +139,7 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
           <Select
             placeholder="Type here"
             className="w-full"
+            onChange={handleFormalityLevelChange}
             options={[
               { value: "very_casual", label: "Very Casual" },
               { value: "casual", label: "Casual" },

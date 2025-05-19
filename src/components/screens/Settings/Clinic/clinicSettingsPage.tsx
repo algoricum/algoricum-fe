@@ -3,14 +3,14 @@ import { Button, Input, PasswordInput } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { CrossIcon, PencilIcon, UploadIcon } from "@/icons";
 import { Clinic, UpdateClinicProps, User } from "@/interfaces/services_type";
-import { saveClinic, updateClinicData, uploadLogo, useClinic } from "@/redux/accessors/clinic.accessors";
-import { getUser } from "@/redux/accessors/user.accessors";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/config/client";
 import { Flex, Form, Upload, UploadFile } from "antd";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import SettingsCard from "../SettingsCard";
-import { getClinicData, getUserData } from "@/services/auth";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { getUserData } from "@/utils/supabase/user-helper";
+import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 
 const ClinicSettingsPage = () => {
   const [form] = Form.useForm();
@@ -101,7 +101,7 @@ const ClinicSettingsPage = () => {
 
       // Handle logo upload if changed
       if (isLogoChanged && logoFile && user?.id) {
-        const logoUrl = await uploadLogo(user.id, logoFile, dispatch);
+        const logoUrl = await uploadClinicLogo(user.id, logoFile);
       }
 
       // Prepare dashboard theme data
@@ -124,9 +124,6 @@ const ClinicSettingsPage = () => {
         },
         ...apiKeyUpdate
       };
-
-      // Update clinic in Supabase and Redux
-      const updatedClinic = await updateClinicData(updateData, dispatch);
       
       SuccessToast("Clinic settings updated successfully");
     } catch (error: any) {

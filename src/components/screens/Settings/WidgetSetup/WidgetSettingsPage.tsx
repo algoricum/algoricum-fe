@@ -2,12 +2,11 @@ import { ColorConfigurator, WidgetPreview } from "@/components/common";
 import { Button } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { Clinic, UpdateClinicProps } from "@/interfaces/services_type";
-import { updateClinicData, useClinic } from "@/redux/accessors/clinic.accessors";
 import { Flex, Form } from "antd";
 import { useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import SettingsCard from "../SettingsCard";
-import { getClinicData } from "@/services/auth";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
 
 const WidgetSettingsPage = () => {
   const [form] = Form.useForm();

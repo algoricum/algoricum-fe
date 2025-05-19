@@ -7,11 +7,12 @@ import OnboardingLayout from "./OnboardingLayout"
 import Step1ClinicInfo from "./Step1ClinicInfo"
 import Step2ContactInfo from "./Step2ContactInfo"
 import Step3BrandConfig from "./Step3BrandConfig"
-import { getUser } from "@/redux/accessors/user.accessors"
 import { ErrorToast, SuccessToast } from "@/helpers/toast"
-import clinicService from "@/services/clinic"
 import apiKeyService from "@/services/apiKey"
 import { BusinessHours } from "@/interfaces/services_type"
+import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads"
+import { createClinic } from "@/utils/supabase/clinic-helper"
+import { getUserData } from "@/utils/supabase/user-helper"
 
 
 export interface OnboardingData {
@@ -47,7 +48,7 @@ const defaultBusinessHours: BusinessHours = {
 const OnboardingContainer = () => {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
-  const [isSubmitting,setIsSubmitting] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<OnboardingData>({
     // Step 1
     legalBusinessName: "",
@@ -78,29 +79,24 @@ const OnboardingContainer = () => {
     } else {
       // Submit the form data
       handleCompleteOnboarding()
-      // Redirect to dashboard or success page
-      router.push("/dashboard")
     }
   }
   const handleCompleteOnboarding = async () => {
     if (currentStep === 3) {
       try {
         setIsSubmitting(true);
-        
         // Get current user
-        const user = await getUser();
+        const user = await getUserData();
         if (!user) {
-          ErrorToast("User not found. Please log in again.");
+          ErrorToast("User not found. Please logout and log in again.");
+          setIsSubmitting(false);
           return;
         }
-        
         // First, upload the logo if provided
         let logoUrl = undefined;
         if (formData.logo) {
-          logoUrl = await clinicService.uploadLogo(user.id, formData.logo);
+          logoUrl = await uploadClinicLogo(user.id, formData.logo);
         }
-        
-        // Prepare clinic data according to new schema
         const clinicData = {
           // Map form fields to database fields
           name: formData.legalBusinessName, // Use legal business name as primary name
@@ -114,12 +110,11 @@ const OnboardingContainer = () => {
           business_hours: formData.businessHours,
           calendly_link: formData.calendlyLink,
           logo: logoUrl,
-          
           // Brand settings
           tone_selector: formData.toneSelector,
           sentence_length: formData.sentenceLength,
           formality_level: formData.formalityLevel,
-          
+
           // Keeping existing theming structure but could merge with new branding fields
           widget_theme: {
             primary_color: "#2563EB",
@@ -127,23 +122,25 @@ const OnboardingContainer = () => {
             border_radius: "8px"
           },
           dashboard_theme: {
-            primary_color: "#2563EB", 
+            primary_color: "#2563EB",
             layout: "sidebar"
           }
         };
-        
+
         // Create clinic (this will also create the clinic-user relationship)
-        const clinic = await clinicService.create(clinicData);
-        
+        const clinic = await createClinic(clinicData);
+
         // Generate API key for the clinic
         const apiKeyName = `${formData.legalBusinessName} Primary Key`;
         await apiKeyService.create({
           name: apiKeyName,
           clinicId: clinic.id
         });
-        
+
         SuccessToast("Clinic created successfully!");
-        router.push('/dashboard');
+        setTimeout(() => {
+          router.push('/dashboard?onboarding=success');
+        }, 2000);
       } catch (error: any) {
         ErrorToast(error.message || "Failed to create clinic");
       } finally {
