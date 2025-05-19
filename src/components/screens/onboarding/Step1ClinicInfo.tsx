@@ -216,7 +216,7 @@ const Step1ClinicInfo: React.FC<Step1Props> = ({ formData, updateFormData, onNex
 
         <div className="flex justify-between items-center gap-3 mt-8 ">
           <div onClick={handleLogout} className="text-brand-primary !px-5 py-3 cursor-pointer">
-            <ArrowLeftOutlined /> Back to Login
+            <ArrowLeftOutlined /> Logout
           </div>
           <Button type="primary" className="!bg-brand-primary !px-5" htmlType="submit">
             Next

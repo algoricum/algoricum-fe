@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Form, Select, Upload } from "antd"
 import  Button from "@/components/elements/Button"
 import type { OnboardingData } from "./OnboardingContainer"
@@ -55,7 +55,23 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
       updateFormData({ logo: null })
     }
   }
+useEffect(() => {
+  form.setFields([
+    {
+      name: 'toneSelector',
+      value: undefined
+    },
+    {
+      name: 'sentenceLength',
+      value: undefined
+    },
+    {
+      name: 'formalityLevel',
+      value: undefined
+    },
 
+  ]);
+}, []);
   return (
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold mb-8">
@@ -73,7 +89,7 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
         onFinish={handleSubmit}
       >
         <div className="mb-6">
-          <h2 className="text-lg font-medium mb-4">Logo Upload</h2>
+          <h2 className="text-lg font-medium mb-4">Upload Logo</h2>
           <p className="mb-2">Clinic Logo</p>
 
           <Form.Item name="logo" valuePropName="fileList" getValueFromEvent={normFile}>
@@ -81,6 +97,7 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
               name="logo"
               fileList={fileList}
               onChange={handleFileChange}
+              accept=".jpg,.jpeg,.png,.svg"
               beforeUpload={() => false}
               maxCount={1}
               className="bg-white rounded-md"
@@ -101,7 +118,7 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
             rules={[{ required: true, message: "Please select a tone" }]}
           >
             <Select
-              placeholder="Type here"
+              placeholder="Select Tone"
               className="w-full"
               onChange={handleToneChange}
               options={[
@@ -119,7 +136,7 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
             rules={[{ required: true, message: "Please select a sentence length" }]}
           >
             <Select
-              placeholder="Type here"
+              placeholder="Select Sentence Length"
               className="w-full"
               onChange={handleSentenceLengthChange}
               options={[
@@ -137,7 +154,7 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
           rules={[{ required: true, message: "Please select a formality level" }]}
         >
           <Select
-            placeholder="Type here"
+            placeholder="Select Formality Level"
             className="w-full"
             onChange={handleFormalityLevelChange}
             options={[

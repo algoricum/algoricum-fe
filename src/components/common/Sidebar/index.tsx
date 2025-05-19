@@ -29,8 +29,9 @@ const Sidebar = () => {
         try {
           // Disable the logout button or show loading state
           setIsLoggingOut(true); // Add this state
-
+          console.log("inside logout after set sate is loggingout")
           const success = await signOut();
+          console.log("after supabase signout")
 
           if (success) {
             SuccessToast("Logout Successfully");
