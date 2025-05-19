@@ -1,7 +1,7 @@
 import { createSlice, Dispatch, PayloadAction } from "@reduxjs/toolkit";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/config/client";
 import { Clinic, UpdateClinicProps } from "@/interfaces/services_type";
-import { getClinicData, setClinicData } from "@/services/auth";
+import { getClinicData, setClinicData } from "@/utils/supabase/clinic-helper";
 
 interface ClinicState {
     clinic: Clinic | null;

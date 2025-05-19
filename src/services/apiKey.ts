@@ -1,5 +1,5 @@
 // services/apiKey.ts
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '@/utils/supabase/config/client';
 import { v4 as uuidv4 } from 'uuid';
 
 // Initialize Supabase client

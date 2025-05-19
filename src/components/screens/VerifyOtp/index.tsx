@@ -2,13 +2,13 @@
 import { Button } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { ResendOtpProps, VerifyOtpProps } from "@/interfaces/services_type";
-import { getUser } from "@/redux/accessors/user.accessors";
-import {getUserData, resendOtp, verifyOtp} from "@/services/auth";
 import { Flex, Form, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useMutation } from "react-query";
 import OtpInput from 'react-otp-input';
+import { getUserData } from "@/utils/supabase/user-helper";
+import { resendOtp, verifyOtp } from "@/utils/supabase/auth-helper";
 
 const { Title, Text } = Typography;
 
@@ -17,8 +17,15 @@ const VerifyOTPPage = () => {
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get("redirectUrl") ?? "/dashboard";
   const [otp, setOtp] = useState('');
+  const [resendTimer, setResendTimer] = useState(60);
   const [user, setUser] = useState<any>(null);
-
+useEffect(() => {
+    if (resendTimer <= 0) return;
+    const interval = setInterval(() => {
+      setResendTimer((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendTimer]);
   useEffect(() => {
     (async () => {
       const currentUser = await getUserData();
@@ -44,6 +51,7 @@ const VerifyOTPPage = () => {
     {
       onSuccess: () => {
         SuccessToast("OTP resent successfully");
+        setResendTimer(60);
       },
       onError: (error: any) => {
         ErrorToast(error?.message || "Failed to resend OTP");
@@ -104,6 +112,11 @@ const VerifyOTPPage = () => {
         </Button>
 
         <Flex justify="center">
+          {resendTimer > 0 ? (
+          <Text type="secondary">
+            You can resend the OTP in <strong>{resendTimer}s</strong>
+          </Text>
+        ) : (
           <Text className="text-sm font-helvetica text-Gray600">
             Didn't receive a code?{" "}
             <Button
@@ -115,6 +128,7 @@ const VerifyOTPPage = () => {
               Resend
             </Button>
           </Text>
+        )}
         </Flex>
       </Flex>
     </Flex>

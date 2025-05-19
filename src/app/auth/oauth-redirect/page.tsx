@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '@/utils/supabase/config/client';
 import { ErrorToast, SuccessToast } from '@/helpers/toast';
 
 export default function OAuthRedirectPage() {

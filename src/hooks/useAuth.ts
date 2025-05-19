@@ -8,14 +8,14 @@ import {
   signupUser,
   verifyOtp,
   resendOtp,
-  forgotPassword,
   resetPassword,
   clearError
 } from '@/redux/slices/user.slice';
-import { clearAll, logoutUser, setupAuthListener } from '@/services/auth';
 import { RootState } from '@/redux/store';
 import { User } from '@/interfaces/services_type';
 import { AppDispatch } from '@/redux/store';
+import { setupAuthListener, signOut } from '@/utils/supabase/auth-helper';
+import { clearAll } from '@/helpers/storage-helper';
 
 export const useAuth = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -98,7 +98,7 @@ export const useAuth = () => {
   // Forgot password handler
   const forgot = useCallback(async (email: string) => {
     try {
-      await dispatch(forgotPassword(email)).unwrap();
+      // await dispatch(forgotPassword(email)).unwrap();
       router.push(`/reset-password?email=${encodeURIComponent(email)}`);
       return true;
     } catch (error) {
@@ -122,7 +122,7 @@ const logout = useCallback(async () => {
   try {
     
     // First ensure the Supabase signOut succeeds
-    await logoutUser();    
+    await signOut();    
     // Then clear local storage data
     clearAll();    
     return true;
