@@ -94,11 +94,12 @@ export const signUp = async (
 /**
  * Sign out the current user
  */
-export const signOut = async (): Promise<void> => {
+export const signOut = async (): Promise<boolean> => {
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     clearAll();
+    return true
   } catch (error: any) {
     console.error('Logout error:', error.message);
     throw error;

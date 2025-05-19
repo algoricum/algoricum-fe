@@ -96,7 +96,6 @@ export async function middleware(request: NextRequest) {
     if (isOnboardingRoute && hasClinic) {
       return redirect('/dashboard');
     }
-
     // If no clinic associated, redirect to onboarding
     if (!hasClinic && pathname !== '/onboarding') {
       return redirect('/onboarding');

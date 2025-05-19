@@ -113,7 +113,22 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
   if (clinicError) {
     throw clinicError;
   }
-  
+   const { error: userClinicError } = await supabase
+    .from('user_clinic')
+    .insert([
+      {
+        user_id: owner_id,
+        clinic_id: clinicResult.id,
+        role: 'owner', // Assuming you have a role field
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ]);
+     if (userClinicError) {
+    console.error("Failed to create user-clinic relationship:", userClinicError);
+    throw userClinicError;
+  }
   // Store in localStorage
   setLocalClinicData(clinicResult);
   
