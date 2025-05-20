@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { FC, useState } from 'react';
 import { Modal, Tabs, Button, Input } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import { SuccessToast } from '@/helpers/toast';
 
-const ChatbotConnectModal = ({ apiKey, isOpen, onClose }) => {
+type ChatbotConnectModalProps = {
+  apiKey: string;
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+const ChatbotConnectModal: FC<ChatbotConnectModalProps> = ({ apiKey, isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState('html');
 
   const generateHtmlScript = () => {
