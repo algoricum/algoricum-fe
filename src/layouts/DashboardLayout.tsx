@@ -1,7 +1,5 @@
-import { SecondaryMenusMobile, SecondarySidebar, Sidebar } from "@/components/common";
+import { Sidebar } from "@/components/common";
 import MobileFooter from "@/components/common/MobileFooter";
-import contentMenuItems from "@/constants/contentMenuItems";
-import settingMenuItems from "@/constants/settingMenu";
 import { Flex, Layout, LayoutProps } from "antd";
 import { usePathname } from "next/navigation";
 import { ReactNode, useEffect } from "react";
@@ -40,15 +38,10 @@ const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
     <div className="min-h-screen">
       <Layout className="h-screen flex flex-row overflow-x-hidden">
         <Sidebar />
-        {path.includes("content") && <SecondarySidebar menuItems={contentMenuItems} />}
-        {path.includes("settings") && <SecondarySidebar menuItems={settingMenuItems} heading="Settings" />}
 
         <Layout className="px-0 py-0 flex-shrink-0 max-w-full flex-1 overflow-hidden">
           <Flex className="w-full border-b border-Gray400">{header}</Flex>
-          <Content className="flex flex-col p-4 gap-4 relative overflow-y-auto max-[820px]:mb-[120px]">
-            {path.includes("content") && <SecondaryMenusMobile menuItems={contentMenuItems} />}
-            {path.includes("settings") && <SecondaryMenusMobile menuItems={settingMenuItems} />}
-
+          <Content className="flex flex-col p-4 gap-4 relative overflow-y-auto max-[820px]:mb-[120px] bg-white">
             {children}
           </Content>
           {/* Footer */}

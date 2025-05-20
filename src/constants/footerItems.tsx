@@ -1,13 +1,13 @@
-import { SetupIcon } from "@/icons";
+import { SettingIcon, SetupIcon } from "@/icons";
 import LogoutIcon from "@/icons/LogoutIcon";
 
 const footerItems = [
-  // {
-  //   key: "setup",
-  //   icon: <SetupIcon />,
-  //   selectedIcon: <SetupIcon color="var(--color-primary-1000)" />,
-  //   label: "Setup",
-  // },
+  {
+    key: "profileSettings",
+    icon: <SettingIcon />,
+    selectedIcon: <SettingIcon color="var(--color-primary-1000)" />,
+    label: "Profile Settings",
+  },
   {
     key: "logout",
     icon: <LogoutIcon />,

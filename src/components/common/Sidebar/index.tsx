@@ -23,6 +23,8 @@ const Sidebar = () => {
     switch (key) {
       case "settings":
         return push("/settings/widget");
+      case "profileSettings":
+        return push("/settings/widget");
       case "setup":
         return push("/setup");
       case "logout":
