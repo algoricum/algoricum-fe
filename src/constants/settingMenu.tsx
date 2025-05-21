@@ -6,7 +6,7 @@ const settingMenuItems = [
     icon: <AllHelpCenterIcon />,
     selectedIcon: <AllHelpCenterIcon color="var(--color-primary-1000)" />,
     label: "Widget Setup",
-    route: "/settings/widget",
+    route: "/settings/chatbot",
   },
 ];
 export default settingMenuItems;

@@ -20,7 +20,7 @@ const Header = ({ title = "", description = "" }: HeaderProps) => {
   const menuHandler = async (key: string) => {
     switch (key) {
       case "settings":
-        return push("/settings/widget");
+        return push("/settings/chatbot");
       case "logout":
         try {
           setIsLoggingOut(true);

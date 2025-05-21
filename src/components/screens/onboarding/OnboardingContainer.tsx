@@ -30,9 +30,10 @@ export interface OnboardingData {
 
   // Step 3
   logo: File | null
-  toneSelector: string
-  sentenceLength: string
-  formalityLevel: string
+  tone_selector: string
+  sentence_length: string
+  formality_level: string
+  clinic_document:File | null
 }
 
 const defaultBusinessHours: BusinessHours = {
@@ -64,9 +65,10 @@ const OnboardingContainer = () => {
 
     // Step 3
     logo: null,
-    toneSelector: "",
-    sentenceLength: "",
-    formalityLevel: "",
+    tone_selector: "",
+    sentence_length: "",
+    formality_level: "",
+    clinic_document: null,
   })
 
   const updateFormData = (data: Partial<OnboardingData>) => {
@@ -111,9 +113,9 @@ const OnboardingContainer = () => {
           calendly_link: formData.calendlyLink,
           logo: logoUrl,
           // Brand settings
-          tone_selector: formData.toneSelector,
-          sentence_length: formData.sentenceLength,
-          formality_level: formData.formalityLevel,
+          tone_selector: formData.tone_selector,
+          sentence_length: formData.sentence_length,
+          formality_level: formData.formality_level,
 
           // Keeping existing theming structure but could merge with new branding fields
           widget_theme: {
@@ -122,8 +124,7 @@ const OnboardingContainer = () => {
             border_radius: "8px"
           },
           dashboard_theme: {
-            primary_color: "#2563EB",
-            layout: "sidebar"
+            primary_color: "#2563EB"
           }
         };
 
@@ -150,7 +151,7 @@ const OnboardingContainer = () => {
   };
   const handleBack = () => {
     if (currentStep > 1) {
-      setCurrentStep((prev) => prev - 1)
+      setCurrentStep((prev) => prev - 1) 
     }
   }
 

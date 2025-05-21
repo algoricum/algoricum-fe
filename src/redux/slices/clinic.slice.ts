@@ -49,7 +49,7 @@ export const fetchUserClinics = createAsyncThunk(
       
       // Get detailed clinic data
       const { data: clinics, error: clinicsError } = await supabase
-        .from('clinics')
+        .from('clinic')
         .select('*')
         .in('id', clinicIds);
         
@@ -70,7 +70,7 @@ export const fetchClinicById = createAsyncThunk(
     try {
       // Get clinic data
       const { data, error } = await supabase
-        .from('clinics')
+        .from('clinic')
         .select('*')
         .eq('id', clinicId)
         .single();
@@ -95,7 +95,7 @@ export const createClinic = createAsyncThunk(
     try {
       // Insert new clinic
       const { data, error } = await supabase
-        .from('clinics')
+        .from('clinic')
         .insert([clinicData])
         .select()
         .single();
@@ -136,7 +136,7 @@ export const updateClinic = createAsyncThunk(
     try {
       // Update clinic
       const { data, error } = await supabase
-        .from('clinics')
+        .from('clinic')
         .update({
           name: clinicData.name,
           address: clinicData.address,

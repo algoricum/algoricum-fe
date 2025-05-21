@@ -29,7 +29,7 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
       case "content":
         return push("/content/articles");
       case "settings":
-        return push("/settings/widget");
+        return push("/settings/chatbot");
       default:
         return push("/content/articles");
     }

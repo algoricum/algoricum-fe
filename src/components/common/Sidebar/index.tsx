@@ -22,18 +22,16 @@ const Sidebar = () => {
   const menuHandler = async (key: string) => {
     switch (key) {
       case "settings":
-        return push("/settings/widget");
+        return push("/settings/chatbot");
       case "profileSettings":
-        return push("/settings/widget");
+        return push("/settings/chatbot");
       case "setup":
         return push("/setup");
       case "logout":
         try {
           // Disable the logout button or show loading state
           setIsLoggingOut(true); // Add this state
-          console.log("inside logout after set sate is loggingout")
           const success = await signOut();
-          console.log("after supabase signout")
 
           if (success) {
             SuccessToast("Logout Successfully");

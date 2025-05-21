@@ -23,7 +23,7 @@ const ColorPicker: React.FC<CustomInputProps> = props => {
         );
       }}
       showText
-      className={`custom-picker p-[8px] border-none flex flex-row-reverse items-center justify-between ${className}`}
+      className={`custom-picker p-[8px] flex flex-row-reverse items-center w-[140px] h-[36px] !border !border-Black5 !rounded-xl justify-between ${className}`}
       {...inputProps}
     />
   );
