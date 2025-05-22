@@ -3,7 +3,7 @@ import { IconProps } from "@/interfaces/iconProps";
 const CollapseIcon = ({ color = "#4A5568", width = 32, height = 36 }: IconProps) => {
   return (
     <svg width={width} height={height} viewBox="0 0 32 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M0 8C0 3.58172 3.58172 0 8 0H32V36H8C3.58172 36 0 32.4183 0 28V8Z" fill="#F7FAFC" />
+      <path d="M0 8C0 3.58172 3.58172 0 8 0H32V36H8C3.58172 36 0 32.4183 0 28V8Z" fill="none" />
       <path
         fillRule="evenodd"
         clipRule="evenodd"

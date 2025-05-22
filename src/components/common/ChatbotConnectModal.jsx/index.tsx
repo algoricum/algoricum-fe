@@ -1,6 +1,6 @@
 import React, { FC, useState } from 'react';
 import { Modal, Tabs, Button, Input } from 'antd';
-import { CopyOutlined } from '@ant-design/icons';
+import { ContactsTwoTone, CopyOutlined } from '@ant-design/icons';
 import { SuccessToast } from '@/helpers/toast';
 
 type ChatbotConnectModalProps = {
@@ -11,20 +11,17 @@ type ChatbotConnectModalProps = {
 
 const ChatbotConnectModal: FC<ChatbotConnectModalProps> = ({ apiKey, isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState('html');
-
   const generateHtmlScript = () => {
     return `
 // Include the SDK in your site:
-<script src="https://localhost:5000/hash-sdk.js"></script>
-
+<script src="${process.env.NEXT_PUBLIC_LIVE_CHATBOT_LINK}"></script>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 // Initialize the chatbot after the script loads:
 <script>
   window.addEventListener("DOMContentLoaded", function () {
     if (window.BOTSDK) {
       window.BOTSDK.initialize({
-        apiKey: "${apiKey}",
-        name: "Your User Name", // optional
-        userId: "your-user-id", // optional
+        apiKey: "${apiKey}"
       });
     } else {
       console.error("Chatbot SDK not found");
@@ -40,13 +37,12 @@ const ChatbotConnectModal: FC<ChatbotConnectModalProps> = ({ apiKey, isOpen, onC
 useEffect(() => {
   const script = document.createElement('script');
   script.async = true;
-  script.src = "https://localhost:5000/hash-sdk.js";
+  script.src = "${process.env.NEXT_PUBLIC_LIVE_CHATBOT_LINK}";
+  script.src="https://unpkg.com/react@18/umd/react.development.js"
   script.onload = () => {
     if (window.BOTSDK) {
       window.BOTSDK.initialize({
         apiKey: "${apiKey}",
-        name: "Your Name",
-        userId: "your-user-id",
       });
     }
   };
@@ -107,31 +103,15 @@ useEffect(() => {
             <Button 
               size="small"
               icon={<CopyOutlined />}
-              onClick={copyApiKey}
+              onClick={copyToClipboard}
               className="text-indigo-600 hover:text-indigo-800"
             >
               Copy
             </Button>
           </div>
-          <Input 
-            value={apiKey} 
-            disabled 
-            className="bg-gray-50" 
-          />
         </div>
 
         <div className="mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <div className="text-sm font-medium text-gray-700">Script:</div>
-            <Button 
-              type="primary" 
-              onClick={copyToClipboard}
-              className="bg-indigo-600 hover:bg-indigo-700"
-            >
-              Generate Script
-            </Button>
-          </div>
-
           <div className="bg-gray-50 p-4 rounded-lg">
             <pre className="text-xs overflow-auto whitespace-pre-wrap max-h-64">
               {activeTab === 'html' ? generateHtmlScript() : generateReactScript()}

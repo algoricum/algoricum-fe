@@ -58,7 +58,7 @@ const SettingsTabs = () => {
 const TabButton = ({ isActive, onClick, label }: { isActive: boolean; onClick: () => void; label: string }) => {
   return (
     <button
-      onClick={onClick}
+      // onClick={onClick}
       className={`flex-1 p-2 text-center transition-all rounded-[48px] ${
         isActive ? "bg-brand-primary text-white" : "bg-Gray100 text-gray-600 hover:bg-gray-200"
       }`}

@@ -46,10 +46,30 @@ export const getClinicData = async (): Promise<Clinic | null> => {
           setLocalClinicData(clinic);
           return clinic;
         } else {
-      const localClinic = getLocalClinicData();
-      if (localClinic) return localClinic;
-    }
+          const localClinic = getLocalClinicData();
+          if (localClinic) return localClinic;
+        }
       }
+    }
+  } catch (error) {
+    console.error('Error fetching clinic data from Supabase:', error);
+  }
+
+  return null;
+};
+export const getClincApiKey = async (clinicId: string): Promise<String | null> => {
+  try {
+    // Get user-clinic mapping
+    const { data: apiKeyData } = await supabase
+      .from('api_key')
+      .select('api_key')
+      .eq('clinic_id', clinicId)
+      .limit(1)
+      .single();
+
+
+    if (apiKeyData) {
+      return apiKeyData.api_key;
     }
   } catch (error) {
     console.error('Error fetching clinic data from Supabase:', error);

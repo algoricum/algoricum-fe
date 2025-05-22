@@ -23,17 +23,15 @@ interface DashboardLayoutProps extends LayoutProps {
 const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
   const path = usePathname();
 
-   useEffect(() => {
-    if (window.BOTSDK) {
-      window.BOTSDK.initialize({
-        apiKey: '3d2f8dc7ff0d42164f00e9040c8931904fbbb524a19241a12ee7dbfa72e55691',
-        name: 'Hassan Shahzad',
-        userId: '6af9e11b-4108-404f-92cb-8cf151d9b847',
-      });
-    } else {
-      console.error("BOTSDK is not defined");
-    }
-  }, []);
+  //  useEffect(() => {
+  //   if (window.BOTSDK) {
+  //     window.BOTSDK.initialize({
+  //       apiKey: '3d2f8dc7ff0d42164f00e9040c8931904fbbb524a19241a12ee7dbfa72e55691',
+  //     });
+  //   } else {
+  //     console.error("BOTSDK is not defined");
+  //   }
+  // }, []);
   return (
     <div className="min-h-screen">
       <Layout className="h-screen flex flex-row overflow-x-hidden">

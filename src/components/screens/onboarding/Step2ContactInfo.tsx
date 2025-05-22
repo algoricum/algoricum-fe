@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { Form, Input } from "antd"
-import  Button from "@/components/elements/Button"
+import Button from "@/components/elements/Button"
 import type { OnboardingData } from "./OnboardingContainer"
 import { CalendarOutlined } from "@ant-design/icons"
 
@@ -74,7 +74,8 @@ const Step2ContactInfo: React.FC<Step2Props> = ({ formData, updateFormData, onNe
             <Input placeholder="Type here" className="rounded-md py-2 px-3 bg-gray-50" />
           </Form.Item>
 
-          <Form.Item label="Calendly Link (optional)" name="calendlyLink">
+          <Form.Item label="Calendly Link" rules={[{ required: true, message: "Please enter calendly link" }]}
+            name="calendlyLink">
             <Input
               placeholder="Enter your Calendly URL"
               className="rounded-md py-2 px-3 bg-gray-50"

@@ -44,8 +44,6 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
         align="middle"
       >
         {menuItems.map((item, index) => (
-          <>
-            {!item.disabled && (
               <Col span={6} key={index}>
                 <Flex
                   vertical
@@ -64,8 +62,6 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
                   </p>
                 </Flex>
               </Col>
-            )}
-          </>
         ))}
       </Row>
       {menuItems.length > 4 && (

@@ -7,7 +7,7 @@ import { SuccessToast, ErrorToast } from "@/helpers/toast"
 import { createClient } from "@/utils/supabase/config/client"
 import { ColorConfigurator, WidgetPreview } from "@/components/common"
 import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx"
-import { getClinicData, updateClinic } from "@/utils/supabase/clinic-helper"
+import { getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper"
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads"
 import { getUserData } from "@/utils/supabase/user-helper"
 
@@ -16,7 +16,7 @@ const { TextArea } = Input
 const ChatbotSettings = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
-  const [apiKey, setApiKey] = useState("sk-129g-abc1-123456xyz")
+  const [apiKey, setApiKey] = useState<string>("")
   const primaryColor = Form.useWatch("primary_color", form);
   const [fileList, setFileList] = useState([])
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false)
@@ -29,6 +29,7 @@ const ChatbotSettings = () => {
         const clinic = await getClinicData()
         setClinicData(clinic)
         if (clinic) {
+          const clinicApiKey = await getClincApiKey(clinic.id)
           form.setFieldsValue({
             greeting: clinic.assistant_prompt,
             primary_color: clinic.widget_theme?.primary_color,
@@ -37,7 +38,9 @@ const ChatbotSettings = () => {
             sentenceLength: clinic.sentence_length || "medium",
             formalityLevel: clinic.formality_level || "neutral"
           })
-          setApiKey(apiKey)
+          if(clinicApiKey) {
+          setApiKey(String(clinicApiKey))
+        }
         }
       } catch (error: any) {
         console.error("Error fetching chatbot settings:", error.message)
@@ -59,7 +62,6 @@ const ChatbotSettings = () => {
         return;
       }
       let logoUrl
-      console.log(values.logo)
       if (values.logo) {
         logoUrl = await uploadClinicLogo(user.id, values.logo[0]);
       }
