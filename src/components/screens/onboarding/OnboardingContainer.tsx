@@ -13,6 +13,8 @@ import { BusinessHours } from "@/interfaces/services_type"
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads"
 import { createClinic } from "@/utils/supabase/clinic-helper"
 import { getUserData } from "@/utils/supabase/user-helper"
+import generateClinicInstructions from "@/utils/generateClinicInstructions"
+import { getSupabaseSession } from "@/utils/supabase/auth-helper"
 
 
 export interface OnboardingData {
@@ -30,9 +32,10 @@ export interface OnboardingData {
 
   // Step 3
   logo: File | null
-  toneSelector: string
-  sentenceLength: string
-  formalityLevel: string
+  tone_selector: string
+  sentence_length: string
+  formality_level: string
+  clinic_document: File | null
 }
 
 const defaultBusinessHours: BusinessHours = {
@@ -64,9 +67,10 @@ const OnboardingContainer = () => {
 
     // Step 3
     logo: null,
-    toneSelector: "",
-    sentenceLength: "",
-    formalityLevel: "",
+    tone_selector: "",
+    sentence_length: "",
+    formality_level: "",
+    clinic_document: null,
   })
 
   const updateFormData = (data: Partial<OnboardingData>) => {
@@ -81,10 +85,14 @@ const OnboardingContainer = () => {
       handleCompleteOnboarding()
     }
   }
+  // Import the instruction generator at the top of your file
+
+  // Updated handleCompleteOnboarding function
   const handleCompleteOnboarding = async () => {
     if (currentStep === 3) {
       try {
         setIsSubmitting(true);
+
         // Get current user
         const user = await getUserData();
         if (!user) {
@@ -92,11 +100,13 @@ const OnboardingContainer = () => {
           setIsSubmitting(false);
           return;
         }
+
         // First, upload the logo if provided
         let logoUrl = undefined;
         if (formData.logo) {
           logoUrl = await uploadClinicLogo(user.id, formData.logo);
         }
+
         const clinicData = {
           // Map form fields to database fields
           name: formData.legalBusinessName, // Use legal business name as primary name
@@ -110,10 +120,11 @@ const OnboardingContainer = () => {
           business_hours: formData.businessHours,
           calendly_link: formData.calendlyLink,
           logo: logoUrl,
+
           // Brand settings
-          tone_selector: formData.toneSelector,
-          sentence_length: formData.sentenceLength,
-          formality_level: formData.formalityLevel,
+          tone_selector: formData.tone_selector,
+          sentence_length: formData.sentence_length,
+          formality_level: formData.formality_level,
 
           // Keeping existing theming structure but could merge with new branding fields
           widget_theme: {
@@ -122,8 +133,7 @@ const OnboardingContainer = () => {
             border_radius: "8px"
           },
           dashboard_theme: {
-            primary_color: "#2563EB",
-            layout: "sidebar"
+            primary_color: "#2563EB"
           }
         };
 
@@ -136,6 +146,67 @@ const OnboardingContainer = () => {
           name: apiKeyName,
           clinicId: clinic.id
         });
+
+        // Now handle document upload and assistant creation if we have a clinic ID
+        if (clinic.id && formData.clinic_document) {
+          // Check if we have a document
+          const hasDocument = !!formData.clinic_document;
+
+          if (hasDocument) {
+            // Prepare form data for the edge function
+            const formDataToSend = new FormData();
+            formDataToSend.append('clinic_document', formData.clinic_document);
+            formDataToSend.append('clinic_id', clinic.id);
+            formDataToSend.append('name', formData.legalBusinessName);
+            formDataToSend.append('description', `AI Assistant for ${formData.legalBusinessName}`);
+
+            // Generate customized instructions based on clinic settings
+            const clinicInstructions = generateClinicInstructions({
+              name: formData.legalBusinessName,
+              address: formData.clinicAddress,
+              phone: formData.phoneNumber,
+              email: formData.emailAddress || user.email,
+              business_hours: formData.businessHours,
+              calendly_link: formData.calendlyLink,
+              tone_selector: formData.tone_selector,
+              sentence_length: formData.sentence_length,
+              formality_level: formData.formality_level,
+              has_uploaded_document: true
+            });
+
+            formDataToSend.append('instructions', clinicInstructions);
+            formDataToSend.append('model', 'gpt-3.5-turbo');
+            formDataToSend.append('tools', JSON.stringify([{ type: "file_search" }]));
+
+            // Get the token for authorization
+             const session =  await getSupabaseSession()
+
+            if (!session.access_token) {
+              throw new Error("Not authenticated");
+            }
+
+            try {
+              // Call the combined edge function
+              const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-assistant-with-files`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: formDataToSend,
+              });
+
+              const result = await response.json();
+
+              if (!response.ok) {
+                console.error("Assistant creation error:", result.error);
+                // We'll still continue with the onboarding process even if assistant creation fails
+              }
+            } catch (assistantError) {
+              console.error("Failed to create assistant:", assistantError);
+              // Continue with onboarding even if assistant creation fails
+            }
+          }
+        }
 
         SuccessToast("Clinic created successfully!");
         setTimeout(() => {

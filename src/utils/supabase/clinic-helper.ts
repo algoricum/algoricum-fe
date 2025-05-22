@@ -18,9 +18,6 @@ export const setClinicData = async (clinicData: Clinic): Promise<void> => {
  */
 export const getClinicData = async (): Promise<Clinic | null> => {
   // First try localStorage
-  const localClinic = getLocalClinicData();
-  if (localClinic) return localClinic;
-
   // If not in localStorage, get from Supabase
   try {
     const userData = await getUserData();
@@ -39,7 +36,7 @@ export const getClinicData = async (): Promise<Clinic | null> => {
       if (userClinicData) {
         // Get clinic data
         const { data: clinicData } = await supabase
-          .from('clinics')
+          .from('clinic')
           .select('*')
           .eq('id', userClinicData.clinic_id)
           .single();
@@ -48,8 +45,31 @@ export const getClinicData = async (): Promise<Clinic | null> => {
           const clinic = clinicData as Clinic;
           setLocalClinicData(clinic);
           return clinic;
+        } else {
+          const localClinic = getLocalClinicData();
+          if (localClinic) return localClinic;
         }
       }
+    }
+  } catch (error) {
+    console.error('Error fetching clinic data from Supabase:', error);
+  }
+
+  return null;
+};
+export const getClincApiKey = async (clinicId: string): Promise<String | null> => {
+  try {
+    // Get user-clinic mapping
+    const { data: apiKeyData } = await supabase
+      .from('api_key')
+      .select('api_key')
+      .eq('clinic_id', clinicId)
+      .limit(1)
+      .single();
+
+
+    if (apiKeyData) {
+      return apiKeyData.api_key;
     }
   } catch (error) {
     console.error('Error fetching clinic data from Supabase:', error);
@@ -68,24 +88,24 @@ export const getUserClinics = async (userId: string): Promise<Clinic[]> => {
       .from('user_clinic')
       .select('clinic_id')
       .eq('user_id', userId);
-      
+
     if (mappingError) throw mappingError;
-    
+
     if (!userClinics || userClinics.length === 0) {
       return [];
     }
-    
+
     // Extract clinic IDs
     const clinicIds = userClinics.map(mapping => mapping.clinic_id);
-    
+
     // Get clinic data
     const { data: clinics, error: clinicsError } = await supabase
-      .from('clinics')
+      .from('clinic')
       .select('*')
       .in('id', clinicIds);
-      
+
     if (clinicsError) throw clinicsError;
-    
+
     return clinics as Clinic[];
   } catch (error) {
     console.error('Error fetching user clinics:', error);
@@ -95,7 +115,7 @@ export const getUserClinics = async (userId: string): Promise<Clinic[]> => {
 
 export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => {
   const { owner_id, ...clinicData } = data;
-  
+
   // Create the clinic record
   const { data: clinicResult, error: clinicError } = await supabase
     .from('clinic')
@@ -113,7 +133,7 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
   if (clinicError) {
     throw clinicError;
   }
-   const { error: userClinicError } = await supabase
+  const { error: userClinicError } = await supabase
     .from('user_clinic')
     .insert([
       {
@@ -125,13 +145,13 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
         updated_at: new Date().toISOString()
       }
     ]);
-     if (userClinicError) {
+  if (userClinicError) {
     console.error("Failed to create user-clinic relationship:", userClinicError);
     throw userClinicError;
   }
   // Store in localStorage
   setLocalClinicData(clinicResult);
-  
+
   return clinicResult;
 };
 
@@ -140,23 +160,23 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
  */
 export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => {
   const { id, ...updateData } = data;
-  
+
   // Prepare update data
   const updateObject: any = {
     ...updateData,
     updated_at: new Date().toISOString()
   };
-  
+
   // Process dashboard_theme if provided
   if (updateData.dashboard_theme) {
     updateObject.dashboard_theme = updateData.dashboard_theme;
   }
-  
+
   // Process widget_theme if provided
   if (updateData.widget_theme) {
     updateObject.widget_theme = updateData.widget_theme;
   }
-  
+
   const { data: clinicData, error } = await supabase
     .from('clinic')
     .update(updateObject)
@@ -167,13 +187,7 @@ export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => 
   if (error) {
     throw error;
   }
-  
-  // Process API key for security
-  if (clinicData && clinicData.openai_api_key) {
-    clinicData.openai_api_key_present = true;
-    delete clinicData.openai_api_key;
-  }
-  
+
   return clinicData;
 };
 
@@ -186,17 +200,17 @@ export const getClinicById = async (id: string): Promise<Clinic> => {
     .select('*')
     .eq('id', id)
     .single();
-    
+
   if (error) {
     throw error;
   }
-  
+
   // Process API key for security
   if (data && data.openai_api_key) {
     data.openai_api_key_present = true;
     delete data.openai_api_key;
   }
-  
+
   return data;
 };
 
@@ -207,23 +221,23 @@ export const fetchClinics = async (page: number = 1, perPage: number = 10, searc
   // Calculate range for pagination
   const from = (page - 1) * perPage;
   const to = from + perPage - 1;
-  
+
   let query = supabase
     .from('clinic')
     .select('*', { count: 'exact' });
-  
+
   // Add search filter if provided
   if (search) {
     query = query.ilike('name', `%${search}%`);
   }
-  
+
   // Execute the query with range
   const { data, error, count } = await query.range(from, to);
-  
+
   if (error) {
     throw error;
   }
-  
+
   // Process API keys for security
   if (data) {
     data.forEach(clinic => {
@@ -233,7 +247,7 @@ export const fetchClinics = async (page: number = 1, perPage: number = 10, searc
       }
     });
   }
-  
+
   return {
     data,
     pagination: {
@@ -252,10 +266,10 @@ export const deleteClinic = async (id: string): Promise<{ success: boolean }> =>
     .from('clinic')
     .delete()
     .eq('id', id);
-    
+
   if (error) {
     throw error;
   }
-  
+
   return { success: true };
 };

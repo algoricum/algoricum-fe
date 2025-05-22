@@ -55,24 +55,50 @@ export interface Clinic {
   dashboard_theme?: DashboardTheme;
   created_at: string;
   updated_at: string;
+  
+  // Additional fields from the database
+  openai_api_key?: string;
+  assistant_prompt?: string;
+  assistant_model?: string;
+  legal_business_name?: string;
+  dba_name?: string;
+  business_hours?: BusinessHours;
+  calendly_link?: string;
+  
+  // New fields for chatbot settings
+  tone_selector?: string;
+  sentence_length?: string;
+  formality_level?: string;
 }
 export interface CreateClinicProps {
+  // Required fields
   name: string;
-  legal_business_name: string;
-  dba_name?: string;
-  address: string;
-  phone: string;
-  email: string;
   language: string;
   owner_id: string;
-  business_hours: BusinessHours;
-  calendly_link?: string;
+  
+  // Optional fields (nullable in database)
+  address?: string;
+  phone?: string;
+  email?: string;
+  legal_business_name?: string;
+  dba_name?: string;
+  domain?: string;
   logo?: string;
-  tone_selector: string;
-  sentence_length: string;
-  formality_level: string;
-  widget_theme: any;
-  dashboard_theme: any;
+  widget_logo?: string;
+  business_hours?: BusinessHours;
+  calendly_link?: string;
+  
+  // Chatbot related fields
+  openai_api_key?: string;
+  assistant_prompt?: string;
+  assistant_model?: string;
+  tone_selector?: string;
+  sentence_length?: string;
+  formality_level?: string;
+  
+  // Theme objects
+  widget_theme?: WidgetTheme;
+  dashboard_theme?: DashboardTheme;
 }
 export interface BusinessHours {
   [key: string]: {
@@ -84,15 +110,30 @@ export interface BusinessHours {
 export interface UpdateClinicProps {
   id: string;
   name?: string;
+  language?: string;
   address?: string;
   phone?: string;
   email?: string;
-  language?: string;
-  logo?: string;
+  legal_business_name?: string;
+  dba_name?: string;
   domain?: string;
-  widget_theme?: any;
-  dashboard_theme?: any;
+  logo?: string;
   widget_logo?: string;
+  business_hours?: BusinessHours;
+  calendly_link?: string;
+  
+  // Chatbot related fields
+  openai_api_key?: string;
+  assistant_prompt?: string;
+  assistant_model?: string;
+  tone_selector?: string;
+  sentence_length?: string;
+  formality_level?: string;
+  
+  // Theme objects
+  widget_theme?: WidgetTheme;
+  dashboard_theme?: DashboardTheme;
+
 }
 
 export interface WidgetTheme {

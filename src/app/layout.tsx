@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode[] | ReactNode }) {
   return (
     <html lang="en">
-      <head>
+      {/* <head>
       <script src="https://algoricum-widget.vercel.app/hash-sdk.js"></script>
-      <script src="https://unpkg.com/react@18/umd/react.development.js"></script>  </head>
+      <script src="https://unpkg.com/react@18/umd/react.development.js"></script>  </head> */}
       <body>
         <Providers>{children}</Providers>
       </body>

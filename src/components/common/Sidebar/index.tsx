@@ -1,6 +1,5 @@
 "use client";
 import footerItems from "@/constants/footerItems";
-import menuItems from "@/constants/menuItems";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { CollapseIcon } from "@/icons";
 import { Flex, Layout, Menu } from "antd";
@@ -9,7 +8,7 @@ import { useCallback, useState } from "react";
 import Logo from "../Logo";
 import { useAuth } from "@/hooks/useAuth"
 import { signOut } from "@/utils/supabase/auth-helper";
-import { clearAll } from "@/helpers/storage-helper";
+import menuItems from "@/constants/menuItems";
 const Sidebar = () => {
   const { Sider } = Layout;
   const { push } = useRouter();
@@ -22,16 +21,16 @@ const Sidebar = () => {
   const menuHandler = async (key: string) => {
     switch (key) {
       case "settings":
-        return push("/settings/widget");
+        return push("/settings/chatbot");
+      case "profileSettings":
+        return push("/settings/chatbot");
       case "setup":
         return push("/setup");
       case "logout":
         try {
           // Disable the logout button or show loading state
           setIsLoggingOut(true); // Add this state
-          console.log("inside logout after set sate is loggingout")
           const success = await signOut();
-          console.log("after supabase signout")
 
           if (success) {
             SuccessToast("Logout Successfully");
@@ -95,7 +94,7 @@ const Sidebar = () => {
             mode="vertical"
             theme="light"
             className={`flex flex-col space-y-3 ${!isCollapsed ? "sidebarmenu" : "sidebarmenu-collapsed"}`}
-          // items={menuItems}
+          items={menuItems}
           />
           <div className="flex flex-col justify-end items-center gap-2">
             {footerItems.map(({ key, label, icon: Icon, selectedIcon }, index) => (

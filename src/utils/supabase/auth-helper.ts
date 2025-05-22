@@ -96,9 +96,7 @@ export const signUp = async (
  */
 export const signOut = async (): Promise<boolean> => {
   try {
-    console.log("control before signout healper supabase")
     const { error } = await supabase.auth.signOut();
-    console.log("control after signout healper supabase")
     if (error) throw error;
     clearAll();
     return true
@@ -138,7 +136,7 @@ export const verifyOtp = async (email: string, otp: string): Promise<void> => {
       token: otp,
       type: 'email',
     });
-    
+
     if (error) throw error;
   } catch (error: any) {
     console.error('OTP verification error:', error.message);
@@ -184,6 +182,16 @@ export const isAuthenticated = async (): Promise<boolean> => {
   } catch (error) {
     console.error('Error checking authentication status:', error);
     return false;
+  }
+};
+export const getSupabaseSession = async (): Promise<Session> => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if(!session) throw {message:"User not authenticated"}
+    return session;
+  } catch (error) {
+    console.error('Error checking authentication status:', error);
+    throw error
   }
 };
 
