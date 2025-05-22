@@ -14,7 +14,7 @@ const EmailConfiguration = () => {
   useEffect(() => {
     const fetchEmailSettings = async () => {
       try {
-        setLoading(true)
+        // setLoading(true)
         const supabase = createClient()
         const { data, error } = await supabase
           .from("email_settings")
@@ -96,6 +96,7 @@ const EmailConfiguration = () => {
 
   return (
     <div className="flex flex-col gap-8">
+            <div className="bg-danger p-4 text-white">Development In Progress</div>
       <div>
         <h2 className="text-xl font-semibold mb-6">SMTP Settings</h2>
         <Form form={smtpForm} layout="vertical" onFinish={handleSaveSMTP}>

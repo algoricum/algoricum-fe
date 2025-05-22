@@ -38,7 +38,7 @@ const LeadCapturingForm = () => {
   useEffect(() => {
     const fetchFormFields = async () => {
       try {
-        setLoading(true)
+        // setLoading(true)
         const supabase = createClient()
         const { data, error } = await supabase
           .from("lead_form_fields")
@@ -108,6 +108,7 @@ const LeadCapturingForm = () => {
 
   return (
     <div className="flex flex-col gap-6">
+            <div className="bg-danger p-4 text-white">Development In Progress</div>
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Lead Capturing Form</h2>
         <Button type="primary" icon={<PlusOutlined />} onClick={addNewField}>
