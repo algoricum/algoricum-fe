@@ -187,7 +187,7 @@ const OnboardingContainer = () => {
 
             try {
               // Call the combined edge function
-              const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-assistant-with-files`, {
+              const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${session.access_token}`,

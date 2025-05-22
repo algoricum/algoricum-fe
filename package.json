@@ -15,7 +15,7 @@
     "@ant-design/icons": "^5.5.2",
     "@reduxjs/toolkit": "^2.3.0",
     "@supabase/ssr": "^0.6.1",
-    "@supabase/supabase-js": "^2.49.4",
+    "@supabase/supabase-js": "2.49.6",
     "antd": "^5.22.2",
     "axios": "^1.7.7",
     "cookies-next": "^5.1.0",
