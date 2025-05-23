@@ -10,6 +10,8 @@ import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx"
 import { getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper"
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads"
 import { getUserData } from "@/utils/supabase/user-helper"
+import generateClinicInstructions from "@/utils/generateClinicInstructions"
+import { getSupabaseSession } from "@/utils/supabase/auth-helper"
 
 const { TextArea } = Input
 
@@ -20,7 +22,7 @@ const ChatbotSettings = () => {
   const primaryColor = Form.useWatch("primary_color", form);
   const [fileList, setFileList] = useState([])
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false)
-  const [clinicData,setClinicData] = useState<any>()
+  const [clinicData, setClinicData] = useState<any>()
 
   useEffect(() => {
     const fetchChatbotSettings = async () => {
@@ -38,9 +40,9 @@ const ChatbotSettings = () => {
             sentenceLength: clinic.sentence_length || "medium",
             formalityLevel: clinic.formality_level || "neutral"
           })
-          if(clinicApiKey) {
-          setApiKey(String(clinicApiKey))
-        }
+          if (clinicApiKey) {
+            setApiKey(String(clinicApiKey))
+          }
         }
       } catch (error: any) {
         console.error("Error fetching chatbot settings:", error.message)
@@ -63,20 +65,56 @@ const ChatbotSettings = () => {
       }
       let logoUrl
       if (values.logo) {
-        logoUrl = await uploadClinicLogo(user.id, values.logo[0]);
+        logoUrl = await uploadClinicLogo(user.id, values.logo[0].originFileObj);
       }
 
       const clinic = await updateClinic({
         id: clinicData.id,
         assistant_prompt: values.greeting,
-        widget_logo:logoUrl,
-        widget_theme: {primary_color:values.primary_color,font_color: values.font_color},
+        widget_logo: logoUrl,
+        widget_theme: { primary_color: values.primary_color, font_color: values.font_color },
         tone_selector: values.toneSelector,
         sentence_length: values.sentenceLength,
         formality_level: values.formalityLevel
       })
+      const clinicInstructions = generateClinicInstructions({
+        name: clinic.legal_business_name || "",
+        address: clinic.address,
+        phone: clinic.phone,
+        email: clinic.email || user.email,
+        business_hours: clinic.business_hours,
+        calendly_link: clinic.calendly_link,
+        tone_selector: values.toneSelector,
+        sentence_length: values.sentenceLength,
+        formality_level: values.formalityLevel,
+        has_uploaded_document: true
+      });
+      const formDataToSend = new FormData();
+       const session =  await getSupabaseSession()
+      formDataToSend.append('clinic_id', clinic.id);
+      formDataToSend.append('name', clinic.legal_business_name||"");
+      formDataToSend.append('instructions', clinicInstructions);
+      try {
+        // Call the combined edge function
+        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: formDataToSend,
+        });
 
-      if (!clinic) throw {message:"Failed to save chatbot settings"}
+        const result = await response.json();
+
+        if (!response.ok) {
+          console.error("Assistant creation error:", result.error);
+          // We'll still continue with the onboarding process even if assistant creation fails
+        }
+      } catch (assistantError) {
+        console.error("Failed to create assistant:", assistantError);
+        // Continue with onboarding even if assistant creation fails
+      }
+      if (!clinic) throw { message: "Failed to save chatbot settings" }
       SuccessToast("Chatbot settings saved successfully")
     } catch (error: any) {
       ErrorToast(error.message || "Failed to save chatbot settings")
