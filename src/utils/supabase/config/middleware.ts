@@ -1,4 +1,4 @@
-//utils/supabase/middleware.ts
+// utils/supabase/middleware.ts
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -19,18 +19,25 @@ export const createClient = (request: NextRequest) => {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          // Set cookies on request for immediate availability
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
+          
+          // Create new response with updated request
           supabaseResponse = NextResponse.next({
             request,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+          });
+          
+          // Set cookies on response for persistence
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
         },
       },
     },
   );
 
-  return supabaseResponse
+  // Return both supabase client and response
+  return { supabase, response: supabaseResponse };
 };
-
