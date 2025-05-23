@@ -9,21 +9,19 @@ const supabase = createClient();
 export const uploadClinicLogo = async (userId: string, file: File): Promise<string> => {
   const fileExt = file.name.split('.').pop();
   const fileName = `${userId}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-  
+
   const { data: uploadData, error: uploadError } = await supabase.storage
     .from('clinic-logos')
-    .upload(fileName, file);
+    .upload(fileName, file, {
+    contentType: file.type,
+    upsert: true,
+  });
 
   if (uploadError) {
     throw uploadError;
   }
 
-  // Get public URL for the uploaded logo
-  const { data: publicUrlData } = supabase.storage
-    .from('clinic-logos')
-    .getPublicUrl(fileName);
-
-  return publicUrlData.publicUrl;
+  return fileName;
 };
 
 /**
@@ -31,20 +29,27 @@ export const uploadClinicLogo = async (userId: string, file: File): Promise<stri
  */
 export const uploadWidgetLogo = async (userId: string, file: File): Promise<string> => {
   const fileExt = file.name.split('.').pop();
-  const fileName = `widget-${userId}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-  
+  const fileName = `${userId}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+  // Upload the file
   const { data: uploadData, error: uploadError } = await supabase.storage
     .from('clinic-logos')
-    .upload(fileName, file);
+    .upload(fileName, file, {
+    contentType: file.type,
+    upsert: true,
+  });
 
   if (uploadError) {
     throw uploadError;
   }
 
-  // Get public URL for the uploaded logo
-  const { data: publicUrlData } = supabase.storage
+  // Create signed URL with max expiry of 7 days (604800 seconds)
+  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
     .from('clinic-logos')
-    .getPublicUrl(fileName);
+    .createSignedUrl(fileName, 60 * 60 * 24 * 7); // 7 days in seconds
 
-  return publicUrlData.publicUrl;
+  if (signedUrlError) {
+    throw signedUrlError;
+  }
+
+  return signedUrlData.signedUrl;
 };
