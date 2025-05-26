@@ -206,23 +206,35 @@ export const setupAuthListener = (
     async (event, session) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session) {
-          // Get full user data from user table
-          const { data } = await supabase
-            .from('user')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+          // Wrap the database call in setTimeout to make it non-blocking
+          // This prevents the auth state change callback from blocking the event loop
+          setTimeout(async () => {
+            try {
+              // Get full user data from user table
+              const { data } = await supabase
+                .from('user')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
 
-          if (data) {
-            const userData = data as User;
-            setAccessToken(session.access_token);
-            await setUserData(userData);
-            onSignIn(userData, session.access_token);
-          }
+              if (data) {
+                const userData = data as User;
+                setAccessToken(session.access_token);
+                await setUserData(userData);
+                onSignIn(userData, session.access_token);
+              }
+            } catch (error) {
+              console.error('Error fetching user data:', error);
+              // Handle error appropriately - maybe call onSignOut or retry
+            }
+          }, 0);
         }
       } else if (event === 'SIGNED_OUT') {
-        clearAll();
-        onSignOut();
+        // Also wrap this in setTimeout to be consistent
+        setTimeout(() => {
+          clearAll();
+          onSignOut();
+        }, 0);
       }
     }
   );

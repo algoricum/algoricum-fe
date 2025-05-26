@@ -208,7 +208,7 @@ const OnboardingContainer = () => {
           }
         }
 
-        SuccessToast("Clinic created successfully!");
+        SuccessToast("You’re all set!");
         setTimeout(() => {
           router.push('/dashboard?onboarding=success');
         }, 2000);
