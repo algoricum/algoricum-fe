@@ -6,7 +6,8 @@ import { useEffect, useState } from "react"
 import { Form, Select, Upload } from "antd"
 import Button from "@/components/elements/Button"
 import type { OnboardingData } from "./OnboardingContainer"
-import { FileTextOutlined, FilePdfOutlined } from "@ant-design/icons"
+import { FileTextOutlined, FilePdfOutlined, MessageOutlined } from "@ant-design/icons"
+import { getPreviewText } from "@/utils/getPreviewChatbot"
 
 interface Step3Props {
   formData: OnboardingData
@@ -171,61 +172,96 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
           </Form.Item>
         </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        {/* Communication Style Section */}
+        <div className="mb-8">
+          <h2 className="text-lg font-medium mb-2">Communication Style</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            Choose how your AI assistant sounds when talking to patients. These settings will shape every interaction.
+          </p>
+
+          <div className="grid grid-cols-1 gap-6 mb-6">
+            <Form.Item
+              label="Tone Selector"
+              name="tone_selector"
+              rules={[{ required: true, message: "Please select a tone" }]}
+            >
+              <div className="mb-2">
+                <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
+              </div>
+              <Select
+                placeholder="Select Tone"
+                className="w-full"
+                onChange={handleToneChange}
+                options={[
+                  { value: "friendly", label: "Friendly - Warm and welcoming" },
+                  { value: "professional", label: "Professional - Competent and reliable" },
+                  { value: "casual", label: "Casual - Relaxed and conversational" },
+                  { value: "formal", label: "Formal - Respectful and structured" },
+                ]}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="Sentence Length"
+              name="sentence_length"
+              rules={[{ required: true, message: "Please select a sentence length" }]}
+            >
+              <div className="mb-2">
+                <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
+              </div>
+              <Select
+                placeholder="Select Sentence Length"
+                className="w-full"
+                onChange={handleSentenceLengthChange}
+                options={[
+                  { value: "short", label: "Short - Quick and concise" },
+                  { value: "medium", label: "Medium - Balanced detail" },
+                  { value: "long", label: "Long - Comprehensive explanations" },
+                ]}
+              />
+            </Form.Item>
+          </div>
+
           <Form.Item
-            label="Tone Selector"
-            name="tone_selector"
-            rules={[{ required: true, message: "Please select a tone" }]}
+            label="Formality Level"
+            name="formality_level"
+            rules={[{ required: true, message: "Please select a formality level" }]}
           >
+            <div className="mb-2">
+              <p className="text-xs text-gray-500 mb-2">How formal should the language be?</p>
+            </div>
             <Select
-              placeholder="Select Tone"
+              placeholder="Select Formality Level"
               className="w-full"
-              onChange={handleToneChange}
+              onChange={handleFormalityLevelChange}
               options={[
-                { value: "friendly", label: "Friendly" },
-                { value: "professional", label: "Professional" },
-                { value: "casual", label: "Casual" },
-                { value: "formal", label: "Formal" },
+                { value: "very_casual", label: "Very Casual - Like talking to a friend" },
+                { value: "casual", label: "Casual - Relaxed but respectful" },
+                { value: "neutral", label: "Neutral - Balanced approach" },
+                { value: "formal", label: "Formal - Professional courtesy" },
+                { value: "very_formal", label: "Very Formal - Traditional business style" },
               ]}
             />
           </Form.Item>
 
-          <Form.Item
-            label="Sentence Length"
-            name="sentence_length"
-            rules={[{ required: true, message: "Please select a sentence length" }]}
-          >
-            <Select
-              placeholder="Select Sentence Length"
-              className="w-full"
-              onChange={handleSentenceLengthChange}
-              options={[
-                { value: "short", label: "Short" },
-                { value: "medium", label: "Medium" },
-                { value: "long", label: "Long" },
-              ]}
-            />
-          </Form.Item>
+          {/* Live Preview Section */}
+          {(formData.tone_selector || formData.formality_level || formData.sentence_length) && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-start gap-3">
+                <MessageOutlined className="text-blue-600 mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-medium text-blue-900 mb-2">Preview: How your assistant will greet patients</h3>
+                  <div className="bg-white p-3 rounded border border-blue-200">
+                    <p className="text-gray-800 italic">"{getPreviewText(formData)}"</p>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2">
+                    This preview updates as you change your settings above
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-
-        <Form.Item
-          label="Formality Level"
-          name="formality_level"
-          rules={[{ required: true, message: "Please select a formality level" }]}
-        >
-          <Select
-            placeholder="Select Formality Level"
-            className="w-full"
-            onChange={handleFormalityLevelChange}
-            options={[
-              { value: "very_casual", label: "Very Casual" },
-              { value: "casual", label: "Casual" },
-              { value: "neutral", label: "Neutral" },
-              { value: "formal", label: "Formal" },
-              { value: "very_formal", label: "Very Formal" },
-            ]}
-          />
-        </Form.Item>
 
         <div className="flex justify-end gap-3 mt-8">
           <Button light onClick={onBack} className="bg-gray-100 !px-5">

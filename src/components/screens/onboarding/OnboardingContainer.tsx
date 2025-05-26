@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 import { useRouter } from "next/navigation"
 import OnboardingLayout from "./OnboardingLayout"
@@ -15,7 +15,6 @@ import { createClinic } from "@/utils/supabase/clinic-helper"
 import { getUserData } from "@/utils/supabase/user-helper"
 import generateClinicInstructions from "@/utils/generateClinicInstructions"
 import { getSupabaseSession } from "@/utils/supabase/auth-helper"
-
 
 export interface OnboardingData {
   // Step 1
@@ -48,10 +47,14 @@ const defaultBusinessHours: BusinessHours = {
   Sunday: { isOpen: false, openTime: "", closeTime: "" },
 }
 
+const ONBOARDING_STORAGE_KEY = 'clinic_onboarding_progress'
+const ONBOARDING_STEP_KEY = 'clinic_onboarding_step'
+
 const OnboardingContainer = () => {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [formData, setFormData] = useState<OnboardingData>({
     // Step 1
     legalBusinessName: "",
@@ -73,6 +76,94 @@ const OnboardingContainer = () => {
     clinic_document: null,
   })
 
+  // Helper function to check if we're in browser environment
+  const isBrowser = typeof window !== 'undefined'
+
+  // Helper function to safely access localStorage
+  const getStoredData = (key: string) => {
+    if (!isBrowser) return null
+    try {
+      const stored = localStorage.getItem(key)
+      return stored ? JSON.parse(stored) : null
+    } catch (error) {
+      console.error('Error reading from localStorage:', error)
+      return null
+    }
+  }
+
+  // Helper function to safely store in localStorage
+  const setStoredData = (key: string, data: any) => {
+    if (!isBrowser) return
+    try {
+      localStorage.setItem(key, JSON.stringify(data))
+    } catch (error) {
+      console.error('Error writing to localStorage:', error)
+    }
+  }
+
+  // Helper function to clear stored onboarding data
+  const clearStoredProgress = () => {
+    if (!isBrowser) return
+    try {
+      localStorage.removeItem(ONBOARDING_STORAGE_KEY)
+      localStorage.removeItem(ONBOARDING_STEP_KEY)
+    } catch (error) {
+      console.error('Error clearing localStorage:', error)
+    }
+  }
+
+  // Load saved progress on component mount
+  useEffect(() => {
+    if (!isBrowser) {
+      setIsLoading(false)
+      return
+    }
+
+    const loadSavedProgress = () => {
+      try {
+        // Load saved form data
+        const savedData = getStoredData(ONBOARDING_STORAGE_KEY)
+        const savedStep = getStoredData(ONBOARDING_STEP_KEY)
+
+        if (savedData) {
+          // Merge saved data with defaults, excluding file fields
+          const restoredData = {
+            ...savedData,
+            logo: null, // Files can't be stored in localStorage
+            clinic_document: null, // Files can't be stored in localStorage
+            businessHours: savedData.businessHours || defaultBusinessHours
+          }
+          setFormData(restoredData)
+        }
+
+        if (savedStep && savedStep >= 1 && savedStep <= 3) {
+          setCurrentStep(savedStep)
+        }
+      } catch (error) {
+        console.error('Error loading saved progress:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadSavedProgress()
+  }, [])
+
+  // Save progress whenever formData or currentStep changes
+  useEffect(() => {
+    if (!isLoading && isBrowser) {
+      // Create a copy of formData without file objects for storage
+      const dataToStore = {
+        ...formData,
+        logo: null, // Files can't be stored in localStorage
+        clinic_document: null // Files can't be stored in localStorage
+      }
+      
+      setStoredData(ONBOARDING_STORAGE_KEY, dataToStore)
+      setStoredData(ONBOARDING_STEP_KEY, currentStep)
+    }
+  }, [formData, currentStep, isLoading])
+
   const updateFormData = (data: Partial<OnboardingData>) => {
     setFormData((prev) => ({ ...prev, ...data }))
   }
@@ -85,7 +176,6 @@ const OnboardingContainer = () => {
       handleCompleteOnboarding()
     }
   }
-  // Import the instruction generator at the top of your file
 
   // Updated handleCompleteOnboarding function
   const handleCompleteOnboarding = async () => {
@@ -208,7 +298,10 @@ const OnboardingContainer = () => {
           }
         }
 
-        SuccessToast("You’re all set!");
+        // Clear stored progress after successful completion
+        clearStoredProgress();
+
+        SuccessToast("You're all set!");
         setTimeout(() => {
           router.push('/dashboard?onboarding=success');
         }, 2000);
@@ -219,14 +312,41 @@ const OnboardingContainer = () => {
       }
     }
   };
+
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep((prev) => prev - 1)
     }
   }
 
+  // Show loading state while restoring data
+  if (isLoading) {
+    return (
+      <OnboardingLayout currentStep={currentStep}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your progress...</p>
+          </div>
+        </div>
+      </OnboardingLayout>
+    )
+  }
+
   return (
     <OnboardingLayout currentStep={currentStep}>
+      {/* Progress restoration notification */}
+      {isBrowser && getStoredData(ONBOARDING_STORAGE_KEY) && currentStep > 1 && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-blue-500 rounded-full flex-shrink-0"></div>
+            <p className="text-sm text-blue-800">
+              <strong>Welcome back!</strong> We've restored your progress from where you left off.
+            </p>
+          </div>
+        </div>
+      )}
+
       {currentStep === 1 && (
         <Step1ClinicInfo formData={formData} updateFormData={updateFormData} onNext={handleNext} onBack={handleBack} />
       )}
