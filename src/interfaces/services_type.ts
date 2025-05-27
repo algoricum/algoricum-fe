@@ -64,7 +64,8 @@ export interface Clinic {
   dba_name?: string;
   business_hours?: BusinessHours;
   calendly_link?: string;
-  
+  chatbot_avatar?:string;
+  chatbot_name?:string;
   // New fields for chatbot settings
   tone_selector?: string;
   sentence_length?: string;
@@ -129,7 +130,8 @@ export interface UpdateClinicProps {
   tone_selector?: string;
   sentence_length?: string;
   formality_level?: string;
-  
+  chatbot_name?:string;
+  chatbot_avatar?:string;
   // Theme objects
   widget_theme?: WidgetTheme;
   dashboard_theme?: DashboardTheme;

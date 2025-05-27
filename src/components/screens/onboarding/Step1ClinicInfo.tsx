@@ -25,6 +25,7 @@ const Step1ClinicInfo: React.FC<Step1Props> = ({ formData, updateFormData, onNex
   const [businessHours, setBusinessHours] = useState<BusinessHours>(formData.businessHours)
   const {logout} = useAuth()
   const {push} = useRouter()
+
   const handlePresetClick = (preset: string) => {
     setSelectedPreset(preset)
     const newHours: BusinessHours = { ...businessHours }
@@ -66,6 +67,9 @@ const Step1ClinicInfo: React.FC<Step1Props> = ({ formData, updateFormData, onNex
 
     setBusinessHours(newHours)
     updateFormData({ businessHours: newHours })
+    
+    // Switch to Custom when user makes manual changes
+    setSelectedPreset("Custom")
   }
 
   const updateHourTime = (day: string, type: "openTime" | "closeTime", value: string) => {
@@ -73,6 +77,9 @@ const Step1ClinicInfo: React.FC<Step1Props> = ({ formData, updateFormData, onNex
     newHours[day][type] = value
     setBusinessHours(newHours)
     updateFormData({ businessHours: newHours })
+    
+    // Switch to Custom when user makes manual changes
+    setSelectedPreset("Custom")
   }
 
   const handleSubmit = (values: any) => {
@@ -83,6 +90,7 @@ const Step1ClinicInfo: React.FC<Step1Props> = ({ formData, updateFormData, onNex
     })
     onNext()
   }
+
   const handleLogout = async () => {
     try {
       // Wait for logout to complete before continuing
@@ -98,6 +106,7 @@ const Step1ClinicInfo: React.FC<Step1Props> = ({ formData, updateFormData, onNex
       ErrorToast("Logout failed. Please try again.");
     }
   }
+
   return (
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold mb-8">Let's Begin By Setting Up Your Clinic's Core Details.</h1>
