@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react"
 import { Flex, Form, Input, message, Select, Upload } from "antd"
 import { Button } from "@/components/elements"
-import { FileTextOutlined, MessageOutlined } from "@ant-design/icons"
+import { FileTextOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons"
 import { SuccessToast, ErrorToast } from "@/helpers/toast"
 import { createClient } from "@/utils/supabase/config/client"
 import { ColorConfigurator, WidgetPreview } from "@/components/common"
@@ -25,6 +25,7 @@ const ChatbotSettings = () => {
   const sentenceLength = Form.useWatch("sentenceLength", form);
   const formalityLevel = Form.useWatch("formalityLevel", form);
   const [fileList, setFileList] = useState([])
+  const [avatarFileList, setAvatarFileList] = useState([])
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false)
   const [clinicData, setClinicData] = useState<any>()
 
@@ -42,7 +43,9 @@ const ChatbotSettings = () => {
             font_color: clinic.widget_theme?.font_color,
             toneSelector: clinic.tone_selector || "friendly",
             sentenceLength: clinic.sentence_length || "medium",
-            formalityLevel: clinic.formality_level || "neutral"
+            formalityLevel: clinic.formality_level || "neutral",
+            chatbotName: clinic.chatbot_name || "",
+            chatbotAvatar: clinic.chatbot_avatar
           })
           if (clinicApiKey) {
             setApiKey(String(clinicApiKey))
@@ -68,14 +71,23 @@ const ChatbotSettings = () => {
         return;
       }
       let logoUrl
+      let avatarUrl
+      
       if (values.logo) {
         logoUrl = await uploadClinicLogo(user.id, values.logo[0].originFileObj);
+      }
+
+      if (values.chatbotAvatar) {
+        // Using the same upload function for avatar, you might want to create a separate one
+        avatarUrl = await uploadClinicLogo(user.id, values.chatbotAvatar[0].originFileObj);
       }
 
       const clinic = await updateClinic({
         id: clinicData.id,
         assistant_prompt: values.greeting,
         widget_logo: logoUrl,
+        chatbot_name: values.chatbotName,
+        chatbot_avatar: avatarUrl,
         widget_theme: { primary_color: values.primary_color, font_color: values.font_color },
         tone_selector: values.toneSelector,
         sentence_length: values.sentenceLength,
@@ -161,6 +173,52 @@ const ChatbotSettings = () => {
               Generate Script
             </Button>
           </div>
+
+          <Form.Item
+            label="Chatbot Name"
+            name="chatbotName"
+            rules={[{ required: true, message: "Please enter a chatbot name" }]}
+          >
+            <Input 
+              placeholder="Enter your chatbot's name (e.g., Dr. Smith Assistant, MedBot)" 
+              prefix={<UserOutlined className="text-gray-400" />}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="chatbotAvatar"
+            label="Chatbot Avatar"
+            valuePropName="fileList"
+            getValueFromEvent={normFile}
+          >
+            <Upload.Dragger
+              name="chatbotAvatar"
+              fileList={avatarFileList}
+              accept=".jpg,.jpeg,.png,.svg"
+              beforeUpload={(file) => {
+                const isJpgOrPngOrSvg =
+                  file.type === 'image/jpeg' ||
+                  file.type === 'image/png' ||
+                  file.type === 'image/svg+xml';
+
+                if (!isJpgOrPngOrSvg) {
+                  ErrorToast('You can only upload JPG, PNG, or SVG files!');
+                }
+
+                return false; // Return false to prevent automatic upload
+              }}
+              maxCount={1}
+              className="bg-white rounded-md"
+            >
+              <p className="flex justify-center mb-2">
+                <UserOutlined className="text-gray-400" />
+              </p>
+              <p className="text-center mb-1">
+                Upload chatbot avatar or <span className="text-brand-primary">Browse Files</span>
+              </p>
+              <p className="text-center text-xs text-gray-500">JPG, PNG, SVG (recommended: square image)</p>
+            </Upload.Dragger>
+          </Form.Item>
 
           <Form.Item
             label="Greeting Message For Visitors"
