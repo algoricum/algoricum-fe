@@ -55,6 +55,7 @@ const OnboardingContainer = () => {
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [wasDataRestored, setWasDataRestored] = useState(false) // Track if user returned from previous session
   const [formData, setFormData] = useState<OnboardingData>({
     // Step 1
     legalBusinessName: "",
@@ -124,6 +125,8 @@ const OnboardingContainer = () => {
         // Load saved form data
         const savedData = getStoredData(ONBOARDING_STORAGE_KEY)
         const savedStep = getStoredData(ONBOARDING_STEP_KEY)
+        
+        let dataWasRestored = false
 
         if (savedData) {
           // Merge saved data with defaults, excluding file fields
@@ -134,11 +137,18 @@ const OnboardingContainer = () => {
             businessHours: savedData.businessHours || defaultBusinessHours
           }
           setFormData(restoredData)
+          dataWasRestored = true
         }
 
         if (savedStep && savedStep >= 1 && savedStep <= 3) {
           setCurrentStep(savedStep)
+          if (savedStep > 1) {
+            dataWasRestored = true
+          }
         }
+
+        // Only set wasDataRestored to true if we actually restored meaningful data
+        setWasDataRestored(dataWasRestored)
       } catch (error) {
         console.error('Error loading saved progress:', error)
       } finally {
@@ -300,6 +310,7 @@ const OnboardingContainer = () => {
 
         // Clear stored progress after successful completion
         clearStoredProgress();
+        setWasDataRestored(false);
 
         SuccessToast("You're all set!");
         setTimeout(() => {
@@ -335,8 +346,8 @@ const OnboardingContainer = () => {
 
   return (
     <OnboardingLayout currentStep={currentStep}>
-      {/* Progress restoration notification */}
-      {isBrowser && getStoredData(ONBOARDING_STORAGE_KEY) && currentStep > 1 && (
+      {/* Progress restoration notification - only shown when user actually returned from previous session */}
+      {wasDataRestored && (
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-blue-500 rounded-full flex-shrink-0"></div>

@@ -252,7 +252,11 @@ const Step3BrandConfig: React.FC<Step3Props> = ({ formData, updateFormData, isSu
                 <div className="flex-1">
                   <h3 className="text-sm font-medium text-blue-900 mb-2">Preview: How your assistant will greet patients</h3>
                   <div className="bg-white p-3 rounded border border-blue-200">
-                    <p className="text-gray-800 italic">"{getPreviewText(formData)}"</p>
+                    <p className="text-gray-800 italic">"{getPreviewText({
+                      tone: formData.tone_selector,
+                      formality:  formData.formality_level,
+                      length: formData.sentence_length
+                    })}"</p>
                   </div>
                   <p className="text-xs text-blue-700 mt-2">
                     This preview updates as you change your settings above

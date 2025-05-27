@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react"
 import { Flex, Form, Input, message, Select, Upload } from "antd"
 import { Button } from "@/components/elements"
-import { FileTextOutlined } from "@ant-design/icons"
+import { FileTextOutlined, MessageOutlined } from "@ant-design/icons"
 import { SuccessToast, ErrorToast } from "@/helpers/toast"
 import { createClient } from "@/utils/supabase/config/client"
 import { ColorConfigurator, WidgetPreview } from "@/components/common"
@@ -12,6 +12,7 @@ import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads"
 import { getUserData } from "@/utils/supabase/user-helper"
 import generateClinicInstructions from "@/utils/generateClinicInstructions"
 import { getSupabaseSession } from "@/utils/supabase/auth-helper"
+import { getPreviewText } from "@/utils/getPreviewChatbot"
 
 const { TextArea } = Input
 
@@ -20,6 +21,9 @@ const ChatbotSettings = () => {
   const [loading, setLoading] = useState(false)
   const [apiKey, setApiKey] = useState<string>("")
   const primaryColor = Form.useWatch("primary_color", form);
+  const toneSelector = Form.useWatch("toneSelector", form);
+  const sentenceLength = Form.useWatch("sentenceLength", form);
+  const formalityLevel = Form.useWatch("formalityLevel", form);
   const [fileList, setFileList] = useState([])
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false)
   const [clinicData, setClinicData] = useState<any>()
@@ -90,9 +94,9 @@ const ChatbotSettings = () => {
         has_uploaded_document: true
       });
       const formDataToSend = new FormData();
-       const session =  await getSupabaseSession()
+      const session = await getSupabaseSession()
       formDataToSend.append('clinic_id', clinic.id);
-      formDataToSend.append('name', clinic.legal_business_name||"");
+      formDataToSend.append('name', clinic.legal_business_name || "");
       formDataToSend.append('instructions', clinicInstructions);
       try {
         // Call the combined edge function
@@ -220,15 +224,18 @@ const ChatbotSettings = () => {
             name="toneSelector"
             rules={[{ required: true, message: "Please select a tone" }]}
           >
+            <div className="mb-2">
+              <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
+            </div>
             <Select
               placeholder="Select Tone"
               className="w-full"
               onChange={handleToneChange}
               options={[
-                { value: "friendly", label: "Friendly" },
-                { value: "professional", label: "Professional" },
-                { value: "casual", label: "Casual" },
-                { value: "formal", label: "Formal" },
+                { value: "friendly", label: "Friendly - Warm and welcoming" },
+                { value: "professional", label: "Professional - Competent and reliable" },
+                { value: "casual", label: "Casual - Relaxed and conversational" },
+                { value: "formal", label: "Formal - Respectful and structured" },
               ]}
             />
           </Form.Item>
@@ -238,14 +245,17 @@ const ChatbotSettings = () => {
             name="sentenceLength"
             rules={[{ required: true, message: "Please select a sentence length" }]}
           >
+            <div className="mb-2">
+              <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
+            </div>
             <Select
               placeholder="Select Sentence Length"
               className="w-full"
               onChange={handleSentenceLengthChange}
               options={[
-                { value: "short", label: "Short" },
-                { value: "medium", label: "Medium" },
-                { value: "long", label: "Long" },
+                { value: "short", label: "Short - Quick and concise" },
+                { value: "medium", label: "Medium - Balanced detail" },
+                { value: "long", label: "Long - Comprehensive explanations" },
               ]}
             />
           </Form.Item>
@@ -255,24 +265,48 @@ const ChatbotSettings = () => {
             name="formalityLevel"
             rules={[{ required: true, message: "Please select a formality level" }]}
           >
+            <div className="mb-2">
+              <p className="text-xs text-gray-500 mb-2">How formal should the language be?</p>
+            </div>
             <Select
               placeholder="Select Formality Level"
               className="w-full"
               onChange={handleFormalityLevelChange}
               options={[
-                { value: "very_casual", label: "Very Casual" },
-                { value: "casual", label: "Casual" },
-                { value: "neutral", label: "Neutral" },
-                { value: "formal", label: "Formal" },
-                { value: "very_formal", label: "Very Formal" },
+                { value: "very_casual", label: "Very Casual - Like talking to a friend" },
+                { value: "casual", label: "Casual - Relaxed but respectful" },
+                { value: "neutral", label: "Neutral - Balanced approach" },
+                { value: "formal", label: "Formal - Professional courtesy" },
+                { value: "very_formal", label: "Very Formal - Traditional business style" },
               ]}
             />
           </Form.Item>
+          {/* Live Preview Section */}
+          {(toneSelector || sentenceLength || formalityLevel) && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-start gap-3">
+                <MessageOutlined className="text-blue-600 mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-medium text-blue-900 mb-2">Preview: How your assistant will greet patients</h3>
+                  <div className="bg-white p-3 rounded border border-blue-200">
+                    <p className="text-gray-800 italic">"{getPreviewText({
+                      tone: toneSelector,
+                      formality: formalityLevel,
+                      length: sentenceLength
+                    })}"</p>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2">
+                    This preview updates as you change your settings above
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <Form.Item>
             <Button
               type="primary"
-              className="bg-brand-primary hover:!bg-brand-secondary !hover:text-white text-white py-2 rounded-md"
+              className="bg-brand-primary hover:!bg-brand-secondary !hover:text-white text-white py-2 mt-3 rounded-md"
               htmlType="submit"
               loading={loading}
             >

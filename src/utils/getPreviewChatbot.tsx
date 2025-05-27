@@ -1,7 +1,4 @@
-export const getPreviewText = (formData:any) => {
-    const tone = formData.tone_selector || 'friendly';
-    const formality = formData.formality_level || 'neutral';
-    const length = formData.sentence_length || 'medium';
+export const getPreviewText = ({tone, formality, length}: {tone: string, formality: string, length: string}) => {
 
     const examples:any = {
       friendly: {
