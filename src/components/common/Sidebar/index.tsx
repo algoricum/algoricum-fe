@@ -6,7 +6,6 @@ import { Flex, Layout, Menu } from "antd";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import Logo from "../Logo";
-import { useAuth } from "@/hooks/useAuth"
 import { signOut } from "@/utils/supabase/auth-helper";
 import menuItems from "@/constants/menuItems";
 const Sidebar = () => {
@@ -17,24 +16,20 @@ const Sidebar = () => {
   const selectedPath = path.startsWith("/content") ? "content" : path.split("/")[1];
   const pathMatch = path.includes("content") || path.includes("settings");
   const [isCollapsed, setIsCollapsed] = useState<boolean>(pathMatch);
-  const { logout } = useAuth()
   const menuHandler = async (key: string) => {
     switch (key) {
-      case "settings":
-        return push("/settings/chatbot");
+      case "leads":
+        return push("/leads");
       case "profileSettings":
         return push("/settings/chatbot");
       case "setup":
         return push("/setup");
       case "logout":
         try {
-          // Disable the logout button or show loading state
-          setIsLoggingOut(true); // Add this state
+          setIsLoggingOut(true); 
           const success = await signOut();
-
           if (success) {
             SuccessToast("Logout Successfully");
-            // Add a slight delay before navigation
             setTimeout(() => {
               push("/login");
             }, 300);
@@ -45,7 +40,7 @@ const Sidebar = () => {
           console.error("Logout error:", error);
           ErrorToast("Logout failed. Please try again.");
         } finally {
-          setIsLoggingOut(false); // Reset loading state
+          setIsLoggingOut(false);
         }
         return;
       default:
@@ -97,14 +92,14 @@ const Sidebar = () => {
           items={menuItems}
           />
           <div className="flex flex-col justify-end items-center gap-2">
-            {footerItems.map(({ key, label, icon: Icon, selectedIcon }, index) => (
+            {footerItems.map(({ key, label, icon: Icon, selectedicon }, index) => (
               <div
                 key={index}
                 className={`w-full flex flex-row items-center py-2 gap-2 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} border-b-2 border-transparent !border  hover:border-Primary900 rounded hover:!bg-Primary50  ${isSelected(key) && "!bg-Primary50 !rounded !border-Primary900"
                   } ${isCollapsed ? "justify-center" : "px-4"}`}
                 onClick={() => menuHandler(key)}
               >
-                {isSelected(key) ? selectedIcon : Icon}
+                {isSelected(key) ? selectedicon : Icon}
                 {!isCollapsed && (
                   <p className={`${isSelected(key) ? "text-Primary1000  font-PoppinsSemiBold" : "text-Gray600"}`}>{label}</p>
                 )}

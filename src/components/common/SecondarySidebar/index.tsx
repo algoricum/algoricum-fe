@@ -8,7 +8,7 @@ import React, { useCallback, useState } from "react";
 interface menuTypeProps {
   key: string;
   icon: React.ReactNode | React.ReactNode[];
-  selectedIcon: React.ReactNode | React.ReactNode[];
+  selectedicon: React.ReactNode | React.ReactNode[];
   label: string;
   route: string;
 }
@@ -39,13 +39,13 @@ const SecondarySidebar = ({ menuItems, heading = "Content" }: ContentSidebarProp
       <Flex vertical className="h-full">
         <h1 className="text-lg font-helvetica-700 text-Gray900">{heading}</h1>
         <Flex vertical className="flex-1 mt-5" gap={1}>
-          {menuItems?.map(({ label, icon: Icon, selectedIcon, route }: menuTypeProps, index: number) => (
+          {menuItems?.map(({ label, icon: Icon, selectedicon, route }: menuTypeProps, index: number) => (
             <div
               key={index}
               onClick={() => push(route)}
               className={`w-full flex flex-row items-center p-2 gap-2 cursor-pointer border border-transparent hover:bg-Primary50 hover:border-Primary900  rounded-lg ${isSelected(route) && "!bg-Primary50 !border-Primary900"}`}
             >
-              {isSelected(route) ? selectedIcon : Icon}
+              {isSelected(route) ? selectedicon : Icon}
               {!isCollapsed && <p className={`${isSelected(route) ? "text-Primary1000 font-PoppinsSemiBold" : "text-Gray600"}`}>{label}</p>}
             </div>
           ))}

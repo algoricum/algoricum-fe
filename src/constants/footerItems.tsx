@@ -5,13 +5,13 @@ const footerItems = [
   {
     key: "profileSettings",
     icon: <SettingIcon />,
-    selectedIcon: <SettingIcon color="var(--color-primary-1000)" />,
+    selectedicon: <SettingIcon color="var(--color-primary-1000)" />,
     label: "Profile Settings",
   },
   {
     key: "logout",
     icon: <LogoutIcon />,
-    selectedIcon: <LogoutIcon color="var(--color-primary-1000)" />,
+    selectedicon: <LogoutIcon color="var(--color-primary-1000)" />,
     label: "Logout",
   },
 ];

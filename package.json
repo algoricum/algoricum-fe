@@ -19,6 +19,7 @@
     "antd": "^5.22.2",
     "axios": "^1.7.7",
     "cookies-next": "^5.1.0",
+    "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.10",

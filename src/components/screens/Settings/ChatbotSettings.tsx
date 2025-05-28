@@ -186,7 +186,6 @@ const ChatbotSettings = () => {
           </Form.Item>
 
           <Form.Item
-            name="chatbotAvatar"
             label="Chatbot Avatar"
             valuePropName="fileList"
             getValueFromEvent={normFile}
