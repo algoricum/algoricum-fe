@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from "react"
 import { Input, Button } from "antd"
 import { SendOutlined, SmileOutlined, PaperClipOutlined } from "@ant-design/icons"
 import MessageBubble from "./MessageBubble"
-import type { Lead } from "@/interfaces/leads"
+import { Lead } from "@/utils/supabase/leads-helper"
 
 interface MessagesPanelProps {
   lead: Lead | null

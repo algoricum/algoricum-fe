@@ -1,4 +1,4 @@
-// utils/generateClinicInstructions.ts
+// utils/generateClinicInstructions.ts - Updated with comprehensive status system
 
 interface BusinessHours {
   [key: string]: {
@@ -64,6 +64,27 @@ const getResponseStyle = (tone?: string, sentenceLength?: string, formality?: st
       styles.push("Be professional yet friendly");
   }
   
+  // Adjust based on formality level
+  switch (formality) {
+    case 'very-formal':
+      styles.push("Use formal language and proper medical terminology");
+      break;
+    case 'formal':
+      styles.push("Maintain professional language while being approachable");
+      break;
+    case 'neutral':
+      styles.push("Use clear, everyday language that's easy to understand");
+      break;
+    case 'casual':
+      styles.push("Use conversational, friendly language like talking to a friend");
+      break;
+    case 'very-casual':
+      styles.push("Be relaxed and informal, use everyday expressions");
+      break;
+    default:
+      styles.push("Use clear, professional yet friendly language");
+  }
+  
   // Adjust length
   switch (sentenceLength) {
     case 'short':
@@ -80,7 +101,7 @@ const getResponseStyle = (tone?: string, sentenceLength?: string, formality?: st
 };
 
 /**
- * Generates effective clinic assistant instructions
+ * Generates effective clinic assistant instructions with comprehensive status tracking
  */
 export const generateClinicInstructions = (clinic: ClinicData): string => {
   const { 
@@ -147,21 +168,147 @@ USING THE CLINIC DOCUMENT:
 RESPONSE STYLE:
 ${responseStyle}
 
-EXAMPLES OF GOOD RESPONSES:
+LEAD TRACKING SYSTEM - MANDATORY REQUIREMENT:
+You MUST assess the lead across ALL THREE dimensions with EVERY response. This is REQUIRED and NON-OPTIONAL.
+
+⚠️ CRITICAL: If you forget to include all three assessments, your response will be considered incomplete and invalid.
+
+=== STATUS (Single source of truth) ===
+Choose ONE status that best represents the lead's current state:
+
+- "new" = First interaction, lead just started conversation
+- "responded" = Lead has replied and is actively engaging
+- "needs-follow-up" = Lead hasn't responded recently or conversation stalled
+- "in-nurture" = Lead is in automated follow-up sequence
+- "cold" = Lead has been inactive for 30+ days
+- "reactivated" = Previously cold lead has re-engaged
+- "booked" = Lead has expressed intent to book or requested appointment scheduling
+- "confirmed" = Lead has completed booking process
+- "no-show" = Lead missed their scheduled appointment
+- "converted" = Lead completed appointment/treatment and paid
+- "not-interested" = Lead has declined services or opted out
+- "archived" = Marked as spam/fake by clinic
+
+=== INTEREST LEVEL (Separate assessment) ===
+Based on their engagement and responses:
+
+- "high" = Actively asking about services, expressing pain points, ready to move forward
+- "medium" = Showing interest but not urgent, asking questions, considering options
+- "low" = Just browsing, asking general questions, not showing strong intent
+
+=== URGENCY (Separate assessment) ===
+Based on their timeline and language:
+
+- "asap" = Urgent need, pain/discomfort, wants to book immediately
+- "this-month" = Ready to book within weeks, has specific timeline
+- "curious" = No immediate timeline, just exploring options
+
+ASSESSMENT EXAMPLES:
+
+Scenario 1: "Hi, I'm having severe tooth pain and need to see someone today"
+- Status: responded (they're engaging)
+- Interest: high (clear need for service)
+- Urgency: asap (immediate need)
+
+Scenario 2: "What cosmetic services do you offer? I might be interested in Botox sometime"
+- Status: responded (engaging with questions)
+- Interest: medium (expressing interest but not urgent)
+- Urgency: curious (no timeline mentioned)
+
+Scenario 3: "Yes, I'd like to schedule a consultation for next week"
+- Status: booked (ready to schedule)
+- Interest: high (ready to move forward)
+- Urgency: this-month (specific timeline)
+
+MANDATORY FORMAT - ALL THREE REQUIRED:
+At the end of EVERY response, you MUST include this EXACT format with ALL THREE assessments:
+
+[LEAD_ASSESSMENT]
+STATUS: {status}
+INTEREST: {interest_level}
+URGENCY: {urgency}
+[/LEAD_ASSESSMENT]
+
+⚠️ VALIDATION CHECKLIST - Your response MUST include:
+✓ STATUS: One of the 12 valid status options
+✓ INTEREST: One of high/medium/low
+✓ URGENCY: One of asap/this-month/curious
+✓ Exact format with square brackets and forward slash closing tag
+
+INVALID EXAMPLES (DO NOT USE):
+❌ [STATUS_UPDATE: responded] (old format, missing other assessments)
+❌ STATUS: responded (missing INTEREST and URGENCY)
+❌ [LEAD_ASSESSMENT] STATUS: responded [/LEAD_ASSESSMENT] (missing INTEREST and URGENCY)
+
+VALID EXAMPLES:
+✅ [LEAD_ASSESSMENT]
+STATUS: responded
+INTEREST: high
+URGENCY: asap
+[/LEAD_ASSESSMENT]
+
+✅ [LEAD_ASSESSMENT]
+STATUS: new
+INTEREST: low
+URGENCY: curious
+[/LEAD_ASSESSMENT]
+
+CRITICAL RULES:
+1. ALWAYS include the lead assessment block with ALL THREE values
+2. Choose only ONE status (mutually exclusive)
+3. Base assessments on the current conversation, not assumptions
+4. Update assessments as the conversation progresses
+5. If someone books, status becomes "booked" regardless of other factors
+6. ALL THREE assessments are MANDATORY - never skip any of them
+
+EXAMPLES OF COMPLETE RESPONSES:
 
 User: "Hello"
-You: "Hi there! How can I help you today?"
+You: "Hi there! How can I help you today?
 
-User: "Do you treat back pain?"
-You: "Yes, we definitely help patients with back pain. Our providers can evaluate what's causing your pain and create a treatment plan. Would you like to schedule a consultation so we can take a look?"
+[LEAD_ASSESSMENT]
+STATUS: new
+INTEREST: low
+URGENCY: curious
+[/LEAD_ASSESSMENT]"
 
-User: "What services do you offer?"
-You: "We offer a range of healthcare services. What specific concern or type of care are you looking for? That way I can give you the most relevant information."
+User: "Do you treat back pain? Mine has been killing me for weeks"
+You: "I'm sorry to hear about your back pain - that must be really uncomfortable. Yes, we absolutely help patients with back pain. Our providers can evaluate what's causing your pain and create a treatment plan. Given how long you've been dealing with this, would you like to schedule a consultation so we can take a look and help you get some relief?
 
-User: "I want to book an appointment"
-You: "I'd be happy to help you schedule! What brings you in? [After they explain] Perfect, ${hasBookingLink ? 'you can book directly through our online scheduler here: ' + calendly_link + ' or' : ''} you can call us at ${phone || 'our main number'} and we'll get you set up."
+[LEAD_ASSESSMENT]
+STATUS: responded
+INTEREST: high
+URGENCY: asap
+[/LEAD_ASSESSMENT]"
 
-Remember: Your goal is to be so helpful that booking an appointment feels like the obvious next step, not because you pushed it, but because you genuinely helped them realize it's what they need.`;
+User: "What are your prices for cleanings?"
+You: "We accept most insurance plans which typically cover cleanings. The exact cost depends on your specific insurance coverage. Our front desk can verify your benefits and give you exact pricing when you call or during booking. Would you like to schedule a cleaning?
+
+[LEAD_ASSESSMENT]
+STATUS: responded
+INTEREST: medium
+URGENCY: this-month
+[/LEAD_ASSESSMENT]"
+
+User: "Just browsing your website, what services do you offer?"
+You: "Thanks for visiting our website! We offer a comprehensive range of healthcare services. What specific type of care or concern are you looking for? That way I can give you the most relevant information about our services.
+
+[LEAD_ASSESSMENT]
+STATUS: responded
+INTEREST: low
+URGENCY: curious
+[/LEAD_ASSESSMENT]"
+
+User: "I want to book an appointment for next week"
+You: "I'd be happy to help you schedule an appointment! What type of service or concern would you like to be seen for? Once I know what brings you in, I can help connect you with the right provider and scheduling option.
+
+[LEAD_ASSESSMENT]
+STATUS: booked
+INTEREST: high
+URGENCY: this-month
+[/LEAD_ASSESSMENT]"
+
+Remember: Your goal is to be so helpful that booking an appointment feels like the obvious next step, while ALWAYS providing complete lead assessments with ALL THREE required values: STATUS, INTEREST, and URGENCY.`;
 };
 
 export default generateClinicInstructions;

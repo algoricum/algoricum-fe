@@ -7,7 +7,7 @@ import { SuccessToast, ErrorToast } from "@/helpers/toast"
 import { createClient } from "@/utils/supabase/config/client"
 import { ColorConfigurator, WidgetPreview } from "@/components/common"
 import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx"
-import { getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper"
+import { getAssistantByClinicId, getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper"
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads"
 import { getUserData } from "@/utils/supabase/user-helper"
 import generateClinicInstructions from "@/utils/generateClinicInstructions"
@@ -28,31 +28,78 @@ const ChatbotSettings = () => {
   const [avatarFileList, setAvatarFileList] = useState([])
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false)
   const [clinicData, setClinicData] = useState<any>()
+  const [dataLoaded, setDataLoaded] = useState(false) // Add this state
+
+  // Helper function to normalize values from database to match dropdown options
+  const normalizeValue = (value: string | null | undefined, validOptions: string[]) => {
+    if (!value) return validOptions[0]; // Return first option as default
+    
+    // Check if value exists in valid options (exact match)
+    if (validOptions.includes(value)) {
+      return value;
+    }
+    
+    // Try to find a match (case-insensitive and handle underscores/hyphens)
+    const normalizedValue = value.toLowerCase().replace(/[_-]/g, '');
+    const match = validOptions.find(option => 
+      option.toLowerCase().replace(/[_-]/g, '') === normalizedValue
+    );
+    
+    return match || validOptions[0]; // Return match or default to first option
+  };
 
   useEffect(() => {
     const fetchChatbotSettings = async () => {
       try {
         setLoading(true)
+        setDataLoaded(false) // Reset data loaded state
+        
         const clinic = await getClinicData()
         setClinicData(clinic)
+        
         if (clinic) {
           const clinicApiKey = await getClincApiKey(clinic.id)
-          form.setFieldsValue({
-            greeting: clinic.assistant_prompt,
-            primary_color: clinic.widget_theme?.primary_color,
-            font_color: clinic.widget_theme?.font_color,
-            toneSelector: clinic.tone_selector || "friendly",
-            sentenceLength: clinic.sentence_length || "medium",
-            formalityLevel: clinic.formality_level || "neutral",
+          
+          // Define valid options for each dropdown
+          const validTones = ["friendly", "professional", "casual", "formal"];
+          const validLengths = ["short", "medium", "long"];
+          const validFormalities = ["very_casual", "casual", "neutral", "formal", "very_formal"];
+          
+          // Normalize the values to ensure they match dropdown options
+          const normalizedTone = normalizeValue(clinic.tone_selector, validTones);
+          const normalizedLength = normalizeValue(clinic.sentence_length, validLengths);
+          const normalizedFormality = normalizeValue(clinic.formality_level, validFormalities);
+          
+          // Set form values with normalized data
+          const formValues = {
+            greeting: clinic.assistant_prompt || "",
+            primary_color: clinic.widget_theme?.primary_color || "#2563EB",
+            font_color: clinic.widget_theme?.font_color || "#000000",
+            toneSelector: normalizedTone,
+            sentenceLength: normalizedLength,
+            formalityLevel: normalizedFormality,
             chatbotName: clinic.chatbot_name || "",
-            chatbotAvatar: clinic.chatbot_avatar
-          })
+            chatbotAvatar: clinic.chatbot_avatar || null
+          };
+          
+          console.log('Setting form values:', formValues); // Debug log
+          
+          // Set the form values
+          form.setFieldsValue(formValues);
+          
+          // Force re-render to ensure dropdowns show the values
+          setTimeout(() => {
+            form.setFieldsValue(formValues);
+            setDataLoaded(true); // Mark data as loaded
+          }, 100);
+          
           if (clinicApiKey) {
             setApiKey(String(clinicApiKey))
           }
         }
       } catch (error: any) {
         console.error("Error fetching chatbot settings:", error.message)
+        ErrorToast("Failed to load chatbot settings")
       } finally {
         setLoading(false)
       }
@@ -70,6 +117,7 @@ const ChatbotSettings = () => {
         setLoading(false);
         return;
       }
+      const assistantData = await getAssistantByClinicId(clinicData.id);
       let logoUrl
       let avatarUrl
       
@@ -110,6 +158,7 @@ const ChatbotSettings = () => {
       formDataToSend.append('clinic_id', clinic.id);
       formDataToSend.append('name', clinic.legal_business_name || "");
       formDataToSend.append('instructions', clinicInstructions);
+      formDataToSend.append('assistant_id', assistantData.id);
       try {
         // Call the combined edge function
         const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
@@ -157,6 +206,18 @@ const ChatbotSettings = () => {
       return e
     }
     return e?.fileList
+  }
+
+  // Don't render the form until data is loaded to prevent empty dropdowns
+  if (loading && !dataLoaded) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading chatbot settings...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -288,6 +349,7 @@ const ChatbotSettings = () => {
               placeholder="Select Tone"
               className="w-full"
               onChange={handleToneChange}
+              value={toneSelector} // Explicitly set value
               options={[
                 { value: "friendly", label: "Friendly - Warm and welcoming" },
                 { value: "professional", label: "Professional - Competent and reliable" },
@@ -309,6 +371,7 @@ const ChatbotSettings = () => {
               placeholder="Select Sentence Length"
               className="w-full"
               onChange={handleSentenceLengthChange}
+              value={sentenceLength} // Explicitly set value
               options={[
                 { value: "short", label: "Short - Quick and concise" },
                 { value: "medium", label: "Medium - Balanced detail" },
@@ -329,6 +392,7 @@ const ChatbotSettings = () => {
               placeholder="Select Formality Level"
               className="w-full"
               onChange={handleFormalityLevelChange}
+              value={formalityLevel} // Explicitly set value
               options={[
                 { value: "very_casual", label: "Very Casual - Like talking to a friend" },
                 { value: "casual", label: "Casual - Relaxed but respectful" },
@@ -338,6 +402,7 @@ const ChatbotSettings = () => {
               ]}
             />
           </Form.Item>
+          
           {/* Live Preview Section */}
           {(toneSelector || sentenceLength || formalityLevel) && (
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">

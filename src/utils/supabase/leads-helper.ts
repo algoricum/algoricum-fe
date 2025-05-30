@@ -1,7 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "./config/client";
 
-
+// Updated interfaces to match our new comprehensive status system
 export interface Lead {
   id: string;
   first_name: string | null;
@@ -9,19 +9,21 @@ export interface Lead {
   name: string; // computed field
   email: string | null;
   phone: string | null;
-  status: string;
-  source_id: string;
+  status: string; // new comprehensive statuses
+  interest_level: string | null; // from new schema
+  urgency: string | null; // from new schema
+  source_id: string | null;
   clinic_id: string;
   assigned_to: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
   avatar?: string; // computed field
-  priority?: 'high' | 'medium' | 'low'; // computed field
   channel?: 'chatbot' | 'form' | 'email'; // computed field
   lastMessage?: string; // computed field
   lastActivity?: Date; // computed field
   messages?: Message[];
+  thread_id?: string; // for optimization
 }
 
 export interface Thread {
@@ -50,7 +52,8 @@ export interface Message {
 
 export interface LeadsFilters {
   status?: string;
-  priority?: 'high' | 'medium' | 'low' | 'all';
+  interest_level?: string;
+  urgency?: string;
   channel?: 'chatbot' | 'form' | 'email' | 'all';
   search?: string;
 }
@@ -60,7 +63,28 @@ export interface ChannelStats {
   form: number;
   email: number;
 }
-const supabase = createClient()
+
+// Valid status options for the new comprehensive system
+export const LEAD_STATUSES = [
+  'new',
+  'responded', 
+  'needs-follow-up',
+  'in-nurture',
+  'cold',
+  'reactivated',
+  'booked',
+  'confirmed',
+  'no-show',
+  'converted',
+  'not-interested',
+  'archived'
+] as const;
+
+export const INTEREST_LEVELS = ['high', 'medium', 'low'] as const;
+export const URGENCY_LEVELS = ['asap', 'this_month', 'curious'] as const;
+
+const supabase = createClient();
+
 // Helper function to get current user's clinic
 export async function getCurrentUserClinic() {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -83,38 +107,27 @@ export async function getCurrentUserClinic() {
   return userClinic.clinic_id;
 }
 
-// Helper function to determine priority based on lead data
-function calculatePriority(lead: any): 'high' | 'medium' | 'low' {
-  // Business logic for priority calculation
-  const now = new Date();
-  const createdAt = new Date(lead.created_at);
-  const hoursOld = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
-
-  if (lead.status === 'new' && hoursOld < 2) return 'high';
-  if (lead.status === 'responded') return 'high';
-  if (hoursOld < 24) return 'medium';
-  return 'low';
-}
-
-// Helper function to determine channel (you might want to add a source table)
-function determineChannel(sourceId: string): 'chatbot' | 'form' | 'email' {
-  // This is simplified - you might want to create a sources table
-  // For now, using simple logic based on source_id patterns
-  return 'chatbot'; // Default - you can enhance this
+// Helper function to determine channel based on source
+function determineChannel(sourceId: string | null): 'chatbot' | 'form' | 'email' {
+  if (!sourceId) return 'chatbot';
+  // Add logic based on your source_id patterns
+  // For now, defaulting to chatbot since most leads come from there
+  return 'chatbot';
 }
 
 // Helper function to generate avatar URL
 function generateAvatar(name: string): string {
-  return `/placeholder.svg?height=40&width=40&text=${encodeURIComponent(name.substring(0, 2).toUpperCase())}`;
+  const initials = name.substring(0, 2).toUpperCase();
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=2563eb&color=fff&size=40`;
 }
 
-// Fetch all leads for a clinic with their latest messages
+// OPTIMIZED: Fetch all leads with their latest messages in fewer queries
 export async function fetchLeadsForClinic(
-
   clinicId: string,
   filters?: LeadsFilters
 ): Promise<Lead[]> {
   try {
+    // Single query to get leads with their threads and latest messages
     let query = supabase
       .from('lead')
       .select(`
@@ -124,19 +137,37 @@ export async function fetchLeadsForClinic(
         email,
         phone,
         status,
+        interest_level,
+        urgency,
         source_id,
         clinic_id,
         assigned_to,
         notes,
         created_at,
-        updated_at
+        updated_at,
+        threads:threads!lead_id (
+          id,
+          openai_thread_id,
+          updated_at,
+          latest_message:conversation (
+            message,
+            timestamp,
+            is_from_user
+          )
+        )
       `)
       .eq('clinic_id', clinicId)
       .order('updated_at', { ascending: false });
 
-    // Apply filters
+    // Apply server-side filters
     if (filters?.status && filters.status !== 'all') {
       query = query.eq('status', filters.status);
+    }
+    if (filters?.interest_level && filters.interest_level !== 'all') {
+      query = query.eq('interest_level', filters.interest_level);
+    }
+    if (filters?.urgency && filters.urgency !== 'all') {
+      query = query.eq('urgency', filters.urgency);
     }
 
     const { data: leads, error } = await query;
@@ -150,58 +181,35 @@ export async function fetchLeadsForClinic(
     }
 
     // Transform and enrich the leads data
-    const enrichedLeads: Lead[] = await Promise.all(
-      leads.map(async (lead) => {
-        const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Anonymous';
-        
-        // Get the latest thread for this lead
-        const { data: thread } = await supabase
-          .from('threads')
-          .select('id, openai_thread_id')
-          .eq('lead_id', lead.id)
-          .eq('clinic_id', clinicId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+    const enrichedLeads: Lead[] = leads.map((lead: any) => {
+      const name = `${lead.first_name || ''} ${lead.last_name || ''}`.trim() || 'Anonymous';
+      
+      // Get the latest thread and message
+      const latestThread = lead.threads?.[0];
+      let lastMessage = 'No messages yet';
+      let lastActivity = new Date(lead.updated_at);
+      let thread_id = latestThread?.id;
 
-        let lastMessage = '';
-        let lastActivity = new Date(lead.updated_at);
+      if (latestThread?.latest_message?.[0]) {
+        const msg = latestThread.latest_message[0];
+        lastMessage = msg.message;
+        lastActivity = new Date(msg.timestamp);
+      }
 
-        // Get latest message if thread exists
-        if (thread) {
-          const { data: latestMessage } = await supabase
-            .from('conversation')
-            .select('message, timestamp')
-            .eq('thread_id', thread.id)
-            .order('timestamp', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (latestMessage) {
-            lastMessage = latestMessage.message;
-            lastActivity = new Date(latestMessage.timestamp);
-          }
-        }
-
-        return {
-          ...lead,
-          name,
-          avatar: generateAvatar(name),
-          priority: calculatePriority(lead),
-          channel: determineChannel(lead.source_id),
-          lastMessage: lastMessage || 'No messages yet',
-          lastActivity,
-          messages: [], // Will be loaded separately when needed
-        };
-      })
-    );
+      return {
+        ...lead,
+        name,
+        avatar: generateAvatar(name),
+        channel: determineChannel(lead.source_id),
+        lastMessage,
+        lastActivity,
+        thread_id,
+        messages: [], // Will be loaded separately when needed
+      };
+    });
 
     // Apply client-side filters
     let filteredLeads = enrichedLeads;
-
-    if (filters?.priority && filters.priority !== 'all') {
-      filteredLeads = filteredLeads.filter(lead => lead.priority === filters.priority);
-    }
 
     if (filters?.channel && filters.channel !== 'all') {
       filteredLeads = filteredLeads.filter(lead => lead.channel === filters.channel);
@@ -223,32 +231,37 @@ export async function fetchLeadsForClinic(
   }
 }
 
-// Fetch messages for a specific lead
+// OPTIMIZED: Fetch messages for a specific lead using existing thread_id
 export async function fetchMessagesForLead(
-
   leadId: string,
-  clinicId: string
+  clinicId: string,
+  threadId?: string
 ): Promise<Message[]> {
   try {
-    // First get the thread for this lead
-    const { data: thread, error: threadError } = await supabase
-      .from('threads')
-      .select('id')
-      .eq('lead_id', leadId)
-      .eq('clinic_id', clinicId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    let actualThreadId = threadId;
 
-    if (threadError || !thread) {
-      return [];
+    // Only query for thread if not provided
+    if (!actualThreadId) {
+      const { data: thread, error: threadError } = await supabase
+        .from('threads')
+        .select('id')
+        .eq('lead_id', leadId)
+        .eq('clinic_id', clinicId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (threadError || !thread) {
+        return [];
+      }
+      actualThreadId = thread.id;
     }
 
     // Get all messages for this thread
     const { data: messages, error: messagesError } = await supabase
       .from('conversation')
       .select('*')
-      .eq('thread_id', thread.id)
+      .eq('thread_id', actualThreadId)
       .order('timestamp', { ascending: true });
 
     if (messagesError) {
@@ -274,7 +287,6 @@ export async function fetchMessagesForLead(
 
 // Send a message to a lead
 export async function sendMessageToLead(
-
   leadId: string,
   clinicId: string,
   content: string,
@@ -346,11 +358,8 @@ export async function sendMessageToLead(
   }
 }
 
-// Calculate channel statistics
-export async function getChannelStats(
-
-  clinicId: string
-): Promise<ChannelStats> {
+// OPTIMIZED: Calculate channel statistics with single query
+export async function getChannelStats(clinicId: string): Promise<ChannelStats> {
   try {
     const { data: leads, error } = await supabase
       .from('lead')
@@ -379,16 +388,20 @@ export async function getChannelStats(
   }
 }
 
-// Update lead status
+// Update lead status, interest_level, or urgency
 export async function updateLeadStatus(
   leadId: string,
-  status: string
+  updates: {
+    status?: string;
+    interest_level?: string;
+    urgency?: string;
+  }
 ): Promise<void> {
   try {
     const { error } = await supabase
       .from('lead')
       .update({ 
-        status,
+        ...updates,
         updated_at: new Date().toISOString()
       })
       .eq('id', leadId);
@@ -397,7 +410,75 @@ export async function updateLeadStatus(
       throw error;
     }
   } catch (error) {
-    console.error('Error updating lead status:', error);
+    console.error('Error updating lead:', error);
     throw error;
+  }
+}
+
+// Helper function to format status for display
+export function formatStatus(status: string): string {
+  return status
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+// Helper function to get status color
+export function getStatusColor(status: string): string {
+  switch (status) {
+    case 'new':
+      return 'bg-blue-100 text-blue-800';
+    case 'responded':
+      return 'bg-green-100 text-green-800';
+    case 'needs-follow-up':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'in-nurture':
+      return 'bg-purple-100 text-purple-800';
+    case 'cold':
+      return 'bg-gray-100 text-gray-800';
+    case 'reactivated':
+      return 'bg-cyan-100 text-cyan-800';
+    case 'booked':
+      return 'bg-indigo-100 text-indigo-800';
+    case 'confirmed':
+      return 'bg-emerald-100 text-emerald-800';
+    case 'no-show':
+      return 'bg-red-100 text-red-800';
+    case 'converted':
+      return 'bg-green-100 text-green-800';
+    case 'not-interested':
+      return 'bg-orange-100 text-orange-800';
+    case 'archived':
+      return 'bg-gray-100 text-gray-600';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+}
+
+// Helper function to get priority color (for interest_level)
+export function getInterestColor(interest: string): string {
+  switch (interest) {
+    case 'high':
+      return 'text-red-600';
+    case 'medium':
+      return 'text-yellow-600';
+    case 'low':
+      return 'text-green-600';
+    default:
+      return 'text-gray-600';
+  }
+}
+
+// Helper function to get urgency color
+export function getUrgencyColor(urgency: string): string {
+  switch (urgency) {
+    case 'asap':
+      return 'text-red-600';
+    case 'this_month':
+      return 'text-yellow-600';
+    case 'curious':
+      return 'text-green-600';
+    default:
+      return 'text-gray-600';
   }
 }

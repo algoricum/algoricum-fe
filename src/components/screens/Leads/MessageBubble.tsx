@@ -1,5 +1,5 @@
+import { Message } from "@/utils/supabase/leads-helper"
 import { format } from "date-fns"
-import type { Message } from "@/interfaces/leads"
 
 interface MessageBubbleProps {
   message: Message
