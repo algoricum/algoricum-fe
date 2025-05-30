@@ -54,7 +54,7 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
                   gap={8}
                   onClick={() => menuHandler(item.key)}
                 >
-                  {isSelected(item?.key) ? item.selectedIcon : item.icon}
+                  {isSelected(item?.key) ? item.selectedicon : item.icon}
                   <p
                     className={`min-w-[80px] capitalize font-PoppinsSemiBold sm:text-xs text-[10px] text-center ${isSelected(item?.key) ? "text-Primary1000" : "text-Gray500"}`}
                   >

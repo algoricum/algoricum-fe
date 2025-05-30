@@ -1,11 +1,12 @@
-import { ArticleIcon, SettingIcon } from "@/icons";
+import { ChatIcon } from "@/icons";
+
 
 const menuItems = [
   {
-    key: "settings",
-    icon: <SettingIcon />,
-    selectedIcon: <SettingIcon color="var(--color-primary-1000)" />,
-    label: "Settings",
+    key: "leads",
+    icon: <ChatIcon />,
+    selectedicon: <ChatIcon color="var(--color-primary-1000)" />,
+    label: "Leads",
     disabled: false,
   },
 ];

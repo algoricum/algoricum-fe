@@ -57,6 +57,33 @@ export const getClinicData = async (): Promise<Clinic | null> => {
 
   return null;
 };
+export const getAssistantByClinicId = async (clinicId:string) => {
+  try {
+    if (!clinicId) {
+      throw new Error('Clinic ID is required');
+    }
+
+    // Query the assistants table to get the assistant for this clinic
+    const { data: assistant, error } = await supabase
+      .from('assistants')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .single(); // Use single() since each clinic should have one assistant
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No assistant found for this clinic
+        return null;
+      }
+      throw error;
+    }
+
+    return assistant;
+  } catch (error) {
+    console.error('Error fetching assistant for clinic:', error);
+    throw error;
+  }
+};
 export const getClincApiKey = async (clinicId: string): Promise<String | null> => {
   try {
     // Get user-clinic mapping
