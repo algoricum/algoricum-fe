@@ -31,7 +31,7 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
       case "settings":
         return push("/settings/chatbot");
       default:
-        return push("/content/articles");
+        return push("/settings/chatbot");
     }
   };
 
