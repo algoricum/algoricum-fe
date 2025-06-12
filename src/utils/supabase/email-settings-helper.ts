@@ -1,12 +1,12 @@
-// utils/supabase/email-settings-helper.ts
+// utils/supabase/email-settings-helper.ts - Updated for IMAP
 
 import { createClient } from "./config/client"
-
 
 // Types and Interfaces
 export interface EmailSettings {
   id?: string
   clinic_id: string
+  // SMTP Settings
   smtp_host: string
   smtp_port: number
   smtp_user: string
@@ -14,11 +14,15 @@ export interface EmailSettings {
   smtp_sender_name: string
   smtp_sender_email: string
   smtp_use_tls: boolean
-  pop_server: string
-  pop_port: number
-  pop_user: string
-  pop_password: string
-  pop_use_ssl: boolean
+  // IMAP Settings (updated from POP3)
+  imap_server: string
+  imap_port: number
+  imap_user: string
+  imap_password: string
+  imap_use_ssl: boolean
+  imap_folder?: string
+  last_processed_uid?: number
+  // Processing Settings
   auto_reply_enabled: boolean
   check_frequency_minutes: number
   last_email_check?: string | null
@@ -27,6 +31,7 @@ export interface EmailSettings {
 }
 
 export interface EmailSettingsInput {
+  // SMTP Settings
   smtp_host: string
   smtp_port: number
   smtp_user: string
@@ -34,11 +39,13 @@ export interface EmailSettingsInput {
   smtp_sender_name: string
   smtp_sender_email: string
   smtp_use_tls: boolean
-  pop_server: string
-  pop_port: number
-  pop_user: string
-  pop_password: string
-  pop_use_ssl: boolean
+  // IMAP Settings (updated from POP3)
+  imap_server: string
+  imap_port: number
+  imap_user: string
+  imap_password: string
+  imap_use_ssl: boolean
+  // Processing Settings
   auto_reply_enabled: boolean
   check_frequency_minutes: number
 }
@@ -53,17 +60,51 @@ export interface EmailSettingsWithClinic extends EmailSettings {
 export interface EmailTestResult {
   success: boolean
   message?: string
+  summary?: {
+    smtp_status: string
+    imap_status: string
+    test_email_sent: boolean
+    mailbox_access: boolean
+  }
   details?: {
     smtp: {
       success: boolean
-      error?: string
-    }
-    pop: {
-      success: boolean
-      error?: string
       message?: string
+      error?: string
+      response_time?: number
+      details?: any
+    }
+    imap: {
+      success: boolean
+      message?: string
+      error?: string
+      response_time?: number
+      details?: {
+        hostname: string
+        port: number
+        username: string
+        useSsl: boolean
+        greeting?: string
+        folder_info?: any
+        status_info?: any
+        search_results?: any
+        available_folders?: any[]
+        capabilities_tested?: string[]
+      }
     }
     overall: boolean
+    test_timestamp: string
+  }
+  troubleshooting?: {
+    smtp_issues: Array<{
+      issue: string
+      solutions: string[]
+    }>
+    imap_issues: Array<{
+      issue: string
+      solutions: string[]
+    }>
+    general_tips: string[]
   }
 }
 
@@ -124,6 +165,7 @@ export const saveEmailSettings = async (
 
     const emailSettingsData: Partial<EmailSettings> = {
       clinic_id: clinicId,
+      // SMTP settings
       smtp_host: settings.smtp_host,
       smtp_port: settings.smtp_port,
       smtp_user: settings.smtp_user,
@@ -131,11 +173,14 @@ export const saveEmailSettings = async (
       smtp_sender_name: settings.smtp_sender_name,
       smtp_sender_email: settings.smtp_sender_email,
       smtp_use_tls: settings.smtp_use_tls,
-      pop_server: settings.pop_server,
-      pop_port: settings.pop_port,
-      pop_user: settings.pop_user,
-      pop_password: settings.pop_password,
-      pop_use_ssl: settings.pop_use_ssl,
+      // IMAP settings (updated from POP3)
+      imap_server: settings.imap_server,
+      imap_port: settings.imap_port,
+      imap_user: settings.imap_user,
+      imap_password: settings.imap_password,
+      imap_use_ssl: settings.imap_use_ssl,
+      imap_folder: 'INBOX', // Default folder
+      // Processing settings
       auto_reply_enabled: settings.auto_reply_enabled,
       check_frequency_minutes: settings.check_frequency_minutes,
       updated_at: new Date().toISOString()
@@ -155,7 +200,10 @@ export const saveEmailSettings = async (
       // Insert new record
       result = await supabase
         .from("email_settings")
-        .insert(emailSettingsData)
+        .insert({
+          ...emailSettingsData,
+          created_at: new Date().toISOString()
+        })
         .select()
         .single()
     }
@@ -204,17 +252,24 @@ export const testEmailConnection = async (
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      const errorText = await response.text()
+      throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`)
     }
 
     const result: EmailTestResult = await response.json()
     return result
 
   } catch (error: any) {
-    console.error('Test connection error:', error)
+    console.log(error,error.details)
     return {
       success: false,
-      message: error.message || "Failed to test email connection"
+      message: error.message || "Failed to test email connection",
+      details: {
+        smtp: { success: error.details.smtp.success, error: error.details.smtp.message },
+        imap: { success: error.details.imap.success, error: error.details.imap.message },
+        overall: false,
+        test_timestamp: new Date().toISOString()
+      }
     }
   }
 }
@@ -348,18 +403,19 @@ export const validateEmailSettings = (settings: Partial<EmailSettingsInput>): Va
   if (!settings.smtp_sender_email) errors.push("Sender email is required")
   if (!settings.smtp_sender_name) errors.push("Sender name is required")
   
-  // Port validation
+  // SMTP port validation
   if (!settings.smtp_port || settings.smtp_port < 1 || settings.smtp_port > 65535) {
     errors.push("Valid SMTP port is required (1-65535)")
   }
 
-  // POP3 validation
-  if (!settings.pop_server) errors.push("POP3 server is required")
-  if (!settings.pop_user) errors.push("POP3 username is required")
-  if (!settings.pop_password) errors.push("POP3 password is required")
+  // IMAP validation (updated from POP3)
+  if (!settings.imap_server) errors.push("IMAP server is required")
+  if (!settings.imap_user) errors.push("IMAP username is required")
+  if (!settings.imap_password) errors.push("IMAP password is required")
   
-  if (!settings.pop_port || settings.pop_port < 1 || settings.pop_port > 65535) {
-    errors.push("Valid POP3 port is required (1-65535)")
+  // IMAP port validation
+  if (!settings.imap_port || settings.imap_port < 1 || settings.imap_port > 65535) {
+    errors.push("Valid IMAP port is required (1-65535)")
   }
 
   // Email format validation
@@ -370,8 +426,8 @@ export const validateEmailSettings = (settings: Partial<EmailSettingsInput>): Va
   if (settings.smtp_sender_email && !emailRegex.test(settings.smtp_sender_email)) {
     errors.push("Sender email must be a valid email address")
   }
-  if (settings.pop_user && !emailRegex.test(settings.pop_user)) {
-    errors.push("POP3 username must be a valid email address")
+  if (settings.imap_user && !emailRegex.test(settings.imap_user)) {
+    errors.push("IMAP username must be a valid email address")
   }
 
   // Processing settings validation
@@ -393,8 +449,8 @@ export const getDefaultEmailSettings = (): Partial<EmailSettingsInput> => {
   return {
     smtp_port: 465,
     smtp_use_tls: true,
-    pop_port: 995,
-    pop_use_ssl: true,
+    imap_port: 993, // Updated from POP3 port 995
+    imap_use_ssl: true, // Updated from pop_use_ssl
     auto_reply_enabled: true,
     check_frequency_minutes: 5
   }
@@ -406,9 +462,217 @@ export const getDefaultEmailSettings = (): Partial<EmailSettingsInput> => {
 export const isEmailConfigured = async (clinicId: string): Promise<boolean> => {
   try {
     const { data } = await getEmailSettings(clinicId)
-    return !!data && !!data.smtp_host && !!data.pop_server
+    return !!data && !!data.smtp_host && !!data.imap_server // Updated from pop_server
   } catch (error) {
     console.error("Error checking email configuration:", error)
     return false
   }
+}
+
+/**
+ * Get common email provider settings for auto-configuration
+ */
+export const getProviderSettings = (emailDomain: string): Partial<EmailSettingsInput> | null => {
+  const domain = emailDomain.toLowerCase()
+  
+  const providers: Record<string, Partial<EmailSettingsInput>> = {
+    'gmail.com': {
+      smtp_host: 'smtp.gmail.com',
+      smtp_port: 465,
+      smtp_use_tls: true,
+      imap_server: 'imap.gmail.com',
+      imap_port: 993,
+      imap_use_ssl: true
+    },
+    'outlook.com': {
+      smtp_host: 'smtp-mail.outlook.com',
+      smtp_port: 587,
+      smtp_use_tls: true,
+      imap_server: 'outlook.office365.com',
+      imap_port: 993,
+      imap_use_ssl: true
+    },
+    'hotmail.com': {
+      smtp_host: 'smtp-mail.outlook.com',
+      smtp_port: 587,
+      smtp_use_tls: true,
+      imap_server: 'outlook.office365.com',
+      imap_port: 993,
+      imap_use_ssl: true
+    },
+    'yahoo.com': {
+      smtp_host: 'smtp.mail.yahoo.com',
+      smtp_port: 465,
+      smtp_use_tls: true,
+      imap_server: 'imap.mail.yahoo.com',
+      imap_port: 993,
+      imap_use_ssl: true
+    },
+    'live.com': {
+      smtp_host: 'smtp-mail.outlook.com',
+      smtp_port: 587,
+      smtp_use_tls: true,
+      imap_server: 'outlook.office365.com',
+      imap_port: 993,
+      imap_use_ssl: true
+    }
+  }
+
+  return providers[domain] || null
+}
+
+/**
+ * Auto-fill provider settings based on email address
+ */
+export const autoFillProviderSettings = (
+  emailAddress: string,
+  currentSettings: Partial<EmailSettingsInput>
+): Partial<EmailSettingsInput> => {
+  const domain = emailAddress.split('@')[1]?.toLowerCase()
+  
+  if (!domain) {
+    return currentSettings
+  }
+  
+  const providerSettings = getProviderSettings(domain)
+  
+  if (providerSettings) {
+    return {
+      ...currentSettings,
+      ...providerSettings,
+      smtp_user: emailAddress,
+      imap_user: emailAddress,
+      smtp_sender_email: emailAddress
+    }
+  }
+  
+  return currentSettings
+}
+
+/**
+ * Get email monitoring status for display
+ */
+export const getEmailMonitoringStatus = (settings: EmailSettings | null) => {
+  if (!settings) {
+    return {
+      status: 'not_configured',
+      message: 'Email not configured',
+      color: 'gray',
+      badge: '⚪'
+    }
+  }
+  
+  if (!isCompletelyConfigured(settings)) {
+    return {
+      status: 'incomplete',
+      message: 'Email configuration incomplete',
+      color: 'orange',
+      badge: '🟡'
+    }
+  }
+  
+  if (!settings.auto_reply_enabled) {
+    return {
+      status: 'disabled',
+      message: 'Auto-reply disabled',
+      color: 'red',
+      badge: '🔴'
+    }
+  }
+  
+  const lastCheck = settings.last_email_check
+  if (!lastCheck) {
+    return {
+      status: 'configured',
+      message: 'Email configured, never checked',
+      color: 'blue',
+      badge: '🔵'
+    }
+  }
+  
+  const lastCheckDate = new Date(lastCheck)
+  const now = new Date()
+  const timeDiff = now.getTime() - lastCheckDate.getTime()
+  const minutesDiff = Math.floor(timeDiff / (1000 * 60))
+  
+  if (minutesDiff > settings.check_frequency_minutes * 2) {
+    return {
+      status: 'warning',
+      message: `Last checked ${minutesDiff} minutes ago`,
+      color: 'orange',
+      badge: '🟡'
+    }
+  }
+  
+  return {
+    status: 'active',
+    message: `Active, last checked ${minutesDiff} minutes ago`,
+    color: 'green',
+    badge: '🟢'
+  }
+}
+
+/**
+ * Check if email settings are completely configured
+ */
+export const isCompletelyConfigured = (settings: EmailSettings): boolean => {
+  return !!(
+    settings.smtp_host &&
+    settings.smtp_port &&
+    settings.smtp_user &&
+    settings.smtp_password &&
+    settings.smtp_sender_email &&
+    settings.smtp_sender_name &&
+    settings.imap_server && // Updated from pop_server
+    settings.imap_port && // Updated from pop_port
+    settings.imap_user && // Updated from pop_user
+    settings.imap_password // Updated from pop_password
+  )
+}
+
+/**
+ * Migration helper for existing POP3 configurations
+ * This helps migrate users from POP3 to IMAP
+ */
+export const migratePOP3ToIMAP = (popSettings: any): Partial<EmailSettingsInput> => {
+  const imapSettings: Partial<EmailSettingsInput> = {}
+  
+  // Copy SMTP settings as-is
+  if (popSettings.smtp_host) imapSettings.smtp_host = popSettings.smtp_host
+  if (popSettings.smtp_port) imapSettings.smtp_port = popSettings.smtp_port
+  if (popSettings.smtp_user) imapSettings.smtp_user = popSettings.smtp_user
+  if (popSettings.smtp_password) imapSettings.smtp_password = popSettings.smtp_password
+  if (popSettings.smtp_sender_name) imapSettings.smtp_sender_name = popSettings.smtp_sender_name
+  if (popSettings.smtp_sender_email) imapSettings.smtp_sender_email = popSettings.smtp_sender_email
+  if (typeof popSettings.smtp_use_tls === 'boolean') imapSettings.smtp_use_tls = popSettings.smtp_use_tls
+  
+  // Migrate POP3 to IMAP settings
+  if (popSettings.pop_server) {
+    // Convert common POP3 servers to IMAP equivalents
+    const popToImapMap: Record<string, string> = {
+      'pop.gmail.com': 'imap.gmail.com',
+      'pop3.live.com': 'outlook.office365.com',
+      'pop.mail.yahoo.com': 'imap.mail.yahoo.com'
+    }
+    
+    imapSettings.imap_server = popToImapMap[popSettings.pop_server] || 
+                               popSettings.pop_server.replace('pop', 'imap')
+  }
+  
+  // Convert POP3 port (995) to IMAP port (993)
+  if (popSettings.pop_port === 995) {
+    imapSettings.imap_port = 993
+  } else if (popSettings.pop_port) {
+    imapSettings.imap_port = popSettings.pop_port
+  }
+  
+  if (popSettings.pop_user) imapSettings.imap_user = popSettings.pop_user
+  if (popSettings.pop_password) imapSettings.imap_password = popSettings.pop_password
+  if (typeof popSettings.pop_use_ssl === 'boolean') imapSettings.imap_use_ssl = popSettings.pop_use_ssl
+  
+  // Copy processing settings
+  if (typeof popSettings.auto_reply_enabled === 'boolean') imapSettings.auto_reply_enabled = popSettings.auto_reply_enabled
+  if (popSettings.check_frequency_minutes) imapSettings.check_frequency_minutes = popSettings.check_frequency_minutes
+  
+  return imapSettings
 }

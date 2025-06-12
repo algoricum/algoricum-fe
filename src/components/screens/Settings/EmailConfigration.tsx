@@ -1,18 +1,19 @@
 "use client"
 import { useState, useEffect, JSX } from "react"
-import { Form, Input, Switch, InputNumber, Card, Space, Alert } from "antd"
+import { Form, Input, Switch, InputNumber, Card, Space, Alert, Modal } from "antd"
 import { Button } from "@/components/elements"
-import { EyeInvisibleOutlined, EyeTwoTone, CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons"
+import { EyeInvisibleOutlined, EyeTwoTone, CheckCircleOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from "@ant-design/icons"
 import { SuccessToast, ErrorToast } from "@/helpers/toast"
 import { getClinicData } from "@/utils/supabase/clinic-helper"
-import { 
-  getEmailSettings, 
-  saveEmailSettings, 
-  testEmailConnection, 
+import {
+  getEmailSettings,
+  saveEmailSettings,
+  testEmailConnection,
   validateEmailSettings,
   getDefaultEmailSettings,
   type EmailSettings,
-  type EmailSettingsInput
+  type EmailSettingsInput,
+  type EmailTestResult
 } from "@/utils/supabase/email-settings-helper"
 
 interface ClinicData {
@@ -28,6 +29,8 @@ const EmailConfiguration: React.FC = () => {
   const [isConfigured, setIsConfigured] = useState<boolean>(false)
   const [lastChecked, setLastChecked] = useState<string | null>(null)
   const [clinicData, setClinicData] = useState<ClinicData | null>(null)
+  const [testResults, setTestResults] = useState<EmailTestResult | null>(null)
+  const [showTestModal, setShowTestModal] = useState<boolean>(false)
 
   useEffect(() => {
     initializeComponent()
@@ -37,7 +40,7 @@ const EmailConfiguration: React.FC = () => {
     try {
       const clinicRes = await getClinicData()
       setClinicData(clinicRes)
-      
+
       if (clinicRes?.id) {
         await fetchEmailSettings(clinicRes.id)
       }
@@ -50,7 +53,7 @@ const EmailConfiguration: React.FC = () => {
   const fetchEmailSettings = async (clinicId: string): Promise<void> => {
     try {
       setLoading(true)
-      
+
       const { data, error } = await getEmailSettings(clinicId)
 
       if (error) {
@@ -58,7 +61,7 @@ const EmailConfiguration: React.FC = () => {
       }
 
       if (data) {
-        // Set form values with all fields
+        // Set form values with all fields (updated for IMAP)
         form.setFieldsValue({
           // SMTP Settings
           smtp_host: data.smtp_host,
@@ -69,12 +72,12 @@ const EmailConfiguration: React.FC = () => {
           smtp_sender_email: data.smtp_sender_email,
           smtp_use_tls: data.smtp_use_tls !== false, // Default to true
 
-          // POP Settings
-          pop_server: data.pop_server,
-          pop_port: data.pop_port || 995,
-          pop_user: data.pop_user,
-          pop_password: data.pop_password,
-          pop_use_ssl: data.pop_use_ssl !== false, // Default to true
+          // IMAP Settings (updated from POP)
+          imap_server: data.imap_server,
+          imap_port: data.imap_port || 993,
+          imap_user: data.imap_user,
+          imap_password: data.imap_password,
+          imap_use_ssl: data.imap_use_ssl !== false, // Default to true
 
           // Processing Settings
           auto_reply_enabled: data.auto_reply_enabled !== false, // Default to true
@@ -121,8 +124,8 @@ const EmailConfiguration: React.FC = () => {
 
       setIsConfigured(true)
       SuccessToast(
-        isUpdate 
-          ? "Email settings updated successfully" 
+        isUpdate
+          ? "Email settings updated successfully"
           : "Email settings created successfully"
       )
 
@@ -155,21 +158,31 @@ const EmailConfiguration: React.FC = () => {
       }
 
       const result = await testEmailConnection(values, clinicData.id)
+      setTestResults(result)
 
+      // Show user-friendly messages based on test results
       if (result.success) {
-        SuccessToast(result.message || "Email connection test successful!")
+        SuccessToast("🎉 Email configuration test successful! Both SMTP and IMAP are working correctly.")
+        setShowTestModal(true)
       } else {
-        ErrorToast(result.message || "Email connection test failed. Please check your settings.")
-        
-        // Show detailed error information if available
-        if (result.details) {
-          if (result.details.smtp?.error) {
-            console.error('SMTP Error:', result.details.smtp.error)
-          }
-          if (result.details.pop?.error) {
-            console.error('POP3 Error:', result.details.pop.error)
-          }
+        // Show detailed status for partial success or complete failure
+        const smtpSuccess = result.details?.smtp?.success === true;
+        const imapSuccess = result.details?.imap?.success === true;
+        console.log(result,result.details)
+        const smtpStatus = smtpSuccess ? "✅ SMTP (Outgoing)" : "❌ SMTP (Outgoing)";
+        const imapStatus = imapSuccess ? "✅ IMAP (Incoming)" : "❌ IMAP (Incoming)";
+
+        if (smtpSuccess && !imapSuccess) {
+          ErrorToast(`${smtpStatus} working, ${imapStatus} failed. Check IMAP settings and App Password.`);
+        } else if (!smtpSuccess && imapSuccess) {
+          ErrorToast(`${smtpStatus} failed, ${imapStatus} working. Check SMTP settings.`);
+        } else if (!smtpSuccess && !imapSuccess) {
+          ErrorToast(`Both ${smtpStatus} and ${imapStatus} failed. Please check all settings.`);
+        } else {
+          SuccessToast("🎉 Email configuration test successful! Both SMTP and IMAP are working correctly.");
         }
+
+        setShowTestModal(true)
       }
 
     } catch (error: any) {
@@ -235,7 +248,7 @@ const EmailConfiguration: React.FC = () => {
               name="smtp_host"
               rules={[{ required: true, message: "Please enter SMTP host" }]}
             >
-              <Input placeholder="e.g., smtp.gmail.com" />
+              <Input placeholder="smtp.gmail.com" />
             </Form.Item>
 
             <Form.Item
@@ -259,16 +272,17 @@ const EmailConfiguration: React.FC = () => {
                 { type: "email", message: "Please enter a valid email address" }
               ]}
             >
-              <Input placeholder="e.g., username@gmail.com" />
+              <Input placeholder="your-email@gmail.com" />
             </Form.Item>
 
             <Form.Item
               label="SMTP Password"
               name="smtp_password"
               rules={[{ required: true, message: "Please enter SMTP password" }]}
+              help="For Gmail: Use 16-character App Password"
             >
               <Input.Password
-                placeholder="Enter SMTP password or app password"
+                placeholder="xxxx xxxx xxxx xxxx"
                 iconRender={(visible: boolean) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
               />
             </Form.Item>
@@ -278,7 +292,7 @@ const EmailConfiguration: React.FC = () => {
               name="smtp_sender_name"
               rules={[{ required: true, message: "Please enter sender name" }]}
             >
-              <Input placeholder="e.g., Clinic Support" />
+              <Input placeholder="Clinic Support" />
             </Form.Item>
 
             <Form.Item
@@ -289,7 +303,7 @@ const EmailConfiguration: React.FC = () => {
                 { type: "email", message: "Please enter a valid email address" }
               ]}
             >
-              <Input placeholder="e.g., support@yourclinic.com" />
+              <Input placeholder="your-email@gmail.com" />
             </Form.Item>
           </div>
 
@@ -302,61 +316,6 @@ const EmailConfiguration: React.FC = () => {
           </Form.Item>
         </Card>
 
-        {/* POP3 Settings Card */}
-        <Card title="POP3 Settings (Incoming Email)" className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Form.Item
-              label="POP3 Server"
-              name="pop_server"
-              rules={[{ required: true, message: "Please enter POP server" }]}
-            >
-              <Input placeholder="e.g., pop.gmail.com" />
-            </Form.Item>
-
-            <Form.Item
-              label="POP3 Port"
-              name="pop_port"
-              rules={[{ required: true, message: "Please enter POP port" }]}
-            >
-              <InputNumber
-                placeholder="995"
-                min={1}
-                max={65535}
-                className="w-full"
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="POP3 Username"
-              name="pop_user"
-              rules={[
-                { required: true, message: "Please enter POP username" },
-                { type: "email", message: "Please enter a valid email address" }
-              ]}
-            >
-              <Input placeholder="e.g., username@gmail.com" />
-            </Form.Item>
-
-            <Form.Item
-              label="POP3 Password"
-              name="pop_password"
-              rules={[{ required: true, message: "Please enter POP password" }]}
-            >
-              <Input.Password
-                placeholder="Enter POP password or app password"
-                iconRender={(visible: boolean) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
-              />
-            </Form.Item>
-          </div>
-
-          <Form.Item
-            label="Use SSL"
-            name="pop_use_ssl"
-            valuePropName="checked"
-          >
-            <Switch />
-          </Form.Item>
-        </Card>
 
         {/* Processing Settings Card */}
         <Card title="Email Processing Settings" className="mb-6">
@@ -407,24 +366,25 @@ const EmailConfiguration: React.FC = () => {
           </Button>
         </div>
       </Form>
-
-      {/* Help Text */}
+      {/* Help Text - Updated for IMAP */}
       <Alert
-        message="Email Setup Tips"
+        message="Quick Setup Guide"
         description={
           <div>
-            <p><strong>For Gmail:</strong></p>
-            <ul className="ml-4 list-disc">
-              <li>SMTP: smtp.gmail.com, Port: 465 (SSL) or 587 (TLS)</li>
-              <li>POP3: pop.gmail.com, Port: 995</li>
-              <li>Use App Password (not your regular password)</li>
-              <li>Enable 2-factor authentication first</li>
-            </ul>
-            <p className="mt-2"><strong>For Outlook:</strong></p>
-            <ul className="ml-4 list-disc">
-              <li>SMTP: smtp-mail.outlook.com, Port: 587</li>
-              <li>POP3: outlook.office365.com, Port: 995</li>
-            </ul>
+            <p><strong>🚀 Gmail Quick Setup:</strong></p>
+            <ol className="ml-4 list-decimal text-sm">
+              <li><strong>Enable 2FA:</strong> myaccount.google.com → Security → 2-Step Verification</li>
+              <li><strong>Create App Password:</strong> Security → App passwords → Mail → Generate</li>
+              <li><strong>Enable IMAP:</strong> Gmail Settings → Forwarding and POP/IMAP → Enable IMAP</li>
+              <li><strong>Use these settings:</strong>
+                <ul className="ml-4 list-disc">
+                  <li>SMTP: smtp.gmail.com:465 (SSL)</li>
+                  <li>IMAP: imap.gmail.com:993 (SSL)</li>
+                  <li>Username: your-email@gmail.com</li>
+                  <li>Password: App Password (same for both)</li>
+                </ul>
+              </li>
+            </ol>
           </div>
         }
         type="info"
