@@ -1,198 +1,395 @@
 "use client"
-import { useState, useEffect } from "react"
-import { Form, Input, Divider } from "antd"
+import { useState, useEffect, JSX } from "react"
+import { Form, Input, Switch, InputNumber, Card, Space, Alert, Modal } from "antd"
 import { Button } from "@/components/elements"
-import { EyeInvisibleOutlined, EyeTwoTone } from "@ant-design/icons"
+import { EyeInvisibleOutlined, EyeTwoTone, CheckCircleOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from "@ant-design/icons"
 import { SuccessToast, ErrorToast } from "@/helpers/toast"
-import { createClient } from "@/utils/supabase/config/client"
+import { getClinicData } from "@/utils/supabase/clinic-helper"
+import {
+  getEmailSettings,
+  saveEmailSettings,
+  testEmailConnection,
+  validateEmailSettings,
+  getDefaultEmailSettings,
+  type EmailSettings,
+  type EmailSettingsInput,
+  type EmailTestResult
+} from "@/utils/supabase/email-settings-helper"
 
-const EmailConfiguration = () => {
-  const [smtpForm] = Form.useForm()
-  const [popForm] = Form.useForm()
-  const [loading, setLoading] = useState(false)
+interface ClinicData {
+  id: string
+  name: string
+  [key: string]: any
+}
+
+const EmailConfiguration: React.FC = () => {
+  const [form] = Form.useForm<EmailSettingsInput>()
+  const [loading, setLoading] = useState<boolean>(false)
+  const [testingConnection, setTestingConnection] = useState<boolean>(false)
+  const [isConfigured, setIsConfigured] = useState<boolean>(false)
+  const [lastChecked, setLastChecked] = useState<string | null>(null)
+  const [clinicData, setClinicData] = useState<ClinicData | null>(null)
+  const [testResults, setTestResults] = useState<EmailTestResult | null>(null)
+  const [showTestModal, setShowTestModal] = useState<boolean>(false)
 
   useEffect(() => {
-    const fetchEmailSettings = async () => {
-      try {
-        // setLoading(true)
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from("email_settings")
-          .select("*")
-          .eq("clinic_id", localStorage.getItem("clinic_id"))
-          .single()
+    initializeComponent()
+  }, [])
 
-        if (error && error.code !== "PGRST116") throw error
-        if (data) {
-          smtpForm.setFieldsValue({
-            smtp_host: data.smtp_host,
-            smtp_user: data.smtp_user,
-            smtp_password: data.smtp_password,
-            smtp_sender_name: data.smtp_sender_name,
-            smtp_sender_email: data.smtp_sender_email,
-          })
+  const initializeComponent = async (): Promise<void> => {
+    try {
+      const clinicRes = await getClinicData()
+      setClinicData(clinicRes)
 
-          popForm.setFieldsValue({
-            pop_server: data.pop_server,
-            pop_port: data.pop_port,
-            pop_user: data.pop_user,
-            pop_password: data.pop_password,
-          })
-        }
-      } catch (error: any) {
-        console.error("Error fetching email settings:", error.message)
-      } finally {
-        setLoading(false)
+      if (clinicRes?.id) {
+        await fetchEmailSettings(clinicRes.id)
       }
+    } catch (error) {
+      console.error("Error initializing component:", error)
+      ErrorToast("Failed to load clinic data")
     }
+  }
 
-    fetchEmailSettings()
-  }, [smtpForm, popForm])
-
-  const handleSaveSMTP = async (values: any) => {
+  const fetchEmailSettings = async (clinicId: string): Promise<void> => {
     try {
       setLoading(true)
-      const supabase = createClient()
 
-      const { error } = await supabase.from("email_settings").upsert({
-        clinic_id: localStorage.getItem("clinic_id"),
-        smtp_host: values.smtp_host,
-        smtp_user: values.smtp_user,
-        smtp_password: values.smtp_password,
-        smtp_sender_name: values.smtp_sender_name,
-        smtp_sender_email: values.smtp_sender_email,
-      })
+      const { data, error } = await getEmailSettings(clinicId)
 
-      if (error) throw error
-      SuccessToast("SMTP settings saved successfully")
+      if (error) {
+        throw error
+      }
+
+      if (data) {
+        // Set form values with all fields (updated for IMAP)
+        form.setFieldsValue({
+          // SMTP Settings
+          smtp_host: data.smtp_host,
+          smtp_port: data.smtp_port || 465,
+          smtp_user: data.smtp_user,
+          smtp_password: data.smtp_password,
+          smtp_sender_name: data.smtp_sender_name,
+          smtp_sender_email: data.smtp_sender_email,
+          smtp_use_tls: data.smtp_use_tls !== false, // Default to true
+
+          // IMAP Settings (updated from POP)
+          imap_server: data.imap_server,
+          imap_port: data.imap_port || 993,
+          imap_user: data.imap_user,
+          imap_password: data.imap_password,
+          imap_use_ssl: data.imap_use_ssl !== false, // Default to true
+
+          // Processing Settings
+          auto_reply_enabled: data.auto_reply_enabled !== false, // Default to true
+          check_frequency_minutes: data.check_frequency_minutes || 5,
+        })
+
+        setIsConfigured(true)
+        setLastChecked(data.last_email_check || null)
+      } else {
+        // Set default values for new configuration
+        const defaultSettings = getDefaultEmailSettings()
+        form.setFieldsValue(defaultSettings)
+        setIsConfigured(false)
+      }
     } catch (error: any) {
-      ErrorToast(error.message || "Failed to save SMTP settings")
+      console.error("Error fetching email settings:", error)
+      ErrorToast("Failed to load email settings")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSavePOP = async (values: any) => {
+  const handleSaveSettings = async (values: EmailSettingsInput): Promise<void> => {
     try {
       setLoading(true)
-      const supabase = createClient()
 
-      const { error } = await supabase.from("email_settings").upsert({
-        clinic_id: localStorage.getItem("clinic_id"),
-        pop_server: values.pop_server,
-        pop_port: values.pop_port,
-        pop_user: values.pop_user,
-        pop_password: values.pop_password,
-      })
+      if (!clinicData?.id) {
+        ErrorToast("Clinic data not available. Please refresh the page.")
+        return
+      }
 
-      if (error) throw error
-      SuccessToast("POP settings saved successfully")
+      // Validate settings before saving
+      const validation = validateEmailSettings(values)
+      if (!validation.isValid) {
+        ErrorToast(`Validation failed: ${validation.errors.join(", ")}`)
+        return
+      }
+
+      const { data, error, isUpdate } = await saveEmailSettings(clinicData.id, values)
+
+      if (error) {
+        throw error
+      }
+
+      setIsConfigured(true)
+      SuccessToast(
+        isUpdate
+          ? "Email settings updated successfully"
+          : "Email settings created successfully"
+      )
+
+      // Refresh the data
+      await fetchEmailSettings(clinicData.id)
+
     } catch (error: any) {
-      ErrorToast(error.message || "Failed to save POP settings")
+      console.error("Error saving email settings:", error)
+      ErrorToast(error.message || "Failed to save email settings")
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleTestConnection = async (): Promise<void> => {
+    try {
+      setTestingConnection(true)
+      const values = form.getFieldsValue()
+
+      if (!clinicData?.id) {
+        ErrorToast("Clinic data not available. Please refresh the page.")
+        return
+      }
+
+      // Validate required fields
+      const validation = validateEmailSettings(values)
+      if (!validation.isValid) {
+        ErrorToast(`Please fix the following issues: ${validation.errors.join(", ")}`)
+        return
+      }
+
+      const result = await testEmailConnection(values, clinicData.id)
+      setTestResults(result)
+
+      // Show user-friendly messages based on test results
+      if (result.success) {
+        SuccessToast("🎉 Email configuration test successful! Both SMTP and IMAP are working correctly.")
+        setShowTestModal(true)
+      } else {
+        // Show detailed status for partial success or complete failure
+        const smtpSuccess = result.details?.smtp?.success === true;
+        const imapSuccess = result.details?.imap?.success === true;
+        console.log(result,result.details)
+        const smtpStatus = smtpSuccess ? "✅ SMTP (Outgoing)" : "❌ SMTP (Outgoing)";
+        const imapStatus = imapSuccess ? "✅ IMAP (Incoming)" : "❌ IMAP (Incoming)";
+
+        if (smtpSuccess && !imapSuccess) {
+          ErrorToast(`${smtpStatus} working, ${imapStatus} failed. Check IMAP settings and App Password.`);
+        } else if (!smtpSuccess && imapSuccess) {
+          ErrorToast(`${smtpStatus} failed, ${imapStatus} working. Check SMTP settings.`);
+        } else if (!smtpSuccess && !imapSuccess) {
+          ErrorToast(`Both ${smtpStatus} and ${imapStatus} failed. Please check all settings.`);
+        } else {
+          SuccessToast("🎉 Email configuration test successful! Both SMTP and IMAP are working correctly.");
+        }
+
+        setShowTestModal(true)
+      }
+
+    } catch (error: any) {
+      console.error('Test connection error:', error)
+      ErrorToast("Failed to test email connection. Please try again.")
+    } finally {
+      setTestingConnection(false)
+    }
+  }
+
+  const getConnectionStatus = (): JSX.Element => {
+    if (!isConfigured) {
+      return (
+        <Alert
+          message="Email not configured"
+          description="Configure your email settings to start receiving and sending emails through your chatbot."
+          type="warning"
+          icon={<ExclamationCircleOutlined />}
+          showIcon
+        />
+      )
+    }
+
+    return (
+      <Alert
+        message="Email configured"
+        description={`Email settings are active. ${lastChecked ? `Last checked: ${new Date(lastChecked).toLocaleString()}` : 'Never checked'}`}
+        type="success"
+        icon={<CheckCircleOutlined />}
+        showIcon
+      />
+    )
+  }
+
+  // Show loading if clinic data isn't loaded yet
+  if (!clinicData) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Loading clinic data...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col gap-8">
-            <div className="bg-danger p-4 text-white">Development In Progress</div>
-      <div>
-        <h2 className="text-xl font-semibold mb-6">SMTP Settings</h2>
-        <Form form={smtpForm} layout="vertical" onFinish={handleSaveSMTP}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Form.Item label="Host" name="smtp_host" rules={[{ required: true, message: "Please enter SMTP host" }]}>
-              <Input placeholder="e.g., smtp.gmail.com" />
-            </Form.Item>
+    <div className="flex flex-col gap-6">
+      {/* Status Alert */}
+      {getConnectionStatus()}
 
-            <Form.Item label="User" name="smtp_user" rules={[{ required: true, message: "Please enter SMTP user" }]}>
-              <Input placeholder="e.g., username@gmail.com" />
-            </Form.Item>
-          </div>
-
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleSaveSettings}
+        disabled={loading}
+      >
+        {/* SMTP Settings Card */}
+        <Card title="SMTP Settings (Outgoing Email)" className="mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Form.Item
-              label="Send Name"
+              label="SMTP Host"
+              name="smtp_host"
+              rules={[{ required: true, message: "Please enter SMTP host" }]}
+            >
+              <Input placeholder="smtp.gmail.com" />
+            </Form.Item>
+
+            <Form.Item
+              label="SMTP Port"
+              name="smtp_port"
+              rules={[{ required: true, message: "Please enter SMTP port" }]}
+            >
+              <InputNumber
+                placeholder="465"
+                min={1}
+                max={65535}
+                className="w-full"
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="SMTP Username"
+              name="smtp_user"
+              rules={[
+                { required: true, message: "Please enter SMTP username" },
+                { type: "email", message: "Please enter a valid email address" }
+              ]}
+            >
+              <Input placeholder="your-email@gmail.com" />
+            </Form.Item>
+
+            <Form.Item
+              label="SMTP Password"
+              name="smtp_password"
+              rules={[{ required: true, message: "Please enter SMTP password" }]}
+              help="For Gmail: Use 16-character App Password"
+            >
+              <Input.Password
+                placeholder="xxxx xxxx xxxx xxxx"
+                iconRender={(visible: boolean) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="Sender Name"
               name="smtp_sender_name"
               rules={[{ required: true, message: "Please enter sender name" }]}
             >
-              <Input placeholder="e.g., Clinic Support" />
+              <Input placeholder="Clinic Support" />
             </Form.Item>
 
             <Form.Item
-              label="Send Email"
+              label="Sender Email"
               name="smtp_sender_email"
               rules={[
                 { required: true, message: "Please enter sender email" },
-                { type: "email", message: "Please enter a valid email" },
+                { type: "email", message: "Please enter a valid email address" }
               ]}
             >
-              <Input placeholder="e.g., support@yourclinic.com" />
+              <Input placeholder="your-email@gmail.com" />
             </Form.Item>
           </div>
 
           <Form.Item
-            label="Password"
-            name="smtp_password"
-            rules={[{ required: true, message: "Please enter SMTP password" }]}
+            label="Use TLS/SSL"
+            name="smtp_use_tls"
+            valuePropName="checked"
           >
-            <Input.Password
-              placeholder="Enter SMTP password"
-              iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
-            />
+            <Switch />
           </Form.Item>
+        </Card>
 
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading}>
-              Save
-            </Button>
-          </Form.Item>
-        </Form>
-      </div>
 
-      <Divider />
-
-      <div>
-        <h2 className="text-xl font-semibold mb-6">POP</h2>
-        <Form form={popForm} layout="vertical" onFinish={handleSavePOP}>
+        {/* Processing Settings Card */}
+        <Card title="Email Processing Settings" className="mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Form.Item
-              label="Server"
-              name="pop_server"
-              rules={[{ required: true, message: "Please enter POP server" }]}
+              label="Enable Auto Reply"
+              name="auto_reply_enabled"
+              valuePropName="checked"
             >
-              <Input placeholder="e.g., pop.gmail.com" />
-            </Form.Item>
-
-            <Form.Item label="Port" name="pop_port" rules={[{ required: true, message: "Please enter POP port" }]}>
-              <Input placeholder="e.g., 995" />
-            </Form.Item>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Form.Item label="User" name="pop_user" rules={[{ required: true, message: "Please enter POP user" }]}>
-              <Input placeholder="e.g., username@gmail.com" />
+              <Switch />
             </Form.Item>
 
             <Form.Item
-              label="Password"
-              name="pop_password"
-              rules={[{ required: true, message: "Please enter POP password" }]}
+              label="Check Frequency (minutes)"
+              name="check_frequency_minutes"
+              rules={[{ required: true, message: "Please enter check frequency" }]}
             >
-              <Input.Password
-                placeholder="Enter POP password"
-                iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+              <InputNumber
+                placeholder="5"
+                min={1}
+                max={60}
+                className="w-full"
               />
             </Form.Item>
           </div>
+        </Card>
 
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading}>
-              Save
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center">
+          <Space>
+            <Button
+              type="default"
+              onClick={handleTestConnection}
+              loading={testingConnection}
+              disabled={loading}
+            >
+              Test Connection
             </Button>
-          </Form.Item>
-        </Form>
-      </div>
+          </Space>
+
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={loading}
+            size="large"
+          >
+            {isConfigured ? 'Update Settings' : 'Save Settings'}
+          </Button>
+        </div>
+      </Form>
+      {/* Help Text - Updated for IMAP */}
+      <Alert
+        message="Quick Setup Guide"
+        description={
+          <div>
+            <p><strong>🚀 Gmail Quick Setup:</strong></p>
+            <ol className="ml-4 list-decimal text-sm">
+              <li><strong>Enable 2FA:</strong> myaccount.google.com → Security → 2-Step Verification</li>
+              <li><strong>Create App Password:</strong> Security → App passwords → Mail → Generate</li>
+              <li><strong>Enable IMAP:</strong> Gmail Settings → Forwarding and POP/IMAP → Enable IMAP</li>
+              <li><strong>Use these settings:</strong>
+                <ul className="ml-4 list-disc">
+                  <li>SMTP: smtp.gmail.com:465 (SSL)</li>
+                  <li>IMAP: imap.gmail.com:993 (SSL)</li>
+                  <li>Username: your-email@gmail.com</li>
+                  <li>Password: App Password (same for both)</li>
+                </ul>
+              </li>
+            </ol>
+          </div>
+        }
+        type="info"
+        showIcon
+      />
     </div>
   )
 }

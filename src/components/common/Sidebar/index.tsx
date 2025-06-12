@@ -1,4 +1,5 @@
 "use client";
+
 import footerItems from "@/constants/footerItems";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { CollapseIcon } from "@/icons";
@@ -8,14 +9,17 @@ import { useCallback, useState } from "react";
 import Logo from "../Logo";
 import { signOut } from "@/utils/supabase/auth-helper";
 import menuItems from "@/constants/menuItems";
+
 const Sidebar = () => {
   const { Sider } = Layout;
   const { push } = useRouter();
   let path = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   const selectedPath = path.startsWith("/content") ? "content" : path.split("/")[1];
   const pathMatch = path.includes("content") || path.includes("settings");
   const [isCollapsed, setIsCollapsed] = useState<boolean>(pathMatch);
+
   const menuHandler = async (key: string) => {
     switch (key) {
       case "leads":
@@ -48,8 +52,12 @@ const Sidebar = () => {
     }
   };
 
+  // Fixed isSelected function to handle profileSettings correctly
   const isSelected = useCallback(
     (route: string) => {
+      if (route === "profileSettings") {
+        return path.includes("/settings");
+      }
       return path.includes(route);
     },
     [path],
@@ -58,6 +66,7 @@ const Sidebar = () => {
   const toggleCollapsed = () => {
     setIsCollapsed(!isCollapsed);
   };
+
   return (
     <Sider
       width={280}
@@ -68,7 +77,6 @@ const Sidebar = () => {
     >
       <Flex vertical className="h-full">
         <Logo isSidebar={true} isCollapsed={isCollapsed} />
-
         {(!path.includes("content") || !path.includes("settings")) && (
           <Flex
             justify="center"
@@ -79,9 +87,7 @@ const Sidebar = () => {
             {<CollapseIcon />}
           </Flex>
         )}
-
         <div className="w-full h-[1px] my-6 bg-Gray400" />
-
         <Flex vertical justify="space-between" className="flex-1">
           <Menu
             onClick={({ key }) => menuHandler(key)}
@@ -89,19 +95,18 @@ const Sidebar = () => {
             mode="vertical"
             theme="light"
             className={`flex flex-col space-y-3 ${!isCollapsed ? "sidebarmenu" : "sidebarmenu-collapsed"}`}
-          items={menuItems}
+            items={menuItems}
           />
           <div className="flex flex-col justify-end items-center gap-2">
             {footerItems.map(({ key, label, icon: Icon, selectedicon }, index) => (
               <div
                 key={index}
-                className={`w-full flex flex-row items-center py-2 gap-2 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} border-b-2 border-transparent !border  hover:border-Primary900 rounded hover:!bg-Primary50  ${isSelected(key) && "!bg-Primary50 !rounded !border-Primary900"
-                  } ${isCollapsed ? "justify-center" : "px-4"}`}
+                className={`w-full flex flex-row items-center py-2 gap-2 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} border-b-2 border-transparent !border hover:border-Primary900 rounded hover:!bg-Primary50 ${isSelected(key) && "!bg-Primary50 !rounded !border-Primary900"} ${isCollapsed ? "justify-center" : "px-4"}`}
                 onClick={() => menuHandler(key)}
               >
                 {isSelected(key) ? selectedicon : Icon}
                 {!isCollapsed && (
-                  <p className={`${isSelected(key) ? "text-Primary1000  font-PoppinsSemiBold" : "text-Gray600"}`}>{label}</p>
+                  <p className={`${isSelected(key) ? "text-Primary1000 font-PoppinsSemiBold" : "text-Gray600"}`}>{label}</p>
                 )}
               </div>
             ))}
