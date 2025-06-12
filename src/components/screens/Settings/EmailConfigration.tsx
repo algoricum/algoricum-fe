@@ -316,6 +316,62 @@ const EmailConfiguration: React.FC = () => {
           </Form.Item>
         </Card>
 
+        {/* IMAP Settings Card */}
+        <Card title="IMAP Settings (Incoming Email)" className="mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Form.Item
+              label="IMAP Server"
+              name="imap_server"
+              rules={[{ required: true, message: "Please enter IMAP server" }]}
+            >
+              <Input placeholder="imap.gmail.com" />
+            </Form.Item>
+
+            <Form.Item
+              label="IMAP Port"
+              name="imap_port"
+              rules={[{ required: true, message: "Please enter IMAP port" }]}
+            >
+              <InputNumber
+                placeholder="993"
+                min={1}
+                max={65535}
+                className="w-full"
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="IMAP Username"
+              name="imap_user"
+              rules={[
+                { required: true, message: "Please enter IMAP username" },
+                { type: "email", message: "Please enter a valid email address" }
+              ]}
+            >
+              <Input placeholder="your-email@gmail.com" />
+            </Form.Item>
+
+            <Form.Item
+              label="IMAP Password"
+              name="imap_password"
+              rules={[{ required: true, message: "Please enter IMAP password" }]}
+              help="Use the SAME App Password as SMTP"
+            >
+              <Input.Password
+                placeholder="xxxx xxxx xxxx xxxx"
+                iconRender={(visible: boolean) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
+              />
+            </Form.Item>
+          </div>
+
+          <Form.Item
+            label="Use SSL/TLS"
+            name="imap_use_ssl"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+        </Card>
 
         {/* Processing Settings Card */}
         <Card title="Email Processing Settings" className="mb-6">

@@ -231,7 +231,6 @@ export const testEmailConnection = async (
   settings: EmailSettingsInput, 
   clinicId: string
 ): Promise<EmailTestResult> => {
-  try {
     const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
 
@@ -251,27 +250,8 @@ export const testEmailConnection = async (
       })
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`)
-    }
-
     const result: EmailTestResult = await response.json()
     return result
-
-  } catch (error: any) {
-    console.log(error,error.details)
-    return {
-      success: false,
-      message: error.message || "Failed to test email connection",
-      details: {
-        smtp: { success: error.details.smtp.success, error: error.details.smtp.message },
-        imap: { success: error.details.imap.success, error: error.details.imap.message },
-        overall: false,
-        test_timestamp: new Date().toISOString()
-      }
-    }
-  }
 }
 
 /**
