@@ -74,7 +74,7 @@ const Step2ContactInfo: React.FC<Step2Props> = ({ formData, updateFormData, onNe
             <Input placeholder="Type here" className="rounded-md py-2 px-3 bg-gray-50" />
           </Form.Item>
 
-          <Form.Item label="Calendly Link" rules={[{ required: true, message: "Please enter calendly link" }]}
+          <Form.Item label="Scheduling Link (optional)" rules={[{ required: false, message: "Please enter calendly link" }]}
             name="calendlyLink">
             <Input
               placeholder="Enter your Calendly URL"
@@ -82,7 +82,7 @@ const Step2ContactInfo: React.FC<Step2Props> = ({ formData, updateFormData, onNe
               prefix={<CalendarOutlined size={16} className="text-gray-400 mr-2" />}
             />
           </Form.Item>
-          <p className="text-sm text-gray-500 -mt-2">Add your Calendly URL for online scheduling</p>
+          <p className="text-sm text-gray-500 -mt-2">Add your scheduling link for online scheduling</p>
         </div>
 
         <div className="flex justify-end gap-3 mt-8 ">
