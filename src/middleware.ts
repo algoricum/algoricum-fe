@@ -10,7 +10,8 @@ const publicRoutes = [
   '/reset-password',
   '/verify-otp',
   '/auth/callback',
-  '/auth/oauth-redirect'
+  '/auth/oauth-redirect',
+  '/schedule-meeting'
 ];
 
 // Paths that should redirect to dashboard if already authenticated
