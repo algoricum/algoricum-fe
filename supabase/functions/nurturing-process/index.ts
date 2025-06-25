@@ -74,7 +74,7 @@ serve(async (req) => {
       cron_job = false, 
       process_all_chats = false,
       batch_process = false,
-      hours_threshold = 124 
+      hours_threshold = 24 
     } = requestData;
 
     // Handle cron job or batch processing
@@ -617,10 +617,6 @@ async function processBatchNurturing(
       ? threadsToProcess.filter(thread => thread.clinic_id === options.clinic_id)
       : threadsToProcess;
 
-    logInfo('Threads fetched for batch processing', { 
-      totalThreads: filteredThreads?.length || 0,
-      totalLeads: leadsData?.length || 0 
-    });
 
     // Filter by clinic if specified
     if (options.clinic_id && !options.process_all_chats) {
@@ -729,7 +725,7 @@ async function processSingleChat(
   if (emailSettingsError || !emailSettings) {
     logError(`No email settings found for clinic ${clinic_id}`, emailSettingsError);
     return {
-      chat_id,
+      thread_id,
       success: false,
       error: `No email configuration found for clinic ${clinic_id}`
     };
@@ -744,7 +740,7 @@ async function processSingleChat(
       hasPassword: !!emailSettings.smtp_password
     });
     return {
-      chat_id,
+      thread_id,
       success: false,
       error: 'Incomplete SMTP configuration in database'
     };
