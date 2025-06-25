@@ -74,7 +74,7 @@ serve(async (req) => {
       cron_job = false, 
       process_all_chats = false,
       batch_process = false,
-      hours_threshold = 24 
+      hours_threshold = 124 
     } = requestData;
 
     // Handle cron job or batch processing
@@ -627,13 +627,6 @@ async function processBatchNurturing(
       logInfo('Filtering by clinic_id', { clinic_id: options.clinic_id });
     }
 
-    // Filter by time threshold for cron jobs
-    
-    logInfo('Applying time threshold filter', { 
-      thresholdDate: thresholdDate.toISOString(),
-      hours_threshold: options.hours_threshold 
-    });
-
     const results = [];
     const batchSize = 5;
 
@@ -764,23 +757,23 @@ async function processSingleChat(
     smtp_use_tls: emailSettings.smtp_use_tls
   });
 
-  // Fetch recent chat messages
+  // Fetch recent conversation messages
   const { data: messagesData, error: messagesError } = await supabaseClient
-    .from('chat_messages')
+    .from('conversation')
     .select('id, message, is_from_user, timestamp, sender_type')
-    .eq('thread_id', chat_id)
+    .eq('thread_id', thread_id)
     .order('timestamp', { ascending: false })
     .limit(20);
 
   if (messagesError) {
-    logError(`Error fetching messages for chat ${chat_id}`, messagesError);
-    throw new Error('Error fetching chat messages');
+    logError(`Error fetching messages for thread ${thread_id}`, messagesError);
+    throw new Error('Error fetching conversation messages');
   }
 
   if (!messagesData || messagesData.length === 0) {
-    logInfo(`No messages found for chat ${chat_id}`);
+    logInfo(`No messages found for thread ${thread_id}`);
     return {
-      chat_id,
+      thread_id,
       success: true,
       action: 'skipped',
       message: 'No messages found'
@@ -1009,15 +1002,15 @@ ${clinicData.name} Team`;
           service_type: 'General',
           urgency: 'Normal',
           status: 'pending',
-          meeting_notes: `Chat ID: ${chat_id}, Initial contact - clinic info shared`,
+          meeting_notes: `Thread ID: ${thread_id}, Initial contact - clinic info shared`,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
 
       await supabaseClient
-        .from('chat_messages')
+        .from('conversation')
         .insert({
-          thread_id: chat_id,
+          thread_id: thread_id,
           message: clinicInfoMessage,
           is_from_user: false,
           sender_type: 'assistant',
@@ -1027,15 +1020,15 @@ ${clinicData.name} Team`;
         });
 
       await supabaseClient
-        .from('chat')
+        .from('threads')
         .update({ 
           status: 'clinic_info_shared',
           updated_at: new Date().toISOString()
         })
-        .eq('id', chat_id);
+        .eq('id', thread_id);
 
       result = {
-        chat_id,
+        thread_id,
         success: true,
         action: 'clinic_info_shared',
         message: 'Clinic information shared'
