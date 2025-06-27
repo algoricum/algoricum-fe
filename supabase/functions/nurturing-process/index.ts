@@ -236,7 +236,7 @@ async function processBatchNurturing(
     // Fetch clinic data for all clinics
     const { data: clinicsData, error: clinicsError } = await supabaseClient
       .from('clinic')
-      .select('id, name, phone, business_hours, calendly_link')
+      .select('id, name, phone, business_hours, booking_link')
       .in('id', clinicIds);
 
     if (clinicsError) {
@@ -393,26 +393,12 @@ async function processSingleLead(
       // First interaction - welcome message
       emailSubject = `Welcome to ${clinicData.name}!`;
       
-      const welcomePrompt = `Create a warm, welcoming email for a new lead named ${leadName} who just started a conversation with ${clinicData.name}. 
-      
-      The email should:
-      - Welcome them personally
-      - Briefly introduce the clinic and services
-      - Encourage them to ask questions or book an appointment
-      - Include clinic details if provided
-      
-      Clinic info:
-      - Name: ${clinicData.name}
-      - Phone: ${clinicData.phone || 'Not provided'}
-      - Business Hours: ${clinicData.business_hours || 'Not provided'}
-      - Booking Link: ${clinicData.booking_link || 'Not provided'}
-      
-      Keep it professional but friendly, and end with an invitation to continue the conversation.`;
+      const welcomePrompt = `Create a brief, warm welcome email (1 paragraph only) for ${leadName} who just contacted ${clinicData.name}. Welcome them, mention you're here to help with their healthcare needs, and include the booking link: ${clinicData.booking_link || 'call us to schedule'}. Keep it under 60 words and friendly.`;
 
       const welcomeResponse = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: welcomePrompt }],
-        max_tokens: 500
+        max_tokens: 100
       });
 
       emailContent = welcomeResponse.choices[0].message.content;
@@ -434,32 +420,12 @@ async function processSingleLead(
 
       emailSubject = `Following up on your inquiry - ${clinicData.name}`;
 
-      const followUpPrompt = `Create a personalized follow-up email for ${leadName} based on their previous conversation with ${clinicData.name}.
-      
-      Lead status: ${leadStatus}
-      
-      Previous conversation context:
-      ${conversationContext}
-      
-      The email should:
-      - Reference their previous interaction naturally
-      - Provide value or helpful information
-      - Include the booking link prominently
-      - Feel personal, not automated
-      - Encourage them to book an appointment
-      
-      Clinic info:
-      - Name: ${clinicData.name}
-      - Phone: ${clinicData.phone || 'Not provided'}
-      - Business Hours: ${clinicData.business_hours || 'Not provided'}
-      - Booking Link: ${clinicData.booking_link || 'Please call us to schedule'}
-      
-      Keep it conversational and helpful.`;
+      const followUpPrompt = `Create a brief follow-up email (1 paragraph only) for ${leadName} regarding their inquiry at ${clinicData.name}. Reference that you wanted to follow up, offer help, and include booking link: ${clinicData.booking_link || 'call to schedule'}. Keep it under 60 words and conversational.`;
 
       const followUpResponse = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: followUpPrompt }],
-        max_tokens: 600
+        max_tokens: 100
       });
 
       emailContent = followUpResponse.choices[0].message.content;
@@ -474,27 +440,12 @@ Is there anything specific I can help you with today? 😊`;
       // Lead expressed intent but hasn't confirmed
       emailSubject = `Ready to confirm your appointment with ${clinicData.name}?`;
 
-      const bookingPrompt = `Create an email for ${leadName} who has expressed interest in booking with ${clinicData.name} but hasn't confirmed yet.
-      
-      The email should:
-      - Acknowledge their interest in booking
-      - Make it easy for them to complete the booking process
-      - Create a sense of gentle urgency
-      - Provide clear next steps
-      - Include all necessary contact information
-      
-      Clinic info:
-      - Name: ${clinicData.name}
-      - Phone: ${clinicData.phone || 'Not provided'}
-      - Business Hours: ${clinicData.business_hours || 'Not provided'}
-      - Booking Link: ${clinicData.booking_link || 'Please call us to schedule'}
-      
-      Make it helpful and encouraging, not pushy.`;
+      const bookingPrompt = `Create a brief email (1 paragraph only) for ${leadName} who showed interest in booking at ${clinicData.name} but hasn't confirmed. Gently remind them to complete booking and include link: ${clinicData.booking_link || 'call to schedule'}. Keep it under 60 words and encouraging.`;
 
       const bookingResponse = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: bookingPrompt }],
-        max_tokens: 500
+        max_tokens: 100
       });
 
       emailContent = bookingResponse.choices[0].message.content;
