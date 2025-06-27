@@ -28,10 +28,6 @@ const logError = (message: string, error?: any) => {
   console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, error);
 };
 
-const logWarning = (message: string, data?: any) => {
-  console.warn(`[WARNING] ${new Date().toISOString()} - ${message}`, data ? JSON.stringify(data) : '');
-};
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -46,19 +42,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
 
-    if (!supabaseUrl || !supabaseKey) {
-      logError('Missing Supabase environment variables');
+    if (!supabaseUrl || !supabaseKey || !openaiKey) {
+      logError('Missing environment variables');
       return createResponse({
         success: false,
-        error: 'Server configuration error: Missing Supabase credentials'
-      }, 500);
-    }
-
-    if (!openaiKey) {
-      logError('Missing OpenAI API key');
-      return createResponse({
-        success: false,
-        error: 'Server configuration error: Missing OpenAI API key'
+        error: 'Server configuration error: Missing credentials'
       }, 500);
     }
 
@@ -70,19 +58,16 @@ serve(async (req) => {
 
     const { 
       clinic_id, 
-      chat_id, 
+      lead_id, 
       cron_job = false, 
       process_all_chats = false,
       batch_process = false,
       hours_threshold = 24 
     } = requestData;
 
-    // Handle cron job or batch processing
+    // Handle batch processing
     if (cron_job || process_all_chats || batch_process) {
       logInfo('Starting batch processing', { cron_job, process_all_chats, batch_process });
-      
-      // For batch processing, we'll fetch SMTP config from email_settings table per clinic
-      // No need to validate SMTP config here since each clinic might have different settings
       return await processBatchNurturing(supabaseClient, openai, {
         clinic_id,
         process_all_chats,
@@ -90,430 +75,65 @@ serve(async (req) => {
       });
     }
 
-    if (!clinic_id || !chat_id) {
-      logError('Missing required fields', { clinic_id, chat_id });
+    // Handle single lead processing
+    if (!clinic_id || !lead_id) {
+      logError('Missing required fields', { clinic_id, lead_id });
       return createResponse({
         success: false,
-        error: 'Missing required fields: clinic_id and chat_id'
+        error: 'Missing required fields: clinic_id and lead_id'
       }, 400);
     }
 
-    logInfo('Processing single chat', { clinic_id, chat_id });
-
-    // Fetch clinic information
-    const { data: clinicData, error: clinicError } = await supabaseClient
-      .from('clinic')
-      .select('name, email, phone, business_hours, calendly_link')
-      .eq('id', clinic_id)
+    // Process single lead
+    const { data: leadData, error: leadError } = await supabaseClient
+      .from('lead')
+      .select('id, email, first_name, last_name, status, clinic_id')
+      .eq('id', lead_id)
+      .eq('clinic_id', clinic_id)
       .single();
 
-    if (clinicError || !clinicData) {
-      logError('Clinic not found', { clinic_id, error: clinicError });
+    if (leadError || !leadData) {
+      logError('Lead not found', { lead_id, clinic_id, error: leadError });
+      return createResponse({
+        success: false,
+        error: 'Lead not found'
+      }, 404);
+    }
+
+    // Get email settings and clinic data
+    const [emailSettingsResult, clinicResult] = await Promise.all([
+      supabaseClient.from('email_settings').select('*').eq('clinic_id', clinic_id).single(),
+      supabaseClient.from('clinic').select('*').eq('id', clinic_id).single()
+    ]);
+
+    if (emailSettingsResult.error || !emailSettingsResult.data) {
+      return createResponse({
+        success: false,
+        error: 'Email settings not configured for this clinic'
+      }, 404);
+    }
+
+    if (clinicResult.error || !clinicResult.data) {
       return createResponse({
         success: false,
         error: 'Clinic not found'
       }, 404);
     }
 
-    logInfo('Clinic data fetched', { clinicName: clinicData.name });
+    const result = await processSingleLead(
+      supabaseClient, 
+      openai, 
+      leadData, 
+      emailSettingsResult.data,
+      clinicResult.data
+    );
 
-    // Fetch chat information with lead details
-    const { data: chatData, error: chatError } = await supabaseClient
-      .from('conversation')
-      .select(`
-        id, 
-        lead_id, 
-        openai_thread_id, 
-        status,
-        leads!inner(email, name, phone)
-      `)
-      .eq('id', chat_id)
-      .eq('clinic_id', clinic_id)
-      .single();
-
-    if (chatError || !chatData) {
-      logError('Chat or lead information not found', { chat_id, clinic_id, error: chatError });
-      return createResponse({
-        success: false,
-        error: 'Chat or lead information not found'
-      }, 404);
-    }
-
-    const leadEmail = chatData.leads.email;
-    const leadName = chatData.leads.name || 'Patient';
-    
-    logInfo('Chat and lead data fetched', { 
-      chatId: chat_id, 
-      leadEmail, 
-      leadName, 
-      currentStatus: chatData.status 
+    return createResponse({
+      success: result.success,
+      message: result.message || 'Lead processed',
+      result: result,
+      executionTime: Date.now() - startTime
     });
-
-    // Fetch recent chat messages (last 20 for better context)
-    const { data: messagesData, error: messagesError } = await supabaseClient
-      .from('chat_messages')
-      .select('id, message, is_from_user, timestamp, sender_type')
-      .eq('thread_id', chat_id)
-      .order('timestamp', { ascending: false })
-      .limit(20);
-
-    if (messagesError) {
-      logError('Error fetching chat messages', { chat_id, error: messagesError });
-      return createResponse({
-        success: false,
-        error: 'Error fetching chat messages'
-      }, 500);
-    }
-
-    if (!messagesData || messagesData.length === 0) {
-      logWarning('No messages found for chat', { chat_id });
-      return createResponse({
-        success: true,
-        action: 'no_messages',
-        message: 'No messages found to process'
-      });
-    }
-
-    logInfo('Messages fetched', { messageCount: messagesData.length });
-
-    // Reverse messages to get chronological order for analysis
-    const chronologicalMessages = messagesData.reverse();
-
-    // Analyze messages for meeting/appointment requests using OpenAI
-    const messagesText = chronologicalMessages
-      .map(m => `${m.is_from_user ? 'User' : 'Assistant'}: ${m.message}`)
-      .join('\n');
-
-    logInfo('Starting OpenAI analysis');
-
-    const analysisPrompt = `
-      Analyze the following conversation to determine if the user has requested a meeting, appointment, or booking.
-      Look for keywords like: "book", "appointment", "meeting", "schedule", "consultation", "visit", "see doctor", etc.
-      
-      Return a JSON object with:
-      - meetingRequested: boolean (true if user has asked for meeting/appointment/booking)
-      - serviceType: string or null (type of service if mentioned: "consultation", "botox", "dental", "general checkup", etc.)
-      - urgency: string or null ("urgent" if they mention urgency, otherwise null)
-
-      Conversation:
-      ${messagesText}
-    `;
-
-    const analysisResponse = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: analysisPrompt }],
-      response_format: { type: 'json_object' }
-    });
-
-    const analysisResult = JSON.parse(analysisResponse.choices[0].message.content);
-    const { meetingRequested, serviceType, urgency } = analysisResult;
-
-    logInfo('OpenAI analysis completed', analysisResult);
-
-    // Initialize SMTP client from request data or environment
-    const smtpHost = requestData.smtp_host || Deno.env.get('SMTP_HOST');
-    const smtpPort = requestData.smtp_port || Deno.env.get('SMTP_PORT') || '465';
-    const smtpUser = requestData.smtp_user || requestData.smtp_username || Deno.env.get('SMTP_USER') || Deno.env.get('SMTP_USERNAME');
-    const smtpPassword = requestData.smtp_password || Deno.env.get('SMTP_PASSWORD');
-
-    // Validate SMTP configuration
-    if (!smtpHost || !smtpUser || !smtpPassword) {
-      logError('Missing SMTP configuration', { 
-        hasHost: !!smtpHost, 
-        hasUser: !!smtpUser, 
-        hasPassword: !!smtpPassword,
-        requestData: {
-          smtp_host: requestData.smtp_host,
-          smtp_user: requestData.smtp_user,
-          smtp_username: requestData.smtp_username,
-          smtp_password: !!requestData.smtp_password
-        }
-      });
-      
-      return createResponse({
-        success: false,
-        error: 'SMTP configuration required: Please provide smtp_host, smtp_user (or smtp_username), and smtp_password in request body or environment variables'
-      }, 400);
-    }
-
-    const smtpClient = new SMTPClient({
-      connection: {
-        hostname: smtpHost,
-        port: parseInt(smtpPort),
-        tls: true,
-        auth: { 
-          username: smtpUser, 
-          password: smtpPassword 
-        }
-      }
-    });
-
-    try {
-      // STEP 1: Check if they asked for meeting/appointment
-      if (meetingRequested) {
-        logInfo('Meeting requested - checking meetings table for existing record');
-        
-        // STEP 2: Check meetings table for existing record
-        const { data: existingMeeting, error: meetingError } = await supabaseClient
-          .from('meetings')
-          .select('id, meeting_time, meeting_link, status, meeting_notes')
-          .eq('lead_email', leadEmail)
-          .eq('clinic_id', clinic_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (meetingError && meetingError.code !== 'PGRST116') {
-          logError('Error checking existing meetings', { leadEmail, error: meetingError });
-          return createResponse({
-            success: false,
-            error: 'Error checking existing meetings'
-          }, 500);
-        }
-
-        if (existingMeeting && existingMeeting.meeting_time) {
-          // STEP 3: Existing meeting found - send reminder + ask for feedback
-          const meetingTime = new Date(existingMeeting.meeting_time);
-          const now = new Date();
-          
-          logInfo('Existing meeting found', { 
-            meetingTime: meetingTime.toISOString(), 
-            isFuture: meetingTime > now 
-          });
-
-          // Meeting reminder + feedback request message
-          const reminderMessage = `Great! I see you have an upcoming ${serviceType || 'appointment'} scheduled for ${meetingTime.toLocaleDateString()} at ${meetingTime.toLocaleTimeString()}.
-
-${existingMeeting.meeting_link ? `🔗 Meeting Link: ${existingMeeting.meeting_link}\n` : ''}${clinicData.calendly_link ? `📅 To reschedule if needed: ${clinicData.calendly_link}\n` : ''}
-We're looking forward to seeing you!
-
-How has your experience with ${clinicData.name} been so far? We'd love to hear your feedback to help us serve you better! 😊`;
-
-          // Meeting reminder email
-          const emailSubject = `Upcoming Appointment Reminder - ${clinicData.name}`;
-          const emailContent = `Dear ${leadName},
-
-This is a friendly reminder about your upcoming ${serviceType || 'appointment'} with ${clinicData.name}.
-
-📅 Date & Time: ${meetingTime.toLocaleDateString()} at ${meetingTime.toLocaleTimeString()}
-${existingMeeting.meeting_link ? `🔗 Meeting Link: ${existingMeeting.meeting_link}\n` : ''}${clinicData.calendly_link ? `📅 To reschedule: ${clinicData.calendly_link}\n` : ''}
-We look forward to seeing you soon!
-
-Best regards,
-${clinicData.name} Team
-${clinicData.phone ? `📞 ${clinicData.phone}` : ''}`;
-
-          await smtpClient.send({
-            from: smtpUser,
-            to: leadEmail,
-            subject: emailSubject,
-            content: emailContent
-          });
-
-          // Store reminder message in chat
-          await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: chat_id,
-              message: reminderMessage,
-              is_from_user: false,
-              sender_type: 'assistant',
-              timestamp: new Date().toISOString(),
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-
-          // Update chat status
-          await supabaseClient
-            .from('conversation')
-            .update({ 
-              status: 'meeting_reminded',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', chat_id);
-
-          logInfo('Meeting reminder sent and feedback requested', { 
-            action: 'meeting_reminder_sent',
-            executionTime: Date.now() - startTime 
-          });
-
-          return createResponse({
-            success: true,
-            action: 'meeting_reminder_sent',
-            message: 'Meeting reminder email sent and feedback requested',
-            meetingDetails: {
-              time: existingMeeting.meeting_time,
-              link: existingMeeting.meeting_link
-            }
-          });
-        } else {
-          // STEP 4: No existing meeting - provide booking link
-          logInfo('No existing meeting found - providing booking link');
-          
-          // Booking link provision message
-          const bookingMessage = `I'd be happy to help you schedule ${urgency === 'urgent' ? 'an urgent ' : ''}${serviceType ? `a ${serviceType}` : 'an appointment'} with ${clinicData.name}!
-
-${clinicData.calendly_link ? `📅 **Book Your Appointment:** ${clinicData.calendly_link}\n` : '🏥 **Please call us to schedule:** '}${clinicData.business_hours ? `⏰ **Business Hours:** ${clinicData.business_hours}\n` : ''}${clinicData.phone ? `📞 **Phone:** ${clinicData.phone}\n` : ''}
-Let me know if you need any assistance with the booking process! 😊`;
-
-          // Booking information email
-          const emailSubject = `Appointment Booking - ${clinicData.name}`;
-          const emailContent = `Dear ${leadName},
-
-Thank you for your interest in scheduling ${serviceType ? `a ${serviceType}` : 'an appointment'} with ${clinicData.name}.
-
-${clinicData.calendly_link ? `📅 Book Your Appointment: ${clinicData.calendly_link}\n\n` : ''}${clinicData.business_hours ? `⏰ Business Hours: ${clinicData.business_hours}\n` : ''}${clinicData.phone ? `📞 Phone: ${clinicData.phone}\n` : ''}
-We look forward to serving you!
-
-Best regards,
-${clinicData.name} Team`;
-
-          await smtpClient.send({
-            from: smtpUser,
-            to: leadEmail,
-            subject: emailSubject,
-            content: emailContent
-          });
-
-          // Create pending meeting record
-          await supabaseClient
-            .from('meetings')
-            .insert({
-              clinic_id: clinic_id,
-              lead_email: leadEmail,
-              lead_name: leadName,
-              service_type: serviceType || 'General',
-              urgency: urgency || 'Normal',
-              status: 'pending',
-              meeting_notes: `Chat ID: ${chat_id}, Service: ${serviceType || 'General'}, Urgency: ${urgency || 'Normal'}`,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-
-          // Store booking message in chat
-          await supabaseClient
-            .from('chat_messages')
-            .insert({
-              thread_id: chat_id,
-              message: bookingMessage,
-              is_from_user: false,
-              sender_type: 'assistant',
-              timestamp: new Date().toISOString(),
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-
-          // Update chat status
-          await supabaseClient
-            .from('conversation')
-            .update({ 
-              status: 'booking_link_provided',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', chat_id);
-
-          logInfo('Booking link provided', { 
-            action: 'booking_link_provided',
-            executionTime: Date.now() - startTime 
-          });
-
-          return createResponse({
-            success: true,
-            action: 'booking_link_provided',
-            message: 'Booking link provided and email sent',
-            bookingLink: clinicData.calendly_link
-          });
-        }
-      } else {
-        // STEP 5: No meeting request - share clinic info with business hours + booking link
-        logInfo('No meeting request detected - sharing clinic info with booking option');
-        
-        // Clinic information with booking option message
-        const clinicInfoMessage = `Hello ${leadName}! 👋
-
-Welcome to ${clinicData.name}. We're here to help with all your healthcare needs.
-
-🏥 **Our Services Include:**
-• General consultations
-• Preventive care  
-• Minor procedures
-• Specialized treatments
-
-${clinicData.business_hours ? `⏰ **Business Hours:** ${clinicData.business_hours}\n` : ''}${clinicData.phone ? `📞 **Phone:** ${clinicData.phone}\n` : ''}${clinicData.calendly_link ? `📅 **Book an Appointment:** ${clinicData.calendly_link}\n` : ''}
-Feel free to ask any questions about our services or book an appointment anytime! 😊`;
-
-        // Welcome email with clinic information
-        const emailSubject = `Welcome to ${clinicData.name}`;
-        const emailContent = `Dear ${leadName},
-
-Thank you for contacting ${clinicData.name}!
-
-We're committed to providing you with excellent healthcare services.
-
-${clinicData.business_hours ? `⏰ Business Hours: ${clinicData.business_hours}\n` : ''}${clinicData.phone ? `📞 Phone: ${clinicData.phone}\n` : ''}${clinicData.calendly_link ? `📅 Book an Appointment: ${clinicData.calendly_link}\n` : ''}
-Please don't hesitate to reach out if you have any questions or would like to schedule an appointment.
-
-Best regards,
-${clinicData.name} Team`;
-
-        await smtpClient.send({
-          from: smtpUser,
-          to: leadEmail,
-          subject: emailSubject,
-          content: emailContent
-        });
-
-        // Store clinic info message in chat
-        await supabaseClient
-          .from('chat_messages')
-          .insert({
-            thread_id: chat_id,
-            message: clinicInfoMessage,
-            is_from_user: false,
-            sender_type: 'assistant',
-            timestamp: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-
-        // Update chat status
-        await supabaseClient
-          .from('conversation')
-          .update({ 
-            status: 'clinic_info_shared',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', chat_id);
-
-        // Create pending meeting record for tracking
-        await supabaseClient
-          .from('meetings')
-          .insert({
-            clinic_id: clinic_id,
-            lead_email: leadEmail,
-            lead_name: leadName,
-            service_type: 'General',
-            urgency: 'Normal',
-            status: 'pending',
-            meeting_notes: `Chat ID: ${chat_id}, Initial contact - clinic info shared`,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-
-        logInfo('Clinic information shared with booking option', { 
-          action: 'clinic_info_shared',
-          executionTime: Date.now() - startTime 
-        });
-
-        return createResponse({
-          success: true,
-          action: 'clinic_info_shared',
-          message: 'Clinic information shared with booking option and welcome email sent'
-        });
-      }
-    } finally {
-      await smtpClient.close();
-    }
 
   } catch (error) {
     logError('Error in nurturing process', error);
@@ -525,145 +145,69 @@ ${clinicData.name} Team`;
   }
 });
 
-// Corrected batch processing function
+// Simplified batch processing function based on lead status
 async function processBatchNurturing(
   supabaseClient: any, 
   openai: any, 
   options: { clinic_id?: string, process_all_chats: boolean, hours_threshold: number }
 ) {
   const batchStartTime = Date.now();
-  logInfo('Starting batch processing', options);
+  logInfo('Starting simplified batch processing based on lead status', options);
 
   try {
-    // Filter by time threshold for cron jobs
-    const thresholdDate = new Date(Date.now() - options.hours_threshold * 60 * 60 * 1000);
-    
-    logInfo('Applying time threshold filter', { 
-      thresholdDate: thresholdDate.toISOString(),
-      hours_threshold: options.hours_threshold 
-    });
-
-    // First get conversations that are OLDER than threshold (stale conversations)
-    const { data: staleConversations, error: conversationError } = await supabaseClient
-      .from('conversation')
-      .select('thread_id, timestamp, message')
-      .lt('timestamp', thresholdDate.toISOString()) // FIXED: Get stale conversations
-      .order('timestamp', { ascending: false });
-
-    if (conversationError) {
-      logError('Error fetching stale conversations', conversationError);
-      return createResponse({
-        success: false,
-        error: 'Error fetching stale conversations'
-      }, 500);
-    }
-
-    if (!staleConversations || staleConversations.length === 0) {
-      logInfo('No stale conversations found');
-      return createResponse({
-        success: true,
-        message: 'No stale conversations found for processing',
-        summary: {
-          total_processed: 0,
-          successful: 0,
-          failed: 0
-        }
-      });
-    }
-
-    // Get unique thread IDs from stale conversations
-    const staleThreadIds = [...new Set(staleConversations.map(conv => conv.thread_id))];
-
-    logInfo(`Found ${staleThreadIds.length} threads with stale conversation activity`);
-
-    // FIXED: Query the correct table - based on your logs, it seems like threads are stored in a different way
-    // Let's query conversations directly and get the thread data
-        let threadsQuery = supabaseClient
-      .from('threads')
-      .select('id, clinic_id, lead_id, status, updated_at, openai_thread_id')
-      .eq('status', 'new')
-      .in('id', staleThreadIds);
+    // Get leads that need nurturing based on status
+    let leadsQuery = supabaseClient
+      .from('lead')
+      .select('id, email, first_name, last_name, status, clinic_id, updated_at')
+      .in('status', ['new', 'needs-follow-up', 'cold', 'in-nurture', 'booked'])
+      .not('email', 'is', null)
+      .neq('email', '');
 
     // Filter by clinic if specified
     if (options.clinic_id && !options.process_all_chats) {
-      threadsQuery = threadsQuery.eq('clinic_id', options.clinic_id);
+      leadsQuery = leadsQuery.eq('clinic_id', options.clinic_id);
       logInfo('Filtering by clinic_id', { clinic_id: options.clinic_id });
     }
 
-    const { data: threadsData, error: threadsError } = await threadsQuery;
-
-    if (threadsError) {
-      logError('Error fetching threads for batch processing', threadsError);
-      return createResponse({
-        success: false,
-        error: 'Error fetching threads for batch processing'
-      }, 500);
-    }
-
-    if (!threadsData || threadsData.length === 0) {
-      logInfo('No threads with new status found for stale conversations');
-      return createResponse({
-        success: true,
-        message: 'No threads with new status found for stale conversations',
-        summary: {
-          total_processed: 0,
-          successful: 0,
-          failed: 0
-        }
+    // Apply time threshold - only process leads updated before threshold
+    if (options.hours_threshold > 0) {
+      const thresholdDate = new Date(Date.now() - options.hours_threshold * 60 * 60 * 1000);
+      leadsQuery = leadsQuery.lt('updated_at', thresholdDate.toISOString());
+      logInfo('Applying time threshold filter', { 
+        thresholdDate: thresholdDate.toISOString(),
+        hours_threshold: options.hours_threshold 
       });
     }
 
-    logInfo('Threads data fetched from threads table', {
-      totalStaleThreadIds: staleThreadIds.length,
-      threadsWithNewStatus: threadsData.length
-    });
-
-    // Get all unique lead IDs
-    const leadIds = [...new Set(threadsData.map(t => t.lead_id).filter(id => id))];
-    
-    if (leadIds.length === 0) {
-      logInfo('No valid lead IDs found');
-      return createResponse({
-        success: true,
-        message: 'No valid lead IDs found for processing',
-        summary: { total_processed: 0, successful: 0, failed: 0 }
-      });
-    }
-
-    // Fetch leads data using the correct table name
-    const { data: leadsData, error: leadsError } = await supabaseClient
-      .from('lead')
-      .select('id, email, first_name, last_name, phone, clinic_id')
-      .in('id', leadIds)
-      .not('email', 'is', null) // Only get leads with email
-      .neq('email', ''); // Exclude empty emails
+    const { data: leadsData, error: leadsError } = await leadsQuery;
 
     if (leadsError) {
-      logError('Error fetching leads data', leadsError);
+      logError('Error fetching leads for batch processing', leadsError);
       return createResponse({
         success: false,
-        error: 'Error fetching leads data'
+        error: 'Error fetching leads for batch processing'
       }, 500);
     }
 
-    logInfo('Leads data fetched', {
-      totalLeadIds: leadIds.length,
-      leadsWithEmail: leadsData?.length || 0
-    });
-
     if (!leadsData || leadsData.length === 0) {
-      logInfo('No leads with valid emails found');
+      logInfo('No leads found for processing');
       return createResponse({
         success: true,
-        message: 'No leads with valid emails found for processing',
+        message: 'No leads found for processing',
         summary: { total_processed: 0, successful: 0, failed: 0 }
       });
     }
 
-    // Get all unique clinic IDs from leads
-    const clinicIds = [...new Set(leadsData.map(lead => lead.clinic_id).filter(id => id))];
-    
-    logInfo('Clinic IDs extracted from leads', { clinicIds });
+    logInfo('Leads found for processing', {
+      totalLeads: leadsData.length,
+      statusBreakdown: leadsData.reduce((acc, lead) => {
+        acc[lead.status] = (acc[lead.status] || 0) + 1;
+        return acc;
+      }, {})
+    });
+
+    // Get all unique clinic IDs
+    const clinicIds = [...new Set(leadsData.map(lead => lead.clinic_id))];
 
     // Fetch email settings for all clinics
     const { data: emailSettingsData, error: emailSettingsError } = await supabaseClient
@@ -679,13 +223,7 @@ async function processBatchNurturing(
       }, 500);
     }
 
-    logInfo('Email settings fetched', {
-      totalClinics: clinicIds.length,
-      emailSettingsFound: emailSettingsData?.length || 0,
-      emailSettings: emailSettingsData
-    });
-
-    // Create a map of clinic email settings (only complete configurations)
+    // Create email settings map
     const emailSettingsMap = new Map();
     if (emailSettingsData) {
       emailSettingsData
@@ -695,72 +233,49 @@ async function processBatchNurturing(
         });
     }
 
-    logInfo(`Email settings map created`, {
-      totalEmailConfigs: emailSettingsMap.size,
-      clinicsWithConfig: Array.from(emailSettingsMap.keys())
+    // Fetch clinic data for all clinics
+    const { data: clinicsData, error: clinicsError } = await supabaseClient
+      .from('clinic')
+      .select('id, name, phone, business_hours, calendly_link')
+      .in('id', clinicIds);
+
+    if (clinicsError) {
+      logError('Error fetching clinics data', clinicsError);
+      return createResponse({
+        success: false,
+        error: 'Error fetching clinics data'
+      }, 500);
+    }
+
+    const clinicsMap = new Map(clinicsData?.map(clinic => [clinic.id, clinic]) || []);
+
+    // Filter leads that have both email settings and clinic data
+    const leadsToProcess = leadsData.filter(lead => {
+      const hasEmailSettings = emailSettingsMap.has(lead.clinic_id);
+      const hasClinicData = clinicsMap.has(lead.clinic_id);
+      
+      if (!hasEmailSettings) {
+        logInfo(`Skipping lead ${lead.id} - clinic ${lead.clinic_id} has no email configuration`);
+        return false;
+      }
+      
+      if (!hasClinicData) {
+        logInfo(`Skipping lead ${lead.id} - clinic ${lead.clinic_id} data not found`);
+        return false;
+      }
+      
+      return true;
     });
 
-    // Create a map for quick lead lookup
-    const leadsMap = new Map(leadsData.map(lead => [lead.id, lead]));
-
-    logInfo('Processing threads with lead mapping');
-
-    // Combine thread and lead data, filtering appropriately
-    const threadsToProcess = threadsData
-      .map(thread => {
-        const leadData = leadsMap.get(thread.lead_id);
-        const emailSettings = leadData ? emailSettingsMap.get(leadData.clinic_id) : null;
-        
-        return {
-          ...thread,
-          leads: leadData,
-          emailSettings: emailSettings
-        };
-      })
-      .filter(thread => {
-        logInfo(`Checking thread ${thread.id}`, {
-          hasLeads: !!thread.leads,
-          hasEmail: !!thread.leads?.email,
-          hasEmailSettings: !!thread.emailSettings,
-          leadClinicId: thread.leads?.clinic_id,
-          threadClinicId: thread.clinic_id
-        });
-
-        // Skip if no lead data
-        if (!thread.leads) {
-          logInfo(`Skipping thread ${thread.id} - no lead data found`);
-          return false;
-        }
-
-        // Skip if no email
-        if (!thread.leads.email) {
-          logInfo(`Skipping thread ${thread.id} - lead has no email`);
-          return false;
-        }
-        
-        // Skip if clinic has no email configuration
-        if (!thread.emailSettings) {
-          logInfo(`Skipping thread ${thread.id} - clinic ${thread.leads.clinic_id} has no email configuration`);
-          return false;
-        }
-        
-        return true;
-      });
-
-    logInfo('Final filtering completed', { 
-      totalStaleConversations: staleConversations?.length || 0,
-      totalUniqueThreadsWithStaleActivity: staleThreadIds?.length || 0,
-      totalThreadsWithNewStatus: threadsData?.length || 0,
-      totalLeadsWithEmail: leadsData?.length || 0,
-      totalClinicsWithEmailConfig: emailSettingsMap.size,
-      finalThreadsToProcess: threadsToProcess?.length || 0
+    logInfo('Final leads to process', {
+      totalLeadsWithEmailAndClinic: leadsToProcess.length,
+      clinicsWithEmailConfig: emailSettingsMap.size
     });
 
-    if (threadsToProcess.length === 0) {
-      logInfo('No threads left to process after filtering');
+    if (leadsToProcess.length === 0) {
       return createResponse({
         success: true,
-        message: 'No threads left to process after filtering',
+        message: 'No leads left to process after filtering',
         summary: { total_processed: 0, successful: 0, failed: 0 }
       });
     }
@@ -768,20 +283,26 @@ async function processBatchNurturing(
     const results = [];
     const batchSize = 5;
 
-    for (let i = 0; i < threadsToProcess.length; i += batchSize) {
-      const batch = threadsToProcess.slice(i, i + batchSize);
+    for (let i = 0; i < leadsToProcess.length; i += batchSize) {
+      const batch = leadsToProcess.slice(i, i + batchSize);
       logInfo(`Processing batch ${Math.floor(i / batchSize) + 1}`, { 
         batchSize: batch.length,
         startIndex: i 
       });
 
-      const batchPromises = batch.map(async (thread) => {
+      const batchPromises = batch.map(async (lead) => {
         try {
-          return await processSingleChatFixed(supabaseClient, openai, thread);
+          return await processSingleLead(
+            supabaseClient, 
+            openai, 
+            lead, 
+            emailSettingsMap.get(lead.clinic_id),
+            clinicsMap.get(lead.clinic_id)
+          );
         } catch (error) {
-          logError(`Error processing thread ${thread.id}`, error);
+          logError(`Error processing lead ${lead.id}`, error);
           return {
-            thread_id: thread.id,
+            lead_id: lead.id,
             success: false,
             error: error.message
           };
@@ -797,7 +318,7 @@ async function processBatchNurturing(
       });
 
       // Small delay between batches
-      if (i + batchSize < threadsToProcess.length) {
+      if (i + batchSize < leadsToProcess.length) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
@@ -813,7 +334,7 @@ async function processBatchNurturing(
 
     return createResponse({
       success: true,
-      message: `Batch processing completed. Processed ${results.length} threads.`,
+      message: `Batch processing completed. Processed ${results.length} leads.`,
       results: results,
       summary: summary
     });
@@ -828,263 +349,249 @@ async function processBatchNurturing(
   }
 }
 
-// Updated processSingleChatFixed function to work with the new structure
-async function processSingleChatFixed(
+// Process individual lead based on status
+async function processSingleLead(
   supabaseClient: any,
   openai: any,
-  threadData: any
+  leadData: any,
+  emailSettings: any,
+  clinicData: any
 ) {
-  const thread_id = threadData.id;
-  const clinic_id = threadData.leads.clinic_id;
-  const leadEmail = threadData.leads.email;
-  const leadName = (threadData.leads.first_name || '') + ' ' + (threadData.leads.last_name || '');
-  const displayName = leadName.trim() || 'Patient';
-  const emailSettings = threadData.emailSettings;
+  const leadId = leadData.id;
+  const leadEmail = leadData.email;
+  const leadName = `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Patient';
+  const leadStatus = leadData.status;
+  const clinicId = leadData.clinic_id;
 
-  logInfo(`Processing individual thread: ${thread_id}`, { 
+  logInfo(`Processing lead: ${leadId}`, { 
     leadEmail, 
-    leadName: displayName, 
-    clinic_id,
-    hasEmailSettings: !!emailSettings 
+    leadName, 
+    leadStatus,
+    clinicId 
   });
 
-  // Fetch clinic information
-  const { data: clinicData, error: clinicError } = await supabaseClient
-    .from('clinic')
-    .select('name, email, phone, business_hours, calendly_link')
-    .eq('id', clinic_id)
-    .single();
-
-  if (clinicError || !clinicData) {
-    logError(`Clinic not found for clinic_id: ${clinic_id}`, clinicError);
-    return {
-      thread_id,
-      success: false,
-      error: `Clinic not found for clinic_id: ${clinic_id}`
-    };
-  }
-
-  // Fetch recent conversation messages
-  const { data: messagesData, error: messagesError } = await supabaseClient
-    .from('conversation')
-    .select('id, message, is_from_user, timestamp, sender_type')
-    .eq('thread_id', thread_id)
-    .order('timestamp', { ascending: false })
-    .limit(20);
-
-  if (messagesError) {
-    logError(`Error fetching messages for thread ${thread_id}`, messagesError);
-    throw new Error('Error fetching conversation messages');
-  }
-
-  if (!messagesData || messagesData.length === 0) {
-    logInfo(`No messages found for thread ${thread_id}`);
-    return {
-      thread_id,
-      success: true,
-      action: 'skipped',
-      message: 'No messages found'
-    };
-  }
-
-  const chronologicalMessages = messagesData.reverse();
-  const messagesText = chronologicalMessages
-    .map(m => `${m.is_from_user ? 'User' : 'Assistant'}: ${m.message}`)
-    .join('\n');
-
-  logInfo(`Processing conversation for thread ${thread_id}`, {
-    messageCount: chronologicalMessages.length,
-    lastMessageTime: messagesData[messagesData.length - 1]?.timestamp
-  });
-
-  // OpenAI analysis
-  const analysisPrompt = `
-    Analyze the following conversation to determine if the user has requested a meeting, appointment, or booking.
-    Look for keywords like: "book", "appointment", "meeting", "schedule", "consultation", "visit", "see doctor", etc.
-    
-    Return a JSON object with:
-    - meetingRequested: boolean (true if user has asked for meeting/appointment/booking)
-    - serviceType: string or null (type of service if mentioned)
-    - urgency: string or null ("urgent" if they mention urgency, otherwise null)
-
-    Conversation:
-    ${messagesText}
-  `;
-
-  const analysisResponse = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: analysisPrompt }],
-    response_format: { type: 'json_object' }
-  });
-
-  const analysisResult = JSON.parse(analysisResponse.choices[0].message.content);
-  const { meetingRequested, serviceType, urgency } = analysisResult;
-
-  logInfo(`Analysis result for thread ${thread_id}`, analysisResult);
-
-  // Create SMTP client
-  const smtpClient = new SMTPClient({
-    connection: {
-      hostname: emailSettings.smtp_host,
-      port: parseInt(emailSettings.smtp_port?.toString() || '465'),
-      tls: emailSettings.smtp_use_tls !== false,
-      auth: { 
-        username: emailSettings.smtp_user, 
-        password: emailSettings.smtp_password 
-      }
-    }
-  });
-
-  let result = {
-    thread_id,
-    success: true,
-    action: 'no_action',
-    message: 'No action required'
-  };
+  let emailSubject = '';
+  let emailContent = '';
+  let conversationMessage = '';
+  let newStatus = leadStatus;
 
   try {
-    if (meetingRequested) {
-      // Check for existing meeting
-      const { data: existingMeeting } = await supabaseClient
-        .from('meetings')
-        .select('id, meeting_time, meeting_link, status')
-        .eq('lead_email', leadEmail)
-        .eq('clinic_id', clinic_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingMeeting && existingMeeting.meeting_time) {
-        // Send meeting reminder
-        const meetingTime = new Date(existingMeeting.meeting_time);
-        const reminderMessage = `I see you have an upcoming ${serviceType || 'appointment'} scheduled for ${meetingTime.toLocaleDateString()} at ${meetingTime.toLocaleTimeString()}. 
-
-${existingMeeting.meeting_link ? `🔗 Meeting Link: ${existingMeeting.meeting_link}\n` : ''}How has your experience with ${clinicData.name} been so far? We'd love your feedback! 😊`;
-
-        await smtpClient.send({
-          from: emailSettings.smtp_sender_email || emailSettings.smtp_user,
-          to: leadEmail,
-          subject: `Appointment Reminder - ${clinicData.name}`,
-          content: `Dear ${displayName},
-
-Reminder: You have an upcoming ${serviceType || 'appointment'} scheduled for ${meetingTime.toLocaleDateString()} at ${meetingTime.toLocaleTimeString()}.
-
-${existingMeeting.meeting_link ? `Meeting Link: ${existingMeeting.meeting_link}\n` : ''}We look forward to seeing you!
-
-Best regards,
-${clinicData.name} Team`
-        });
-
-        await supabaseClient.from('conversation').insert({
-          thread_id: thread_id,
-          message: reminderMessage,
-          is_from_user: false,
-          sender_type: 'assistant',
-          timestamp: new Date().toISOString()
-        });
-
-        result = {
-          thread_id,
-          success: true,
-          action: 'meeting_reminder_sent',
-          message: 'Meeting reminder sent'
-        };
-      } else {
-        // Provide booking link
-        const bookingMessage = `I'd be happy to help you schedule ${serviceType ? `a ${serviceType}` : 'an appointment'}! 
-
-${clinicData.calendly_link ? `📅 Book here: ${clinicData.calendly_link}` : 'Please call us to schedule.'}
-
-${clinicData.business_hours ? `⏰ Business Hours: ${clinicData.business_hours}\n` : ''}${clinicData.phone ? `📞 Phone: ${clinicData.phone}` : ''}`;
-
-        await smtpClient.send({
-          from: emailSettings.smtp_sender_email || emailSettings.smtp_user,
-          to: leadEmail,
-          subject: `Appointment Booking - ${clinicData.name}`,
-          content: `Dear ${displayName},
-
-Thank you for your interest in scheduling ${serviceType ? `a ${serviceType}` : 'an appointment'}.
-
-${clinicData.calendly_link ? `📅 Book Your Appointment: ${clinicData.calendly_link}\n` : ''}${clinicData.business_hours ? `⏰ Business Hours: ${clinicData.business_hours}\n` : ''}${clinicData.phone ? `📞 Phone: ${clinicData.phone}\n` : ''}We look forward to serving you!
-
-Best regards,
-${clinicData.name} Team`
-        });
-
-        await supabaseClient.from('meetings').insert({
-          clinic_id: clinic_id,
-          lead_email: leadEmail,
-          lead_name: displayName,
-          service_type: serviceType || 'General',
-          urgency: urgency || 'Normal',
-          status: 'pending',
-          meeting_notes: `Thread ID: ${thread_id}`,
-          created_at: new Date().toISOString()
-        });
-
-        await supabaseClient.from('conversation').insert({
-          thread_id: thread_id,
-          message: bookingMessage,
-          is_from_user: false,
-          sender_type: 'assistant',
-          timestamp: new Date().toISOString()
-        });
-
-        result = {
-          thread_id,
-          success: true,
-          action: 'booking_link_provided',
-          message: 'Booking link provided'
-        };
+    // Create SMTP client
+    const smtpClient = new SMTPClient({
+      connection: {
+        hostname: emailSettings.smtp_host,
+        port: parseInt(emailSettings.smtp_port?.toString() || '465'),
+        tls: emailSettings.smtp_use_tls !== false,
+        auth: { 
+          username: emailSettings.smtp_user, 
+          password: emailSettings.smtp_password 
+        }
       }
-    } else {
-      // Share clinic info
-      const clinicInfoMessage = `Hello ${displayName}! 👋
+    });
 
-Welcome to ${clinicData.name}. We're here to help with all your healthcare needs.
+    if (leadStatus === 'new') {
+      // First interaction - welcome message
+      emailSubject = `Welcome to ${clinicData.name}!`;
+      
+      const welcomePrompt = `Create a warm, welcoming email for a new lead named ${leadName} who just started a conversation with ${clinicData.name}. 
+      
+      The email should:
+      - Welcome them personally
+      - Briefly introduce the clinic and services
+      - Encourage them to ask questions or book an appointment
+      - Include clinic details if provided
+      
+      Clinic info:
+      - Name: ${clinicData.name}
+      - Phone: ${clinicData.phone || 'Not provided'}
+      - Business Hours: ${clinicData.business_hours || 'Not provided'}
+      - Booking Link: ${clinicData.booking_link || 'Not provided'}
+      
+      Keep it professional but friendly, and end with an invitation to continue the conversation.`;
 
-${clinicData.business_hours ? `⏰ Business Hours: ${clinicData.business_hours}\n` : ''}${clinicData.phone ? `📞 Phone: ${clinicData.phone}\n` : ''}${clinicData.calendly_link ? `📅 Book an appointment: ${clinicData.calendly_link}\n` : ''}Feel free to ask any questions! 😊`;
-
-      await smtpClient.send({
-        from: emailSettings.smtp_sender_email || emailSettings.smtp_user,
-        to: leadEmail,
-        subject: `Welcome to ${clinicData.name}`,
-        content: `Dear ${displayName},
-
-Thank you for contacting ${clinicData.name}!
-
-${clinicData.business_hours ? `⏰ Business Hours: ${clinicData.business_hours}\n` : ''}${clinicData.phone ? `📞 Phone: ${clinicData.phone}\n` : ''}${clinicData.calendly_link ? `📅 Book an Appointment: ${clinicData.calendly_link}\n` : ''}Please don't hesitate to reach out with any questions.
-
-Best regards,
-${clinicData.name} Team`
+      const welcomeResponse = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: welcomePrompt }],
+        max_tokens: 500
       });
 
-      await supabaseClient.from('conversation').insert({
-        thread_id: thread_id,
-        message: clinicInfoMessage,
-        is_from_user: false,
-        sender_type: 'assistant',
-        timestamp: new Date().toISOString()
+      emailContent = welcomeResponse.choices[0].message.content;
+      conversationMessage = `Welcome! I'm here to help you with any questions about ${clinicData.name}. Feel free to ask about our services or book an appointment! 😊`;
+      newStatus = 'responded';
+
+    } else if (['needs-follow-up', 'cold', 'in-nurture'].includes(leadStatus)) {
+      // Get last conversation to provide context
+      const { data: lastConversation } = await supabaseClient
+        .from('conversation')
+        .select('message, timestamp, is_from_user')
+        .eq('lead_id', leadId)
+        .order('timestamp', { ascending: false })
+        .limit(5);
+
+      const conversationContext = lastConversation 
+        ? lastConversation.map(c => `${c.is_from_user ? 'Patient' : 'Assistant'}: ${c.message}`).join('\n')
+        : 'No previous conversation found';
+
+      emailSubject = `Following up on your inquiry - ${clinicData.name}`;
+
+      const followUpPrompt = `Create a personalized follow-up email for ${leadName} based on their previous conversation with ${clinicData.name}.
+      
+      Lead status: ${leadStatus}
+      
+      Previous conversation context:
+      ${conversationContext}
+      
+      The email should:
+      - Reference their previous interaction naturally
+      - Provide value or helpful information
+      - Include the booking link prominently
+      - Feel personal, not automated
+      - Encourage them to book an appointment
+      
+      Clinic info:
+      - Name: ${clinicData.name}
+      - Phone: ${clinicData.phone || 'Not provided'}
+      - Business Hours: ${clinicData.business_hours || 'Not provided'}
+      - Booking Link: ${clinicData.booking_link || 'Please call us to schedule'}
+      
+      Keep it conversational and helpful.`;
+
+      const followUpResponse = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: followUpPrompt }],
+        max_tokens: 600
       });
 
-      result = {
-        thread_id,
-        success: true,
-        action: 'clinic_info_shared',
-        message: 'Clinic information shared'
-      };
+      emailContent = followUpResponse.choices[0].message.content;
+      
+      conversationMessage = `Hi ${leadName}! I wanted to follow up on our previous conversation. ${clinicData.booking_link ? `If you're ready to book an appointment, you can do so here: ${clinicData.booking_link}` : `Please call us to schedule: ${clinicData.phone}`}
+
+Is there anything specific I can help you with today? 😊`;
+      
+      newStatus = 'in-nurture';
+
+    } else if (leadStatus === 'booked') {
+      // Lead expressed intent but hasn't confirmed
+      emailSubject = `Ready to confirm your appointment with ${clinicData.name}?`;
+
+      const bookingPrompt = `Create an email for ${leadName} who has expressed interest in booking with ${clinicData.name} but hasn't confirmed yet.
+      
+      The email should:
+      - Acknowledge their interest in booking
+      - Make it easy for them to complete the booking process
+      - Create a sense of gentle urgency
+      - Provide clear next steps
+      - Include all necessary contact information
+      
+      Clinic info:
+      - Name: ${clinicData.name}
+      - Phone: ${clinicData.phone || 'Not provided'}
+      - Business Hours: ${clinicData.business_hours || 'Not provided'}
+      - Booking Link: ${clinicData.booking_link || 'Please call us to schedule'}
+      
+      Make it helpful and encouraging, not pushy.`;
+
+      const bookingResponse = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: bookingPrompt }],
+        max_tokens: 500
+      });
+
+      emailContent = bookingResponse.choices[0].message.content;
+      
+      conversationMessage = `Hi ${leadName}! I see you're interested in booking an appointment with us. ${clinicData.booking_link ? `You can complete your booking here: ${clinicData.booking_link}` : `Please call us to schedule: ${clinicData.phone}`}
+
+I'm here if you have any questions about our services! 📅`;
+      
+      // Keep status as 'booked' until they actually confirm
     }
 
+    // Send email
+    await smtpClient.send({
+      from: emailSettings.smtp_sender_email || emailSettings.smtp_user,
+      to: leadEmail,
+      subject: emailSubject,
+      content: emailContent
+    });
+
+    // Find or create thread for this lead
+    let { data: existingThread } = await supabaseClient
+      .from('thread')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('clinic_id', clinicId)
+      .single();
+
+    let threadId = existingThread?.id;
+
+    if (!threadId) {
+      // Create new thread
+      const { data: newThread, error: threadError } = await supabaseClient
+        .from('thread')
+        .insert({
+          lead_id: leadId,
+          clinic_id: clinicId,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+
+      if (threadError) {
+        logError(`Error creating thread for lead ${leadId}`, threadError);
+        threadId = null;
+      } else {
+        threadId = newThread.id;
+      }
+    }
+
+    // Store conversation message if we have a thread
+    if (threadId) {
+      await supabaseClient
+        .from('conversation')
+        .insert({
+          thread_id: threadId,
+          message: conversationMessage,
+          is_from_user: false,
+          timestamp: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+    }
+
+    // Update lead status
+    await supabaseClient
+      .from('lead')
+      .update({ 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', leadId);
+
+    await smtpClient.close();
+
+    logInfo(`Successfully processed lead ${leadId}`, {
+      oldStatus: leadStatus,
+      newStatus: newStatus,
+      emailSent: true
+    });
+
+    return {
+      lead_id: leadId,
+      success: true,
+      action: `${leadStatus}_email_sent`,
+      message: `Email sent for ${leadStatus} lead`,
+      old_status: leadStatus,
+      new_status: newStatus
+    };
+
   } catch (error) {
-    logError(`Error processing thread ${thread_id}`, error);
-    result = {
-      thread_id,
+    logError(`Error processing lead ${leadId}`, error);
+    return {
+      lead_id: leadId,
       success: false,
       error: error.message
     };
-  } finally {
-    await smtpClient.close();
   }
-
-  return result;
 }
