@@ -119,7 +119,7 @@ serve(async (req) => {
 
     // Fetch chat information with lead details
     const { data: chatData, error: chatError } = await supabaseClient
-      .from('chat')
+      .from('conversation')
       .select(`
         id, 
         lead_id, 
@@ -325,7 +325,7 @@ ${clinicData.phone ? `📞 ${clinicData.phone}` : ''}`;
 
           // Update chat status
           await supabaseClient
-            .from('chat')
+            .from('conversation')
             .update({ 
               status: 'meeting_reminded',
               updated_at: new Date().toISOString()
@@ -405,7 +405,7 @@ ${clinicData.name} Team`;
 
           // Update chat status
           await supabaseClient
-            .from('chat')
+            .from('conversation')
             .update({ 
               status: 'booking_link_provided',
               updated_at: new Date().toISOString()
@@ -478,7 +478,7 @@ ${clinicData.name} Team`;
 
         // Update chat status
         await supabaseClient
-          .from('chat')
+          .from('conversation')
           .update({ 
             status: 'clinic_info_shared',
             updated_at: new Date().toISOString()
@@ -533,35 +533,63 @@ async function processBatchNurturing(
 ) {
   const batchStartTime = Date.now();
   logInfo('Starting batch processing', options);
-  const thresholdDate = new Date(Date.now() - options.hours_threshold * 60 * 60 * 1000);
-
 
   try {
-    let query = supabaseClient
-      .from('threads')
-      .select(`
-        id,
-        clinic_id,
-        lead_id,
-        status,
-        updated_at,
-        openai_thread_id,
-        leads!threads_lead_id_fkey(id, email, first_name, last_name, phone)
-      `)
-      .eq('status', 'new');
+    // Filter by time threshold for cron jobs
+    const thresholdDate = new Date(Date.now() - options.hours_threshold * 60 * 60 * 1000);
+    
+    logInfo('Applying time threshold filter', { 
+      thresholdDate: thresholdDate.toISOString(),
+      hours_threshold: options.hours_threshold 
+    });
 
-    // Filter by clinic if specified
-    if (options.clinic_id && !options.process_all_chats) {
-      query = query.eq('clinic_id', options.clinic_id);
-      logInfo('Filtering by clinic_id', { clinic_id: options.clinic_id });
+    // First get conversations that have recent activity (within the threshold)
+    const { data: recentConversations, error: conversationError } = await supabaseClient
+      .from('conversation')
+      .select('thread_id, timestamp, message')
+      .lt('timestamp', thresholdDate.toISOString())
+      .order('timestamp', { ascending: false });
+
+    if (conversationError) {
+      logError('Error fetching recent conversations', conversationError);
+      return createResponse({
+        success: false,
+        error: 'Error fetching recent conversations'
+      }, 500);
     }
 
-    // First get threads, then manually join with leads data
-    const { data: threadsData, error: threadsError } = await supabaseClient
+    if (!recentConversations || recentConversations.length === 0) {
+      logInfo('No recent conversations found');
+      return createResponse({
+        success: true,
+        message: 'No recent conversations found for processing',
+        summary: {
+          total_processed: 0,
+          successful: 0,
+          failed: 0
+        }
+      });
+    }
+
+    // Get unique thread IDs from recent conversations
+    const recentThreadIds = [...new Set(recentConversations.map(conv => conv.thread_id))];
+
+    logInfo(`Found ${recentThreadIds.length} threads with recent conversation activity`);
+
+    // Now get threads that have recent conversation activity and status 'new'
+    let threadsQuery = supabaseClient
       .from('threads')
       .select('id, clinic_id, lead_id, status, updated_at, openai_thread_id')
       .eq('status', 'new')
-      .lt('updated_at', thresholdDate.toISOString());
+      .in('id', recentThreadIds);
+
+    // Filter by clinic if specified
+    if (options.clinic_id && !options.process_all_chats) {
+      threadsQuery = threadsQuery.eq('clinic_id', options.clinic_id);
+      logInfo('Filtering by clinic_id', { clinic_id: options.clinic_id });
+    }
+
+    const { data: threadsData, error: threadsError } = await threadsQuery;
 
     if (threadsError) {
       logError('Error fetching threads for batch processing', threadsError);
@@ -572,10 +600,10 @@ async function processBatchNurturing(
     }
 
     if (!threadsData || threadsData.length === 0) {
-      logInfo('No threads to process');
+      logInfo('No threads with recent conversations to process');
       return createResponse({
         success: true,
-        message: 'No threads found for processing',
+        message: 'No threads with recent conversations found for processing',
         summary: {
           total_processed: 0,
           successful: 0,
@@ -587,10 +615,10 @@ async function processBatchNurturing(
     // Get all unique lead IDs
     const leadIds = [...new Set(threadsData.map(t => t.lead_id))];
     
-    // Fetch leads data
+    // Fetch leads data (note: lead table has clinic_id)
     const { data: leadsData, error: leadsError } = await supabaseClient
       .from('lead')
-      .select('id, email, first_name, last_name, phone')
+      .select('id, email, first_name, last_name, phone, clinic_id')
       .in('id', leadIds);
 
     if (leadsError) {
@@ -601,33 +629,73 @@ async function processBatchNurturing(
       }, 500);
     }
 
+    // Get all unique clinic IDs from leads
+    const clinicIds = [...new Set(leadsData.map(lead => lead.clinic_id))];
+
+
+    
+    // Fetch email settings for all clinics to see which ones have email configuration
+    const { data: emailSettingsData, error: emailSettingsError } = await supabaseClient
+      .from('email_settings')
+      .select('clinic_id, smtp_host, smtp_user, smtp_password')
+      .in('clinic_id', clinicIds);
+
+    if (emailSettingsError) {
+      logError('Error fetching email settings', emailSettingsError);
+      return createResponse({
+        success: false,
+        error: 'Error fetching email settings'
+      }, 500);
+    }
+
+        logInfo(`clinic id are  ${clinicIds} ---- ${emailSettingsData} `);
+
+
+    // Create a set of clinic IDs that have complete email configuration
+    const clinicsWithEmailConfig = new Set(
+      emailSettingsData
+        .filter(settings => settings.smtp_host && settings.smtp_user && settings.smtp_password)
+    );
+
+    logInfo(`Found ${clinicsWithEmailConfig.size} clinics with complete email configuration out of ${clinicIds.length} total clinics`);
+
     // Create a map for quick lead lookup
     const leadsMap = new Map(leadsData.map(lead => [lead.id, lead]));
 
-    // Combine thread and lead data
+    // Combine thread and lead data, filtering out leads from clinics without email config
     const threadsToProcess = threadsData
       .map(thread => ({
         ...thread,
         leads: leadsMap.get(thread.lead_id)
       }))
-      .filter(thread => thread.leads && thread.leads.email); // Only process threads with valid lead email
+      .filter(thread => {
+        // Skip if no lead data
+        if (!thread.leads || !thread.leads.email) {
+          return false;
+        }
+        
+        // Skip if clinic has no email configuration
+        if (!clinicsWithEmailConfig.has(thread.leads.clinic_id)) {
+          logInfo(`Skipping thread ${thread.id} - clinic ${thread.leads.clinic_id} has no email configuration`);
+          return false;
+        }
+        
+        return true;
+      });
 
-    // Filter by clinic if specified (after manual join)
-    const filteredThreads = options.clinic_id && !options.process_all_chats 
-      ? threadsToProcess.filter(thread => thread.clinic_id === options.clinic_id)
-      : threadsToProcess;
-
-
-    // Filter by clinic if specified
-    if (options.clinic_id && !options.process_all_chats) {
-      logInfo('Filtering by clinic_id', { clinic_id: options.clinic_id });
-    }
+    logInfo('Threads with recent conversations fetched', { 
+      totalRecentConversationMessages: recentConversations?.length || 0,
+      totalUniqueThreadsWithActivity: recentThreadIds?.length || 0,
+      totalThreadsWithNewStatus: threadsData?.length || 0,
+      totalClinicsWithEmailConfig: clinicsWithEmailConfig.size,
+      finalThreadsToProcess: threadsToProcess?.length || 0
+    });
 
     const results = [];
     const batchSize = 5;
 
-    for (let i = 0; i < filteredThreads.length; i += batchSize) {
-      const batch = filteredThreads.slice(i, i + batchSize);
+    for (let i = 0; i < threadsToProcess.length; i += batchSize) {
+      const batch = threadsToProcess.slice(i, i + batchSize);
       logInfo(`Processing batch ${Math.floor(i / batchSize) + 1}`, { 
         batchSize: batch.length,
         startIndex: i 
@@ -655,7 +723,7 @@ async function processBatchNurturing(
       });
 
       // Small delay between batches
-      if (i + batchSize < filteredThreads.length) {
+      if (i + batchSize < threadsToProcess.length) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
@@ -693,7 +761,8 @@ async function processSingleChat(
   threadData: any
 ) {
   const thread_id = threadData.id;
-  const clinic_id = threadData.clinic_id;
+  // Use clinic_id from the lead data since lead table has clinic_id
+  const clinic_id = threadData.leads.clinic_id;
   const leadEmail = threadData.leads.email;
   const leadName = (threadData.leads.first_name || '') + ' ' + (threadData.leads.last_name || '') || 'Patient';
 
@@ -780,6 +849,13 @@ async function processSingleChat(
   const messagesText = chronologicalMessages
     .map(m => `${m.is_from_user ? 'User' : 'Assistant'}: ${m.message}`)
     .join('\n');
+
+  // Log the conversation for debugging
+  logInfo(`Conversation for thread ${thread_id}`, {
+    messageCount: chronologicalMessages.length,
+    conversation: messagesText.substring(0, 1000) + (messagesText.length > 1000 ? '...' : ''),
+    fullConversation: messagesText // Full conversation for detailed logs
+  });
 
   const analysisPrompt = `
     Analyze the following conversation to determine if the user has requested a meeting, appointment, or booking.
