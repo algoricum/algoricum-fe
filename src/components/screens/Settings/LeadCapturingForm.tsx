@@ -225,10 +225,8 @@ const LeadCapturingForm = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="bg-danger p-4 text-white">Development In Progress</div>
-
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Lead Capturing Form Builder</h2>
+        <h2 className="text-xl font-semibold">Lead Capturing Form</h2>
         <div className="flex gap-3">
           <Button type="default" icon={<EyeOutlined />} onClick={handlePreviewForm}>
             Preview Form
