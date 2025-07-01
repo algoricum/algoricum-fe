@@ -101,7 +101,7 @@ const LeadGenerationForm = () => {
 
       // Phone validation
       if (field.field_type === "tel" && formData[field.field_id]) {
-        const phoneRegex = /^[+]?[1-9][\d]{0,15}$/;
+        const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
         if (!phoneRegex.test(formData[field.field_id].toString().replace(/[\s\-\(\)]/g, ""))) {
           newErrors[field.field_id] = "Please enter a valid phone number";
         }
@@ -139,23 +139,40 @@ const LeadGenerationForm = () => {
     try {
       const supabase = createClient();
 
-      // Prepare submission data
+      // Step 1: Fetch the source_id where name is "Phone"
+      const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Phone").single();
+
+      if (sourceError) {
+        console.error("Error fetching lead source:", sourceError);
+        throw new Error("Could not find lead source 'Phone'");
+      }
+
+      // Step 2: Prepare submission data for leads table
       const submissionData = {
         clinic_id: clinicId,
-        name: formData.name || null,
+        source_id: sourceData.id,
         email: formData.email || null,
         phone: formData.phone || null,
         form_data: formData,
+        interest_level: "high",
+        urgency: "curious",
+        status: "new",
       };
 
-      const { error } = await supabase.from("clinic_leads").insert([submissionData]);
+      console.log("Submitting lead data:", submissionData);
 
-      if (error) throw error;
+      // Step 3: Insert into leads table
+      const { error: insertError } = await supabase.from("lead").insert([submissionData]);
+
+      if (insertError) {
+        console.error("Error inserting lead:", insertError);
+        throw insertError;
+      }
 
       setSubmitted(true);
     } catch (error: any) {
       console.error("Error submitting form:", error);
-      alert("There was an error submitting your information. Please try again.");
+      alert(`There was an error submitting your information: ${error.message}. Please try again.`);
     } finally {
       setSubmitting(false);
     }
