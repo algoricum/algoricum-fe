@@ -3,8 +3,6 @@ import MobileFooter from "@/components/common/MobileFooter";
 import { Flex, Layout, type LayoutProps } from "antd";
 import type { ReactNode } from "react";
 
-const { Content } = Layout;
-
 interface DashboardLayoutProps extends LayoutProps {
   header?: ReactNode;
 }
@@ -21,17 +19,7 @@ const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
             </Flex>
           )}
 
-          <Content
-            className="bg-white p-4"
-            style={{
-              height: header ? "calc(100vh - 60px - 60px)" : "calc(100vh - 60px)", // Subtract header and footer height
-              overflowY: "auto",
-              overflowX: "hidden",
-            }}
-          >
-            {children}
-          </Content>
-
+          {children}
           <MobileFooter />
         </Layout>
       </Layout>
