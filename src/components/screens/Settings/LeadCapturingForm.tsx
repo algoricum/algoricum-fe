@@ -23,10 +23,8 @@ type FormField = {
 const LeadCapturingForm = () => {
   const [loading, setLoading] = useState(false);
   const clinicData = getLocalClinicData();
-
-  console.log("clinic data is ", clinicData);
-
   const router = useRouter();
+
   const [fields, setFields] = useState<FormField[]>([
     {
       id: "1",
@@ -90,18 +88,26 @@ const LeadCapturingForm = () => {
 
   useEffect(() => {
     const fetchFormFields = async () => {
+      if (!clinicData?.id) {
+        console.error("No clinic ID found");
+        return;
+      }
+
       try {
         setLoading(true);
         const supabase = createClient();
         const { data, error } = await supabase
           .from("clinic_lead_form")
           .select("*")
-          .eq("clinic_id", clinicData?.id)
+          .eq("clinic_id", clinicData.id)
           .order("field_order", { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+          console.error("Supabase error:", error);
+          throw error;
+        }
+
         if (data && data.length > 0) {
-          // Transform the data to match our component structure
           const transformedFields = data.map(field => ({
             id: field.id,
             field_id: field.field_id,
@@ -114,41 +120,58 @@ const LeadCapturingForm = () => {
           setFields(transformedFields);
         }
       } catch (error: any) {
-        console.error("Error fetching form fields:", error.message);
+        console.error("Error fetching form fields:", error);
+        ErrorToast("Failed to load form fields: " + error.message);
       } finally {
         setLoading(false);
       }
     };
 
     fetchFormFields();
-  }, []);
+  }, [clinicData?.id]);
 
   const handleSave = async () => {
+    if (!clinicData?.id) {
+      ErrorToast("No clinic ID found. Please ensure you're logged in.");
+      return;
+    }
+
     try {
       setLoading(true);
       const supabase = createClient();
-      const clinicId = clinicData?.id;
 
       // Delete existing fields
-      await supabase.from("clinic_lead_form").delete().eq("clinic_id", clinicId);
+      const { error: deleteError } = await supabase.from("clinic_lead_form").delete().eq("clinic_id", clinicData.id);
+
+      if (deleteError) {
+        console.error("Delete error:", deleteError);
+        throw deleteError;
+      }
 
       // Transform and insert new fields
       const fieldsToInsert = fields.map((field, index) => ({
-        clinic_id: clinicId,
+        clinic_id: clinicData.id,
         field_id: field.field_id,
         field_name: field.field_name,
         field_type: field.field_type,
         is_required: field.is_required,
-        field_options: field.field_options || null,
+        field_options: field.field_options && field.field_options.length > 0 ? field.field_options : null,
         field_order: index + 1,
       }));
 
-      const { error } = await supabase.from("clinic_lead_form").insert(fieldsToInsert);
+      console.log("Inserting fields:", fieldsToInsert);
 
-      if (error) throw error;
+      const { error: insertError } = await supabase.from("clinic_lead_form").insert(fieldsToInsert);
+
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        throw insertError;
+      }
+
       SuccessToast("Form fields saved successfully");
     } catch (error: any) {
-      ErrorToast(error.message || "Failed to save form fields");
+      console.error("Save error:", error);
+      ErrorToast(`Failed to save form fields: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -156,7 +179,7 @@ const LeadCapturingForm = () => {
 
   const addNewField = () => {
     const newField: FormField = {
-      id: `temp_${Date.now()}`, // Temporary ID for new fields
+      id: `temp_${Date.now()}`,
       field_id: `field_${Date.now()}`,
       field_name: "New Field",
       field_type: "text",
@@ -175,7 +198,6 @@ const LeadCapturingForm = () => {
   const removeField = (index: number) => {
     const updatedFields = [...fields];
     updatedFields.splice(index, 1);
-    // Update field_order for remaining fields
     updatedFields.forEach((field, idx) => {
       field.field_order = idx + 1;
     });
@@ -183,10 +205,23 @@ const LeadCapturingForm = () => {
   };
 
   const handlePreviewForm = () => {
-    // Navigate to the lead generation form page
-    const clinicId = clinicData?.id;
-    router.push(`/lead-form/${clinicId}`);
+    if (!clinicData?.id) {
+      ErrorToast("No clinic ID found");
+      return;
+    }
+    router.push(`/lead-form/${clinicData.id}`);
   };
+
+  if (!clinicData?.id) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold mb-2">No Clinic Data Found</h3>
+          <p className="text-gray-600">Please ensure you&apos;re logged in and have clinic access.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
