@@ -1,8 +1,8 @@
-// utils/supabase/email-settings-helper.ts - Updated for IMAP
+// utils/supabase/email-settings-helper.ts - Updated for IMAP + SMS
 
 import { createClient } from "./config/client"
 
-// Types and Interfaces
+// Types and Interfaces - Extended for SMS
 export interface EmailSettings {
   id?: string
   clinic_id: string
@@ -26,6 +26,13 @@ export interface EmailSettings {
   auto_reply_enabled: boolean
   check_frequency_minutes: number
   last_email_check?: string | null
+  // SMS Settings - NEW
+  twilio_account_sid?: string
+  twilio_auth_token?: string
+  twilio_phone_number?: string
+  sms_enabled?: boolean
+  sms_auto_reply_enabled?: boolean
+  twilio_webhook_url?: string
   created_at?: string
   updated_at?: string
 }
@@ -48,6 +55,13 @@ export interface EmailSettingsInput {
   // Processing Settings
   auto_reply_enabled: boolean
   check_frequency_minutes: number
+  // SMS Settings - NEW
+  twilio_account_sid?: string
+  twilio_auth_token?: string
+  twilio_phone_number?: string
+  sms_enabled?: boolean
+  sms_auto_reply_enabled?: boolean
+  twilio_webhook_url?: string
 }
 
 export interface EmailSettingsWithClinic extends EmailSettings {
@@ -108,6 +122,19 @@ export interface EmailTestResult {
   }
 }
 
+// NEW: SMS Test Result Interface
+export interface SMSTestResult {
+  success: boolean
+  message: string
+  details?: {
+    account_status: string
+    phone_number_status: string
+    test_message_sent: boolean
+    balance_info?: any
+  }
+  error?: string
+}
+
 export interface ValidationResult {
   isValid: boolean
   errors: string[]
@@ -147,7 +174,7 @@ export const getEmailSettings = async (clinicId: string): Promise<EmailSettingsR
 }
 
 /**
- * Save email settings (create or update)
+ * Save email settings (create or update) - UPDATED to include SMS fields
  */
 export const saveEmailSettings = async (
   clinicId: string, 
@@ -183,6 +210,13 @@ export const saveEmailSettings = async (
       // Processing settings
       auto_reply_enabled: settings.auto_reply_enabled,
       check_frequency_minutes: settings.check_frequency_minutes,
+      // SMS settings - NEW
+      twilio_account_sid: settings.twilio_account_sid,
+      twilio_auth_token: settings.twilio_auth_token,
+      twilio_phone_number: settings.twilio_phone_number,
+      sms_enabled: settings.sms_enabled,
+      sms_auto_reply_enabled: settings.sms_auto_reply_enabled,
+      twilio_webhook_url: settings.twilio_webhook_url,
       updated_at: new Date().toISOString()
     }
 
@@ -252,6 +286,60 @@ export const testEmailConnection = async (
 
     const result: EmailTestResult = await response.json()
     return result
+}
+
+/**
+ * Test SMS connection - NEW
+ */
+export const testSMSConnection = async (
+  settings: EmailSettingsInput,
+  clinicId: string
+): Promise<SMSTestResult> => {
+  try {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) {
+      throw new Error("Please log in to test SMS connection")
+    }
+
+    // Validate required SMS fields
+    if (!settings.twilio_account_sid || !settings.twilio_auth_token || !settings.twilio_phone_number) {
+      return {
+        success: false,
+        message: "Missing required Twilio credentials"
+      }
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/test-sms-connection`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({
+        twilio_account_sid: settings.twilio_account_sid,
+        twilio_auth_token: settings.twilio_auth_token,
+        twilio_phone_number: settings.twilio_phone_number,
+        clinic_id: clinicId
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result: SMSTestResult = await response.json()
+    return result
+
+  } catch (error: any) {
+    console.error('Error testing SMS connection:', error)
+    return {
+      success: false,
+      message: `SMS test failed: ${error.message}`,
+      error: error.message
+    }
+  }
 }
 
 /**
@@ -371,49 +459,76 @@ export const getAllEmailSettings = async (): Promise<EmailSettingsResponse<Email
 }
 
 /**
- * Validate email settings
+ * Validate email settings - UPDATED to allow partial validation
  */
 export const validateEmailSettings = (settings: Partial<EmailSettingsInput>): ValidationResult => {
   const errors: string[] = []
 
-  // SMTP validation
-  if (!settings.smtp_host) errors.push("SMTP host is required")
-  if (!settings.smtp_user) errors.push("SMTP username is required")
-  if (!settings.smtp_password) errors.push("SMTP password is required")
-  if (!settings.smtp_sender_email) errors.push("Sender email is required")
-  if (!settings.smtp_sender_name) errors.push("Sender name is required")
+  // Email validation (only validate if user is trying to configure email)
+  const hasEmailSettings = settings.smtp_host || settings.imap_server || 
+                           settings.smtp_user || settings.smtp_password
   
-  // SMTP port validation
-  if (!settings.smtp_port || settings.smtp_port < 1 || settings.smtp_port > 65535) {
-    errors.push("Valid SMTP port is required (1-65535)")
+  if (hasEmailSettings) {
+    // Only validate email fields if user is actively configuring email
+    if (settings.smtp_host && !settings.smtp_user) errors.push("SMTP username is required when SMTP host is provided")
+    if (settings.smtp_host && !settings.smtp_password) errors.push("SMTP password is required when SMTP host is provided")
+    if (settings.smtp_host && !settings.smtp_sender_email) errors.push("Sender email is required when SMTP host is provided")
+    if (settings.smtp_host && !settings.smtp_sender_name) errors.push("Sender name is required when SMTP host is provided")
+    
+    // SMTP port validation
+    if (settings.smtp_host && (!settings.smtp_port || settings.smtp_port < 1 || settings.smtp_port > 65535)) {
+      errors.push("Valid SMTP port is required (1-65535)")
+    }
+
+    // IMAP validation (updated from POP3)
+    if (settings.imap_server && !settings.imap_user) errors.push("IMAP username is required when IMAP server is provided")
+    if (settings.imap_server && !settings.imap_password) errors.push("IMAP password is required when IMAP server is provided")
+    
+    // IMAP port validation
+    if (settings.imap_server && (!settings.imap_port || settings.imap_port < 1 || settings.imap_port > 65535)) {
+      errors.push("Valid IMAP port is required (1-65535)")
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (settings.smtp_user && !emailRegex.test(settings.smtp_user)) {
+      errors.push("SMTP username must be a valid email address")
+    }
+    if (settings.smtp_sender_email && !emailRegex.test(settings.smtp_sender_email)) {
+      errors.push("Sender email must be a valid email address")
+    }
+    if (settings.imap_user && !emailRegex.test(settings.imap_user)) {
+      errors.push("IMAP username must be a valid email address")
+    }
+
+    // Processing settings validation
+    if (settings.check_frequency_minutes !== undefined && 
+        (settings.check_frequency_minutes < 1 || settings.check_frequency_minutes > 60)) {
+      errors.push("Check frequency must be between 1 and 60 minutes")
+    }
   }
 
-  // IMAP validation (updated from POP3)
-  if (!settings.imap_server) errors.push("IMAP server is required")
-  if (!settings.imap_user) errors.push("IMAP username is required")
-  if (!settings.imap_password) errors.push("IMAP password is required")
+  // SMS validation (only if SMS is enabled OR user is providing SMS credentials)
+  const hasSMSSettings = settings.sms_enabled || settings.twilio_account_sid || 
+                        settings.twilio_auth_token || settings.twilio_phone_number
   
-  // IMAP port validation
-  if (!settings.imap_port || settings.imap_port < 1 || settings.imap_port > 65535) {
-    errors.push("Valid IMAP port is required (1-65535)")
-  }
-
-  // Email format validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (settings.smtp_user && !emailRegex.test(settings.smtp_user)) {
-    errors.push("SMTP username must be a valid email address")
-  }
-  if (settings.smtp_sender_email && !emailRegex.test(settings.smtp_sender_email)) {
-    errors.push("Sender email must be a valid email address")
-  }
-  if (settings.imap_user && !emailRegex.test(settings.imap_user)) {
-    errors.push("IMAP username must be a valid email address")
-  }
-
-  // Processing settings validation
-  if (settings.check_frequency_minutes !== undefined && 
-      (settings.check_frequency_minutes < 1 || settings.check_frequency_minutes > 60)) {
-    errors.push("Check frequency must be between 1 and 60 minutes")
+  if (settings.sms_enabled && hasSMSSettings) {
+    if (!settings.twilio_account_sid) {
+      errors.push("Twilio Account SID is required when SMS is enabled")
+    }
+    if (!settings.twilio_auth_token) {
+      errors.push("Twilio Auth Token is required when SMS is enabled")
+    }
+    if (!settings.twilio_phone_number) {
+      errors.push("Twilio Phone Number is required when SMS is enabled")
+    } else if (!settings.twilio_phone_number.match(/^\+[1-9]\d{1,14}$/)) {
+      errors.push("Twilio Phone Number must be in E.164 format (e.g., +1234567890)")
+    }
+    
+    // Account SID format validation
+    if (settings.twilio_account_sid && !settings.twilio_account_sid.match(/^AC[a-z0-9]{32}$/i)) {
+      errors.push("Twilio Account SID must start with 'AC' followed by 32 characters")
+    }
   }
 
   return {
@@ -423,7 +538,38 @@ export const validateEmailSettings = (settings: Partial<EmailSettingsInput>): Va
 }
 
 /**
- * Get default email settings
+ * NEW: Validate SMS settings separately
+ */
+export const validateSMSSettings = (settings: Partial<EmailSettingsInput>): ValidationResult => {
+  const errors: string[] = []
+
+  if (settings.sms_enabled) {
+    if (!settings.twilio_account_sid) {
+      errors.push("Twilio Account SID is required")
+    }
+    if (!settings.twilio_auth_token) {
+      errors.push("Twilio Auth Token is required")
+    }
+    if (!settings.twilio_phone_number) {
+      errors.push("Twilio Phone Number is required")
+    } else if (!settings.twilio_phone_number.match(/^\+[1-9]\d{1,14}$/)) {
+      errors.push("Twilio Phone Number must be in E.164 format (e.g., +1234567890)")
+    }
+    
+    // Account SID format validation
+    if (settings.twilio_account_sid && !settings.twilio_account_sid.match(/^AC[a-z0-9]{32}$/)) {
+      errors.push("Twilio Account SID must start with 'AC' followed by 32 characters")
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  }
+}
+
+/**
+ * Get default email settings - UPDATED to include SMS defaults
  */
 export const getDefaultEmailSettings = (): Partial<EmailSettingsInput> => {
   return {
@@ -432,7 +578,10 @@ export const getDefaultEmailSettings = (): Partial<EmailSettingsInput> => {
     imap_port: 993, // Updated from POP3 port 995
     imap_use_ssl: true, // Updated from pop_use_ssl
     auto_reply_enabled: true,
-    check_frequency_minutes: 5
+    check_frequency_minutes: 5,
+    // SMS defaults
+    sms_enabled: true,
+    sms_auto_reply_enabled: true,
   }
 }
 
@@ -445,6 +594,19 @@ export const isEmailConfigured = async (clinicId: string): Promise<boolean> => {
     return !!data && !!data.smtp_host && !!data.imap_server // Updated from pop_server
   } catch (error) {
     console.error("Error checking email configuration:", error)
+    return false
+  }
+}
+
+/**
+ * NEW: Check if SMS settings are configured for a clinic
+ */
+export const isSMSConfigured = async (clinicId: string): Promise<boolean> => {
+  try {
+    const { data } = await getEmailSettings(clinicId)
+    return !!data && !!data.twilio_account_sid && !!data.twilio_auth_token && !!data.twilio_phone_number
+  } catch (error) {
+    console.error("Error checking SMS configuration:", error)
     return false
   }
 }
@@ -530,31 +692,52 @@ export const autoFillProviderSettings = (
 }
 
 /**
- * Get email monitoring status for display
+ * Get email monitoring status for display - UPDATED to include SMS status
  */
 export const getEmailMonitoringStatus = (settings: EmailSettings | null) => {
   if (!settings) {
     return {
       status: 'not_configured',
-      message: 'Email not configured',
+      message: 'Communication not configured',
       color: 'gray',
       badge: '⚪'
     }
   }
   
-  if (!isCompletelyConfigured(settings)) {
+  const emailConfigured = isCompletelyConfigured(settings)
+  const smsConfigured = !!(settings.twilio_account_sid && settings.twilio_auth_token && settings.twilio_phone_number)
+  
+  if (!emailConfigured && !smsConfigured) {
     return {
-      status: 'incomplete',
-      message: 'Email configuration incomplete',
+      status: 'not_configured',
+      message: 'Email and SMS not configured',
+      color: 'gray',
+      badge: '⚪'
+    }
+  }
+  
+  if (!emailConfigured && smsConfigured) {
+    return {
+      status: 'partial',
+      message: 'SMS configured, email incomplete',
       color: 'orange',
       badge: '🟡'
     }
   }
   
-  if (!settings.auto_reply_enabled) {
+  if (emailConfigured && !smsConfigured) {
+    return {
+      status: 'partial',
+      message: 'Email configured, SMS incomplete',
+      color: 'orange',
+      badge: '🟡'
+    }
+  }
+  
+  if (!settings.auto_reply_enabled && !settings.sms_auto_reply_enabled) {
     return {
       status: 'disabled',
-      message: 'Auto-reply disabled',
+      message: 'Auto-reply disabled for both email and SMS',
       color: 'red',
       badge: '🔴'
     }
@@ -564,7 +747,7 @@ export const getEmailMonitoringStatus = (settings: EmailSettings | null) => {
   if (!lastCheck) {
     return {
       status: 'configured',
-      message: 'Email configured, never checked',
+      message: 'Communication configured, never checked',
       color: 'blue',
       badge: '🔵'
     }
@@ -586,7 +769,7 @@ export const getEmailMonitoringStatus = (settings: EmailSettings | null) => {
   
   return {
     status: 'active',
-    message: `Active, last checked ${minutesDiff} minutes ago`,
+    message: `Email & SMS active, last checked ${minutesDiff} minutes ago`,
     color: 'green',
     badge: '🟢'
   }
@@ -607,6 +790,17 @@ export const isCompletelyConfigured = (settings: EmailSettings): boolean => {
     settings.imap_port && // Updated from pop_port
     settings.imap_user && // Updated from pop_user
     settings.imap_password // Updated from pop_password
+  )
+}
+
+/**
+ * NEW: Check if SMS settings are completely configured
+ */
+export const isSMSCompletelyConfigured = (settings: EmailSettings): boolean => {
+  return !!(
+    settings.twilio_account_sid &&
+    settings.twilio_auth_token &&
+    settings.twilio_phone_number
   )
 }
 
@@ -656,3 +850,14 @@ export const migratePOP3ToIMAP = (popSettings: any): Partial<EmailSettingsInput>
   
   return imapSettings
 }
+
+// BACKWARD COMPATIBILITY ALIASES
+export const getCommunicationSettings = getEmailSettings
+export const saveCommunicationSettings = saveEmailSettings
+export const validateCommunicationSettings = validateEmailSettings
+export const getDefaultCommunicationSettings = getDefaultEmailSettings
+
+// Export types for backward compatibility
+export type CommunicationSettings = EmailSettings
+export type CommunicationSettingsInput = EmailSettingsInput
+export type CommunicationTestResult = EmailTestResult

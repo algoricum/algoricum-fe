@@ -18,11 +18,14 @@ import {
   getEmailSettings,
   saveEmailSettings,
   testEmailConnection,
+  testSMSConnection,
   validateEmailSettings,
+  validateSMSSettings,
   getDefaultEmailSettings,
   type EmailSettings,
   type EmailSettingsInput,
   type EmailTestResult,
+  type SMSTestResult,
 } from "@/utils/supabase/email-settings-helper";
 
 interface ClinicData {
@@ -31,19 +34,8 @@ interface ClinicData {
   [key: string]: any;
 }
 
-// Extended interface to include Twilio settings
-interface CommunicationSettingsInput extends EmailSettingsInput {
-  // Twilio SMS Settings
-  twilio_account_sid?: string;
-  twilio_auth_token?: string;
-  twilio_phone_number?: string;
-  sms_enabled?: boolean;
-  sms_auto_reply_enabled?: boolean;
-  twilio_webhook_url?: string;
-}
-
 const CommunicationConfiguration: React.FC = () => {
-  const [form] = Form.useForm<CommunicationSettingsInput>();
+  const [form] = Form.useForm<EmailSettingsInput>();
   const [loading, setLoading] = useState<boolean>(false);
   const [testingConnection, setTestingConnection] = useState<boolean>(false);
   const [testingSMS, setTestingSMS] = useState<boolean>(false);
@@ -76,7 +68,6 @@ const CommunicationConfiguration: React.FC = () => {
     try {
       setLoading(true);
 
-      // Fetch email settings (existing)
       const { data, error } = await getEmailSettings(clinicId);
 
       if (error) {
@@ -106,7 +97,7 @@ const CommunicationConfiguration: React.FC = () => {
           auto_reply_enabled: data.auto_reply_enabled !== false,
           check_frequency_minutes: data.check_frequency_minutes || 5,
 
-          // Twilio SMS Settings (you'll need to extend your data model)
+          // Twilio SMS Settings
           twilio_account_sid: data.twilio_account_sid,
           twilio_auth_token: data.twilio_auth_token,
           twilio_phone_number: data.twilio_phone_number,
@@ -115,18 +106,19 @@ const CommunicationConfiguration: React.FC = () => {
           twilio_webhook_url: data.twilio_webhook_url,
         });
 
-        setIsEmailConfigured(true);
+        // Check if email is configured (has required SMTP and IMAP settings)
+        setIsEmailConfigured(
+          !!data.smtp_host && !!data.smtp_user && !!data.smtp_password && !!data.imap_server && !!data.imap_user && !!data.imap_password,
+        );
+
+        // Check if SMS is configured (has required Twilio settings)
         setIsSMSConfigured(!!data.twilio_account_sid && !!data.twilio_auth_token && !!data.twilio_phone_number);
+
         setLastChecked(data.last_email_check || null);
       } else {
         // Set default values for new configuration
         const defaultSettings = getDefaultEmailSettings();
-        form.setFieldsValue({
-          ...defaultSettings,
-          // Default Twilio settings
-          sms_enabled: true,
-          sms_auto_reply_enabled: true,
-        });
+        form.setFieldsValue(defaultSettings);
         setIsEmailConfigured(false);
         setIsSMSConfigured(false);
       }
@@ -138,7 +130,7 @@ const CommunicationConfiguration: React.FC = () => {
     }
   };
 
-  const handleSaveSettings = async (values: CommunicationSettingsInput): Promise<void> => {
+  const handleSaveSettings = async (values: EmailSettingsInput): Promise<void> => {
     try {
       setLoading(true);
 
@@ -147,34 +139,35 @@ const CommunicationConfiguration: React.FC = () => {
         return;
       }
 
-      // Validate email settings if provided
-      if (values.smtp_host || values.imap_server) {
-        const emailValidation = validateEmailSettings(values);
-        if (!emailValidation.isValid) {
-          ErrorToast(`Email validation failed: ${emailValidation.errors.join(", ")}`);
-          return;
-        }
+      console.log("Form values being saved:", values); // Debug log
+
+      // Validate all settings together (supports partial configuration)
+      const validation = validateEmailSettings(values);
+      if (!validation.isValid) {
+        ErrorToast(`Validation failed: ${validation.errors.join(", ")}`);
+        return;
       }
 
-      // Validate Twilio settings if provided
-      if (values.sms_enabled && values.twilio_account_sid) {
-        const twilioValidation = validateTwilioSettings(values);
-        if (!twilioValidation.isValid) {
-          ErrorToast(`SMS validation failed: ${twilioValidation.errors.join(", ")}`);
-          return;
-        }
-      }
-
-      // You'll need to update your saveEmailSettings to handle Twilio fields
-      // or create a new saveCommunicationSettings function
+      // Save communication settings using the updated helper
       const { data, error, isUpdate } = await saveEmailSettings(clinicData.id, values);
 
       if (error) {
+        console.error("Save error:", error); // Debug log
         throw error;
       }
 
-      setIsEmailConfigured(true);
-      setIsSMSConfigured(!!values.twilio_account_sid && !!values.twilio_auth_token && !!values.twilio_phone_number);
+      console.log("Saved data:", data); // Debug log
+
+      // Update configuration status based on saved data
+      setIsEmailConfigured(
+        !!data?.smtp_host &&
+          !!data?.smtp_user &&
+          !!data?.smtp_password &&
+          !!data?.imap_server &&
+          !!data?.imap_user &&
+          !!data?.imap_password,
+      );
+      setIsSMSConfigured(!!data?.twilio_account_sid && !!data?.twilio_auth_token && !!data?.twilio_phone_number);
 
       SuccessToast(isUpdate ? "Communication settings updated successfully" : "Communication settings created successfully");
 
@@ -188,29 +181,6 @@ const CommunicationConfiguration: React.FC = () => {
     }
   };
 
-  const validateTwilioSettings = (values: CommunicationSettingsInput) => {
-    const errors: string[] = [];
-
-    if (values.sms_enabled) {
-      if (!values.twilio_account_sid) {
-        errors.push("Twilio Account SID is required");
-      }
-      if (!values.twilio_auth_token) {
-        errors.push("Twilio Auth Token is required");
-      }
-      if (!values.twilio_phone_number) {
-        errors.push("Twilio Phone Number is required");
-      } else if (!values.twilio_phone_number.match(/^\+[1-9]\d{1,14}$/)) {
-        errors.push("Twilio Phone Number must be in E.164 format (e.g., +1234567890)");
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
-  };
-
   const handleTestSMS = async (): Promise<void> => {
     try {
       setTestingSMS(true);
@@ -221,18 +191,20 @@ const CommunicationConfiguration: React.FC = () => {
         return;
       }
 
-      // Validate Twilio settings
-      const validation = validateTwilioSettings(values);
-      if (!validation.isValid) {
-        ErrorToast(`Please fix the following issues: ${validation.errors.join(", ")}`);
+      // Validate SMS settings before testing
+      const smsValidation = validateSMSSettings(values);
+      if (!smsValidation.isValid) {
+        ErrorToast(`Please fix the following issues: ${smsValidation.errors.join(", ")}`);
         return;
       }
 
-      // You'll need to implement this function
-      // const result = await testTwilioConnection(values, clinicData.id)
+      const result = await testSMSConnection(values, clinicData.id);
 
-      // For now, simulate success
-      SuccessToast("🎉 SMS configuration test successful! Twilio connection is working correctly.");
+      if (result.success) {
+        SuccessToast("🎉 SMS configuration test successful! Twilio connection is working correctly.");
+      } else {
+        ErrorToast(`SMS test failed: ${result.message}`);
+      }
     } catch (error: any) {
       console.error("Test SMS error:", error);
       ErrorToast("Failed to test SMS connection. Please try again.");
@@ -251,10 +223,9 @@ const CommunicationConfiguration: React.FC = () => {
         return;
       }
 
-      // Validate required fields
-      const validation = validateEmailSettings(values);
-      if (!validation.isValid) {
-        ErrorToast(`Please fix the following issues: ${validation.errors.join(", ")}`);
+      // Validate required email fields
+      if (!values.smtp_host || !values.smtp_user || !values.smtp_password) {
+        ErrorToast("Please fill in all required email fields before testing");
         return;
       }
 
@@ -269,7 +240,7 @@ const CommunicationConfiguration: React.FC = () => {
         // Show detailed status for partial success or complete failure
         const smtpSuccess = result.details?.smtp?.success === true;
         const imapSuccess = result.details?.imap?.success === true;
-        console.log(result, result.details);
+
         const smtpStatus = smtpSuccess ? "✅ SMTP (Outgoing)" : "❌ SMTP (Outgoing)";
         const imapStatus = imapSuccess ? "✅ IMAP (Incoming)" : "❌ IMAP (Incoming)";
 
@@ -360,48 +331,33 @@ const CommunicationConfiguration: React.FC = () => {
           {/* SMTP Settings Card */}
           <Card title="SMTP Settings (Outgoing Email)" className="mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Form.Item label="SMTP Host" name="smtp_host" rules={[{ required: true, message: "Please enter SMTP host" }]}>
+              <Form.Item label="SMTP Host" name="smtp_host">
                 <Input placeholder="smtp.gmail.com" />
               </Form.Item>
 
-              <Form.Item label="SMTP Port" name="smtp_port" rules={[{ required: true, message: "Please enter SMTP port" }]}>
+              <Form.Item label="SMTP Port" name="smtp_port">
                 <InputNumber placeholder="465" min={1} max={65535} className="w-full" />
               </Form.Item>
 
-              <Form.Item
-                label="SMTP Username"
-                name="smtp_user"
-                rules={[
-                  { required: true, message: "Please enter SMTP username" },
-                  { type: "email", message: "Please enter a valid email address" },
-                ]}
-              >
+              <Form.Item label="SMTP Username" name="smtp_user" rules={[{ type: "email", message: "Please enter a valid email address" }]}>
                 <Input placeholder="your-email@gmail.com" />
               </Form.Item>
 
-              <Form.Item
-                label="SMTP Password"
-                name="smtp_password"
-                rules={[{ required: true, message: "Please enter SMTP password" }]}
-                help="For Gmail: Use 16-character App Password"
-              >
+              <Form.Item label="SMTP Password" name="smtp_password" help="For Gmail: Use 16-character App Password">
                 <Input.Password
                   placeholder="xxxx xxxx xxxx xxxx"
                   iconRender={(visible: boolean) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
                 />
               </Form.Item>
 
-              <Form.Item label="Sender Name" name="smtp_sender_name" rules={[{ required: true, message: "Please enter sender name" }]}>
+              <Form.Item label="Sender Name" name="smtp_sender_name">
                 <Input placeholder="Clinic Support" />
               </Form.Item>
 
               <Form.Item
                 label="Sender Email"
                 name="smtp_sender_email"
-                rules={[
-                  { required: true, message: "Please enter sender email" },
-                  { type: "email", message: "Please enter a valid email address" },
-                ]}
+                rules={[{ type: "email", message: "Please enter a valid email address" }]}
               >
                 <Input placeholder="your-email@gmail.com" />
               </Form.Item>
@@ -415,31 +371,19 @@ const CommunicationConfiguration: React.FC = () => {
           {/* IMAP Settings Card */}
           <Card title="IMAP Settings (Incoming Email)" className="mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Form.Item label="IMAP Server" name="imap_server" rules={[{ required: true, message: "Please enter IMAP server" }]}>
+              <Form.Item label="IMAP Server" name="imap_server">
                 <Input placeholder="imap.gmail.com" />
               </Form.Item>
 
-              <Form.Item label="IMAP Port" name="imap_port" rules={[{ required: true, message: "Please enter IMAP port" }]}>
+              <Form.Item label="IMAP Port" name="imap_port">
                 <InputNumber placeholder="993" min={1} max={65535} className="w-full" />
               </Form.Item>
 
-              <Form.Item
-                label="IMAP Username"
-                name="imap_user"
-                rules={[
-                  { required: true, message: "Please enter IMAP username" },
-                  { type: "email", message: "Please enter a valid email address" },
-                ]}
-              >
+              <Form.Item label="IMAP Username" name="imap_user" rules={[{ type: "email", message: "Please enter a valid email address" }]}>
                 <Input placeholder="your-email@gmail.com" />
               </Form.Item>
 
-              <Form.Item
-                label="IMAP Password"
-                name="imap_password"
-                rules={[{ required: true, message: "Please enter IMAP password" }]}
-                help="Use the SAME App Password as SMTP"
-              >
+              <Form.Item label="IMAP Password" name="imap_password" help="Use the SAME App Password as SMTP">
                 <Input.Password
                   placeholder="xxxx xxxx xxxx xxxx"
                   iconRender={(visible: boolean) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
@@ -459,11 +403,7 @@ const CommunicationConfiguration: React.FC = () => {
                 <Switch />
               </Form.Item>
 
-              <Form.Item
-                label="Check Frequency (minutes)"
-                name="check_frequency_minutes"
-                rules={[{ required: true, message: "Please enter check frequency" }]}
-              >
+              <Form.Item label="Check Frequency (minutes)" name="check_frequency_minutes">
                 <InputNumber placeholder="5" min={1} max={60} className="w-full" />
               </Form.Item>
             </div>
@@ -480,31 +420,11 @@ const CommunicationConfiguration: React.FC = () => {
           {/* Twilio Settings Card */}
           <Card title="Twilio SMS Settings" className="mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Form.Item
-                label="Twilio Account SID"
-                name="twilio_account_sid"
-                rules={[
-                  {
-                    required: form.getFieldValue("sms_enabled"),
-                    message: "Please enter Twilio Account SID",
-                  },
-                ]}
-                help="Found in Twilio Console Dashboard"
-              >
+              <Form.Item label="Twilio Account SID" name="twilio_account_sid" help="Found in Twilio Console Dashboard">
                 <Input placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
               </Form.Item>
 
-              <Form.Item
-                label="Twilio Auth Token"
-                name="twilio_auth_token"
-                rules={[
-                  {
-                    required: form.getFieldValue("sms_enabled"),
-                    message: "Please enter Twilio Auth Token",
-                  },
-                ]}
-                help="Found in Twilio Console Dashboard"
-              >
+              <Form.Item label="Twilio Auth Token" name="twilio_auth_token" help="Found in Twilio Console Dashboard">
                 <Input.Password
                   placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                   iconRender={(visible: boolean) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
@@ -515,10 +435,6 @@ const CommunicationConfiguration: React.FC = () => {
                 label="Twilio Phone Number"
                 name="twilio_phone_number"
                 rules={[
-                  {
-                    required: form.getFieldValue("sms_enabled"),
-                    message: "Please enter Twilio Phone Number",
-                  },
                   {
                     pattern: /^\+[1-9]\d{1,14}$/,
                     message: "Phone number must be in E.164 format (e.g., +1234567890)",
@@ -562,6 +478,51 @@ const CommunicationConfiguration: React.FC = () => {
           </Button>
         </div>
       </Form>
+
+      {/* Test Results Modal */}
+      <Modal
+        title="Connection Test Results"
+        open={showTestModal}
+        onCancel={() => setShowTestModal(false)}
+        footer={[
+          <Button key="close" onClick={() => setShowTestModal(false)}>
+            Close
+          </Button>,
+        ]}
+      >
+        {testResults && (
+          <div className="space-y-4">
+            <Alert
+              message={testResults.success ? "Test Successful" : "Test Failed"}
+              description={testResults.message}
+              type={testResults.success ? "success" : "error"}
+              showIcon
+            />
+
+            {testResults.details && (
+              <div className="space-y-2">
+                <h4 className="font-medium">Email Details:</h4>
+                {testResults.details.smtp && (
+                  <Alert
+                    message={`SMTP: ${testResults.details.smtp.success ? "Success" : "Failed"}`}
+                    description={testResults.details.smtp.message || testResults.details.smtp.error}
+                    type={testResults.details.smtp.success ? "success" : "error"}
+                    size="small"
+                  />
+                )}
+                {testResults.details.imap && (
+                  <Alert
+                    message={`IMAP: ${testResults.details.imap.success ? "Success" : "Failed"}`}
+                    description={testResults.details.imap.message || testResults.details.imap.error}
+                    type={testResults.details.imap.success ? "success" : "error"}
+                    size="small"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Help Text - Updated for both Email and SMS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
