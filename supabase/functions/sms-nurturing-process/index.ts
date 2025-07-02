@@ -1,10 +1,6 @@
-// supabase/functions/lead-manager/index.ts
-// Single function that handles incoming messages AND follow-ups
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Get API keys from environment
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 
 interface IncomingMessage {
@@ -20,6 +16,42 @@ interface ProcessMode {
   mode: 'incoming_message' | 'process_followups' | 'twilio_webhook'
   message_data?: IncomingMessage
   twilio_data?: any
+}
+
+interface Lead {
+  id: string
+  first_name?: string
+  last_name?: string
+  phone?: string
+  email?: string
+  status: string
+  source_id: string
+  clinic_id: string
+  notes?: string
+  interest_level: number
+  urgency: number
+  created_at: string
+  updated_at: string
+}
+
+interface Thread {
+  id: string
+  lead_id: string
+  clinic_id: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+interface Conversation {
+  id?: string
+  thread_id: string
+  message: string
+  timestamp: string
+  created_at: string
+  updated_at: string
+  is_from_user: boolean
+  sender_type: 'user' | 'assistant'
 }
 
 // Utility function to extract name from message
@@ -45,21 +77,17 @@ function extractNameFromMessage(message: string): { first_name?: string, last_na
 
 // Generate messages using GPT
 async function generateMessage(
-  leadInfo: any, 
+  lead: Lead, 
   messageType: 'welcome' | 'followup_4h' | 'followup_2d' | 'followup_weekly',
   originalMessage?: string,
-  conversationHistory?: any[]
+  conversationHistory?: Conversation[]
 ): Promise<string> {
-  
-  // Fallback messages if OpenAI is not available
   const fallbackMessages = {
-    welcome: `Hi${leadInfo.first_name ? ` ${leadInfo.first_name}` : ''}! 👋 Thanks for reaching out to our clinic. We received your message and will get back to you shortly. How can we help you today?`,
-    
-    followup_4h: `Hi${leadInfo.first_name ? ` ${leadInfo.first_name}` : ''}! Just checking in - did you have any questions about our services? We're here to help! 🏥`,
-    
-    followup_2d: `Hi${leadInfo.first_name ? ` ${leadInfo.first_name}` : ''},\n\nI wanted to follow up on your inquiry. Many of our patients have had great success with our treatments:\n\n• 95% patient satisfaction rate\n• Personalized care plans\n• Quick appointment scheduling\n\nWould you like to schedule a consultation?\n\nBest regards,\nYour Clinic Team`,
-    
-    followup_weekly: `Hi${leadInfo.first_name ? ` ${leadInfo.first_name}` : ''}! Hope you're doing well. Just a friendly reminder that we're here when you're ready to prioritize your health. Any questions? 💙`
+    welcome: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! 👋 Thanks for rea
+    ching out to our clinic. How can we help you today?`,
+    followup_4h: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! Just checking in - any questions about our services? We're here to help! 🏥`,
+    followup_2d: `Hi${lead.first_name ? ` ${lead.first_name}` : ''},\n\nThanks for your interest in our clinic. We offer:\n• 95% patient satisfaction\n• Personalized care plans\n• Quick scheduling\n\nWould you like to book a consultation?\n\nBest,\nYour Clinic Team`,
+    followup_weekly: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! Hope you're well. Ready to prioritize your health? We're here to help! 💙`
   }
 
   if (!OPENAI_API_KEY) {
@@ -68,7 +96,7 @@ async function generateMessage(
 
   try {
     const conversationContext = conversationHistory?.slice(-3)
-      .map(msg => `${msg.is_from_user ? 'Patient' : 'Clinic'}: ${msg.message}`)
+      .map(msg => `${msg.sender_type === 'user' ? 'Patient' : 'Clinic'}: ${msg.message}`)
       .join('\n') || 'No previous conversation'
 
     let systemPrompt = ''
@@ -76,23 +104,20 @@ async function generateMessage(
 
     switch (messageType) {
       case 'welcome':
-        systemPrompt = `You are a friendly clinic receptionist. Generate a warm, professional welcome message for a new lead. Keep it brief (1-2 sentences), welcoming, and ask how you can help. Use their name if provided.`
-        userPrompt = `New lead${leadInfo.first_name ? ` named ${leadInfo.first_name}` : ''} sent: "${originalMessage}". Generate a welcome response.`
+        systemPrompt = `You are a friendly clinic receptionist. Generate a warm, professional welcome message (1-2 sentences) for a new lead. Use their name if provided and ask how you can help.`
+        userPrompt = `New lead${lead.first_name ? ` named ${lead.first_name}` : ''} sent: "${originalMessage}". Generate a welcome response.`
         break
-        
       case 'followup_4h':
-        systemPrompt = `You are a caring clinic follow-up assistant. Generate a brief SMS follow-up (under 160 chars) for a lead who hasn't responded in 4 hours. Be helpful, not pushy.`
-        userPrompt = `Follow up with ${leadInfo.first_name || 'lead'} who contacted us 4 hours ago about: "${originalMessage}"`
+        systemPrompt = `You are a caring clinic assistant. Generate a brief SMS follow-up (under 160 chars) for a lead who hasn't responded in 4 hours. Be helpful, not pushy.`
+        userPrompt = `Follow up with ${lead.first_name || 'lead'} who contacted us 4 hours ago about: "${originalMessage}"`
         break
-        
       case 'followup_2d':
-        systemPrompt = `Generate a professional email follow-up for a lead who hasn't responded in 2 days. Include success stories and value proposition. Keep under 200 words.`
-        userPrompt = `Email follow-up for ${leadInfo.first_name || 'lead'} who initially asked about: "${originalMessage}"`
+        systemPrompt = `Generate a professional email follow-up for a lead who hasn't responded in 2 days. Include success stats and value proposition. Keep under 200 words.`
+        userPrompt = `Email follow-up for ${lead.first_name || 'lead'} who initially asked about: "${originalMessage}"`
         break
-        
       case 'followup_weekly':
-        systemPrompt = `Generate a gentle weekly SMS check-in (under 160 chars) for a lead. Be supportive and health-focused, not sales-y.`
-        userPrompt = `Weekly check-in for ${leadInfo.first_name || 'lead'}`
+        systemPrompt = `Generate a gentle weekly SMS check-in (under 160 chars) for a lead. Be supportive and health-focused.`
+        userPrompt = `Weekly check-in for ${lead.first_name || 'lead'}`
         break
     }
 
@@ -161,8 +186,8 @@ async function sendSMS(toPhone: string, message: string, clinicId: string, supab
   }
 }
 
-// Send Email using your existing email function
-async function sendEmail(toEmail: string, subject: string, message: string, clinicId: string): Promise<{ success: boolean, error?: string }> {
+// Send Email using external function
+async function sendEmail(toEmail: string, subject: string, message: string, clinicId: string, threadId: string): Promise<{ success: boolean, error?: string }> {
   try {
     const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`, {
       method: 'POST',
@@ -174,7 +199,8 @@ async function sendEmail(toEmail: string, subject: string, message: string, clin
         to_email: toEmail,
         subject: subject,
         message: message,
-        clinic_id: clinicId
+        clinic_id: clinicId,
+        thread_id: threadId
       })
     })
 
@@ -186,10 +212,8 @@ async function sendEmail(toEmail: string, subject: string, message: string, clin
 
 // Process incoming message
 async function processIncomingMessage(messageData: IncomingMessage, supabase: any) {
-  console.log('Processing incoming message:', messageData)
-
   try {
-    // 1. Get SMS lead source ID
+    // Get SMS lead source ID
     const { data: smsSource } = await supabase
       .from('lead_source')
       .select('id')
@@ -200,8 +224,8 @@ async function processIncomingMessage(messageData: IncomingMessage, supabase: an
       throw new Error('SMS lead source not found')
     }
 
-    // 2. Check if lead already exists
-    let lead = null
+    // Check if lead exists
+    let lead: Lead | null = null
     let isNewLead = false
     
     if (messageData.from_phone) {
@@ -215,7 +239,7 @@ async function processIncomingMessage(messageData: IncomingMessage, supabase: an
       lead = existingLead
     }
 
-    // 3. Create new lead if doesn't exist
+    // Create new lead if doesn't exist
     if (!lead) {
       const extractedName = extractNameFromMessage(messageData.message_body)
       
@@ -241,9 +265,7 @@ async function processIncomingMessage(messageData: IncomingMessage, supabase: an
       if (leadError) throw leadError
       lead = createdLead
       isNewLead = true
-      console.log('Created new lead:', lead.id)
     } else {
-      // Update existing lead
       await supabase
         .from('lead')
         .update({ 
@@ -253,8 +275,8 @@ async function processIncomingMessage(messageData: IncomingMessage, supabase: an
         .eq('id', lead.id)
     }
 
-    // 4. Get or create thread
-    let thread = null
+    // Get or create thread
+    let thread: Thread | null = null
     const { data: existingThread } = await supabase
       .from('thread')
       .select('*')
@@ -281,7 +303,7 @@ async function processIncomingMessage(messageData: IncomingMessage, supabase: an
       thread = createdThread
     }
 
-    // 5. Save the incoming message
+    // Save the incoming message
     await supabase
       .from('conversation')
       .insert({
@@ -290,10 +312,11 @@ async function processIncomingMessage(messageData: IncomingMessage, supabase: an
         timestamp: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        is_from_user: true
+        is_from_user: true,
+        sender_type: 'user'
       })
 
-    // 6. Send immediate welcome message for new leads
+    // Send immediate welcome message for new leads
     if (isNewLead && messageData.message_type === 'sms' && messageData.from_phone) {
       const welcomeMessage = await generateMessage(lead, 'welcome', messageData.message_body)
       
@@ -308,10 +331,9 @@ async function processIncomingMessage(messageData: IncomingMessage, supabase: an
             timestamp: new Date().toISOString(),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            is_from_user: false
+            is_from_user: false,
+            sender_type: 'assistant'
           })
-
-        console.log('Sent welcome SMS to:', messageData.from_phone)
       }
     }
 
@@ -328,208 +350,196 @@ async function processIncomingMessage(messageData: IncomingMessage, supabase: an
   }
 }
 
-// Process follow-ups based on conversation timestamps
+// Process follow-ups for all clinics
 async function processFollowUps(supabase: any) {
-  console.log('Processing follow-ups...')
-  
   const now = new Date()
-  let processed = 0
-  let errors = 0
+  let totalProcessed = 0
+  let totalErrors = 0
 
   try {
-    // Get all active leads with their last conversation details
-    const { data: leadsWithLastMessage, error: fetchError } = await supabase
-      .from('lead')
-      .select(`
-        id,
-        first_name,
-        last_name,
-        phone,
-        email,
-        status,
-        clinic_id,
-        created_at,
-        thread:thread!inner (
-          id,
-          status,
-          last_conversation:conversation (
-            message,
-            timestamp,
-            is_from_user,
-            created_at,
-            updated_at
-          )
-        )
-      `)
-      .eq('status', 'new')
-      .eq('thread.status', 'active')
-      .not('phone', 'is', null)
+    // Get all clinics
+    const { data: clinics, error: clinicError } = await supabase
+      .from('clinic')
+      .select('id')
 
-    if (fetchError) {
-      console.error('Error fetching leads:', fetchError)
+    if (clinicError) {
+      console.error('Error fetching clinics:', clinicError)
       return { processed: 0, errors: 1 }
     }
 
-    if (!leadsWithLastMessage || leadsWithLastMessage.length === 0) {
-      console.log('No active leads found for follow-up')
+    if (!clinics || clinics.length === 0) {
+      console.log('No clinics found for follow-up')
       return { processed: 0, errors: 0 }
     }
 
-    for (const lead of leadsWithLastMessage) {
+    // Process follow-ups for each clinic
+    for (const clinic of clinics) {
+      let processed = 0
+      let errors = 0
+
       try {
-        const thread = lead.thread[0] // Since we're using inner join, there should be exactly one
-        if (!thread) continue
+        const { data: leads, error: fetchError } = await supabase
+          .from('lead')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            phone,
+            email,
+            status,
+            clinic_id,
+            created_at,
+            thread:thread!inner (
+              id,
+              status,
+              conversation (
+                message,
+                timestamp,
+                is_from_user,
+                sender_type,
+                created_at,
+                updated_at
+              )
+            )
+          `)
+          .eq('status', 'new')
+          .eq('thread.status', 'active')
+          .eq('clinic_id', clinic.id)
+          .not('phone', 'is', null)
 
-        // Get the most recent conversation for this thread
-        const { data: lastConversation } = await supabase
-          .from('conversation')
-          .select('*')
-          .eq('thread_id', thread.id)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .single()
-
-        if (!lastConversation) continue
-
-        const lastMessageTime = new Date(lastConversation.updated_at)
-        const timeSinceLastMessage = now.getTime() - lastMessageTime.getTime()
-        const hoursSince = timeSinceLastMessage / (1000 * 60 * 60)
-        const daysSince = timeSinceLastMessage / (1000 * 60 * 60 * 24)
-
-        // Skip if the last message was from us (clinic)
-        if (!lastConversation.is_from_user) {
-          console.log(`Skipping lead ${lead.id} - last message was from clinic`)
+        if (fetchError) {
+          console.error(`Error fetching leads for clinic ${clinic.id}:`, fetchError)
+          errors++
           continue
         }
 
-        // Get conversation history for context
-        const { data: conversationHistory } = await supabase
-          .from('conversation')
-          .select('message, is_from_user, timestamp')
-          .eq('thread_id', thread.id)
-          .order('timestamp', { ascending: false })
-          .limit(5)
-
-        // Get the first message from user for context
-        const { data: firstMessage } = await supabase
-          .from('conversation')
-          .select('message')
-          .eq('thread_id', thread.id)
-          .eq('is_from_user', true)
-          .order('timestamp', { ascending: true })
-          .limit(1)
-          .single()
-
-        const originalMessage = firstMessage?.message || ''
-
-        // Determine what follow-up to send based on time elapsed
-        let followUpType = null
-        let messageTemplate = ''
-
-        if (hoursSince >= 4 && hoursSince < 6) {
-          // 4-hour follow-up (SMS)
-          const { data: existingFollowup } = await supabase
-            .from('conversation')
-            .select('id')
-            .eq('thread_id', thread.id)
-            .eq('is_from_user', false)
-            .gte('created_at', new Date(lastMessageTime.getTime() + 4 * 60 * 60 * 1000).toISOString())
-            .limit(1)
-            .single()
-
-          if (!existingFollowup) {
-            followUpType = 'sms'
-            messageTemplate = 'followup_4h'
-          }
-        } else if (daysSince >= 2 && daysSince < 2.2) {
-          // 2-day follow-up (Email)
-          const { data: existingFollowup } = await supabase
-            .from('conversation')
-            .select('id')
-            .eq('thread_id', thread.id)
-            .eq('is_from_user', false)
-            .gte('created_at', new Date(lastMessageTime.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString())
-            .limit(1)
-            .single()
-
-          if (!existingFollowup && lead.email) {
-            followUpType = 'email'
-            messageTemplate = 'followup_2d'
-          }
-        } else if (daysSince >= 7 && Math.floor(daysSince) % 7 === 0 && daysSince <= 84) {
-          // Weekly follow-up (SMS) - up to 12 weeks
-          const weeksSince = Math.floor(daysSince / 7)
-          const { data: existingFollowup } = await supabase
-            .from('conversation')
-            .select('id')
-            .eq('thread_id', thread.id)
-            .eq('is_from_user', false)
-            .gte('created_at', new Date(lastMessageTime.getTime() + (weeksSince * 7 - 0.5) * 24 * 60 * 60 * 1000).toISOString())
-            .limit(1)
-            .single()
-
-          if (!existingFollowup) {
-            followUpType = 'sms'
-            messageTemplate = 'followup_weekly'
-          }
+        if (!leads || leads.length === 0) {
+          console.log(`No active leads found for clinic ${clinic.id}`)
+          continue
         }
 
-        // Send the follow-up if needed
-        if (followUpType && messageTemplate) {
-          console.log(`Sending ${messageTemplate} to lead ${lead.id}`)
+        for (const lead of leads) {
+          try {
+            const thread = lead.thread[0]
+            if (!thread) continue
 
-          const message = await generateMessage(
-            lead, 
-            messageTemplate as any, 
-            originalMessage, 
-            conversationHistory
-          )
+            const lastConversation = thread.conversation
+              .sort((a: Conversation, b: Conversation) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
 
-          let sendResult = { success: false, error: 'Unknown error' }
+            if (!lastConversation) continue
 
-          if (followUpType === 'sms' && lead.phone) {
-            sendResult = await sendSMS(lead.phone, message, lead.clinic_id, supabase)
-          } else if (followUpType === 'email' && lead.email) {
-            let subject = 'Following up on your inquiry'
-            let emailMessage = message
-            
-            if (message.includes('Subject:')) {
-              const lines = message.split('\n')
-              subject = lines[0].replace('Subject:', '').trim()
-              emailMessage = lines.slice(1).join('\n').trim()
+            const lastMessageTime = new Date(lastConversation.updated_at)
+            const timeSinceLastMessage = now.getTime() - lastMessageTime.getTime()
+            const hoursSince = timeSinceLastMessage / (1000 * 60 * 60)
+            const daysSince = timeSinceLastMessage / (1000 * 60 * 60 * 24)
+
+            if (!lastConversation.is_from_user) {
+              continue
             }
-            
-            sendResult = await sendEmail(lead.email, subject, emailMessage, lead.clinic_id)
-          }
 
-          if (sendResult.success) {
-            // Save the follow-up message to conversation
-            await supabase
-              .from('conversation')
-              .insert({
-                thread_id: thread.id,
-                message: message,
-                timestamp: now.toISOString(),
-                created_at: now.toISOString(),
-                updated_at: now.toISOString(),
-                is_from_user: false
-              })
+            const conversationHistory = thread.conversation
+              .sort((a: Conversation, b: Conversation) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+              .slice(0, 5)
 
-            console.log(`Sent ${messageTemplate} to lead ${lead.id}`)
-            processed++
-          } else {
-            console.error(`Failed to send ${messageTemplate} to lead ${lead.id}:`, sendResult.error)
+            const firstMessage = thread.conversation.find((c: Conversation) => c.is_from_user)?.message || ''
+
+            let followUpType = null
+            let messageTemplate = ''
+            let subject = 'Following up on your inquiry'
+
+            if (hoursSince >= 4 && hoursSince < 6) {
+              const { data: existingFollowup } = await supabase
+                .from('conversation')
+                .select('id')
+                .eq('thread_id', thread.id)
+                .eq('is_from_user', false)
+                .gte('created_at', new Date(lastMessageTime.getTime() + 4 * 60 * 60 * 1000).toISOString())
+                .limit(1)
+                .single()
+
+              if (!existingFollowup) {
+                followUpType = 'sms'
+                messageTemplate = 'followup_4h'
+              }
+            } else if (daysSince >= 2 && daysSince < 2.2 && lead.email) {
+              const { data: existingFollowup } = await supabase
+                .from('conversation')
+                .select('id')
+                .eq('thread_id', thread.id)
+                .eq('is_from_user', false)
+                .gte('created_at', new Date(lastMessageTime.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString())
+                .limit(1)
+                .single()
+
+              if (!existingFollowup) {
+                followUpType = 'email'
+                messageTemplate = 'followup_2d'
+              }
+            } else if (daysSince >= 7 && Math.floor(daysSince) % 7 === 0 && daysSince <= 84) {
+              const weeksSince = Math.floor(daysSince / 7)
+              const { data: existingFollowup } = await supabase
+                .from('conversation')
+                .select('id')
+                .eq('thread_id', thread.id)
+                .eq('is_from_user', false)
+                .gte('created_at', new Date(lastMessageTime.getTime() + (weeksSince * 7 - 0.5) * 24 * 60 * 60 * 1000).toISOString())
+                .limit(1)
+                .single()
+
+              if (!existingFollowup) {
+                followUpType = 'sms'
+                messageTemplate = 'followup_weekly'
+              }
+            }
+
+            if (followUpType && messageTemplate) {
+              const message = await generateMessage(lead, messageTemplate as any, firstMessage, conversationHistory)
+
+              let sendResult = { success: false, error: 'Unknown error' }
+
+              if (followUpType === 'sms' && lead.phone) {
+                sendResult = await sendSMS(lead.phone, message, lead.clinic_id, supabase)
+              } else if (followUpType === 'email' && lead.email) {
+                sendResult = await sendEmail(lead.email, subject, message, lead.clinic_id, thread.id)
+              }
+
+              if (sendResult.success) {
+                await supabase
+                  .from('conversation')
+                  .insert({
+                    thread_id: thread.id,
+                    message: message,
+                    timestamp: now.toISOString(),
+                    created_at: now.toISOString(),
+                    updated_at: now.toISOString(),
+                    is_from_user: false,
+                    sender_type: 'assistant'
+                  })
+
+                processed++
+              } else {
+                console.error(`Failed to send ${messageTemplate} to lead ${lead.id} for clinic ${clinic.id}:`, sendResult.error)
+                errors++
+              }
+            }
+
+          } catch (error: any) {
+            console.error(`Error processing follow-up for lead ${lead.id} in clinic ${clinic.id}:`, error)
             errors++
           }
         }
 
+        totalProcessed += processed
+        totalErrors += errors
+        console.log(`Processed ${processed} follow-ups with ${errors} errors for clinic ${clinic.id}`)
+
       } catch (error: any) {
-        console.error(`Error processing follow-up for lead ${lead.id}:`, error)
-        errors++
+        console.error(`Error processing clinic ${clinic.id}:`, error)
+        totalErrors++
       }
     }
 
-    return { processed, errors }
+    return { processed: totalProcessed, errors: totalErrors }
 
   } catch (error: any) {
     console.error('Error in processFollowUps:', error)
@@ -547,9 +557,6 @@ async function handleTwilioWebhook(formData: FormData, supabase: any) {
     accountSid: formData.get('AccountSid') as string
   }
 
-  console.log('Received Twilio webhook:', twilioData)
-
-  // Find which clinic this phone number belongs to
   const { data: clinicSettings } = await supabase
     .from('email_settings')
     .select('clinic_id')
@@ -560,7 +567,6 @@ async function handleTwilioWebhook(formData: FormData, supabase: any) {
     throw new Error('No clinic found for phone number: ' + twilioData.to)
   }
 
-  // Process the incoming message
   return await processIncomingMessage({
     from_phone: twilioData.from,
     message_body: twilioData.body,
@@ -582,16 +588,13 @@ serve(async (req) => {
   }
 
   try {
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     const contentType = req.headers.get('content-type') || ''
     
-    // Handle Twilio webhook (form data)
     if (contentType.includes('application/x-www-form-urlencoded')) {
-      console.log('Processing Twilio webhook')
       const formData = await req.formData()
       
       const result = await handleTwilioWebhook(formData, supabase)
@@ -606,11 +609,9 @@ serve(async (req) => {
       )
     }
 
-    // Handle JSON requests (API calls)
     const requestData = await req.json()
     
     if (requestData.mode === 'process_followups') {
-      console.log('Processing follow-ups')
       const result = await processFollowUps(supabase)
       
       return new Response(
@@ -626,8 +627,6 @@ serve(async (req) => {
         }
       )
     } else {
-      // Process incoming message
-      console.log('Processing incoming message')
       const result = await processIncomingMessage(requestData, supabase)
       
       return new Response(
