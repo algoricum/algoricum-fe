@@ -130,7 +130,28 @@ export interface SMSTestResult {
     account_status: string
     phone_number_status: string
     test_message_sent: boolean
-    balance_info?: any
+    balance_info?: {
+      balance: string
+      currency: string
+    }
+    account_info?: {
+      friendly_name: string
+      status: string
+      type: string
+    }
+    phone_number_info?: {
+      phone_number: string
+      friendly_name: string
+      capabilities: any
+    }
+    response_time?: number
+  }
+  troubleshooting?: {
+    issues: Array<{
+      issue: string
+      solutions: string[]
+    }>
+    tips: string[]
   }
   error?: string
 }

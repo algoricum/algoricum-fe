@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, JSX } from "react";
+import React, { useState, useEffect, JSX } from "react";
 import { Form, Input, Switch, InputNumber, Card, Space, Alert, Modal } from "antd";
 import { Button } from "@/components/elements";
 import {
@@ -20,9 +20,7 @@ import {
   testEmailConnection,
   testSMSConnection,
   validateEmailSettings,
-  validateSMSSettings,
   getDefaultEmailSettings,
-  type EmailSettings,
   type EmailSettingsInput,
   type EmailTestResult,
   type SMSTestResult,
@@ -45,6 +43,9 @@ const CommunicationConfiguration: React.FC = () => {
   const [clinicData, setClinicData] = useState<ClinicData | null>(null);
   const [testResults, setTestResults] = useState<EmailTestResult | null>(null);
   const [showTestModal, setShowTestModal] = useState<boolean>(false);
+
+  const [smsTestResults, setSmsTestResults] = useState<SMSTestResult | null>(null);
+  const [showSMSTestModal, setShowSMSTestModal] = useState<boolean>(false);
 
   useEffect(() => {
     initializeComponent();
@@ -192,18 +193,37 @@ const CommunicationConfiguration: React.FC = () => {
       }
 
       // Validate SMS settings before testing
-      const smsValidation = validateSMSSettings(values);
-      if (!smsValidation.isValid) {
-        ErrorToast(`Please fix the following issues: ${smsValidation.errors.join(", ")}`);
+      if (!values.sms_enabled) {
+        ErrorToast("Please enable SMS first");
         return;
       }
 
+      if (!values.twilio_account_sid || !values.twilio_auth_token || !values.twilio_phone_number) {
+        ErrorToast("Please fill in all required Twilio fields before testing");
+        return;
+      }
+
+      // Validate phone number format
+      if (!values.twilio_phone_number.match(/^\+[1-9]\d{1,14}$/)) {
+        ErrorToast("Phone number must be in E.164 format (e.g., +1234567890)");
+        return;
+      }
+
+      console.log("Testing SMS connection with:", {
+        account_sid: values.twilio_account_sid,
+        phone_number: values.twilio_phone_number,
+        clinic_id: clinicData.id,
+      });
+
       const result = await testSMSConnection(values, clinicData.id);
+      setSmsTestResults(result);
 
       if (result.success) {
-        SuccessToast("🎉 SMS configuration test successful! Twilio connection is working correctly.");
+        SuccessToast(result.message || "🎉 SMS configuration test successful!");
+        setShowSMSTestModal(true);
       } else {
-        ErrorToast(`SMS test failed: ${result.message}`);
+        ErrorToast(result.message || "SMS test failed");
+        setShowSMSTestModal(true); // Still show modal for troubleshooting
       }
     } catch (error: any) {
       console.error("Test SMS error:", error);
@@ -524,6 +544,100 @@ const CommunicationConfiguration: React.FC = () => {
         )}
       </Modal>
 
+      <Modal
+        title="SMS Connection Test Results"
+        open={showSMSTestModal}
+        onCancel={() => setShowSMSTestModal(false)}
+        width={600}
+        footer={[
+          <Button key="close" onClick={() => setShowSMSTestModal(false)}>
+            Close
+          </Button>,
+        ]}
+      >
+        {smsTestResults && (
+          <div className="space-y-4">
+            <Alert
+              message={smsTestResults.success ? "SMS Test Successful" : "SMS Test Failed"}
+              description={smsTestResults.message}
+              type={smsTestResults.success ? "success" : "error"}
+              showIcon
+            />
+
+            {/* Detailed Results */}
+            {smsTestResults.details && (
+              <div className="space-y-3">
+                <h4 className="font-medium">Connection Details:</h4>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Alert
+                    message="Account Status"
+                    description={smsTestResults.details.account_status || "Unknown"}
+                    type={smsTestResults.details.account_status === "active" ? "success" : "warning"}
+                    size="small"
+                  />
+
+                  <Alert
+                    message="Phone Number Status"
+                    description={smsTestResults.details.phone_number_status || "Unknown"}
+                    type={smsTestResults.details.phone_number_status === "active" ? "success" : "warning"}
+                    size="small"
+                  />
+                </div>
+
+                {smsTestResults.details.balance_info && (
+                  <Alert
+                    message="Account Balance"
+                    description={`${smsTestResults.details.balance_info.balance} ${smsTestResults.details.balance_info.currency}`}
+                    type="info"
+                    size="small"
+                  />
+                )}
+
+                {smsTestResults.details.test_message_sent && (
+                  <Alert message="Test Message" description="✅ Test SMS sent successfully!" type="success" size="small" />
+                )}
+
+                <div className="text-sm text-gray-600">Response time: {smsTestResults.details.response_time}ms</div>
+              </div>
+            )}
+
+            {/* Troubleshooting Section */}
+            {smsTestResults.troubleshooting && smsTestResults.troubleshooting.issues.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-red-600">Issues Found:</h4>
+                {smsTestResults.troubleshooting.issues.map((issue, index) => (
+                  <div key={index} className="border border-red-200 rounded p-3">
+                    <h5 className="font-medium text-red-800">{issue.issue}</h5>
+                    <ul className="mt-2 space-y-1">
+                      {issue.solutions.map((solution, sIndex) => (
+                        <li key={sIndex} className="text-sm text-red-700">
+                          • {solution}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tips Section */}
+            {smsTestResults.troubleshooting && smsTestResults.troubleshooting.tips.length > 0 && (
+              <div>
+                <h4 className="font-medium text-blue-600">Tips:</h4>
+                <ul className="mt-2 space-y-1">
+                  {smsTestResults.troubleshooting.tips.map((tip, index) => (
+                    <li key={index} className="text-sm text-blue-700">
+                      💡 {tip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
       {/* Help Text - Updated for both Email and SMS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gmail Setup Guide */}
@@ -573,7 +687,7 @@ const CommunicationConfiguration: React.FC = () => {
                   <strong>Find Credentials:</strong> Console → Dashboard
                   <ul className="ml-4 list-disc">
                     <li>Account SID: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</li>
-                    <li>Auth Token: Click "View" to reveal</li>
+                    <li>Auth Token: Click &quot;View&quot; to reveal</li>
                   </ul>
                 </li>
                 <li>
