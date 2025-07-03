@@ -66,7 +66,7 @@ async function generateMessage(
   const fallbackMessages = {
     welcome: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! 👋 Thanks for your interest in our clinic. How can we help you today?`,
     followup_4h: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! Just checking in - any questions about our services? We're here to help! 🏥`,
-    followup_2w: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! It's been a while. We're here whenever you're ready to discuss your health needs. 💙`,
+    followup_2d: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! Just wanted to follow up on your interest in our clinic. Any questions we can help with? 💙`,
     followup_weekly: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! Hope you're well. Ready to prioritize your health? We're here to help! 💙`
   }
 
@@ -93,7 +93,7 @@ async function generateMessage(
         userPrompt = `Follow up with ${lead.first_name || 'lead'} who hasn't responded in 4 hours`
         break
       case 'followup_2d':
-        systemPrompt = `Generate a gentle 2-week SMS follow-up (under 160 chars) for a lead who hasn't responded. Be patient and supportive.`
+        systemPrompt = `Generate a gentle 2-day SMS follow-up (under 160 chars) for a lead who hasn't responded. Be patient and supportive.`
         userPrompt = `2-day follow-up with ${lead.first_name || 'lead'} who hasn't responded`
         break
       case 'followup_weekly':
@@ -246,7 +246,7 @@ async function processNewLeads(supabase: any) {
           try {
             // Check if thread exists for this lead
             const { data: existingThread } = await supabase
-              .from('thread')
+              .from('threads')
               .select('id')
               .eq('lead_id', lead.id)
               .eq('clinic_id', lead.clinic_id)
@@ -592,21 +592,21 @@ async function processFollowUps(supabase: any) {
                 logInfo(`Lead ${lead.id} needs 4-hour SMS follow-up`)
               }
             } 
-            // Check for 2-week SMS follow-up (between 14-15 days)
-            else if (daysSince >= 14 && daysSince < 15) {
+            // Check for 2-day SMS follow-up (between 48-50 hours)
+            else if (daysSince >= 2 && daysSince < 2.1) {
               const { data: existingFollowup } = await supabase
                 .from('conversation')
                 .select('id')
                 .eq('thread_id', thread.id)
                 .eq('is_from_user', false)
-                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString())
+                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 48 * 60 * 60 * 1000).toISOString())
                 .limit(1)
                 .single()
 
               if (!existingFollowup) {
                 followUpType = 'sms'
-                messageTemplate = 'followup_2w'
-                logInfo(`Lead ${lead.id} needs 2-week SMS follow-up`)
+                messageTemplate = 'followup_2d'
+                logInfo(`Lead ${lead.id} needs 2-day SMS follow-up`)
               }
             }
             // Check for weekly SMS follow-up (every 7 days for up to 12 weeks, starting from week 3)
