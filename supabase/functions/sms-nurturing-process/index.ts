@@ -138,25 +138,63 @@ async function generateMessage(
   return fallbackMessages[messageType]
 }
 
-// Send SMS using Twilio
-async function sendSMS(toPhone: string, message: string, clinicId: string, supabase: any): Promise<{ success: boolean, error?: string }> {
+// Enhanced sendSMS function with better error handling and debugging
+async function sendSMS(
+  toPhone: string, 
+  message: string, 
+  clinicId: string, 
+  supabase: any,
+  twilioSettings?: any // Optional: pass settings to avoid re-fetching
+): Promise<{ success: boolean, error?: string }> {
   logInfo(`Attempting to send SMS to ${toPhone} for clinic ${clinicId}`)
   
   try {
-    const { data: smsSettings } = await supabase
-      .from('email_settings')
-      .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_webhook_url')
-      .eq('clinic_id', clinicId)
-      .single()
+    let smsSettings = twilioSettings;
+    
+    // Only fetch settings if not provided
+    if (!smsSettings) {
+      const { data: fetchedSettings, error: settingsError } = await supabase
+        .from('email_settings')
+        .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_webhook_url')
+        .eq('clinic_id', clinicId)
+        .single()
+        
+      if (settingsError) {
+        logError('Error fetching Twilio settings', { clinicId, error: settingsError })
+        return { success: false, error: `Error fetching Twilio settings: ${settingsError.message}` }
+      }
+      
+      smsSettings = fetchedSettings
+    }
 
-    if (!smsSettings?.twilio_account_sid || !smsSettings?.twilio_auth_token || !smsSettings?.twilio_phone_number || !smsSettings?.twilio_webhook_url) {
-      logError('Incomplete Twilio settings for clinic', { clinicId, settings: smsSettings })
-      return { success: false, error: 'Incomplete Twilio settings for clinic' }
+    // Enhanced validation with specific field logging
+    const missingFields = []
+    if (!smsSettings?.twilio_account_sid) missingFields.push('twilio_account_sid')
+    if (!smsSettings?.twilio_auth_token) missingFields.push('twilio_auth_token') 
+    if (!smsSettings?.twilio_phone_number) missingFields.push('twilio_phone_number')
+    if (!smsSettings?.twilio_webhook_url) missingFields.push('twilio_webhook_url')
+
+    if (missingFields.length > 0) {
+      logError('Incomplete Twilio settings for clinic', { 
+        clinicId, 
+        missingFields,
+        availableFields: Object.keys(smsSettings || {}),
+        settings: smsSettings 
+      })
+      return { 
+        success: false, 
+        error: `Incomplete Twilio settings for clinic. Missing: ${missingFields.join(', ')}` 
+      }
     }
 
     const { twilio_account_sid, twilio_auth_token, twilio_phone_number } = smsSettings
 
-    logInfo('Calling Twilio API to send SMS')
+    logInfo('Calling Twilio API to send SMS', { 
+      from: twilio_phone_number, 
+      to: toPhone,
+      messageLength: message.length 
+    })
+    
     const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilio_account_sid}/Messages.json`, {
       method: 'POST',
       headers: {
@@ -171,12 +209,13 @@ async function sendSMS(toPhone: string, message: string, clinicId: string, supab
     })
 
     if (response.ok) {
-      logInfo('SMS sent successfully')
+      const responseData = await response.json()
+      logInfo('SMS sent successfully', { messageSid: responseData.sid })
       return { success: true }
     } else {
       const errorText = await response.text()
-      logError('Twilio API call failed', errorText)
-      return { success: false, error: errorText }
+      logError('Twilio API call failed', { status: response.status, error: errorText })
+      return { success: false, error: `Twilio API error (${response.status}): ${errorText}` }
     }
   } catch (error: any) {
     logError('Error sending SMS', error)
@@ -458,33 +497,45 @@ async function processFollowUps(supabase: any) {
   let totalErrors = 0
 
   try {
-    // Get all clinics with complete Twilio settings (SMS only)
-    logInfo('Fetching clinics with Twilio settings')
+    // Get all clinics with complete Twilio settings - fetch ALL fields at once
+    logInfo('Fetching clinics with complete Twilio settings')
     const { data: clinics, error: clinicError } = await supabase
       .from('email_settings')
-      .select('clinic_id')
+      .select('clinic_id, twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_webhook_url')
       .not('twilio_account_sid', 'is', null)
       .not('twilio_auth_token', 'is', null)
       .not('twilio_phone_number', 'is', null)
       .not('twilio_webhook_url', 'is', null)
+      .neq('twilio_account_sid', '')
+      .neq('twilio_auth_token', '')
+      .neq('twilio_phone_number', '')
+      .neq('twilio_webhook_url', '')
 
     if (clinicError) {
-      logError('Error fetching clinics', clinicError)
+      logError('Error fetching clinics with Twilio settings', clinicError)
       return { processed: 0, errors: 1 }
     }
 
     if (!clinics || clinics.length === 0) {
-      logInfo('No clinics with complete settings found for follow-up')
+      logInfo('No clinics with complete Twilio settings found for follow-up')
       return { processed: 0, errors: 0 }
     }
 
-    logInfo(`Found ${clinics.length} clinics with complete settings`)
+    logInfo(`Found ${clinics.length} clinics with complete Twilio settings`)
 
     // Process follow-ups for each clinic
     for (const clinic of clinics) {
       logInfo(`Processing follow-ups for clinic ${clinic.clinic_id}`)
 
       try {
+        // Create a settings object for this clinic
+        const twilioSettings = {
+          twilio_account_sid: clinic.twilio_account_sid,
+          twilio_auth_token: clinic.twilio_auth_token,
+          twilio_phone_number: clinic.twilio_phone_number,
+          twilio_webhook_url: clinic.twilio_webhook_url
+        }
+
         // Get active threads with their leads
         const { data: threads, error: threadError } = await supabase
           .from('threads')
@@ -508,6 +559,7 @@ async function processFollowUps(supabase: any) {
 
         if (threadError) {
           logError(`Error fetching threads for clinic ${clinic.clinic_id}`, threadError)
+          totalErrors++
           continue
         }
 
@@ -526,6 +578,7 @@ async function processFollowUps(supabase: any) {
 
         if (convError) {
           logError(`Error fetching conversations for clinic ${clinic.clinic_id}`, convError)
+          totalErrors++
           continue
         }
 
@@ -535,7 +588,10 @@ async function processFollowUps(supabase: any) {
         for (const thread of threads) {
           try {
             const lead = thread.lead as any
-            if (!lead) continue
+            if (!lead || !lead.phone) {
+              logInfo(`Skipping lead ${lead?.id || 'unknown'} - no phone number`)
+              continue
+            }
 
             // Get conversations for this thread
             const threadConversations = conversations?.filter(c => c.thread_id === thread.id) || []
@@ -583,8 +639,8 @@ async function processFollowUps(supabase: any) {
                 .eq('thread_id', thread.id)
                 .eq('is_from_user', false)
                 .eq('sender_type', 'assistant')
-                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 3.5 * 60 * 60 * 1000).toISOString()) // 3.5 hours after last message
-                .lte('created_at', new Date(lastAssistantMessageTime.getTime() + 6.5 * 60 * 60 * 1000).toISOString()) // 6.5 hours after last message
+                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 3.5 * 60 * 60 * 1000).toISOString())
+                .lte('created_at', new Date(lastAssistantMessageTime.getTime() + 6.5 * 60 * 60 * 1000).toISOString())
 
               if (!existing4hFollowup || existing4hFollowup.length === 0) {
                 followUpType = 'sms'
@@ -596,15 +652,14 @@ async function processFollowUps(supabase: any) {
             } 
             // Check for 2-day SMS follow-up (between 48-50 hours) - only send once
             else if (hoursSince >= 48 && hoursSince < 49) {
-              // Check if we already sent a 2-day follow-up
               const { data: existing2dFollowup } = await supabase
                 .from('conversation')
                 .select('id, message')
                 .eq('thread_id', thread.id)
                 .eq('is_from_user', false)
                 .eq('sender_type', 'assistant')
-                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 47 * 60 * 60 * 1000).toISOString()) // 47 hours after last message
-                .lte('created_at', new Date(lastAssistantMessageTime.getTime() + 51 * 60 * 60 * 1000).toISOString()) // 51 hours after last message
+                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 47 * 60 * 60 * 1000).toISOString())
+                .lte('created_at', new Date(lastAssistantMessageTime.getTime() + 51 * 60 * 60 * 1000).toISOString())
 
               if (!existing2dFollowup || existing2dFollowup.length === 0) {
                 followUpType = 'sms'
@@ -618,7 +673,6 @@ async function processFollowUps(supabase: any) {
             else if (daysSince >= 7 && Math.floor(daysSince) % 7 === 0 && daysSince <= 84) {
               const weeksSince = Math.floor(daysSince / 7)
               
-              // Check if we already sent this week's follow-up
               const { data: existingWeeklyFollowup } = await supabase
                 .from('conversation')
                 .select('id, message')
@@ -642,8 +696,8 @@ async function processFollowUps(supabase: any) {
             if (followUpType && messageTemplate) {
               const message = await generateMessage(lead, messageTemplate as any, conversationHistory)
 
-              // Only SMS follow-ups now
-              const sendResult = await sendSMS(lead.phone, message, lead.clinic_id, supabase)
+              // Pass the pre-fetched Twilio settings to avoid re-querying
+              const sendResult = await sendSMS(lead.phone, message, lead.clinic_id, supabase, twilioSettings)
 
               if (sendResult.success) {
                 await supabase
