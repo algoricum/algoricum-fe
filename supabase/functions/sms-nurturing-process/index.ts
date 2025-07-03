@@ -66,7 +66,7 @@ async function generateMessage(
   const fallbackMessages = {
     welcome: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! 👋 Thanks for your interest in our clinic. How can we help you today?`,
     followup_4h: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! Just checking in - any questions about our services? We're here to help! 🏥`,
-    followup_2d: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! It's been a while. We're here whenever you're ready to discuss your health needs. 💙`,
+    followup_2w: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! It's been a while. We're here whenever you're ready to discuss your health needs. 💙`,
     followup_weekly: `Hi${lead.first_name ? ` ${lead.first_name}` : ''}! Hope you're well. Ready to prioritize your health? We're here to help! 💙`
   }
 
@@ -291,6 +291,7 @@ async function processNewLeads(supabase: any) {
                   .insert({
                     lead_id: lead.id,
                     clinic_id: lead.clinic_id,
+                    status: 'new',
                     created_at: now.toISOString(),
                     updated_at: now.toISOString()
                   })
@@ -415,6 +416,7 @@ async function handleTwilioWebhook(formData: FormData, supabase: any) {
       .insert({
         lead_id: lead.id,
         clinic_id: clinicSettings.clinic_id,
+        status: 'new',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -503,6 +505,7 @@ async function processFollowUps(supabase: any) {
             )
           `)
           .eq('clinic_id', clinic.clinic_id)
+          .eq('status', 'new')
 
         if (threadError) {
           logError(`Error fetching threads for clinic ${clinic.clinic_id}`, threadError)
@@ -766,8 +769,43 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
+    } else if (requestData.mode === 'run_all') {
+      logInfo('Starting full processing mode (new leads + followups)')
+      
+      // Process new leads first
+      const newLeadsResult = await processNewLeads(supabase)
+      logInfo('New leads processing completed', newLeadsResult)
+      
+      // Then process follow-ups
+      const followupsResult = await processFollowUps(supabase)
+      logInfo('Follow-ups processing completed', followupsResult)
+      
+      const response = {
+        success: true,
+        new_leads: {
+          processed: newLeadsResult.processed,
+          errors: newLeadsResult.errors
+        },
+        followups: {
+          processed: followupsResult.processed,
+          errors: followupsResult.errors
+        },
+        total_processed: newLeadsResult.processed + followupsResult.processed,
+        total_errors: newLeadsResult.errors + followupsResult.errors,
+        timestamp: new Date().toISOString()
+      }
+      
+      logInfo('Full processing completed', response)
+      
+      return new Response(
+        JSON.stringify(response),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     } else {
-      throw new Error('Invalid mode specified. Use: process_new_leads or process_followups')
+      throw new Error('Invalid mode specified. Use: process_new_leads, process_followups, or run_all')
     }
 
   } catch (error: any) {
