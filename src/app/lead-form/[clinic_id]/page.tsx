@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/config/client";
+import { getCountries, getCountryCallingCode } from "react-phone-number-input/input";
 
 type FormField = {
   id: string;
@@ -23,10 +24,20 @@ const LeadGenerationForm = () => {
 
   const [fields, setFields] = useState<FormField[]>([]);
   const [formData, setFormData] = useState<FormData>({});
+  const [countryCode, setCountryCode] = useState("US");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Get countries for dropdown
+  const countries = getCountries();
+  const countryOptions = countries.map(country => ({
+    value: country,
+    label: `${country} (+${getCountryCallingCode(country)})`,
+    code: getCountryCallingCode(country),
+  }));
 
   useEffect(() => {
     const fetchFormFields = async () => {
@@ -83,6 +94,22 @@ const LeadGenerationForm = () => {
     }
   }, [clinicId]);
 
+  // Update formData when country code or phone number changes
+  useEffect(() => {
+    if (phoneNumber && countryCode) {
+      const fullPhoneNumber = `+${getCountryCallingCode(countryCode)}${phoneNumber}`;
+      setFormData(prev => ({
+        ...prev,
+        phone: fullPhoneNumber,
+      }));
+    } else if (phoneNumber === "") {
+      setFormData(prev => ({
+        ...prev,
+        phone: "",
+      }));
+    }
+  }, [countryCode, phoneNumber]);
+
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
@@ -100,11 +127,8 @@ const LeadGenerationForm = () => {
       }
 
       // Phone validation
-      if (field.field_type === "tel" && formData[field.field_id]) {
-        const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-        if (!phoneRegex.test(formData[field.field_id].toString().replace(/[\s\-\(\)]/g, ""))) {
-          newErrors[field.field_id] = "Please enter a valid phone number";
-        }
+      if (field.field_type === "tel" && field.is_required && (!phoneNumber || phoneNumber.trim() === "")) {
+        newErrors[field.field_id] = "Please enter a valid phone number";
       }
     });
 
@@ -125,6 +149,22 @@ const LeadGenerationForm = () => {
         [fieldId]: "",
       }));
     }
+  };
+
+  const handlePhoneNumberChange = (value: string) => {
+    setPhoneNumber(value);
+
+    // Clear error when user starts typing
+    if (errors.phone) {
+      setErrors(prev => ({
+        ...prev,
+        phone: "",
+      }));
+    }
+  };
+
+  const handleCountryChange = (value: string) => {
+    setCountryCode(value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -153,7 +193,11 @@ const LeadGenerationForm = () => {
         source_id: sourceData.id,
         email: formData.email || null,
         phone: formData.phone || null,
-        form_data: formData,
+        form_data: {
+          ...formData,
+          country_code: countryCode,
+          phone_number: phoneNumber,
+        },
         interest_level: "high",
         urgency: "curious",
         status: "new",
@@ -189,7 +233,6 @@ const LeadGenerationForm = () => {
     switch (field.field_type) {
       case "text":
       case "email":
-      case "tel":
       case "number":
         return (
           <input
@@ -200,6 +243,50 @@ const LeadGenerationForm = () => {
             placeholder={`Enter your ${field.field_name.toLowerCase()}`}
             required={field.is_required}
           />
+        );
+
+      case "tel":
+        return (
+          <div className="space-y-3">
+            {/* Country Code Dropdown */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Country</label>
+              <select
+                value={countryCode}
+                onChange={e => handleCountryChange(e.target.value)}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors ${
+                  hasError ? "border-red-500" : "border-gray-300"
+                }`}
+              >
+                {countryOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Phone Number Input */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Phone Number</label>
+              <div className="flex">
+                <div className="flex items-center px-3 py-3 bg-gray-50 border border-r-0 border-gray-300 rounded-l-lg">
+                  <span className="text-gray-700 font-medium">+{getCountryCallingCode(countryCode)}</span>
+                </div>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={e => handlePhoneNumberChange(e.target.value)}
+                  className={`flex-1 px-4 py-3 border rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors ${
+                    hasError ? "border-red-500" : "border-gray-300"
+                  }`}
+                  placeholder="Enter phone number"
+                  required={field.is_required}
+                />
+              </div>
+              {formData.phone && <p className="mt-1 text-xs text-gray-500">Complete number: {formData.phone}</p>}
+            </div>
+          </div>
         );
 
       case "textarea":
@@ -263,6 +350,8 @@ const LeadGenerationForm = () => {
               setSubmitted(false);
               setFormData({});
               setErrors({});
+              setPhoneNumber("");
+              setCountryCode("US");
             }}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
