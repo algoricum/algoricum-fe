@@ -256,9 +256,8 @@ async function processNewLeads(supabase: any) {
             let threadId = existingThread?.id
 
             if (!existingThread) {
-              // No thread exists - this lead has never been contacted
               shouldSendWelcome = true
-              logInfo(`No thread found for lead ${lead.id}, will send initial welcome message`)
+              logInfo(`No thread found for lead ${lead.id}, will send initial welcome message`)          
             } else {
               // Thread exists - check if any assistant messages have been sent
               const { data: conversations, error: convError } = await supabase
@@ -575,57 +574,69 @@ async function processFollowUps(supabase: any) {
             let followUpType = null
             let messageTemplate = ''
 
-            // Check for 4-hour SMS follow-up (between 4-6 hours)
-            if (hoursSince >= 4 && hoursSince < 6) {
-              const { data: existingFollowup } = await supabase
+            // Check for 4-hour SMS follow-up (between 4-6 hours) - only send once
+            if (hoursSince >= 4 && hoursSince < 5) {
+              // Check if we already sent a 4-hour follow-up
+              const { data: existing4hFollowup } = await supabase
                 .from('conversation')
-                .select('id')
+                .select('id, message')
                 .eq('thread_id', thread.id)
                 .eq('is_from_user', false)
-                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 4 * 60 * 60 * 1000).toISOString())
-                .limit(1)
-                .single()
+                .eq('sender_type', 'assistant')
+                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 3.5 * 60 * 60 * 1000).toISOString()) // 3.5 hours after last message
+                .lte('created_at', new Date(lastAssistantMessageTime.getTime() + 6.5 * 60 * 60 * 1000).toISOString()) // 6.5 hours after last message
 
-              if (!existingFollowup) {
+              if (!existing4hFollowup || existing4hFollowup.length === 0) {
                 followUpType = 'sms'
                 messageTemplate = 'followup_4h'
-                logInfo(`Lead ${lead.id} needs 4-hour SMS follow-up`)
+                logInfo(`Lead ${lead.id} needs 4-hour SMS follow-up (${hoursSince.toFixed(1)} hours since last message)`)
+              } else {
+                logInfo(`Lead ${lead.id} already has 4-hour follow-up sent`)
               }
             } 
-            // Check for 2-day SMS follow-up (between 48-50 hours)
-            else if (daysSince >= 2 && daysSince < 2.1) {
-              const { data: existingFollowup } = await supabase
+            // Check for 2-day SMS follow-up (between 48-50 hours) - only send once
+            else if (hoursSince >= 48 && hoursSince < 49) {
+              // Check if we already sent a 2-day follow-up
+              const { data: existing2dFollowup } = await supabase
                 .from('conversation')
-                .select('id')
+                .select('id, message')
                 .eq('thread_id', thread.id)
                 .eq('is_from_user', false)
-                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 48 * 60 * 60 * 1000).toISOString())
-                .limit(1)
-                .single()
+                .eq('sender_type', 'assistant')
+                .gte('created_at', new Date(lastAssistantMessageTime.getTime() + 47 * 60 * 60 * 1000).toISOString()) // 47 hours after last message
+                .lte('created_at', new Date(lastAssistantMessageTime.getTime() + 51 * 60 * 60 * 1000).toISOString()) // 51 hours after last message
 
-              if (!existingFollowup) {
+              if (!existing2dFollowup || existing2dFollowup.length === 0) {
                 followUpType = 'sms'
                 messageTemplate = 'followup_2d'
-                logInfo(`Lead ${lead.id} needs 2-day SMS follow-up`)
+                logInfo(`Lead ${lead.id} needs 2-day SMS follow-up (${hoursSince.toFixed(1)} hours since last message)`)
+              } else {
+                logInfo(`Lead ${lead.id} already has 2-day follow-up sent`)
               }
             }
-            // Check for weekly SMS follow-up (every 7 days for up to 12 weeks, starting from week 3)
-            else if (daysSince >= 21 && Math.floor(daysSince) % 7 === 0 && daysSince <= 84) {
+            // Check for weekly SMS follow-up (every 7 days for up to 12 weeks, starting from week 1)
+            else if (daysSince >= 7 && Math.floor(daysSince) % 7 === 0 && daysSince <= 84) {
               const weeksSince = Math.floor(daysSince / 7)
-              const { data: existingFollowup } = await supabase
+              
+              // Check if we already sent this week's follow-up
+              const { data: existingWeeklyFollowup } = await supabase
                 .from('conversation')
-                .select('id')
+                .select('id, message')
                 .eq('thread_id', thread.id)
                 .eq('is_from_user', false)
+                .eq('sender_type', 'assistant')
                 .gte('created_at', new Date(lastAssistantMessageTime.getTime() + (weeksSince * 7 - 0.5) * 24 * 60 * 60 * 1000).toISOString())
-                .limit(1)
-                .single()
+                .lte('created_at', new Date(lastAssistantMessageTime.getTime() + (weeksSince * 7 + 0.5) * 24 * 60 * 60 * 1000).toISOString())
 
-              if (!existingFollowup) {
+              if (!existingWeeklyFollowup || existingWeeklyFollowup.length === 0) {
                 followUpType = 'sms'
                 messageTemplate = 'followup_weekly'
-                logInfo(`Lead ${lead.id} needs weekly SMS follow-up (week ${weeksSince})`)
+                logInfo(`Lead ${lead.id} needs weekly SMS follow-up (week ${weeksSince}, ${daysSince.toFixed(1)} days since last message)`)
+              } else {
+                logInfo(`Lead ${lead.id} already has weekly follow-up for week ${weeksSince}`)
               }
+            } else {
+              logInfo(`Lead ${lead.id} doesn't need follow-up yet (${hoursSince.toFixed(1)} hours / ${daysSince.toFixed(1)} days since last message)`)
             }
 
             if (followUpType && messageTemplate) {
