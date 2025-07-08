@@ -2,7 +2,8 @@
 
 import { Button, Table, Dropdown, Card } from "antd";
 import { PlusOutlined, MoreOutlined } from "@ant-design/icons";
-import type { ColumnsType, MenuProps } from "antd/es/table";
+import type { ColumnsType } from "antd/es/table";
+import type { MenuProps } from "antd/es/menu";
 
 interface StaffData {
   key: string;
@@ -13,7 +14,11 @@ interface StaffData {
   password: string;
 }
 
-const StaffManagement = () => {
+interface StaffManagementProps {
+  onAddStaff: () => void;
+}
+
+const StaffManagement = ({ onAddStaff }: StaffManagementProps) => {
   // Sample data - replace with your actual data
   const staffData: StaffData[] = [
     {
@@ -78,11 +83,6 @@ const StaffManagement = () => {
     // Add your view logic here
   };
 
-  const handleAddStaff = () => {
-    console.log("Add new staff member");
-    // Add your add staff logic here
-  };
-
   // Table columns configuration
   const columns: ColumnsType<StaffData> = [
     {
@@ -145,7 +145,7 @@ const StaffManagement = () => {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={handleAddStaff}
+          onClick={onAddStaff}
           className="bg-purple-600 hover:bg-purple-700 border-purple-600 hover:border-purple-700 rounded-lg px-4 py-2 h-auto font-medium"
         >
           Add Staff Member

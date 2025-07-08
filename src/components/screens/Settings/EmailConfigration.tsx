@@ -527,7 +527,6 @@ const CommunicationConfiguration: React.FC = () => {
                     message={`SMTP: ${testResults.details.smtp.success ? "Success" : "Failed"}`}
                     description={testResults.details.smtp.message || testResults.details.smtp.error}
                     type={testResults.details.smtp.success ? "success" : "error"}
-                    size="small"
                   />
                 )}
                 {testResults.details.imap && (
@@ -535,7 +534,6 @@ const CommunicationConfiguration: React.FC = () => {
                     message={`IMAP: ${testResults.details.imap.success ? "Success" : "Failed"}`}
                     description={testResults.details.imap.message || testResults.details.imap.error}
                     type={testResults.details.imap.success ? "success" : "error"}
-                    size="small"
                   />
                 )}
               </div>
@@ -574,14 +572,12 @@ const CommunicationConfiguration: React.FC = () => {
                     message="Account Status"
                     description={smsTestResults.details.account_status || "Unknown"}
                     type={smsTestResults.details.account_status === "active" ? "success" : "warning"}
-                    size="small"
                   />
 
                   <Alert
                     message="Phone Number Status"
                     description={smsTestResults.details.phone_number_status || "Unknown"}
                     type={smsTestResults.details.phone_number_status === "active" ? "success" : "warning"}
-                    size="small"
                   />
                 </div>
 
@@ -590,12 +586,11 @@ const CommunicationConfiguration: React.FC = () => {
                     message="Account Balance"
                     description={`${smsTestResults.details.balance_info.balance} ${smsTestResults.details.balance_info.currency}`}
                     type="info"
-                    size="small"
                   />
                 )}
 
                 {smsTestResults.details.test_message_sent && (
-                  <Alert message="Test Message" description="✅ Test SMS sent successfully!" type="success" size="small" />
+                  <Alert message="Test Message" description="✅ Test SMS sent successfully!" type="success" />
                 )}
 
                 <div className="text-sm text-gray-600">Response time: {smsTestResults.details.response_time}ms</div>

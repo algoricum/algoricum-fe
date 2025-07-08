@@ -1,8 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import StaffManagement from "./staff-management"; // Replace with correct relative path
-import AddStaffModal from "./add-staff-modal"; // Replace with correct relative path
+import StaffManagement from "./staff-management";
+import AddStaffModal from "./add-staff-modal";
+
+interface StaffFormValues {
+  name: string;
+  email: string;
+  role: string;
+  password: string;
+}
 
 const StaffManagementWithModal = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,9 +22,10 @@ const StaffManagementWithModal = () => {
     setIsModalOpen(false);
   };
 
-  const handleStaffSubmit = (values: any) => {
-    console.log("New staff data:", values);
+  const handleStaffSubmit = (values: StaffFormValues) => {
+    console.log("New staff data:", values); // ✅ You are using `values` here
     // Add your API call here
+    setIsModalOpen(false); // Optionally close modal after submit
   };
 
   return (

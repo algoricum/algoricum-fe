@@ -3,22 +3,31 @@
 import { Modal, Form, Input, Select, Button } from "antd";
 import { useState } from "react";
 
+// Use this in parent too if needed
+export interface StaffFormValues {
+  name: string;
+  email: string;
+  role: string;
+  password: string;
+}
+
 interface AddStaffModalProps {
   open: boolean;
   onCancel: () => void;
-  onSubmit: (values: any) => void;
+  // eslint-disable-next-line no-unused-vars
+  onSubmit: (values: StaffFormValues) => void; // ✅ replaced `any` with StaffFormValues
 }
 
 const AddStaffModal = ({ open, onCancel, onSubmit }: AddStaffModalProps) => {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<StaffFormValues>();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: StaffFormValues) => {
     setLoading(true);
     try {
-      await onSubmit(values);
+      onSubmit(values); // ✅ properly typed
       form.resetFields();
-      onCancel();
+      onCancel(); // Close the modal after submission
     } catch (error) {
       console.error("Error adding staff:", error);
     } finally {
