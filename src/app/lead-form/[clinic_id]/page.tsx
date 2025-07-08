@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/config/client";
 import { getCountries, getCountryCallingCode } from "react-phone-number-input/input";
+import type { CountryCode } from "libphonenumber-js"; // add this import
 
 type FormField = {
   id: string;
@@ -24,7 +25,7 @@ const LeadGenerationForm = () => {
 
   const [fields, setFields] = useState<FormField[]>([]);
   const [formData, setFormData] = useState<FormData>({});
-  const [countryCode, setCountryCode] = useState("US");
+  const [countryCode, setCountryCode] = useState<CountryCode>("US");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -97,7 +98,8 @@ const LeadGenerationForm = () => {
   // Update formData when country code or phone number changes
   useEffect(() => {
     if (phoneNumber && countryCode) {
-      const fullPhoneNumber = `+${getCountryCallingCode(countryCode)}${phoneNumber}`;
+      const fullPhoneNumber = `+${getCountryCallingCode(countryCode as CountryCode)}${phoneNumber}`;
+
       setFormData(prev => ({
         ...prev,
         phone: fullPhoneNumber,
@@ -164,7 +166,7 @@ const LeadGenerationForm = () => {
   };
 
   const handleCountryChange = (value: string) => {
-    setCountryCode(value);
+    setCountryCode(value as CountryCode);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
