@@ -24,13 +24,17 @@ const Sidebar = () => {
     switch (key) {
       case "leads":
         return push("/leads");
+      case "dashboard":
+        return push("/dashboard");
+      case "staff-managment":
+        return push("/staff-managment");
       case "profileSettings":
         return push("/settings/chatbot");
       case "setup":
         return push("/setup");
       case "logout":
         try {
-          setIsLoggingOut(true); 
+          setIsLoggingOut(true);
           const success = await signOut();
           if (success) {
             SuccessToast("Logout Successfully");
@@ -101,13 +105,11 @@ const Sidebar = () => {
             {footerItems.map(({ key, label, icon: Icon, selectedicon }, index) => (
               <div
                 key={index}
-                className={`w-full flex flex-row items-center py-2 gap-2 ${isLoggingOut ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} border-b-2 border-transparent !border hover:border-Primary900 rounded hover:!bg-Primary50 ${isSelected(key) && "!bg-Primary50 !rounded !border-Primary900"} ${isCollapsed ? "justify-center" : "px-4"}`}
+                className={`w-full flex flex-row items-center py-2 gap-2 ${isLoggingOut ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} border-b-2 border-transparent !border hover:border-Primary900 rounded hover:!bg-Primary50 ${isSelected(key) && "!bg-Primary50 !rounded !border-Primary900"} ${isCollapsed ? "justify-center" : "px-4"}`}
                 onClick={() => menuHandler(key)}
               >
                 {isSelected(key) ? selectedicon : Icon}
-                {!isCollapsed && (
-                  <p className={`${isSelected(key) ? "text-Primary1000 font-PoppinsSemiBold" : "text-Gray600"}`}>{label}</p>
-                )}
+                {!isCollapsed && <p className={`${isSelected(key) ? "text-Primary1000 font-PoppinsSemiBold" : "text-Gray600"}`}>{label}</p>}
               </div>
             ))}
           </div>
