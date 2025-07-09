@@ -1,0 +1,130 @@
+"use client";
+
+import { useState } from "react";
+import { Button, Select, Typography } from "antd";
+
+const { Option } = Select;
+const { Title, Text } = Typography;
+
+interface ToneIdentityStepProps {
+  onNext: (data: any) => void;
+  onPrev?: () => void;
+  initialData?: any;
+}
+
+export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: ToneIdentityStepProps) {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [formData, setFormData] = useState({
+    toneSelector: initialData.toneSelector || "",
+    sentenceLength: initialData.sentenceLength || "",
+    formalityLevel: initialData.formalityLevel || "",
+  });
+
+  const questions = [
+    {
+      id: "toneSelector",
+      question: "How warm and approachable should your AI assistant sound?",
+      options: ["Very warm and friendly", "Warm and professional (recommended)", "Professional and courteous", "Formal and clinical"],
+    },
+    {
+      id: "sentenceLength",
+      question: "How detailed should responses be?",
+      options: ["Brief and concise", "Moderate detail (recommended)", "Comprehensive and thorough"],
+    },
+    {
+      id: "formalityLevel",
+      question: "How formal should the language be?",
+      options: ["Casual and conversational", "Professional but approachable (recommended)", "Formal and medical"],
+    },
+  ];
+
+  const currentQuestion = questions[currentQuestionIndex];
+  const currentValue = formData[currentQuestion.id as keyof typeof formData];
+
+  const handleSelectChange = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [currentQuestion.id]: value,
+    }));
+
+    // Auto-advance to next question after a short delay
+    setTimeout(() => {
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+      } else {
+        onNext(formData);
+      }
+    }, 300);
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    } else if (onPrev) {
+      onPrev();
+    }
+  };
+
+  const renderPreviousQuestions = () => {
+    return questions.slice(0, currentQuestionIndex).map(q => {
+      const value = formData[q.id as keyof typeof formData];
+
+      return (
+        <div key={q.id} className="mb-8">
+          <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">{q.question}</Text>
+          <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+            <Text className="text-gray-700 text-lg">{value}</Text>
+          </div>
+        </div>
+      );
+    });
+  };
+
+  return (
+    <div className="max-w-4xl">
+      {/* Previous Questions */}
+      {renderPreviousQuestions()}
+
+      {/* Current Question */}
+      <div>
+        <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
+          {currentQuestion.question}
+        </Title>
+
+        <Select
+          placeholder="Select an option"
+          value={currentValue || undefined}
+          onChange={handleSelectChange}
+          size="large"
+          className="w-full text-lg mb-6"
+          dropdownClassName="text-base"
+        >
+          {currentQuestion.options.map(option => (
+            <Option key={option} value={option}>
+              {option}
+            </Option>
+          ))}
+        </Select>
+
+        <div className="flex justify-between">
+          <Button
+            onClick={handlePrevious}
+            className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
+            disabled={currentQuestionIndex === 0 && !onPrev}
+          >
+            Previous
+          </Button>
+
+          <Button
+            type="primary"
+            onClick={() => onNext(formData)}
+            disabled={!currentValue}
+            className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
+          >
+            Continue to Next Step
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
