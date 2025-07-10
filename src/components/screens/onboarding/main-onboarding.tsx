@@ -19,10 +19,11 @@ import { getUserData } from "@/utils/supabase/user-helper";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { useAuth } from "@/hooks/useAuth";
+import ChatbotSetupStep from "./chatbot-setup-step";
 
 const { Text } = Typography;
 
-const STEPS = [
+const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Info", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours", description: "Schedule", icon: "👥" },
   { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
@@ -35,16 +36,22 @@ const STEPS = [
 const ONBOARDING_STORAGE_KEY = "clinic_onboarding_progress_v2";
 const ONBOARDING_STEP_KEY = "clinic_onboarding_step_v2";
 
+const CHATBOT_STEP = { id: "chatbot-setup", title: "Chatbot", description: "AI Assistant", icon: "🤖" };
+
 export default function MainOnboarding() {
   const router = useRouter();
   const { logout } = useAuth();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [allData, setAllData] = useState<Record<string, any>>({});
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [showChatbotStep, setShowChatbotStep] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const currentStep = STEPS[currentStepIndex];
+  // Determine if chatbot step should be shown based on integrations data
+  const shouldShowChatbotStep = allData.integrations?.hasChatbot === "No";
+  const STEPS = shouldShowChatbotStep ? [...BASE_STEPS, CHATBOT_STEP] : BASE_STEPS;
 
+  const currentStep = STEPS[currentStepIndex];
   // Helper functions for localStorage (same as old flow)
   const isBrowser = typeof window !== "undefined";
 
@@ -284,16 +291,28 @@ export default function MainOnboarding() {
     setStoredData(ONBOARDING_STORAGE_KEY, newAllData);
     setStoredData(ONBOARDING_STEP_KEY, currentStepIndex + 1);
 
+    // Check if we need to show chatbot step after integrations
+    if (currentStep.id === "integrations" && stepData.hasChatbot === "No") {
+      setShowChatbotStep(true);
+    }
+
     // Mark step as completed
     if (!completedSteps.includes(currentStepIndex)) {
       setCompletedSteps(prev => [...prev, currentStepIndex]);
     }
 
+    // Determine the actual steps array that should be used
+    const actualSteps =
+      currentStep.id === "integrations" && stepData.hasChatbot === "No"
+        ? [...BASE_STEPS, CHATBOT_STEP]
+        : shouldShowChatbotStep
+          ? [...BASE_STEPS, CHATBOT_STEP]
+          : BASE_STEPS;
+
     // Move to next step or complete onboarding
-    if (currentStepIndex < STEPS.length - 1) {
+    if (currentStepIndex < actualSteps.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
-      // This is the last step - trigger Supabase submission
       handleCompleteOnboarding();
     }
   };
@@ -348,9 +367,9 @@ export default function MainOnboarding() {
       case "booking-setup":
         return <BookingSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "integrations":
-        return (
-          <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} isSubmitting={isSubmitting} />
-        );
+        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+      case "chatbot-setup":
+        return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       default:
         return <div>Unknown step</div>;
     }
@@ -397,7 +416,9 @@ export default function MainOnboarding() {
 
                   {/* Step Content */}
                   <div className="flex-1 pt-0">
-                    <Text className="text-white text-opacity-80 text-xs font-normal block mb-0 tracking-wide">{index + 1}/6</Text>
+                    <Text className="text-white text-opacity-80 text-xs font-normal block mb-0 tracking-wide">
+                      {index + 1}/{STEPS.length}
+                    </Text>
                     <Text className="text-white text-sm font-semibold block mb-0 leading-none">{step.title}</Text>
                     <Text className="text-white text-opacity-70 text-xs leading-tight block">{step.description}</Text>
                   </div>

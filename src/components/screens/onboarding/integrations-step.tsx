@@ -216,6 +216,22 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               ))}
             </Space>
           </Radio.Group>
+
+          {/* Show "We've got you covered" message for chatbot "No" answer */}
+          {currentQuestion.id === "hasChatbot" && currentValue === "No" && (
+            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" bodyStyle={{ padding: "20px" }}>
+              <div className="flex items-center mb-3">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                  <Text className="text-white text-base">✓</Text>
+                </div>
+                <Text className="text-lg font-semibold text-blue-900">We've got you covered!</Text>
+              </div>
+              <Text className="text-blue-900 text-base leading-6">
+                Perfect! We&apos;ll help you set up our intelligent chatbot that can handle patient inquiries, book appointments, and provide
+                information about your services 24/7.
+              </Text>
+            </Card>
+          )}
         </div>
       );
     }
@@ -275,11 +291,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             loading={isSubmitting && currentQuestionIndex === questions.length - 1}
             className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
           >
-            {currentQuestionIndex === questions.length - 1
-              ? isSubmitting
-                ? "Setting up your clinic..."
-                : "Complete Onboarding"
-              : "Continue"}
+            {currentQuestionIndex === questions.length - 1 ? (isSubmitting ? "Setting up your clinic..." : "Continue") : "Continue"}
           </Button>
         </div>
       </div>
