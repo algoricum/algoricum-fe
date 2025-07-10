@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Radio, Card, Space, Select, Typography } from "antd";
+import { Button, Radio, Card, Space, Select, Typography, Modal, Input, Alert } from "antd";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -10,11 +10,16 @@ interface IntegrationsStepProps {
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
-  isSubmitting?: boolean; // Add loading state prop
+  isSubmitting?: boolean;
 }
 
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [showHubspotModal, setShowHubspotModal] = useState(false);
+  const [hubspotConfig, setHubspotConfig] = useState({
+    apiKey: initialData.hubspotConfig?.apiKey || "",
+    portalId: initialData.hubspotConfig?.portalId || "",
+  });
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
     usesAds: initialData.usesAds || "",
@@ -27,18 +32,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       id: "usesHubspot",
       type: "radio",
       question: "Do you use HubSpot as your CRM?",
-      options: ["Yes", "No"],
-    },
-    {
-      id: "usesAds",
-      type: "radio",
-      question: "Do you use ads?",
-      options: ["Yes", "No"],
-    },
-    {
-      id: "hasChatbot",
-      type: "radio",
-      question: "Are you already using a chatbot?",
       options: ["Yes", "No"],
     },
     {
@@ -99,6 +92,18 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         "Other",
       ],
     },
+    {
+      id: "usesAds",
+      type: "radio",
+      question: "Do you use ads?",
+      options: ["Yes", "No"],
+    },
+    {
+      id: "hasChatbot",
+      type: "radio",
+      question: "Are you already using a chatbot?",
+      options: ["Yes", "No"],
+    },
   ];
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -109,14 +114,46 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       ...prev,
       [currentQuestion.id]: value,
     }));
+
+    // Show HubSpot modal if user selects "Yes" for HubSpot
+    if (currentQuestion.id === "usesHubspot" && value === "Yes") {
+      setShowHubspotModal(true);
+    }
+  };
+
+  const handleHubspotModalOk = () => {
+    setShowHubspotModal(false);
+    // Continue to next question after modal is closed
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    }
+  };
+
+  const handleHubspotModalCancel = () => {
+    setShowHubspotModal(false);
+    // Reset HubSpot selection if user cancels
+    setFormData(prev => ({
+      ...prev,
+      usesHubspot: "",
+    }));
   };
 
   const handleNext = () => {
+    // If HubSpot is selected but modal hasn't been completed, show modal
+    if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && !hubspotConfig.apiKey) {
+      setShowHubspotModal(true);
+      return;
+    }
+
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      // This is the final step - trigger submission
-      onNext(formData);
+      // Include HubSpot config in final data
+      const finalData = {
+        ...formData,
+        ...(formData.usesHubspot === "Yes" && { hubspotConfig }),
+      };
+      onNext(finalData);
     }
   };
 
@@ -144,6 +181,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                     .join(", ")
                 : value || "Not specified"}
             </Text>
+            {/* Show HubSpot integration status */}
+            {q.id === "usesHubspot" && value === "Yes" && hubspotConfig.apiKey && (
+              <div className="mt-2 p-2 bg-green-100 rounded-lg">
+                <Text className="text-green-700 text-sm">✓ HubSpot integration configured</Text>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -240,6 +283,83 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           </Button>
         </div>
       </div>
+
+      {/* HubSpot Integration Modal */}
+      <Modal
+        title={
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center mr-3">
+              <Text className="text-white font-bold text-sm">H</Text>
+            </div>
+            <span className="text-xl font-semibold">HubSpot Integration</span>
+          </div>
+        }
+        open={showHubspotModal}
+        onOk={handleHubspotModalOk}
+        onCancel={handleHubspotModalCancel}
+        okText="Save Integration"
+        cancelText="Skip for Now"
+        okButtonProps={{
+          disabled: !hubspotConfig.apiKey || !hubspotConfig.portalId,
+          className: "bg-purple-500 border-purple-500",
+        }}
+        width={600}
+        centered
+      >
+        <div className="py-4">
+          <Alert
+            message="Connect your HubSpot account"
+            description="Enter your HubSpot credentials to sync leads and contacts automatically."
+            type="info"
+            showIcon
+            className="mb-6"
+          />
+
+          <div className="space-y-4">
+            <div>
+              <Text className="block text-sm font-medium text-gray-700 mb-2">HubSpot API Key</Text>
+              <Input
+                placeholder="Enter your HubSpot API key"
+                value={hubspotConfig.apiKey}
+                onChange={e =>
+                  setHubspotConfig(prev => ({
+                    ...prev,
+                    apiKey: e.target.value,
+                  }))
+                }
+                className="rounded-lg"
+              />
+              <Text className="text-xs text-gray-500 mt-1">Find your API key in HubSpot Settings → Integrations → API key</Text>
+            </div>
+
+            <div>
+              <Text className="block text-sm font-medium text-gray-700 mb-2">Portal ID</Text>
+              <Input
+                placeholder="Enter your HubSpot Portal ID"
+                value={hubspotConfig.portalId}
+                onChange={e =>
+                  setHubspotConfig(prev => ({
+                    ...prev,
+                    portalId: e.target.value,
+                  }))
+                }
+                className="rounded-lg"
+              />
+              <Text className="text-xs text-gray-500 mt-1">Find your Portal ID in HubSpot Settings → Account Setup → Account Defaults</Text>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <Text className="text-sm text-gray-600">
+              <strong>What this enables:</strong>
+              <br />• Automatic lead capture from your website
+              <br />• Sync patient information with HubSpot
+              <br />• Track appointment bookings in your CRM
+              <br />• Automated follow-up sequences
+            </Text>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
