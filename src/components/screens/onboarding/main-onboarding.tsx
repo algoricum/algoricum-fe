@@ -170,6 +170,12 @@ export default function MainOnboarding() {
         // Additional fields from new flow
         clinic_type: mappedData.clinicType,
 
+        // Integrations data
+        uses_hubspot: mappedData.integrations.usesHubspot === "Yes",
+        uses_ads: mappedData.integrations.usesAds === "Yes",
+        has_chatbot: mappedData.integrations.hasChatbot === "Yes",
+        other_tools: mappedData.integrations.otherTools || "",
+
         // Keeping existing theming structure
         widget_theme: {
           primary_color: "#2563EB",
