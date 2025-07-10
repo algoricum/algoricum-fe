@@ -10,9 +10,10 @@ interface IntegrationsStepProps {
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
+  isSubmitting?: boolean; // Add loading state prop
 }
 
-export default function IntegrationsStep({ onNext, onPrev, initialData = {} }: IntegrationsStepProps) {
+export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
@@ -114,6 +115,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {} }: I
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
+      // This is the final step - trigger submission
       onNext(formData);
     }
   };
@@ -162,9 +164,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {} }: I
                     currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"
                   }`}
                   bodyStyle={{ padding: "16px" }}
-                  onClick={() => handleInputChange(option)}
+                  onClick={() => !isSubmitting && handleInputChange(option)}
                 >
-                  <Radio value={option} className="text-lg text-black">
+                  <Radio value={option} className="text-lg text-black" disabled={isSubmitting}>
                     <span className="text-black">{option}</span>
                   </Radio>
                 </Card>
@@ -186,6 +188,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {} }: I
             size="large"
             className="w-full text-lg"
             dropdownClassName="text-base"
+            disabled={isSubmitting}
           >
             {currentQuestion.options?.map(option => (
               <Option key={option} value={option}>
@@ -217,7 +220,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {} }: I
           <Button
             onClick={handlePrevious}
             className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
-            disabled={currentQuestionIndex === 0 && !onPrev}
+            disabled={(currentQuestionIndex === 0 && !onPrev) || isSubmitting}
           >
             Previous
           </Button>
@@ -225,10 +228,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {} }: I
           <Button
             type="primary"
             onClick={handleNext}
-            disabled={currentQuestion.type === "radio" ? !currentValue : false}
+            disabled={(currentQuestion.type === "radio" ? !currentValue : false) || isSubmitting}
+            loading={isSubmitting && currentQuestionIndex === questions.length - 1}
             className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
           >
-            {currentQuestionIndex === questions.length - 1 ? "Complete Onboarding" : "Continue"}
+            {currentQuestionIndex === questions.length - 1
+              ? isSubmitting
+                ? "Setting up your clinic..."
+                : "Complete Onboarding"
+              : "Continue"}
           </Button>
         </div>
       </div>

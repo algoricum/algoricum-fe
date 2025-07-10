@@ -2,12 +2,23 @@
 
 import { useState } from "react";
 import { Typography } from "antd";
+import { useRouter } from "next/navigation";
 import ClinicInfoStep from "./clinic-info-step";
 import StaffHoursStep from "./staff-hours-step";
 import ToneIdentityStep from "./tone-identity-step";
 import AiAssistantStep from "./ai-assistant-step";
 import BookingSetupStep from "./booking-setup-step";
 import IntegrationsStep from "./integrations-step";
+
+// Import your existing services and helpers
+import apiKeyService from "@/services/apiKey";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
+import { createClinic } from "@/utils/supabase/clinic-helper";
+import { getUserData } from "@/utils/supabase/user-helper";
+import generateClinicInstructions from "@/utils/generateClinicInstructions";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+import { useAuth } from "@/hooks/useAuth";
 
 const { Text } = Typography;
 
@@ -20,50 +31,294 @@ const STEPS = [
   { id: "integrations", title: "Integrations", description: "Tools", icon: "⚡" },
 ];
 
+// Storage keys for persistence
+const ONBOARDING_STORAGE_KEY = "clinic_onboarding_progress_v2";
+const ONBOARDING_STEP_KEY = "clinic_onboarding_step_v2";
+
 export default function MainOnboarding() {
+  const router = useRouter();
+  const { logout } = useAuth();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [allData, setAllData] = useState<Record<string, any>>({});
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const currentStep = STEPS[currentStepIndex];
 
+  // Helper functions for localStorage (same as old flow)
+  const isBrowser = typeof window !== "undefined";
+
+  const getStoredData = (key: string) => {
+    if (!isBrowser) return null;
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.error("Error reading from localStorage:", error);
+      return null;
+    }
+  };
+
+  const setStoredData = (key: string, data: any) => {
+    if (!isBrowser) return;
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error("Error writing to localStorage:", error);
+    }
+  };
+
+  const clearStoredProgress = () => {
+    if (!isBrowser) return;
+    try {
+      localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+      localStorage.removeItem(ONBOARDING_STEP_KEY);
+    } catch (error) {
+      console.error("Error clearing localStorage:", error);
+    }
+  };
+
+  // Map new flow data to old flow structure for Supabase
+  const mapDataForSubmission = (data: Record<string, any>) => {
+    const clinicInfo = data["clinic-info"] || {};
+    const staffHours = data["staff-hours"] || {};
+    const toneIdentity = data["tone-identity"] || {};
+    const aiAssistant = data["ai-assistant"] || {};
+    const bookingSetup = data["booking-setup"] || {};
+    const integrations = data["integrations"] || {};
+
+    // Convert business hours to old format
+    const businessHours: any = {};
+    const newBusinessHours = staffHours.businessHours || {};
+
+    Object.keys(newBusinessHours).forEach(day => {
+      const dayData = newBusinessHours[day];
+      businessHours[day] = {
+        isOpen: dayData.enabled || false,
+        openTime: dayData.start || "9:00 AM",
+        closeTime: dayData.end || "5:00 PM",
+      };
+    });
+
+    return {
+      // Step 1 - Clinic Info
+      legalBusinessName: clinicInfo.clinicName || "",
+      dbaName: "", // Not collected in new flow
+      clinicAddress: clinicInfo.businessAddress || "",
+      businessHours: businessHours,
+
+      // Step 2 - Contact Info
+      fullName: "", // Not collected in new flow
+      emailAddress: clinicInfo.primaryContactEmail || "",
+      phoneNumber: clinicInfo.clinicPhone || "",
+      calendlyLink: bookingSetup.hasBookingLink === "Yes, I have a booking link" ? bookingSetup.bookingLinkUrl : "",
+
+      // Step 3 - Brand Config
+      logo: aiAssistant.logoUpload?.[0]?.originFileObj || null,
+      tone_selector: toneIdentity.toneSelector || "",
+      sentence_length: toneIdentity.sentenceLength || "",
+      formality_level: toneIdentity.formalityLevel || "",
+      clinic_document: aiAssistant.clinicDetailsUpload?.[0]?.originFileObj || null,
+
+      // Additional data from new flow
+      clinicType: clinicInfo.clinicType || "",
+      integrations: integrations,
+    };
+  };
+
+  // Main submission function (adapted from old flow)
+  const handleCompleteOnboarding = async () => {
+    try {
+      setIsSubmitting(true);
+
+      // Map the new flow data to the old structure
+      const mappedData = mapDataForSubmission(allData);
+
+      // Get current user
+      const user = await getUserData();
+      if (!user) {
+        ErrorToast("User not found. Please logout and log in again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // First, upload the logo if provided
+      let logoUrl = undefined;
+      if (mappedData.logo) {
+        logoUrl = await uploadClinicLogo(user.id, mappedData.logo);
+      }
+
+      const clinicData = {
+        // Map form fields to database fields
+        name: mappedData.legalBusinessName,
+        legal_business_name: mappedData.legalBusinessName,
+        dba_name: mappedData.dbaName,
+        address: mappedData.clinicAddress,
+        phone: mappedData.phoneNumber,
+        email: mappedData.emailAddress || user.email,
+        language: "en",
+        owner_id: user.id,
+        business_hours: mappedData.businessHours,
+        calendly_link: mappedData.calendlyLink,
+        logo: logoUrl,
+
+        // Brand settings
+        tone_selector: mappedData.tone_selector,
+        sentence_length: mappedData.sentence_length,
+        formality_level: mappedData.formality_level,
+
+        // Additional fields from new flow
+        clinic_type: mappedData.clinicType,
+
+        // Keeping existing theming structure
+        widget_theme: {
+          primary_color: "#2563EB",
+          font_family: "Inter, sans-serif",
+          border_radius: "8px",
+        },
+        dashboard_theme: {
+          primary_color: "#2563EB",
+        },
+      };
+
+      // Create clinic
+      const clinic = await createClinic(clinicData);
+
+      // Generate API key for the clinic
+      const apiKeyName = `${mappedData.legalBusinessName} Primary Key`;
+      await apiKeyService.create({
+        name: apiKeyName,
+        clinicId: clinic.id,
+      });
+
+      // Handle document upload and assistant creation if we have a clinic ID
+      if (clinic.id && mappedData.clinic_document) {
+        const hasDocument = !!mappedData.clinic_document;
+
+        if (hasDocument) {
+          // Prepare form data for the edge function
+          const formDataToSend = new FormData();
+          formDataToSend.append("clinic_document", mappedData.clinic_document);
+          formDataToSend.append("clinic_id", clinic.id);
+          formDataToSend.append("name", mappedData.legalBusinessName);
+          formDataToSend.append("description", `AI Assistant for ${mappedData.legalBusinessName}`);
+
+          // Generate customized instructions based on clinic settings
+          const clinicInstructions = generateClinicInstructions({
+            name: mappedData.legalBusinessName,
+            address: mappedData.clinicAddress,
+            phone: mappedData.phoneNumber,
+            email: mappedData.emailAddress || user.email,
+            business_hours: mappedData.businessHours,
+            calendly_link: mappedData.calendlyLink,
+            tone_selector: mappedData.tone_selector,
+            sentence_length: mappedData.sentence_length,
+            formality_level: mappedData.formality_level,
+            has_uploaded_document: true,
+          });
+
+          formDataToSend.append("instructions", clinicInstructions);
+          formDataToSend.append("model", "gpt-3.5-turbo");
+          formDataToSend.append("tools", JSON.stringify([{ type: "file_search" }]));
+
+          // Get the token for authorization
+          const session = await getSupabaseSession();
+
+          if (!session.access_token) {
+            throw new Error("Not authenticated");
+          }
+
+          try {
+            // Call the combined edge function
+            const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: formDataToSend,
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+              console.error("Assistant creation error:", result.error);
+              // Continue with onboarding even if assistant creation fails
+            }
+          } catch (assistantError) {
+            console.error("Failed to create assistant:", assistantError);
+            // Continue with onboarding even if assistant creation fails
+          }
+        }
+      }
+
+      // Clear stored progress after successful completion
+      clearStoredProgress();
+
+      SuccessToast("You're all set!");
+      setTimeout(() => {
+        router.push("/dashboard?onboarding=success");
+      }, 2000);
+    } catch (error: any) {
+      ErrorToast(error.message || "Failed to create clinic");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleStepComplete = (stepData: any) => {
     // Save step data
-    setAllData(prev => ({
-      ...prev,
+    const newAllData = {
+      ...allData,
       [currentStep.id]: stepData,
-    }));
+    };
+
+    setAllData(newAllData);
+
+    // Save to localStorage for persistence
+    setStoredData(ONBOARDING_STORAGE_KEY, newAllData);
+    setStoredData(ONBOARDING_STEP_KEY, currentStepIndex + 1);
 
     // Mark step as completed
     if (!completedSteps.includes(currentStepIndex)) {
       setCompletedSteps(prev => [...prev, currentStepIndex]);
     }
 
-    // Move to next step
+    // Move to next step or complete onboarding
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
-      // Onboarding complete
-      console.log("Onboarding complete!", allData);
-      alert("Onboarding Complete! Check console for data.");
+      // This is the last step - trigger Supabase submission
+      handleCompleteOnboarding();
     }
   };
 
   const handleStepPrevious = () => {
     if (currentStepIndex > 0) {
       setCurrentStepIndex(currentStepIndex - 1);
+      setStoredData(ONBOARDING_STEP_KEY, currentStepIndex - 1);
     }
   };
 
   const handleStepClick = (stepIndex: number) => {
     if (completedSteps.includes(stepIndex) || stepIndex === currentStepIndex) {
       setCurrentStepIndex(stepIndex);
+      setStoredData(ONBOARDING_STEP_KEY, stepIndex);
     }
   };
 
-  const handleLogout = () => {
-    console.log("Logout clicked");
-    // Add logout logic here
+  const handleLogout = async () => {
+    try {
+      const success = await logout();
+      if (success) {
+        SuccessToast("Logout Successfully");
+        router.push("/login");
+      } else {
+        ErrorToast("Logout failed. Please try again.");
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+      ErrorToast("Logout failed. Please try again.");
+    }
   };
 
   const renderCurrentStep = () => {
@@ -87,7 +342,9 @@ export default function MainOnboarding() {
       case "booking-setup":
         return <BookingSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "integrations":
-        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+        return (
+          <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} isSubmitting={isSubmitting} />
+        );
       default:
         return <div>Unknown step</div>;
     }
@@ -149,6 +406,7 @@ export default function MainOnboarding() {
           <button
             onClick={handleLogout}
             className="w-auto bg-white bg-opacity-20 border border-white border-opacity-30 text-white rounded-lg px-4 py-2 h-auto text-sm hover:bg-white hover:bg-opacity-30 transition-all flex items-center"
+            disabled={isSubmitting}
           >
             <span className="mr-2">→</span>
             Logout
@@ -158,6 +416,16 @@ export default function MainOnboarding() {
 
       {/* Main Content */}
       <div className="flex-1 h-screen overflow-hidden relative">
+        {/* Loading overlay when submitting */}
+        {isSubmitting && (
+          <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Setting up your clinic...</p>
+            </div>
+          </div>
+        )}
+
         <div className="h-full overflow-y-auto py-11 px-8">{renderCurrentStep()}</div>
       </div>
     </div>
