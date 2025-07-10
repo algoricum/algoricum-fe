@@ -1,7 +1,11 @@
 "use client";
 
+import type React from "react";
+
 import { useState } from "react";
 import { Input, Button, Typography } from "antd";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -11,6 +15,11 @@ interface ClinicInfoStepProps {
   onPrev?: () => void;
   initialData?: any;
 }
+
+const validateEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
 
 export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: ClinicInfoStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -43,9 +52,9 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
     },
     {
       id: "clinicPhone",
-      type: "text",
+      type: "phone",
       question: "What's your clinic's phone number?",
-      placeholder: "(555) 123-4567",
+      placeholder: "Enter your phone number",
     },
     {
       id: "businessAddress",
@@ -65,7 +74,27 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
     }));
   };
 
+  const handlePhoneChange = (value: string | undefined) => {
+    setFormData(prev => ({
+      ...prev,
+      clinicPhone: value || "",
+    }));
+  };
+
   const handleNext = () => {
+    const currentValue = formData[currentQuestion.id as keyof typeof formData];
+
+    // Validate current field
+    if (currentQuestion.type === "email" && !validateEmail(currentValue)) {
+      alert("Please enter a valid email address");
+      return;
+    }
+
+    if (currentQuestion.type === "phone" && !currentValue) {
+      alert("Please enter a valid phone number");
+      return;
+    }
+
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
@@ -95,9 +124,13 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
               rows={3}
               className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700"
             />
+          ) : q.type === "phone" ? (
+            <div className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700 text-xs">
+              {value || "No phone number entered"}
+            </div>
           ) : (
             <Input
-              type={q.type}
+              type={q.type === "phone" ? "text" : q.type}
               value={value}
               disabled
               className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700"
@@ -109,6 +142,8 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
   };
 
   const renderCurrentInput = () => {
+    const isEmailInvalid = currentQuestion.type === "email" && currentValue && !validateEmail(currentValue);
+
     if (currentQuestion.type === "textarea") {
       return (
         <TextArea
@@ -122,16 +157,92 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
       );
     }
 
+    if (currentQuestion.type === "phone") {
+      return (
+        <div className="mb-6">
+          <PhoneInput
+            placeholder={currentQuestion.placeholder}
+            value={currentValue}
+            onChange={handlePhoneChange}
+            defaultCountry="US"
+            international
+            countryCallingCodeEditable={false}
+            className="phone-input-custom"
+            style={
+              {
+                "--PhoneInput-color--focus": "#a855f7",
+                "--PhoneInputInternationalIconPhone-opacity": "0.8",
+                "--PhoneInputInternationalIconGlobe-opacity": "0.65",
+                "--PhoneInputCountrySelect-marginRight": "0.5em",
+                "--PhoneInputCountrySelectArrow-width": "0.3em",
+                "--PhoneInputCountrySelectArrow-marginLeft": "0.35em",
+              } as React.CSSProperties
+            }
+          />
+          <style jsx>{`
+            :global(.phone-input-custom) {
+              display: flex;
+              align-items: center;
+              padding: 12px;
+              border: 2px solid #e5e7eb;
+              border-radius: 12px;
+              background: white;
+              font-size: 12px;
+            }
+            :global(.phone-input-custom:focus-within) {
+              border-color: #a855f7;
+              outline: none;
+              box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+            }
+            :global(.phone-input-custom .PhoneInputInput) {
+              border: none;
+              outline: none;
+              font-size: 12px;
+              background: transparent;
+              flex: 1;
+            }
+            :global(.phone-input-custom .PhoneInputCountrySelect) {
+              border: none;
+              outline: none;
+              background: transparent;
+              margin-right: 8px;
+            }
+            :global(.phone-input-custom .PhoneInputCountryIcon) {
+              width: 20px;
+              height: 15px;
+            }
+          `}</style>
+        </div>
+      );
+    }
+
     return (
-      <Input
-        type={currentQuestion.type}
-        placeholder={currentQuestion.placeholder}
-        value={currentValue}
-        onChange={e => handleInputChange(e.target.value)}
-        className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-white w-full mb-6"
-        autoFocus
-      />
+      <>
+        <Input
+          type={currentQuestion.type}
+          placeholder={currentQuestion.placeholder}
+          value={currentValue}
+          onChange={e => handleInputChange(e.target.value)}
+          className={`text-xs p-3 rounded-xl border-2 bg-white w-full mb-2 ${isEmailInvalid ? "border-red-500" : "border-gray-200"}`}
+          autoFocus
+        />
+        {isEmailInvalid && <p className="text-red-500 text-sm mb-4">Please enter a valid email address</p>}
+      </>
     );
+  };
+
+  const isCurrentFieldValid = () => {
+    if (!currentValue?.trim()) return false;
+
+    if (currentQuestion.type === "email") {
+      return validateEmail(currentValue);
+    }
+
+    if (currentQuestion.type === "phone") {
+      return currentValue.length > 0;
+    }
+
+    return true;
   };
 
   return (
@@ -159,7 +270,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
           <Button
             type="primary"
             onClick={handleNext}
-            disabled={!currentValue.trim()}
+            disabled={!isCurrentFieldValid()}
             className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
           >
             {currentQuestionIndex === questions.length - 1 ? "Continue to Next Step" : "Continue"}

@@ -73,7 +73,7 @@ export default function AiAssistantStep({ onNext, onPrev, initialData = {} }: Ai
   };
 
   const renderPreviousQuestions = () => {
-    return questions.slice(0, currentQuestionIndex).map(q => {
+    return questions.slice(0, currentQuestionIndex).map((q, index) => {
       const files = uploadedFiles[q.id as keyof typeof uploadedFiles] || [];
 
       return (
@@ -116,27 +116,56 @@ export default function AiAssistantStep({ onNext, onPrev, initialData = {} }: Ai
       },
     };
 
+    const files = uploadedFiles[currentQuestion.id as keyof typeof uploadedFiles] || [];
+
     return (
       <div className="mb-8">
-        <Text className="text-base font-medium text-gray-700 block mb-2">{currentQuestion.title}</Text>
+        {/* Title and Description */}
+        <div className="mb-4">
+          <Text className="text-lg font-medium text-gray-700 block mb-2">{currentQuestion.title}</Text>
+          {currentQuestion.note && <Text className="text-sm text-gray-500 block">{currentQuestion.note}</Text>}
+        </div>
 
-        <Dragger {...uploadProps} className="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-12">
-          <div className="mb-4">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14,2 14,8 20,8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10,9 9,9 8,9" />
-            </svg>
+        {/* Upload Area */}
+        <Dragger
+          {...uploadProps}
+          className="rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 hover:border-purple-400 transition-colors"
+        >
+          <div className="p-8">
+            {/* Upload Icon */}
+            <div className="flex justify-center mb-4">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5" className="mx-auto">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14,2 14,8 20,8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10,9 9,9 8,9" />
+              </svg>
+            </div>
+
+            {/* Upload Text */}
+            <div className="text-center">
+              <Text className="text-base text-gray-700 block mb-2">{currentQuestion.description}</Text>
+              <Text className="text-sm text-gray-400">Supported formats: {currentQuestion.acceptedExtensions}</Text>
+              <Text className="text-xs text-gray-400 block mt-1">Maximum file size: 10MB</Text>
+            </div>
           </div>
-
-          <Text className="text-base text-gray-700 block mb-2">{currentQuestion.description}</Text>
-
-          <Text className="text-sm text-gray-400">{currentQuestion.acceptedExtensions}</Text>
         </Dragger>
 
-        {currentQuestion.note && <Text className="text-sm text-gray-400 text-center block mt-2">{currentQuestion.note}</Text>}
+        {/* File List */}
+        {files.length > 0 && (
+          <div className="mt-4 p-4 bg-green-50 rounded-xl border border-green-200">
+            <Text className="text-sm font-medium text-green-800 block mb-2">Uploaded Files:</Text>
+            {files.map((file: any, idx: number) => (
+              <div key={idx} className="flex items-center text-sm text-green-700">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-2">
+                  <polyline points="20,6 9,17 4,12" />
+                </svg>
+                {file.name}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
