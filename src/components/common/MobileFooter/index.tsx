@@ -44,24 +44,24 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
         align="middle"
       >
         {menuItems.map((item, index) => (
-              <Col span={6} key={index}>
-                <Flex
-                  vertical
-                  align="center"
-                  className={`w-full px-4 py-2 cursor-pointer group hover:border-b-2 border-Gray300 hover:${isSiteDashboard ? "border-b-2 border-b-Primary1000" : "bg-Primary900"} rounded-xl ${
-                    isSelected(item?.key) && `!bg-white rounded shadow-2xl ${isSiteDashboard && "border-b border-b-Primary1000"}`
-                  } `}
-                  gap={8}
-                  onClick={() => menuHandler(item.key)}
-                >
-                  {isSelected(item?.key) ? item.selectedicon : item.icon}
-                  <p
-                    className={`min-w-[80px] capitalize font-PoppinsSemiBold sm:text-xs text-[10px] text-center ${isSelected(item?.key) ? "text-Primary1000" : "text-Gray500"}`}
-                  >
-                    {item.label}
-                  </p>
-                </Flex>
-              </Col>
+          <Col span={6} key={index}>
+            <Flex
+              vertical
+              align="center"
+              className={`w-full px-4 py-2 cursor-pointer group hover:border-b-2 border-Gray300 hover:${isSiteDashboard ? "border-b-2 border-b-Primary1000" : "bg-Primary900"} rounded-xl ${
+                isSelected(item?.key) && `!bg-white rounded shadow-2xl ${isSiteDashboard && "border-b border-b-Primary1000"}`
+              } `}
+              gap={8}
+              onClick={() => menuHandler(item.key)}
+            >
+              {isSelected(item?.key) ? item.selectedicon : item.icon}
+              <p
+                className={`min-w-[80px] capitalize font-PoppinsSemiBold sm:text-xs text-[10px] text-center ${isSelected(item?.key) ? "text-Primary1000" : "text-Gray500"}`}
+              >
+                {item.label}
+              </p>
+            </Flex>
+          </Col>
         ))}
       </Row>
       {menuItems.length > 4 && (
