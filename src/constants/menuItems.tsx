@@ -1,4 +1,4 @@
-import { ChatIcon } from "@/icons";
+import { ChatIcon, SettingIcon } from "@/icons";
 import { DashboardIcon } from "@/icons";
 import { StaffManagementIcon } from "@/icons";
 
@@ -23,6 +23,12 @@ const menuItems = [
     selectedicon: <ChatIcon color="var(--color-primary-1000)" />,
     label: "Leads",
     disabled: false,
+  },
+  {
+    key: "profileSettings",
+    icon: <SettingIcon />,
+    selectedicon: <SettingIcon color="var(--color-primary-1000)" />,
+    label: "Profile Settings",
   },
 ];
 export default menuItems;
