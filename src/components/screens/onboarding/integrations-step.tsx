@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Radio, Card, Space, Select, Typography, Modal, Input, Alert } from "antd";
+import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin } from "antd";
+import { CheckCircleOutlined, LinkOutlined } from "@ant-design/icons";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -16,10 +17,8 @@ interface IntegrationsStepProps {
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
-  const [hubspotConfig, setHubspotConfig] = useState({
-    apiKey: initialData.hubspotConfig?.apiKey || "",
-    portalId: initialData.hubspotConfig?.portalId || "",
-  });
+  const [hubspotStatus, setHubspotStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+  const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null);
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
     usesAds: initialData.usesAds || "",
@@ -115,15 +114,69 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       [currentQuestion.id]: value,
     }));
 
-    // Show HubSpot modal if user selects "Yes" for HubSpot
     if (currentQuestion.id === "usesHubspot" && value === "Yes") {
       setShowHubspotModal(true);
     }
   };
 
+  // Simple one-click HubSpot connection
+  const connectToHubSpot = async () => {
+    setHubspotStatus("connecting");
+
+    try {
+      // This would call your backend API that handles the OAuth flow
+      const response = await fetch("/api/hubspot/connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: "current-user-id", // Get from your auth context
+          redirectUrl: window.location.href,
+        }),
+      });
+
+      const { authUrl } = await response.json();
+
+      // Redirect to HubSpot for authorization
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error("Connection failed:", error);
+      setHubspotStatus("disconnected");
+      Alert.error({
+        message: "Connection Failed",
+        description: "Unable to connect to HubSpot. Please try again.",
+      });
+    }
+  };
+
+  // Handle successful OAuth return
+  const handleHubSpotSuccess = (accountInfo: any) => {
+    setHubspotStatus("connected");
+    setHubspotAccountInfo(accountInfo);
+  };
+
+  const disconnectHubSpot = async () => {
+    try {
+      await fetch("/api/hubspot/disconnect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: "current-user-id",
+        }),
+      });
+
+      setHubspotStatus("disconnected");
+      setHubspotAccountInfo(null);
+    } catch (error) {
+      console.error("Disconnection failed:", error);
+    }
+  };
+
   const handleHubspotModalOk = () => {
     setShowHubspotModal(false);
-    // Continue to next question after modal is closed
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
@@ -131,7 +184,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const handleHubspotModalCancel = () => {
     setShowHubspotModal(false);
-    // Reset HubSpot selection if user cancels
     setFormData(prev => ({
       ...prev,
       usesHubspot: "",
@@ -139,8 +191,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handleNext = () => {
-    // If HubSpot is selected but modal hasn't been completed, show modal
-    if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && !hubspotConfig.apiKey) {
+    if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
       setShowHubspotModal(true);
       return;
     }
@@ -148,10 +199,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      // Include HubSpot config in final data
       const finalData = {
         ...formData,
-        ...(formData.usesHubspot === "Yes" && { hubspotConfig }),
+        ...(formData.usesHubspot === "Yes" && {
+          hubspotConnected: hubspotStatus === "connected",
+          hubspotAccountInfo,
+        }),
       };
       onNext(finalData);
     }
@@ -181,10 +234,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                     .join(", ")
                 : value || "Not specified"}
             </Text>
-            {/* Show HubSpot integration status */}
-            {q.id === "usesHubspot" && value === "Yes" && hubspotConfig.apiKey && (
+            {q.id === "usesHubspot" && value === "Yes" && hubspotStatus === "connected" && (
               <div className="mt-2 p-2 bg-green-100 rounded-lg">
-                <Text className="text-green-700 text-sm">✓ HubSpot integration configured</Text>
+                <Text className="text-green-700 text-sm">
+                  <CheckCircleOutlined className="mr-1" />
+                  Connected to {hubspotAccountInfo?.accountName || "HubSpot"}
+                </Text>
               </div>
             )}
           </div>
@@ -217,18 +272,17 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             </Space>
           </Radio.Group>
 
-          {/* Show "We've got you covered" message for chatbot "No" answer */}
           {currentQuestion.id === "hasChatbot" && currentValue === "No" && (
             <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" bodyStyle={{ padding: "20px" }}>
               <div className="flex items-center mb-3">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
                   <Text className="text-white text-base">✓</Text>
                 </div>
-                <Text className="text-lg font-semibold text-blue-900">We've got you covered!</Text>
+                <Text className="text-lg font-semibold text-blue-900">We&apos;ve got you covered!</Text>
               </div>
               <Text className="text-blue-900 text-base leading-6">
-                Perfect! We&apos;ll help you set up our intelligent chatbot that can handle patient inquiries, book appointments, and provide
-                information about your services 24/7.
+                Perfect! We&apos;ll help you set up our intelligent chatbot that can handle patient inquiries, book appointments, and
+                provide information about your services 24/7.
               </Text>
             </Card>
           )}
@@ -264,10 +318,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   return (
     <div className="max-w-4xl">
-      {/* Previous Questions */}
       {renderPreviousQuestions()}
 
-      {/* Current Question */}
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
           {currentQuestion.question}
@@ -296,80 +348,105 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         </div>
       </div>
 
-      {/* HubSpot Integration Modal */}
+      {/* Super Simple HubSpot Connection Modal */}
       <Modal
         title={
           <div className="flex items-center">
             <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center mr-3">
               <Text className="text-white font-bold text-sm">H</Text>
             </div>
-            <span className="text-xl font-semibold">HubSpot Integration</span>
+            <span className="text-xl font-semibold">Connect to HubSpot</span>
           </div>
         }
         open={showHubspotModal}
         onOk={handleHubspotModalOk}
         onCancel={handleHubspotModalCancel}
-        okText="Save Integration"
-        cancelText="Skip for Now"
+        okText={hubspotStatus === "connected" ? "Continue" : "Skip for Now"}
+        cancelText="Cancel"
         okButtonProps={{
-          disabled: !hubspotConfig.apiKey || !hubspotConfig.portalId,
           className: "bg-purple-500 border-purple-500",
         }}
-        width={600}
+        width={500}
         centered
       >
-        <div className="py-4">
-          <Alert
-            message="Connect your HubSpot account"
-            description="Enter your HubSpot credentials to sync leads and contacts automatically."
-            type="info"
-            showIcon
-            className="mb-6"
-          />
-
-          <div className="space-y-4">
-            <div>
-              <Text className="block text-sm font-medium text-gray-700 mb-2">HubSpot API Key</Text>
-              <Input
-                placeholder="Enter your HubSpot API key"
-                value={hubspotConfig.apiKey}
-                onChange={e =>
-                  setHubspotConfig(prev => ({
-                    ...prev,
-                    apiKey: e.target.value,
-                  }))
-                }
-                className="rounded-lg"
+        <div className="py-6">
+          {hubspotStatus === "disconnected" && (
+            <>
+              <Alert
+                message="Connect your HubSpot account"
+                description="We'll automatically sync your contacts and deals. This takes just one click!"
+                type="info"
+                showIcon
+                className="mb-6"
               />
-              <Text className="text-xs text-gray-500 mt-1">Find your API key in HubSpot Settings → Integrations → API key</Text>
-            </div>
 
-            <div>
-              <Text className="block text-sm font-medium text-gray-700 mb-2">Portal ID</Text>
-              <Input
-                placeholder="Enter your HubSpot Portal ID"
-                value={hubspotConfig.portalId}
-                onChange={e =>
-                  setHubspotConfig(prev => ({
-                    ...prev,
-                    portalId: e.target.value,
-                  }))
-                }
-                className="rounded-lg"
+              <div className="text-center">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<LinkOutlined />}
+                  onClick={connectToHubSpot}
+                  className="bg-orange-500 border-orange-500 hover:bg-orange-600 h-12 px-8 text-lg font-medium"
+                >
+                  Connect to HubSpot
+                </Button>
+
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <Text className="text-sm text-gray-600">
+                    <strong>What happens next:</strong>
+                    <br />• You&apos;ll be redirected to HubSpot to sign in
+                    <br />• Grant permission to access your contacts
+                    <br />• We&apos;ll automatically sync everything
+                    <br />• Takes less than 30 seconds!
+                  </Text>
+                </div>
+              </div>
+            </>
+          )}
+
+          {hubspotStatus === "connecting" && (
+            <div className="text-center py-8">
+              <Spin size="large" />
+              <div className="mt-4">
+                <Text className="text-lg">Connecting to HubSpot...</Text>
+                <br />
+                <Text className="text-gray-500">You may be redirected to sign in</Text>
+              </div>
+            </div>
+          )}
+
+          {hubspotStatus === "connected" && hubspotAccountInfo && (
+            <>
+              <Alert
+                message="Successfully Connected!"
+                description={`Connected to ${hubspotAccountInfo.accountName}. Your contacts and deals will sync automatically.`}
+                type="success"
+                showIcon
+                className="mb-4"
               />
-              <Text className="text-xs text-gray-500 mt-1">Find your Portal ID in HubSpot Settings → Account Setup → Account Defaults</Text>
-            </div>
-          </div>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <Text className="text-sm text-gray-600">
-              <strong>What this enables:</strong>
-              <br />• Automatic lead capture from your website
-              <br />• Sync patient information with HubSpot
-              <br />• Track appointment bookings in your CRM
-              <br />• Automated follow-up sequences
-            </Text>
-          </div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <Text strong className="text-green-800">
+                      {hubspotAccountInfo.accountName}
+                    </Text>
+                    <br />
+                    <Text className="text-green-600 text-sm">
+                      {hubspotAccountInfo.contactCount} contacts • {hubspotAccountInfo.dealCount} deals
+                    </Text>
+                  </div>
+                  <Button type="link" danger onClick={disconnectHubSpot} className="text-red-500">
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4 text-center">
+                <Text className="text-gray-600">🎉 All set! Your HubSpot data will sync automatically.</Text>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </div>

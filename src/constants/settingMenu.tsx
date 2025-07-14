@@ -6,7 +6,7 @@ const settingMenuItems = [
     icon: <AllHelpCenterIcon />,
     selectedicon: <AllHelpCenterIcon color="var(--color-primary-1000)" />,
     label: "Widget Setup",
-    route: "/settings/chatbot",
+    route: "/settings/lead-capturing-form",
   },
 ];
 export default settingMenuItems;
