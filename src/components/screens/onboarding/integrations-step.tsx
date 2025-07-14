@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin } from "antd";
-import { CheckCircleOutlined, LinkOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined } from "@ant-design/icons";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -17,8 +17,11 @@ interface IntegrationsStepProps {
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
+  const [showZapierModal, setShowZapierModal] = useState(false);
   const [hubspotStatus, setHubspotStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+  const [zapierStatus, setZapierStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null);
+  const [zapierAccountInfo, setZapierAccountInfo] = useState<any>(null);
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
     usesAds: initialData.usesAds || "",
@@ -117,6 +120,16 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     if (currentQuestion.id === "usesHubspot" && value === "Yes") {
       setShowHubspotModal(true);
     }
+
+    // Show Zapier modal when tools are selected (with 2-3 second delay)
+    if (currentQuestion.id === "otherTools" && value && value.length > 0) {
+      const selectedTools = value.split(",").filter((s: string) => s);
+      if (selectedTools.length > 0) {
+        setTimeout(() => {
+          setShowZapierModal(true);
+        }, 2500); // 2.5 second delay
+      }
+    }
   };
 
   // Simple one-click HubSpot connection
@@ -150,10 +163,47 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
+  // Simple one-click Zapier connection
+  const connectToZapier = async () => {
+    setZapierStatus("connecting");
+
+    try {
+      // This would call your backend API that handles the Zapier OAuth flow
+      const response = await fetch("/api/zapier/connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: "current-user-id", // Get from your auth context
+          redirectUrl: window.location.href,
+          selectedTools: formData.otherTools ? formData.otherTools.split(",").filter((s: string) => s) : [],
+        }),
+      });
+
+      const { authUrl } = await response.json();
+
+      // Redirect to Zapier for authorization
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error("Zapier connection failed:", error);
+      setZapierStatus("disconnected");
+      Alert.error({
+        message: "Connection Failed",
+        description: "Unable to connect to Zapier. Please try again.",
+      });
+    }
+  };
+
   // Handle successful OAuth return
   const handleHubSpotSuccess = (accountInfo: any) => {
     setHubspotStatus("connected");
     setHubspotAccountInfo(accountInfo);
+  };
+
+  const handleZapierSuccess = (accountInfo: any) => {
+    setZapierStatus("connected");
+    setZapierAccountInfo(accountInfo);
   };
 
   const disconnectHubSpot = async () => {
@@ -175,6 +225,25 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
+  const disconnectZapier = async () => {
+    try {
+      await fetch("/api/zapier/disconnect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: "current-user-id",
+        }),
+      });
+
+      setZapierStatus("disconnected");
+      setZapierAccountInfo(null);
+    } catch (error) {
+      console.error("Zapier disconnection failed:", error);
+    }
+  };
+
   const handleHubspotModalOk = () => {
     setShowHubspotModal(false);
     if (currentQuestionIndex < questions.length - 1) {
@@ -190,9 +259,29 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }));
   };
 
+  const handleZapierModalOk = () => {
+    setShowZapierModal(false);
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    }
+  };
+
+  const handleZapierModalCancel = () => {
+    setShowZapierModal(false);
+    setFormData(prev => ({
+      ...prev,
+      otherTools: "",
+    }));
+  };
+
   const handleNext = () => {
     if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
       setShowHubspotModal(true);
+      return;
+    }
+
+    if (currentQuestion.id === "otherTools" && currentValue && currentValue.length > 0 && zapierStatus !== "connected") {
+      setShowZapierModal(true);
       return;
     }
 
@@ -205,6 +294,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           hubspotConnected: hubspotStatus === "connected",
           hubspotAccountInfo,
         }),
+        ...(formData.otherTools &&
+          formData.otherTools.length > 0 && {
+            zapierConnected: zapierStatus === "connected",
+            zapierAccountInfo,
+          }),
       };
       onNext(finalData);
     }
@@ -239,6 +333,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 <Text className="text-green-700 text-sm">
                   <CheckCircleOutlined className="mr-1" />
                   Connected to {hubspotAccountInfo?.accountName || "HubSpot"}
+                </Text>
+              </div>
+            )}
+            {q.id === "otherTools" && value && value.length > 0 && zapierStatus === "connected" && (
+              <div className="mt-2 p-2 bg-blue-100 rounded-lg">
+                <Text className="text-blue-700 text-sm">
+                  <CheckCircleOutlined className="mr-1" />
+                  Connected to Zapier for automated workflows
                 </Text>
               </div>
             )}
@@ -309,6 +411,21 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </Option>
             ))}
           </Select>
+
+          {currentValue && currentValue.length > 0 && (
+            <Card className="rounded-xl bg-orange-50 border-2 border-orange-500 mt-6" bodyStyle={{ padding: "20px" }}>
+              <div className="flex items-center mb-3">
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
+                  <ThunderboltOutlined className="text-white text-base" />
+                </div>
+                <Text className="text-lg font-semibold text-orange-900">Automate your workflows!</Text>
+              </div>
+              <Text className="text-orange-900 text-base leading-6">
+                Great! We can connect your tools through Zapier to automatically sync data and create seamless workflows between your
+                existing tools and our platform.
+              </Text>
+            </Card>
+          )}
         </div>
       );
     }
@@ -348,7 +465,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         </div>
       </div>
 
-      {/* Super Simple HubSpot Connection Modal */}
+      {/* HubSpot Connection Modal */}
       <Modal
         title={
           <div className="flex items-center">
@@ -444,6 +561,127 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
               <div className="mt-4 text-center">
                 <Text className="text-gray-600">🎉 All set! Your HubSpot data will sync automatically.</Text>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      {/* Zapier Connection Modal */}
+      <Modal
+        title={
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-orange-400 rounded-lg flex items-center justify-center mr-3">
+              <ThunderboltOutlined className="text-white text-base" />
+            </div>
+            <span className="text-xl font-semibold">Connect to Zapier</span>
+          </div>
+        }
+        open={showZapierModal}
+        onOk={handleZapierModalOk}
+        onCancel={handleZapierModalCancel}
+        okText={zapierStatus === "connected" ? "Continue" : "Skip for Now"}
+        cancelText="Cancel"
+        okButtonProps={{
+          className: "bg-purple-500 border-purple-500",
+        }}
+        width={600}
+        centered
+      >
+        <div className="py-6">
+          {zapierStatus === "disconnected" && (
+            <>
+              <Alert
+                message="Automate your workflows with Zapier"
+                description={`Connect your selected tools (${
+                  formData.otherTools
+                    ? formData.otherTools
+                        .split(",")
+                        .filter((s: string) => s)
+                        .slice(0, 3)
+                        .join(", ") + (formData.otherTools.split(",").filter((s: string) => s).length > 3 ? "..." : "")
+                    : ""
+                }) to create seamless automations.`}
+                type="info"
+                showIcon
+                className="mb-6"
+              />
+
+              <div className="text-center">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<ThunderboltOutlined />}
+                  onClick={connectToZapier}
+                  className="bg-orange-400 border-orange-400 hover:bg-orange-500 h-12 px-8 text-lg font-medium"
+                >
+                  Connect to Zapier
+                </Button>
+
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <Text className="text-sm text-gray-600">
+                    <strong>What you&apos;ll get:</strong>
+                    <br />• Automatic data sync between tools
+                    <br />• Lead capture from forms to your CRM
+                    <br />• Notification workflows
+                    <br />• Custom automation triggers
+                    <br />• No coding required!
+                  </Text>
+                </div>
+
+                {formData.otherTools && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <Text className="text-sm text-blue-800">
+                      <strong>Your selected tools:</strong>{" "}
+                      {formData.otherTools
+                        .split(",")
+                        .filter((s: string) => s)
+                        .join(", ")}
+                    </Text>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {zapierStatus === "connecting" && (
+            <div className="text-center py-8">
+              <Spin size="large" />
+              <div className="mt-4">
+                <Text className="text-lg">Connecting to Zapier...</Text>
+                <br />
+                <Text className="text-gray-500">You may be redirected to sign in</Text>
+              </div>
+            </div>
+          )}
+
+          {zapierStatus === "connected" && zapierAccountInfo && (
+            <>
+              <Alert
+                message="Successfully Connected!"
+                description="Your Zapier account is connected. We'll help you set up automations for your selected tools."
+                type="success"
+                showIcon
+                className="mb-4"
+              />
+
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <Text strong className="text-green-800">
+                      Zapier Account Connected
+                    </Text>
+                    <br />
+                    <Text className="text-green-600 text-sm">{zapierAccountInfo.zapCount || 0} active Zaps • Ready for automation</Text>
+                  </div>
+                  <Button type="link" danger onClick={disconnectZapier} className="text-red-500">
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4 text-center">
+                <Text className="text-gray-600">⚡ Ready to automate! We&apos;ll help you set up workflows next.</Text>
               </div>
             </>
           )}
