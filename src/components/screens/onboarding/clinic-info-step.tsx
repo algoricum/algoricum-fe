@@ -12,6 +12,7 @@ interface ClinicInfoStepProps {
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
+  showAllQuestions?: boolean;
 }
 
 const validateEmail = (email: string) => {
@@ -19,7 +20,7 @@ const validateEmail = (email: string) => {
   return emailRegex.test(email);
 };
 
-export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: ClinicInfoStepProps) {
+export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showAllQuestions = false }: ClinicInfoStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [formData, setFormData] = useState({
     clinicName: initialData.clinicName || "",
@@ -66,17 +67,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
       required: true,
     },
   ];
-     // Effect to check localStorage on component mount
-  useEffect(() => {
-    // Check if localStorage is available (for SSR compatibility)
-    if (typeof window !== "undefined") {
-      const onboardingCompleted = localStorage.getItem("clinic_onboarding_completed_steps_v2")
-      if (onboardingCompleted && JSON.parse(onboardingCompleted).includes(0)) {
-        // If the key exists, set the current question index to the last one
-        setCurrentQuestionIndex(questions.length - 1)
-      }
-    }
-  }, []) // Empty dependency array ensures this runs only once on mount
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
@@ -169,6 +159,27 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
       );
     });
   };
+
+  const renderAllQuestions = () => (
+    <div className="mb-8">
+      <Typography.Title level={4} className="mb-4">All Answers</Typography.Title>
+      {questions.map(q => {
+        const value = formData[q.id as keyof typeof formData];
+        return (
+          <div key={q.id} className="mb-4">
+            <Text className="text-gray-700 font-medium block mb-1">{q.question}</Text>
+            {q.type === "textarea" ? (
+              <TextArea value={value} disabled rows={3} className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700" />
+            ) : q.type === "phone" ? (
+              <div className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700 text-xs">{value || "No phone number entered"}</div>
+            ) : (
+              <Input value={value} disabled className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700" />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   const renderCurrentInput = () => {
     const error = getFieldError();
@@ -278,18 +289,17 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
 
   return (
     <div className="max-w-4xl">
+      {/* Show all questions/answers if requested */}
+      {showAllQuestions && renderAllQuestions()}
       {/* Previous Questions */}
       {renderPreviousQuestions()}
-
       {/* Current Question */}
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
           {currentQuestion.question}
           {currentQuestion.required && <span className="text-red-500 ml-1">*</span>}
         </Title>
-
         {renderCurrentInput()}
-
         <div className="flex justify-between">
           <Button
             onClick={handlePrevious}
@@ -298,7 +308,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
           >
             Previous
           </Button>
-
           <Button
             type="primary"
             onClick={handleNext}
