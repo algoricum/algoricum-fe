@@ -355,6 +355,7 @@ export default function MainOnboarding() {
       if (success) {
         localStorage.removeItem(ONBOARDING_STORAGE_KEY);
         localStorage.removeItem(ONBOARDING_STEP_KEY);
+        localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
         SuccessToast("Logout Successfully");
         router.push("/login");
       } else {

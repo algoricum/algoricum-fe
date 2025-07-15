@@ -1,6 +1,6 @@
 "use client";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input, Button, Typography } from "antd";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -66,6 +66,17 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
       required: true,
     },
   ];
+     // Effect to check localStorage on component mount
+  useEffect(() => {
+    // Check if localStorage is available (for SSR compatibility)
+    if (typeof window !== "undefined") {
+      const onboardingCompleted = localStorage.getItem("clinic_onboarding_completed_steps_v2")
+      if (onboardingCompleted) {
+        // If the key exists, set the current question index to the last one
+        setCurrentQuestionIndex(questions.length - 1)
+      }
+    }
+  }, []) // Empty dependency array ensures this runs only once on mount
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
@@ -126,6 +137,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
   };
 
   const renderPreviousQuestions = () => {
+    
     return questions.slice(0, currentQuestionIndex).map(q => {
       const value = formData[q.id as keyof typeof formData];
       return (
