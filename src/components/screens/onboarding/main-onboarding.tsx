@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState ,useEffect} from "react";
 import { Typography } from "antd";
 import { useRouter } from "next/navigation";
 import ClinicInfoStep from "./clinic-info-step";
@@ -35,6 +35,7 @@ const BASE_STEPS = [
 // Storage keys for persistence
 const ONBOARDING_STORAGE_KEY = "clinic_onboarding_progress_v2";
 const ONBOARDING_STEP_KEY = "clinic_onboarding_step_v2";
+const ONBOARDING_COMPLETED_STEPS_KEY = "clinic_onboarding_completed_steps_v2";
 
 const CHATBOT_STEP = { id: "chatbot-setup", title: "Chatbot", description: "AI Assistant", icon: "🤖" };
 
@@ -47,6 +48,8 @@ export default function MainOnboarding() {
   const [showChatbotStep, setShowChatbotStep] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+
+
   // Determine if chatbot step should be shown based on integrations data
   const shouldShowChatbotStep = allData.integrations?.hasChatbot === "No";
   const STEPS = shouldShowChatbotStep ? [...BASE_STEPS, CHATBOT_STEP] : BASE_STEPS;
@@ -54,6 +57,18 @@ export default function MainOnboarding() {
   const currentStep = STEPS[currentStepIndex];
   // Helper functions for localStorage (same as old flow)
   const isBrowser = typeof window !== "undefined";
+
+  // restore onboarding progress from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedData = getStoredData(ONBOARDING_STORAGE_KEY);
+      const savedStep = getStoredData(ONBOARDING_STEP_KEY);
+      const savedCompleted = getStoredData(ONBOARDING_COMPLETED_STEPS_KEY);
+      if (savedData) setAllData(savedData);
+      if (typeof savedStep === "number") setCurrentStepIndex(savedStep);
+      if (Array.isArray(savedCompleted)) setCompletedSteps(savedCompleted);
+    }
+  }, []);
 
   const getStoredData = (key: string) => {
     if (!isBrowser) return null;
@@ -291,14 +306,17 @@ export default function MainOnboarding() {
     setStoredData(ONBOARDING_STORAGE_KEY, newAllData);
     setStoredData(ONBOARDING_STEP_KEY, currentStepIndex + 1);
 
+    // Mark step as completed
+    let newCompletedSteps = completedSteps;
+    if (!completedSteps.includes(currentStepIndex)) {
+      newCompletedSteps = [...completedSteps, currentStepIndex];
+      setCompletedSteps(newCompletedSteps);
+      setStoredData(ONBOARDING_COMPLETED_STEPS_KEY, newCompletedSteps);
+    }
+
     // Check if we need to show chatbot step after integrations
     if (currentStep.id === "integrations" && stepData.hasChatbot === "No") {
       setShowChatbotStep(true);
-    }
-
-    // Mark step as completed
-    if (!completedSteps.includes(currentStepIndex)) {
-      setCompletedSteps(prev => [...prev, currentStepIndex]);
     }
 
     // Determine the actual steps array that should be used
@@ -335,6 +353,8 @@ export default function MainOnboarding() {
     try {
       const success = await logout();
       if (success) {
+        localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+        localStorage.removeItem(ONBOARDING_STEP_KEY);
         SuccessToast("Logout Successfully");
         router.push("/login");
       } else {
