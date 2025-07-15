@@ -1,33 +1,42 @@
-"use client";
+"use client"
+import { useState } from "react"
+import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin } from "antd"
+import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined } from "@ant-design/icons"
 
-import { useState } from "react";
-import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin } from "antd";
-import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined } from "@ant-design/icons";
-
-const { Option } = Select;
-const { Title, Text } = Typography;
+const { Option } = Select
+const { Title, Text } = Typography
 
 interface IntegrationsStepProps {
-  onNext: (data: any) => void;
-  onPrev?: () => void;
-  initialData?: any;
-  isSubmitting?: boolean;
+  onNext: (data: any) => void
+  onPrev?: () => void
+  initialData?: any
+  isSubmitting?: boolean
 }
 
-export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [showHubspotModal, setShowHubspotModal] = useState(false);
-  const [showZapierModal, setShowZapierModal] = useState(false);
-  const [hubspotStatus, setHubspotStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [zapierStatus, setZapierStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null);
-  const [zapierAccountInfo, setZapierAccountInfo] = useState<any>(null);
+export default function IntegrationsStep({
+  onNext,
+  onPrev,
+  initialData = {},
+  isSubmitting = false,
+}: IntegrationsStepProps) {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [showHubspotModal, setShowHubspotModal] = useState(false)
+  const [showZapierModal, setShowZapierModal] = useState(false)
+  // New state for manual leads modal
+  const [showManualLeadsModal, setShowManualLeadsModal] = useState(false)
+
+  const [hubspotStatus, setHubspotStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected")
+  const [zapierStatus, setZapierStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected")
+
+  const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null)
+  const [zapierAccountInfo, setZapierAccountInfo] = useState<any>(null)
+
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
     usesAds: initialData.usesAds || "",
     hasChatbot: initialData.hasChatbot || "",
     otherTools: initialData.otherTools || "",
-  });
+  })
 
   const questions = [
     {
@@ -106,36 +115,33 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       question: "Are you already using a chatbot?",
       options: ["Yes", "No"],
     },
-  ];
+  ]
 
-  const currentQuestion = questions[currentQuestionIndex];
-  const currentValue = formData[currentQuestion.id as keyof typeof formData];
+  const currentQuestion = questions[currentQuestionIndex]
+  const currentValue = formData[currentQuestion.id as keyof typeof formData]
 
   const handleInputChange = (value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [currentQuestion.id]: value,
-    }));
-
+    }))
     if (currentQuestion.id === "usesHubspot" && value === "Yes") {
-      setShowHubspotModal(true);
+      setShowHubspotModal(true)
     }
-
     // Show Zapier modal when tools are selected (with 2-3 second delay)
     if (currentQuestion.id === "otherTools" && value && value.length > 0) {
-      const selectedTools = value.split(",").filter((s: string) => s);
+      const selectedTools = value.split(",").filter((s: string) => s)
       if (selectedTools.length > 0) {
         setTimeout(() => {
-          setShowZapierModal(true);
-        }, 2500); // 2.5 second delay
+          setShowZapierModal(true)
+        }, 2500) // 2.5 second delay
       }
     }
-  };
+  }
 
   // Simple one-click HubSpot connection
   const connectToHubSpot = async () => {
-    setHubspotStatus("connecting");
-
+    setHubspotStatus("connecting")
     try {
       // This would call your backend API that handles the OAuth flow
       const response = await fetch("/api/hubspot/connect", {
@@ -147,26 +153,23 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           userId: "current-user-id", // Get from your auth context
           redirectUrl: window.location.href,
         }),
-      });
-
-      const { authUrl } = await response.json();
-
+      })
+      const { authUrl } = await response.json()
       // Redirect to HubSpot for authorization
-      window.location.href = authUrl;
+      window.location.href = authUrl
     } catch (error) {
-      console.error("Connection failed:", error);
-      setHubspotStatus("disconnected");
+      console.error("Connection failed:", error)
+      setHubspotStatus("disconnected")
       Alert.error({
         message: "Connection Failed",
         description: "Unable to connect to HubSpot. Please try again.",
-      });
+      })
     }
-  };
+  }
 
   // Simple one-click Zapier connection
   const connectToZapier = async () => {
-    setZapierStatus("connecting");
-
+    setZapierStatus("connecting")
     try {
       // This would call your backend API that handles the Zapier OAuth flow
       const response = await fetch("/api/zapier/connect", {
@@ -179,32 +182,30 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           redirectUrl: window.location.href,
           selectedTools: formData.otherTools ? formData.otherTools.split(",").filter((s: string) => s) : [],
         }),
-      });
-
-      const { authUrl } = await response.json();
-
+      })
+      const { authUrl } = await response.json()
       // Redirect to Zapier for authorization
-      window.location.href = authUrl;
+      window.location.href = authUrl
     } catch (error) {
-      console.error("Zapier connection failed:", error);
-      setZapierStatus("disconnected");
+      console.error("Zapier connection failed:", error)
+      setZapierStatus("disconnected")
       Alert.error({
         message: "Connection Failed",
         description: "Unable to connect to Zapier. Please try again.",
-      });
+      })
     }
-  };
+  }
 
   // Handle successful OAuth return
   const handleHubSpotSuccess = (accountInfo: any) => {
-    setHubspotStatus("connected");
-    setHubspotAccountInfo(accountInfo);
-  };
+    setHubspotStatus("connected")
+    setHubspotAccountInfo(accountInfo)
+  }
 
   const handleZapierSuccess = (accountInfo: any) => {
-    setZapierStatus("connected");
-    setZapierAccountInfo(accountInfo);
-  };
+    setZapierStatus("connected")
+    setZapierAccountInfo(accountInfo)
+  }
 
   const disconnectHubSpot = async () => {
     try {
@@ -216,14 +217,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         body: JSON.stringify({
           userId: "current-user-id",
         }),
-      });
-
-      setHubspotStatus("disconnected");
-      setHubspotAccountInfo(null);
+      })
+      setHubspotStatus("disconnected")
+      setHubspotAccountInfo(null)
     } catch (error) {
-      console.error("Disconnection failed:", error);
+      console.error("Disconnection failed:", error)
     }
-  };
+  }
 
   const disconnectZapier = async () => {
     try {
@@ -235,58 +235,96 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         body: JSON.stringify({
           userId: "current-user-id",
         }),
-      });
-
-      setZapierStatus("disconnected");
-      setZapierAccountInfo(null);
+      })
+      setZapierStatus("disconnected")
+      setZapierAccountInfo(null)
     } catch (error) {
-      console.error("Zapier disconnection failed:", error);
+      console.error("Zapier disconnection failed:", error)
     }
-  };
+  }
 
   const handleHubspotModalOk = () => {
-    setShowHubspotModal(false);
+    setShowHubspotModal(false)
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setCurrentQuestionIndex(currentQuestionIndex + 1)
     }
-  };
+  }
 
   const handleHubspotModalCancel = () => {
-    setShowHubspotModal(false);
-    setFormData(prev => ({
+    setShowHubspotModal(false)
+    setFormData((prev) => ({
       ...prev,
       usesHubspot: "",
-    }));
-  };
+    }))
+  }
 
   const handleZapierModalOk = () => {
-    setShowZapierModal(false);
+    setShowZapierModal(false)
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setCurrentQuestionIndex(currentQuestionIndex + 1)
     }
-  };
+  }
 
   const handleZapierModalCancel = () => {
-    setShowZapierModal(false);
-    setFormData(prev => ({
+    setShowZapierModal(false)
+    setFormData((prev) => ({
       ...prev,
       otherTools: "",
-    }));
-  };
+    }))
+  }
+
+  // New handlers for manual leads modal
+  const handleManualLeadsModalOk = () => {
+    setShowManualLeadsModal(false)
+    // You might want to proceed to the next step or handle the CSV upload here
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1)
+    } else {
+      onNext(formData) // Or handle final submission
+    }
+  }
+
+  const handleManualLeadsModalCancel = () => {
+    setShowManualLeadsModal(false)
+    // If the user cancels, you might want to reset the selection or just close the modal
+    // For now, we'll just close it and allow them to continue if they wish.
+  }
+
+  const handleCsvUpload = (file: File) => {
+    console.log("CSV file selected for upload:", file.name)
+    // Implement your CSV upload logic here
+    // e.g., send file to a server, parse it, etc.
+    alert(`CSV file "${file.name}" selected for upload! (Upload logic not implemented)`)
+    return false // Prevent Ant Design's default upload behavior
+  }
 
   const handleNext = () => {
     if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
-      setShowHubspotModal(true);
-      return;
+      setShowHubspotModal(true)
+      return
     }
-
-    if (currentQuestion.id === "otherTools" && currentValue && currentValue.length > 0 && zapierStatus !== "connected") {
-      setShowZapierModal(true);
-      return;
+    if (
+      currentQuestion.id === "otherTools" &&
+      currentValue &&
+      currentValue.length > 0 &&
+      zapierStatus !== "connected"
+    ) {
+      setShowZapierModal(true)
+      return
+    }
+    // NEW LOGIC: Manual Leads Modal condition
+    // If on the "otherTools" question, HubSpot is "No", and no other tools are selected
+    if (
+      currentQuestion.id === "otherTools" &&
+      formData.usesHubspot === "No" &&
+      (!formData.otherTools || formData.otherTools.length === 0)
+    ) {
+      setShowManualLeadsModal(true)
+      return
     }
 
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      setCurrentQuestionIndex(currentQuestionIndex + 1)
     } else {
       const finalData = {
         ...formData,
@@ -299,23 +337,22 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             zapierConnected: zapierStatus === "connected",
             zapierAccountInfo,
           }),
-      };
-      onNext(finalData);
+      }
+      onNext(finalData)
     }
-  };
+  }
 
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      setCurrentQuestionIndex(currentQuestionIndex - 1)
     } else if (onPrev) {
-      onPrev();
+      onPrev()
     }
-  };
+  }
 
   const renderPreviousQuestions = () => {
-    return questions.slice(0, currentQuestionIndex).map(q => {
-      const value = formData[q.id as keyof typeof formData];
-
+    return questions.slice(0, currentQuestionIndex).map((q) => {
+      const value = formData[q.id as keyof typeof formData]
       return (
         <div key={q.id} className="mb-8">
           <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">{q.question}</Text>
@@ -331,37 +368,37 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             {q.id === "usesHubspot" && value === "Yes" && hubspotStatus === "connected" && (
               <div className="mt-2 p-2 bg-green-100 rounded-lg">
                 <Text className="text-green-700 text-sm">
-                  <CheckCircleOutlined className="mr-1" />
-                  Connected to {hubspotAccountInfo?.accountName || "HubSpot"}
+                  <CheckCircleOutlined className="mr-1" /> Connected to {hubspotAccountInfo?.accountName || "HubSpot"}
                 </Text>
               </div>
             )}
             {q.id === "otherTools" && value && value.length > 0 && zapierStatus === "connected" && (
               <div className="mt-2 p-2 bg-blue-100 rounded-lg">
                 <Text className="text-blue-700 text-sm">
-                  <CheckCircleOutlined className="mr-1" />
-                  Connected to Zapier for automated workflows
+                  <CheckCircleOutlined className="mr-1" /> Connected to Zapier for automated workflows
                 </Text>
               </div>
             )}
           </div>
         </div>
-      );
-    });
-  };
+      )
+    })
+  }
 
   const renderCurrentInput = () => {
     if (currentQuestion.type === "radio") {
       return (
         <div className="mb-6">
-          <Radio.Group value={currentValue} onChange={e => handleInputChange(e.target.value)} className="w-full">
+          <Radio.Group value={currentValue} onChange={(e) => handleInputChange(e.target.value)} className="w-full">
             <Space direction="vertical" size="middle" className="w-full">
-              {currentQuestion.options?.map(option => (
+              {currentQuestion.options?.map((option) => (
                 <Card
                   key={option}
                   hoverable
                   className={`rounded-xl border-2 cursor-pointer ${
-                    currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"
+                    currentValue === option
+                      ? "border-purple-500 bg-purple-50"
+                      : "border-gray-200 bg-white hover:border-purple-300"
                   }`}
                   bodyStyle={{ padding: "16px" }}
                   onClick={() => !isSubmitting && handleInputChange(option)}
@@ -372,26 +409,24 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 </Card>
               ))}
             </Space>
-          </Radio.Group>
-
-          {currentQuestion.id === "hasChatbot" && currentValue === "No" && (
-            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" bodyStyle={{ padding: "20px" }}>
-              <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
-                  <Text className="text-white text-base">✓</Text>
+            {currentQuestion.id === "hasChatbot" && currentValue === "No" && (
+              <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" bodyStyle={{ padding: "20px" }}>
+                <div className="flex items-center mb-3">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                    <Text className="text-white text-base">✓</Text>
+                  </div>
+                  <Text className="text-lg font-semibold text-blue-900">We&apos;ve got you covered!</Text>
                 </div>
-                <Text className="text-lg font-semibold text-blue-900">We&apos;ve got you covered!</Text>
-              </div>
-              <Text className="text-blue-900 text-base leading-6">
-                Perfect! We&apos;ll help you set up our intelligent chatbot that can handle patient inquiries, book appointments, and
-                provide information about your services 24/7.
-              </Text>
-            </Card>
-          )}
+                <Text className="text-blue-900 text-base leading-6">
+                  Perfect! We&apos;ll help you set up our intelligent chatbot that can handle patient inquiries, book
+                  appointments, and provide information about your services 24/7.
+                </Text>
+              </Card>
+            )}
+          </Radio.Group>
         </div>
-      );
+      )
     }
-
     if (currentQuestion.type === "multiselect") {
       return (
         <div className="mb-6">
@@ -399,19 +434,18 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             mode="multiple"
             placeholder="Select tools you use"
             value={currentValue ? currentValue.split(",").filter((s: string) => s) : []}
-            onChange={values => handleInputChange(values.join(","))}
+            onChange={(values) => handleInputChange(values.join(","))}
             size="large"
             className="w-full text-lg"
             dropdownClassName="text-base"
             disabled={isSubmitting}
           >
-            {currentQuestion.options?.map(option => (
+            {currentQuestion.options?.map((option) => (
               <Option key={option} value={option}>
                 {option}
               </Option>
             ))}
           </Select>
-
           {currentValue && currentValue.length > 0 && (
             <Card className="rounded-xl bg-orange-50 border-2 border-orange-500 mt-6" bodyStyle={{ padding: "20px" }}>
               <div className="flex items-center mb-3">
@@ -421,29 +455,29 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 <Text className="text-lg font-semibold text-orange-900">Automate your workflows!</Text>
               </div>
               <Text className="text-orange-900 text-base leading-6">
-                Great! We can connect your tools through Zapier to automatically sync data and create seamless workflows between your
-                existing tools and our platform.
+                Great! We can connect your tools through Zapier to automatically sync data and create seamless workflows
+                between your existing tools and our platform.
               </Text>
             </Card>
           )}
         </div>
-      );
+      )
     }
-
-    return null;
-  };
+    return null
+  }
 
   return (
     <div className="max-w-4xl">
       {renderPreviousQuestions()}
-
       <div>
-        <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
+        <Title
+          level={1}
+          className="text-gray-800 mb-5 text-3xl font-semibold leading-tight"
+          style={{ margin: 0, marginBottom: "21px" }}
+        >
           {currentQuestion.question}
         </Title>
-
         {renderCurrentInput()}
-
         <div className="flex justify-between">
           <Button
             onClick={handlePrevious}
@@ -452,7 +486,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           >
             Previous
           </Button>
-
           <Button
             type="primary"
             onClick={handleNext}
@@ -460,7 +493,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             loading={isSubmitting && currentQuestionIndex === questions.length - 1}
             className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
           >
-            {currentQuestionIndex === questions.length - 1 ? (isSubmitting ? "Setting up your clinic..." : "Continue") : "Continue"}
+            {currentQuestionIndex === questions.length - 1
+              ? isSubmitting
+                ? "Setting up your clinic..."
+                : "Continue"
+              : "Continue"}
           </Button>
         </div>
       </div>
@@ -491,12 +528,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             <>
               <Alert
                 message="Connect your HubSpot account"
-                description="We'll automatically sync your contacts and deals. This takes just one click!"
+                description="We&apos;ll automatically sync your contacts and deals. This takes just one click!"
                 type="info"
                 showIcon
                 className="mb-6"
               />
-
               <div className="text-center">
                 <Button
                   type="primary"
@@ -507,7 +543,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 >
                   Connect to HubSpot
                 </Button>
-
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <Text className="text-sm text-gray-600">
                     <strong>What happens next:</strong>
@@ -520,7 +555,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </>
           )}
-
           {hubspotStatus === "connecting" && (
             <div className="text-center py-8">
               <Spin size="large" />
@@ -531,7 +565,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </div>
           )}
-
           {hubspotStatus === "connected" && hubspotAccountInfo && (
             <>
               <Alert
@@ -541,7 +574,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 showIcon
                 className="mb-4"
               />
-
               <div className="bg-green-50 rounded-lg p-4">
                 <div className="flex justify-between items-center">
                   <div>
@@ -558,7 +590,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                   </Button>
                 </div>
               </div>
-
               <div className="mt-4 text-center">
                 <Text className="text-gray-600">🎉 All set! Your HubSpot data will sync automatically.</Text>
               </div>
@@ -606,7 +637,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 showIcon
                 className="mb-6"
               />
-
               <div className="text-center">
                 <Button
                   type="primary"
@@ -617,7 +647,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 >
                   Connect to Zapier
                 </Button>
-
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <Text className="text-sm text-gray-600">
                     <strong>What you&apos;ll get:</strong>
@@ -628,7 +657,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                     <br />• No coding required!
                   </Text>
                 </div>
-
                 {formData.otherTools && (
                   <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                     <Text className="text-sm text-blue-800">
@@ -643,7 +671,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </>
           )}
-
           {zapierStatus === "connecting" && (
             <div className="text-center py-8">
               <Spin size="large" />
@@ -654,17 +681,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </div>
           )}
-
           {zapierStatus === "connected" && zapierAccountInfo && (
             <>
               <Alert
                 message="Successfully Connected!"
-                description="Your Zapier account is connected. We'll help you set up automations for your selected tools."
+                description="Your Zapier account is connected. We&apos;ll help you set up automations for your selected tools."
                 type="success"
                 showIcon
                 className="mb-4"
               />
-
               <div className="bg-green-50 rounded-lg p-4">
                 <div className="flex justify-between items-center">
                   <div>
@@ -672,14 +697,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                       Zapier Account Connected
                     </Text>
                     <br />
-                    <Text className="text-green-600 text-sm">{zapierAccountInfo.zapCount || 0} active Zaps • Ready for automation</Text>
+                    <Text className="text-green-600 text-sm">
+                      {zapierAccountInfo.zapCount || 0} active Zaps • Ready for automation
+                    </Text>
                   </div>
                   <Button type="link" danger onClick={disconnectZapier} className="text-red-500">
                     Disconnect
                   </Button>
                 </div>
               </div>
-
               <div className="mt-4 text-center">
                 <Text className="text-gray-600">⚡ Ready to automate! We&apos;ll help you set up workflows next.</Text>
               </div>
@@ -687,6 +713,62 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           )}
         </div>
       </Modal>
+
+      {/* Manual Leads Connection Modal */}
+      <Modal
+        title={
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
+              <Text className="text-white font-bold text-sm">CSV</Text>
+            </div>
+            <span className="text-xl font-semibold">You want to enter manual leads?</span>
+          </div>
+        }
+        open={showManualLeadsModal}
+        onOk={handleManualLeadsModalOk}
+        onCancel={handleManualLeadsModalCancel}
+        okText="Upload CSV"
+        cancelText="Skip for Now"
+        okButtonProps={{
+          className: "bg-purple-500 border-purple-500",
+        }}
+        width={500}
+        centered
+      >
+        <div className="py-6">
+          <Alert
+            message="Upload your leads via CSV"
+            description="You can upload a CSV file with your existing leads to import them into our platform."
+            type="info"
+            showIcon
+            className="mb-6"
+          />
+          <div className="text-center">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  handleCsvUpload(e.target.files[0])
+                }
+              }}
+              className="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-purple-50 file:text-purple-700
+                hover:file:bg-purple-100"
+            />
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <Text className="text-sm text-gray-600">
+                <strong>CSV Format:</strong>
+                <br />• Ensure your CSV has columns like 'Name', 'Email', 'Phone', etc.
+                <br />• We&apos;ll guide you through mapping fields after upload.
+              </Text>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
-  );
+  )
 }

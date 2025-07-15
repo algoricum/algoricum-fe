@@ -54,7 +54,7 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
       } else {
         onNext(formData);
       }
-    }, 300);
+    }, 1000);
   };
 
   const handlePrevious = () => {
