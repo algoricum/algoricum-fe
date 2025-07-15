@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin } from "antd";
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined } from "@ant-design/icons";
 
@@ -111,6 +111,26 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
 
+  // Listen for OAuth callback messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === "hubspot_success") {
+        setHubspotStatus("connected");
+        setHubspotAccountInfo(event.data.accountInfo);
+        setShowHubspotModal(false);
+      } else if (event.data.type === "hubspot_error") {
+        setHubspotStatus("disconnected");
+        Alert.error({
+          message: "Connection Failed",
+          description: event.data.error || "Unable to connect to HubSpot. Please try again.",
+        });
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
   const handleInputChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -132,16 +152,24 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
-  // Simple one-click HubSpot connection
+  // Updated connectToHubSpot and disconnectHubSpot functions
+  // Add these to your React component
+
+  const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
+  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""; // Get this from your Supabase dashboard
+
+  // Updated HubSpot connection function
   const connectToHubSpot = async () => {
     setHubspotStatus("connecting");
 
     try {
-      // This would call your backend API that handles the OAuth flow
-      const response = await fetch("/api/hubspot/connect", {
+      // Call your Supabase edge function with proper headers
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
           userId: "current-user-id", // Get from your auth context
@@ -149,16 +177,87 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         }),
       });
 
-      const { authUrl } = await response.json();
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Response error:", response.status, errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
 
-      // Redirect to HubSpot for authorization
-      window.location.href = authUrl;
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Open popup for OAuth
+      const popup = window.open(data.authUrl, "hubspot-oauth", "width=600,height=700,scrollbars=yes,resizable=yes");
+
+      // Check if popup was blocked
+      if (!popup) {
+        throw new Error("Popup was blocked. Please allow popups for this site.");
+      }
+
+      // Monitor popup closure
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          // If popup closed without success message, reset status
+          setTimeout(() => {
+            if (hubspotStatus === "connecting") {
+              setHubspotStatus("disconnected");
+            }
+          }, 1000);
+        }
+      }, 1000);
     } catch (error) {
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
       Alert.error({
         message: "Connection Failed",
-        description: "Unable to connect to HubSpot. Please try again.",
+        description: error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again.",
+      });
+    }
+  };
+
+  // Updated HubSpot disconnect function
+  const disconnectHubSpot = async () => {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          userId: "current-user-id",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Disconnect error:", response.status, errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setHubspotStatus("disconnected");
+      setHubspotAccountInfo(null);
+
+      Alert.success({
+        message: "Disconnected Successfully",
+        description: "Your HubSpot account has been disconnected.",
+      });
+    } catch (error) {
+      console.error("Disconnection failed:", error);
+      Alert.error({
+        message: "Disconnection Failed",
+        description: error instanceof Error ? error.message : "Unable to disconnect from HubSpot. Please try again.",
       });
     }
   };
@@ -204,25 +303,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const handleZapierSuccess = (accountInfo: any) => {
     setZapierStatus("connected");
     setZapierAccountInfo(accountInfo);
-  };
-
-  const disconnectHubSpot = async () => {
-    try {
-      await fetch("/api/hubspot/disconnect", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: "current-user-id",
-        }),
-      });
-
-      setHubspotStatus("disconnected");
-      setHubspotAccountInfo(null);
-    } catch (error) {
-      console.error("Disconnection failed:", error);
-    }
   };
 
   const disconnectZapier = async () => {
@@ -527,7 +607,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               <div className="mt-4">
                 <Text className="text-lg">Connecting to HubSpot...</Text>
                 <br />
-                <Text className="text-gray-500">You may be redirected to sign in</Text>
+                <Text className="text-gray-500">Please complete the authorization in the popup window</Text>
               </div>
             </div>
           )}
