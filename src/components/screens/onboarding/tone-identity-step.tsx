@@ -39,7 +39,7 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
   ];
 
    useEffect(() => {
-    if (localStorage.getItem("clinic_onboarding_completed_steps_v2")) {
+    if (localStorage.getItem("clinic_onboarding_completed_steps_v2") && JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(2)) {
       setCurrentQuestionIndex(questions.length - 1);
     }
    },[])

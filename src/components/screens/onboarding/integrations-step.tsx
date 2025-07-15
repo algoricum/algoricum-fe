@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin } from "antd"
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined } from "@ant-design/icons"
 
@@ -116,6 +116,12 @@ export default function IntegrationsStep({
       options: ["Yes", "No"],
     },
   ]
+   
+  useEffect(() => {
+    if (localStorage.getItem("clinic_onboarding_completed_steps_v2") && JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(5)) {
+      setCurrentQuestionIndex(questions.length - 1);
+    }
+  },[])
 
   const currentQuestion = questions[currentQuestionIndex]
   const currentValue = formData[currentQuestion.id as keyof typeof formData]

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Upload, message, Typography } from "antd";
 
 const { Dragger } = Upload;
@@ -40,7 +40,17 @@ export default function AiAssistantStep({ onNext, onPrev, initialData = {} }: Ai
       required: true,
     },
   ];
-
+   
+  useEffect(() => {
+    // Check if localStorage is available (for SSR compatibility)
+    if (typeof window !== "undefined") {
+      const onboardingCompleted = localStorage.getItem("clinic_onboarding_completed_steps_v2")
+      if (onboardingCompleted && JSON.parse(onboardingCompleted).includes(3)) {
+        // If the key exists, set the current question index to the last one
+        setCurrentQuestionIndex(questions.length - 1)
+      }
+    }
+  }, []) // Empty dependency array ensures this runs only once on mount 
   const currentQuestion = questions[currentQuestionIndex];
 
   const handleFileUpload = (info: any, questionId: string) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import { Button, Input, Radio, Card, Space, Typography } from "antd";
 
 const { Title, Text } = Typography;
@@ -36,6 +36,13 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
       },
     },
   ];
+ 
+
+  useEffect(() => {
+    if (localStorage.getItem("clinic_onboarding_completed_steps_v2") && JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(4)) {
+      setCurrentQuestionIndex(questions.length - 1);
+    }
+  },[])
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];

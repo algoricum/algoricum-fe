@@ -71,7 +71,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {} }: Cli
     // Check if localStorage is available (for SSR compatibility)
     if (typeof window !== "undefined") {
       const onboardingCompleted = localStorage.getItem("clinic_onboarding_completed_steps_v2")
-      if (onboardingCompleted) {
+      if (onboardingCompleted && JSON.parse(onboardingCompleted).includes(0)) {
         // If the key exists, set the current question index to the last one
         setCurrentQuestionIndex(questions.length - 1)
       }
