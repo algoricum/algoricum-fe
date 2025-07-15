@@ -29,9 +29,9 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
       case "content":
         return push("/content/articles");
       case "settings":
-        return push("/settings/chatbot");
+        return push("/settings/lead-capturing-form");
       default:
-        return push("/settings/chatbot");
+        return push("/settings/lead-capturing-form");
     }
   };
 

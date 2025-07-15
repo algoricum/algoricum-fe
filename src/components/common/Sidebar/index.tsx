@@ -29,7 +29,7 @@ const Sidebar = () => {
       case "staff-managment":
         return push("/staff-managment");
       case "profileSettings":
-        return push("/settings/chatbot");
+        return push("/settings/lead-capturing-form");
       case "setup":
         return push("/setup");
       case "logout":
