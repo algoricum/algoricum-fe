@@ -2,6 +2,7 @@
 
 import { useState,useEffect } from "react";
 import { Button, Input, Radio, Card, Space, Typography } from "antd";
+import { forEach } from "lodash";
 
 const { Title, Text } = Typography;
 
@@ -40,9 +41,13 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
 
   useEffect(() => {
     if (localStorage.getItem("clinic_onboarding_completed_steps_v2") && JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(4)) {
-      setCurrentQuestionIndex(questions.length - 1);
+      if(formData.hasBookingLink === "Yes, I have a booking link"){
+        setCurrentQuestionIndex(questions.length - 1);
+      }else if(formData.hasBookingLink==="No, I don't have one"){
+        setCurrentQuestionIndex(0);
+      }
     }
-  },[])
+  },[formData.hasBookingLink])
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];

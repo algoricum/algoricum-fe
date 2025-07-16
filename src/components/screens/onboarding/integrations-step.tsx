@@ -472,7 +472,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handleManualLeadsModalCancel = () => {
+    
+
     setShowManualLeadsModal(false);
+
+    setCurrentQuestionIndex(prev => prev + 1);
     // If the user cancels, you might want to reset the selection or just close the modal
     // For now, we'll just close it and allow them to continue if they wish.
   };

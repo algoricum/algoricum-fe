@@ -20,6 +20,7 @@ import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { useAuth } from "@/hooks/useAuth";
 import ChatbotSetupStep from "./chatbot-setup-step";
+import { ClientPageRoot } from "next/dist/client/components/client-page";
 
 const { Text } = Typography;
 
@@ -95,6 +96,7 @@ export default function MainOnboarding() {
     try {
       localStorage.removeItem(ONBOARDING_STORAGE_KEY);
       localStorage.removeItem(ONBOARDING_STEP_KEY);
+      localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
     } catch (error) {
       console.error("Error clearing localStorage:", error);
     }
@@ -297,7 +299,7 @@ export default function MainOnboarding() {
     // Save step data
     const newAllData = {
       ...allData,
-      [currentStep.id]: stepData,
+      [currentStep?.id]: stepData,
     };
 
     setAllData(newAllData);
@@ -331,7 +333,7 @@ export default function MainOnboarding() {
     if (currentStepIndex < actualSteps.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
-      handleCompleteOnboarding();
+           handleCompleteOnboarding();
     }
   };
 

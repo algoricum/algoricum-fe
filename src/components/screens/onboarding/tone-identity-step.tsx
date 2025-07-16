@@ -24,17 +24,17 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
     {
       id: "toneSelector",
       question: "How warm and approachable should your AI assistant sound?",
-      options: ["Very warm and friendly", "Warm and professional (recommended)", "Professional and courteous", "Formal and clinical"],
+      options: ["friendly", "professional", "casual", "formal"],
     },
     {
       id: "sentenceLength",
       question: "How detailed should responses be?",
-      options: ["Brief and concise", "Moderate detail (recommended)", "Comprehensive and thorough"],
+      options: ["short", "medium", "long"],
     },
     {
       id: "formalityLevel",
       question: "How formal should the language be?",
-      options: ["Casual and conversational", "Professional but approachable (recommended)", "Formal and medical"],
+      options: ["very_casual", "casual", "neutral", "formal", "very_formal"],
     },
   ];
 
