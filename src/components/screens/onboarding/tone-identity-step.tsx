@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState ,useEffect} from "react";
 import { Button, Select, Typography } from "antd";
 
 const { Option } = Select;
@@ -24,19 +24,25 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
     {
       id: "toneSelector",
       question: "How warm and approachable should your AI assistant sound?",
-      options: ["Very warm and friendly", "Warm and professional (recommended)", "Professional and courteous", "Formal and clinical"],
+      options: ["friendly", "professional", "casual", "formal"],
     },
     {
       id: "sentenceLength",
       question: "How detailed should responses be?",
-      options: ["Brief and concise", "Moderate detail (recommended)", "Comprehensive and thorough"],
+      options: ["short", "medium", "long"],
     },
     {
       id: "formalityLevel",
       question: "How formal should the language be?",
-      options: ["Casual and conversational", "Professional but approachable (recommended)", "Formal and medical"],
+      options: ["very_casual", "casual", "neutral", "formal", "very_formal"],
     },
   ];
+
+   useEffect(() => {
+    if (localStorage.getItem("clinic_onboarding_completed_steps_v2") && JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(2)) {
+      setCurrentQuestionIndex(questions.length - 1);
+    }
+   },[])
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
@@ -48,13 +54,17 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
     }));
 
     // Auto-advance to next question after a short delay
-    setTimeout(() => {
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1);
-      } else {
-        onNext(formData);
-      }
-    }, 300);
+    // setTimeout(() => {
+    //   if (currentQuestionIndex < questions.length - 1) {
+    //     setCurrentQuestionIndex(currentQuestionIndex + 1);
+    //   } else {
+    //     onNext(formData);
+    //   }
+    // }, 1000);
+  };
+
+  const handleNext = () => {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
   };
 
   const handlePrevious = () => {
@@ -114,6 +124,16 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
           >
             Previous
           </Button>
+          {currentQuestionIndex < questions.length - 1 ? (
+          <Button
+            type="primary"
+            onClick={handleNext}
+            disabled={!currentValue}
+            className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
+          >
+            Next
+          </Button>
+          ) : (
 
           <Button
             type="primary"
@@ -122,7 +142,7 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
             className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
           >
             Continue to Next Step
-          </Button>
+          </Button>)}
         </div>
       </div>
     </div>

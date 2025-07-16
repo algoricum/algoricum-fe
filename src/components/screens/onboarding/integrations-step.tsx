@@ -20,6 +20,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
+  const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
   const [hubspotStatus, setHubspotStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [zapierStatus, setZapierStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null);
@@ -116,6 +117,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   // Listen for OAuth callback messages
   useEffect(() => {
+    if (
+      localStorage.getItem("clinic_onboarding_completed_steps_v2") &&
+      JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(5)
+    ) {
+      setCurrentQuestionIndex(questions.length - 1);
+    }
+
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === "hubspot_success") {
         setHubspotStatus("connected");
@@ -453,6 +461,34 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }));
   };
 
+  const handleManualLeadsModalOk = () => {
+    setShowManualLeadsModal(false);
+    // You might want to proceed to the next step or handle the CSV upload here
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      onNext(formData); // Or handle final submission
+    }
+  };
+
+  const handleManualLeadsModalCancel = () => {
+    
+
+    setShowManualLeadsModal(false);
+
+    setCurrentQuestionIndex(prev => prev + 1);
+    // If the user cancels, you might want to reset the selection or just close the modal
+    // For now, we'll just close it and allow them to continue if they wish.
+  };
+
+  const handleCsvUpload = (file: File) => {
+    console.log("CSV file selected for upload:", file.name);
+    // Implement your CSV upload logic here
+    // e.g., send file to a server, parse it, etc.
+    alert(`CSV file "${file.name}" selected for upload! (Upload logic not implemented)`);
+    return false; // Prevent Ant Design's default upload behavior
+  };
+
   const handleNext = () => {
     if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
       setShowHubspotModal(true);
@@ -461,6 +497,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
     if (currentQuestion.id === "otherTools" && currentValue && currentValue.length > 0 && zapierStatus !== "connected") {
       setShowZapierModal(true);
+      return;
+    } // NEW LOGIC: Manual Leads Modal condition
+    // If on the "otherTools" question, HubSpot is "No", and no other tools are selected
+    if (
+      currentQuestion.id === "otherTools" &&
+      formData.usesHubspot === "No" &&
+      (!formData.otherTools || formData.otherTools.length === 0)
+    ) {
+      setShowManualLeadsModal(true);
       return;
     }
 
@@ -914,6 +959,61 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        title={
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
+              <Text className="text-white font-bold text-sm">CSV</Text>
+            </div>
+            <span className="text-xl font-semibold">You want to enter manual leads?</span>
+          </div>
+        }
+        open={showManualLeadsModal}
+        onOk={handleManualLeadsModalOk}
+        onCancel={handleManualLeadsModalCancel}
+        okText="Upload CSV"
+        cancelText="Skip for Now"
+        okButtonProps={{
+          className: "bg-purple-500 border-purple-500",
+        }}
+        width={500}
+        centered
+      >
+        <div className="py-6">
+          <Alert
+            message="Upload your leads via CSV"
+            description="You can upload a CSV file with your existing leads to import them into our platform."
+            type="info"
+            showIcon
+            className="mb-6"
+          />
+          <div className="text-center">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={e => {
+                if (e.target.files && e.target.files[0]) {
+                  handleCsvUpload(e.target.files[0]);
+                }
+              }}
+              className="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-purple-50 file:text-purple-700
+                hover:file:bg-purple-100"
+            />
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <Text className="text-sm text-gray-600">
+                <strong>CSV Format:</strong>
+                <br />• Ensure your CSV has columns like 'Name', 'Email', 'Phone', etc.
+                <br />• We&apos;ll guide you through mapping fields after upload.
+              </Text>
+            </div>
+          </div>
         </div>
       </Modal>
     </div>

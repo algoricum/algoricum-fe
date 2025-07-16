@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Input, Select, Upload, Typography, Card } from "antd";
+import { Button, Input, Select, Upload, Typography, Card,Flex } from "antd";
 import { UserOutlined, MessageOutlined, FileTextOutlined } from "@ant-design/icons";
+import { ColorConfigurator} from "@/components/common";
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -73,6 +74,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
   };
 
   const handleNext = () => {
+    console.log(formData);
     onNext(formData);
   };
 
@@ -173,25 +175,22 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
           </div>
 
           {/* Color Configuration */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Text className="block text-base font-medium text-gray-700 mb-2">Primary Color</Text>
-              <Input
-                type="color"
+          <div >
+            <Flex wrap="wrap" gap="middle">
+              <ColorConfigurator
+                fieldName="primaryColor"
+                heading="Primary color"
                 value={formData.primaryColor}
-                onChange={e => handleInputChange("primaryColor", e.target.value)}
-                className="h-12 rounded-lg"
+                onChange={value => handleInputChange("primaryColor", value)}
               />
-            </div>
-            <div>
-              <Text className="block text-base font-medium text-gray-700 mb-2">Font Color</Text>
-              <Input
-                type="color"
+              
+              <ColorConfigurator
+                fieldName="fontColor"
+                heading="Font color"
                 value={formData.fontColor}
-                onChange={e => handleInputChange("fontColor", e.target.value)}
-                className="h-12 rounded-lg"
+                onChange={value => handleInputChange("fontColor", value)}
               />
-            </div>
+            </Flex>
           </div>
         </div>
 
