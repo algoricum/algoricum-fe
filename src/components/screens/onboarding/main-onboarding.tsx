@@ -48,7 +48,7 @@ export default function MainOnboarding() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [showChatbotStep, setShowChatbotStep] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [csvLeads, setCsvLeads] = useState<any>([]);
 
 
   // Determine if chatbot step should be shown based on integrations data
@@ -70,6 +70,20 @@ export default function MainOnboarding() {
       if (Array.isArray(savedCompleted)) setCompletedSteps(savedCompleted);
     }
   }, []);
+  
+
+  const handleCsvLeads= (csvLeads:any) => {
+    setCsvLeads(csvLeads);
+  }
+
+  async function uploadLeads(leads:any,clinic_id:string) {
+    
+    await fetch('/api/upload-leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leads, clinic_id }),
+    });
+  }
 
   const getStoredData = (key: string) => {
     if (!isBrowser) return null;
@@ -284,6 +298,10 @@ export default function MainOnboarding() {
       // Clear stored progress after successful completion
       clearStoredProgress();
 
+      if (csvLeads && csvLeads.length > 0) {
+        await uploadLeads(csvLeads, clinic.id);
+      }
+
       SuccessToast("You're all set!");
       setTimeout(() => {
         router.push("/dashboard?onboarding=success");
@@ -390,7 +408,7 @@ export default function MainOnboarding() {
       case "booking-setup":
         return <BookingSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "integrations":
-        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+        return <IntegrationsStep  onCsv={handleCsvLeads}  onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "chatbot-setup":
         return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       default:

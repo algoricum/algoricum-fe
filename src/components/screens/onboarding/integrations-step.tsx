@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Input, Form } from "antd";
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
 import { getUserData } from "@/utils/supabase/user-helper";
+import Papa from 'papaparse';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -12,11 +13,12 @@ const { TextArea } = Input;
 interface IntegrationsStepProps {
   onNext: (data: any) => void;
   onPrev?: () => void;
+  onCsv?: (leads: any[]) => void;
   initialData?: any;
   isSubmitting?: boolean;
 }
 
-export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
+export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
@@ -114,6 +116,22 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
+
+ 
+
+  const handleCsvUpload = (file: File) => {
+    Papa.parse(file, {
+      header: true,
+      complete: async function(results) {
+        const leads = results.data; // Array of lead objects
+        
+         onCsv(leads);
+      }
+    });
+  };
+
+  
+  
 
   // Listen for OAuth callback messages
   useEffect(() => {
@@ -481,14 +499,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     // For now, we'll just close it and allow them to continue if they wish.
   };
 
-  const handleCsvUpload = (file: File) => {
-    console.log("CSV file selected for upload:", file.name);
-    // Implement your CSV upload logic here
-    // e.g., send file to a server, parse it, etc.
-    alert(`CSV file "${file.name}" selected for upload! (Upload logic not implemented)`);
-    return false; // Prevent Ant Design's default upload behavior
-  };
-
+ 
   const handleNext = () => {
     if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
       setShowHubspotModal(true);
