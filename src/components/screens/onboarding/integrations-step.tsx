@@ -730,14 +730,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                   label="Zapier API Key"
                   name="zapierApiKey"
                   rules={[{ required: true, message: "Please enter your Zapier API key" }]}
-                  extra={
-                    <Text className="text-gray-500 text-xs">
-                      Find this in your Zapier account under Settings → API Keys.{" "}
-                      <a href="https://zapier.com/app/profile/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-500">
-                        Get your API key
-                      </a>
-                    </Text>
-                  }
                 >
                   <Input.Password placeholder="Enter your Zapier API key" size="large" />
                 </Form.Item>
