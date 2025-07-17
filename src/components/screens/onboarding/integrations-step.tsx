@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Input, Form } from "antd";
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
@@ -25,6 +26,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null);
   const [zapierAccountInfo, setZapierAccountInfo] = useState<any>(null);
   const [zapierForm] = Form.useForm();
+  const [autoProgressing, setAutoProgressing] = useState(false);
+  const [hubspotPrompted, setHubspotPrompted] = useState(false);
+
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
     usesAds: initialData.usesAds || "",
@@ -114,8 +118,36 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
 
-  // Listen for OAuth callback messages
+  const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
+  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+  // Auto-progress to next question after successful HubSpot connection
+  const autoProgressToNext = () => {
+    if (autoProgressing) return; // Prevent multiple calls
+
+    setAutoProgressing(true);
+
+    setTimeout(() => {
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+        setShowHubspotModal(false);
+      } else {
+        // This was the last question, submit the form
+        const finalData = {
+          ...formData,
+          usesHubspot: "Yes",
+          hubspotConnected: true,
+          hubspotAccountInfo,
+        };
+        onNext(finalData);
+      }
+      setAutoProgressing(false);
+    }, 1500); // 1.5 second delay to show success message
+  };
+
+  // Restore state from localStorage on component mount
   useEffect(() => {
+    // Check for completed steps
     if (
       localStorage.getItem("clinic_onboarding_completed_steps_v2") &&
       JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(5)
@@ -123,8 +155,39 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       setCurrentQuestionIndex(questions.length - 1);
     }
 
+    // Restore OAuth state if it exists
+    const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
+    const savedQuestionIndex = localStorage.getItem("hubspot_oauth_question_index");
+    const savedFormData = localStorage.getItem("hubspot_oauth_form_data");
+    const savedAccountInfo = localStorage.getItem("hubspot_oauth_account_info");
+
+    if (savedHubspotStatus) {
+      setHubspotStatus(savedHubspotStatus as "disconnected" | "connecting" | "connected");
+    }
+    if (savedQuestionIndex && !isNaN(Number.parseInt(savedQuestionIndex))) {
+      setCurrentQuestionIndex(Number.parseInt(savedQuestionIndex));
+    }
+    if (savedFormData) {
+      try {
+        const parsedFormData = JSON.parse(savedFormData);
+        setFormData(parsedFormData);
+      } catch (error) {
+        console.error("Error parsing saved form data:", error);
+      }
+    }
+    if (savedAccountInfo) {
+      try {
+        const parsedAccountInfo = JSON.parse(savedAccountInfo);
+        setHubspotAccountInfo(parsedAccountInfo);
+      } catch (error) {
+        console.error("Error parsing saved account info:", error);
+      }
+    }
+  }, []);
+
+  // Listen for OAuth callback messages
+  useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      // Verify origin for security
       if (event.origin !== window.location.origin) {
         return;
       }
@@ -132,30 +195,26 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       if (event.data.type === "hubspot_success") {
         setHubspotStatus("connected");
         setHubspotAccountInfo(event.data.accountInfo);
-        setShowHubspotModal(false);
+
+        // Update form data
+        setFormData(prevFormData => ({
+          ...prevFormData,
+          usesHubspot: "Yes",
+        }));
+
+        // Clear saved OAuth state
+        clearOAuthState();
 
         Alert.success({
           message: "Connection Successful",
           description: "Your HubSpot account has been connected successfully!",
         });
 
-        // Automatically proceed to next step after successful connection
-        setTimeout(() => {
-          if (currentQuestionIndex < questions.length - 1) {
-            setCurrentQuestionIndex(currentQuestionIndex + 1);
-          } else {
-            // If this was the last question, proceed with final submission
-            const finalData = {
-              ...formData,
-              usesHubspot: "Yes",
-              hubspotConnected: true,
-              hubspotAccountInfo: event.data.accountInfo,
-            };
-            onNext(finalData);
-          }
-        }, 1500); // Small delay to show success message
+        // Auto-progress to next question
+        autoProgressToNext();
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
+        clearOAuthState();
         Alert.error({
           message: "Connection Failed",
           description: event.data.error || "Unable to connect to HubSpot. Please try again.",
@@ -165,11 +224,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing]);
 
-  // Add this useEffect after the existing one
+  // Handle OAuth callback if code parameter is present
   useEffect(() => {
-    // Handle OAuth callback if code parameter is present
     const handleOAuthCallback = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get("code");
@@ -178,18 +236,18 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
       if (error) {
         setHubspotStatus("disconnected");
+        clearOAuthState();
         Alert.error({
           message: "Connection Failed",
           description: errorDescription || error || "Unable to connect to HubSpot. Please try again.",
         });
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
       }
 
-      if (code && hubspotStatus === "connecting") {
+      const savedStatus = localStorage.getItem("hubspot_oauth_status");
+      if (code && savedStatus === "connecting") {
         try {
-          // Exchange code for token
           const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
             method: "PUT",
             headers: {
@@ -208,7 +266,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           }
 
           const data = await response.json();
-
           if (data.error) {
             throw new Error(data.error);
           }
@@ -216,7 +273,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           // Success - update state
           setHubspotStatus("connected");
           setHubspotAccountInfo(data.accountInfo);
-          setShowHubspotModal(false);
+
+          // Update form data
+          setFormData(prevFormData => ({
+            ...prevFormData,
+            usesHubspot: "Yes",
+          }));
+
+          // Clear saved OAuth state
+          clearOAuthState();
 
           Alert.success({
             message: "Connection Successful",
@@ -226,39 +291,43 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           // Clean up URL
           window.history.replaceState({}, document.title, window.location.pathname);
 
-          // Auto-proceed to next step after success
-          setTimeout(() => {
-            if (currentQuestionIndex < questions.length - 1) {
-              setCurrentQuestionIndex(currentQuestionIndex + 1);
-            } else {
-              const finalData = {
-                ...formData,
-                usesHubspot: "Yes",
-                hubspotConnected: true,
-                hubspotAccountInfo: data.accountInfo,
-              };
-              onNext(finalData);
-            }
-          }, 1500);
+          // Auto-progress to next question
+          autoProgressToNext();
         } catch (error) {
           console.error("Token exchange failed:", error);
           setHubspotStatus("disconnected");
+          clearOAuthState();
           Alert.error({
             message: "Connection Failed",
             description: error instanceof Error ? error.message : "Token exchange failed",
           });
-          // Clean up URL
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
     };
 
     handleOAuthCallback();
-  }, [hubspotStatus, currentQuestionIndex, formData, onNext]);
+  }, [onNext, currentQuestionIndex]);
 
   const getCurrentUserId = async () => {
     const user = await getUserData();
     return user?.id;
+  };
+
+  const clearOAuthState = () => {
+    localStorage.removeItem("hubspot_oauth_status");
+    localStorage.removeItem("hubspot_oauth_question_index");
+    localStorage.removeItem("hubspot_oauth_form_data");
+    localStorage.removeItem("hubspot_oauth_account_info");
+  };
+
+  const saveOAuthState = () => {
+    localStorage.setItem("hubspot_oauth_status", "connecting");
+    localStorage.setItem("hubspot_oauth_question_index", currentQuestionIndex.toString());
+    localStorage.setItem("hubspot_oauth_form_data", JSON.stringify(formData));
+    if (hubspotAccountInfo) {
+      localStorage.setItem("hubspot_oauth_account_info", JSON.stringify(hubspotAccountInfo));
+    }
   };
 
   const handleInputChange = (value: string) => {
@@ -267,27 +336,31 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       [currentQuestion.id]: value,
     }));
 
-    if (currentQuestion.id === "usesHubspot" && value === "Yes") {
+    // Reset prompted flag if user changes from Yes to No
+    if (currentQuestion.id === "usesHubspot" && value !== "Yes") {
+      setHubspotPrompted(false);
+    }
+
+    if (currentQuestion.id === "usesHubspot" && value === "Yes" && hubspotStatus !== "connected" && !hubspotPrompted) {
+      setHubspotPrompted(true);
       setShowHubspotModal(true);
     }
 
-    // Show Zapier modal when tools are selected (with 2-3 second delay)
+    // Show Zapier modal when tools are selected (with delay)
     if (currentQuestion.id === "otherTools" && value && value.length > 0) {
       const selectedTools = value.split(",").filter((s: string) => s);
       if (selectedTools.length > 0) {
         setTimeout(() => {
           setShowZapierModal(true);
-        }, 2500); // 2.5 second delay
+        }, 2500);
       }
     }
   };
 
-  const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
-  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-
-  // Replace the existing connectToHubSpot function
   const connectToHubSpot = async () => {
     setHubspotStatus("connecting");
+    saveOAuthState();
+
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
         method: "POST",
@@ -298,7 +371,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         },
         body: JSON.stringify({
           userId: await getCurrentUserId(),
-          // Redirect back to the current page
           redirectUrl: window.location.origin + window.location.pathname,
         }),
       });
@@ -314,11 +386,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         throw new Error(data.error);
       }
 
-      // Redirect to HubSpot OAuth in the same window
+      // Redirect to HubSpot OAuth
       window.location.href = data.authUrl;
     } catch (error) {
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
+      clearOAuthState();
       Alert.error({
         message: "Connection Failed",
         description: error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again.",
@@ -326,7 +399,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
-  // Updated HubSpot disconnect function
   const disconnectHubSpot = async () => {
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
@@ -354,6 +426,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
       setHubspotStatus("disconnected");
       setHubspotAccountInfo(null);
+      clearOAuthState();
       Alert.success({
         message: "Disconnected Successfully",
         description: "Your HubSpot account has been disconnected.",
@@ -401,11 +474,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }));
   };
 
-  // Enhanced form validation with API key testing
   const validateZapierForm = async (): Promise<boolean> => {
     try {
       const formValues = await zapierForm.validateFields();
-      // Test API key format
       if (!formValues.zapierApiKey || formValues.zapierApiKey.length < 32) {
         Alert.warning({
           message: "Invalid API Key",
@@ -427,7 +498,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       }
     } else {
-      // Validate form before connecting
       const isValid = await validateZapierForm();
       if (isValid) {
         // await connectToZapier();
@@ -446,45 +516,35 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const handleManualLeadsModalOk = () => {
     setShowManualLeadsModal(false);
-    // You might want to proceed to the next step or handle the CSV upload here
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      onNext(formData); // Or handle final submission
+      onNext(formData);
     }
   };
 
   const handleManualLeadsModalCancel = () => {
     setShowManualLeadsModal(false);
     setCurrentQuestionIndex(prev => prev + 1);
-    // If the user cancels, you might want to reset the selection or just close the modal
-    // For now, we'll just close it and allow them to continue if they wish.
   };
 
   const handleCsvUpload = (file: File) => {
     console.log("CSV file selected for upload:", file.name);
-    // Implement your CSV upload logic here
-    // e.g., send file to a server, parse it, etc.
     alert(`CSV file "${file.name}" selected for upload! (Upload logic not implemented)`);
-    return false; // Prevent Ant Design's default upload behavior
+    return false;
   };
 
   const handleNext = () => {
-    if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
-      setShowHubspotModal(true);
-      return;
-    }
-
     if (currentQuestion.id === "otherTools" && currentValue && currentValue.length > 0 && zapierStatus !== "connected") {
       setShowZapierModal(true);
       return;
     }
 
-    // If on the "otherTools" question, HubSpot is "No", and no other tools are selected
+    // Fixed logic for manual leads modal
     if (
       currentQuestion.id === "otherTools" &&
       formData.usesHubspot === "No" &&
-      (!formData.otherTools || formData.otherTools.length === 0)
+      (!currentValue || currentValue.trim() === "" || currentValue.split(",").filter((s: string) => s.trim()).length === 0)
     ) {
       setShowManualLeadsModal(true);
       return;
@@ -512,6 +572,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
+      // Reset HubSpot prompted flag when going back
+      if (currentQuestionIndex - 1 === 0) {
+        // Going back to HubSpot question
+        setHubspotPrompted(false);
+      }
     } else if (onPrev) {
       onPrev();
     }
@@ -635,14 +700,27 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     return null;
   };
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      const savedStatus = localStorage.getItem("hubspot_oauth_status");
+      if (savedStatus !== "connecting") {
+        clearOAuthState();
+      }
+    };
+  }, []);
+
   return (
     <div className="max-w-4xl">
       {renderPreviousQuestions()}
+
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
           {currentQuestion.question}
         </Title>
+
         {renderCurrentInput()}
+
         <div className="flex justify-between">
           <Button
             onClick={handlePrevious}
@@ -651,14 +729,21 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           >
             Previous
           </Button>
+
           <Button
             type="primary"
             onClick={handleNext}
-            disabled={(currentQuestion.type === "radio" ? !currentValue : false) || isSubmitting}
-            loading={isSubmitting && currentQuestionIndex === questions.length - 1}
+            disabled={(currentQuestion.type === "radio" ? !currentValue : false) || isSubmitting || autoProgressing}
+            loading={(isSubmitting && currentQuestionIndex === questions.length - 1) || autoProgressing}
             className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
           >
-            {currentQuestionIndex === questions.length - 1 ? (isSubmitting ? "Setting up your clinic..." : "Continue") : "Continue"}
+            {autoProgressing
+              ? "Moving to next question..."
+              : currentQuestionIndex === questions.length - 1
+                ? isSubmitting
+                  ? "Setting up your clinic..."
+                  : "Continue"
+                : "Continue"}
           </Button>
         </div>
       </div>
@@ -716,50 +801,33 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </>
           )}
+
           {hubspotStatus === "connecting" && (
             <div className="text-center py-8">
               <Spin size="large" />
               <div className="mt-4">
                 <Text className="text-lg">Connecting to HubSpot...</Text>
                 <br />
-                <Text className="text-gray-500">Please complete the authorization in the popup window</Text>
+                <Text className="text-gray-500">Please complete the authorization process</Text>
               </div>
             </div>
           )}
+
           {hubspotStatus === "connected" && hubspotAccountInfo && (
             <>
               <Alert
                 message="Successfully Connected!"
-                description={`Connected to ${hubspotAccountInfo.accountName}. Your contacts and deals will sync automatically.`}
+                description={`Connected to ${hubspotAccountInfo.accountName}. Moving to next step...`}
                 type="success"
                 showIcon
                 className="mb-4"
               />
-              <div className="bg-green-50 rounded-lg p-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <Text strong className="text-green-800">
-                      {hubspotAccountInfo.accountName}
-                    </Text>
-                    <br />
-                    <Text className="text-green-600 text-sm">
-                      {hubspotAccountInfo.contactCount} contacts • {hubspotAccountInfo.dealCount} deals
-                    </Text>
-                  </div>
-                  <Button type="link" danger onClick={disconnectHubSpot} className="text-red-500">
-                    Disconnect
-                  </Button>
-                </div>
-              </div>
-              <div className="mt-4 text-center">
-                <Text className="text-gray-600">🎉 All set! Your HubSpot data will sync automatically.</Text>
-              </div>
             </>
           )}
         </div>
       </Modal>
 
-      {/* Simplified Zapier Connection Modal with only 2 fields */}
+      {/* Zapier Modal - keeping existing implementation */}
       <Modal
         title={
           <div className="flex items-center">
@@ -849,6 +917,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               )}
             </>
           )}
+
           {zapierStatus === "connecting" && (
             <div className="text-center py-8">
               <Spin size="large" />
@@ -859,6 +928,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </div>
           )}
+
           {zapierStatus === "connected" && zapierAccountInfo && (
             <>
               <Alert
@@ -890,6 +960,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         </div>
       </Modal>
 
+      {/* Manual Leads Modal - keeping existing implementation */}
       <Modal
         title={
           <div className="flex items-center">
