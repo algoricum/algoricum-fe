@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Input, Form } from "antd";
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
 import { getUserData } from "@/utils/supabase/user-helper";
-import Papa from 'papaparse';
+import { createClient } from "@/utils/supabase/config/client";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -34,6 +34,7 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
     hasChatbot: initialData.hasChatbot || "",
     otherTools: initialData.otherTools || "",
   });
+  const supabase = createClient();
 
   const questions = [
     {
@@ -117,21 +118,62 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
 
- 
-
-  const handleCsvUpload = (file: File) => {
-    Papa.parse(file, {
-      header: true,
-      complete: async function(results) {
-        const leads = results.data; // Array of lead objects
-        
-         onCsv(leads);
+  const handleCsvUpload = async (file: File) => {
+    try {
+      // Get current user
+      const user = await getUserData();
+      if (!user) {
+        throw new Error("User not found. Please log in again.");
       }
-    });
-  };
 
-  
-  
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const fileName = `leads-${user.id}-${timestamp}.csv`;
+
+      // Create file path: user_id/filename.csv
+      const filePath = `${user.id}/${fileName}`;
+
+      // Upload file directly to Supabase Storage
+      const { data, error } = await supabase.storage.from("lead-uploads").upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+      if (error) {
+        console.error("Upload error:", error);
+        throw new Error(`Failed to upload CSV: ${error.message}`);
+      }
+
+      // Get the public URL
+      const { data: publicUrlData } = supabase.storage.from("lead-upload").getPublicUrl(filePath);
+
+      const uploadResult = {
+        success: true,
+        path: data.path,
+        publicUrl: publicUrlData.publicUrl,
+        fileName: fileName,
+        userId: user.id,
+      };
+
+      console.log("CSV file uploaded successfully:", uploadResult);
+
+      // onCsv && onCsv(uploadResult);
+
+      // Show success message
+      Alert.success({
+        message: "CSV Uploaded Successfully!",
+        description: `File "${fileName}" has been uploaded to secure storage.`,
+        duration: 5,
+      });
+    } catch (error) {
+      console.error("Error uploading CSV:", error);
+      Alert.error({
+        message: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload CSV file. Please try again.",
+        duration: 8,
+      });
+    }
+  };
 
   // Listen for OAuth callback messages
   useEffect(() => {
@@ -490,8 +532,6 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
   };
 
   const handleManualLeadsModalCancel = () => {
-    
-
     setShowManualLeadsModal(false);
 
     setCurrentQuestionIndex(prev => prev + 1);
@@ -499,7 +539,6 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
     // For now, we'll just close it and allow them to continue if they wish.
   };
 
- 
   const handleNext = () => {
     if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
       setShowHubspotModal(true);
