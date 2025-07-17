@@ -124,10 +124,36 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
 
     const handleMessage = (event: MessageEvent) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
       if (event.data.type === "hubspot_success") {
         setHubspotStatus("connected");
         setHubspotAccountInfo(event.data.accountInfo);
         setShowHubspotModal(false);
+
+        Alert.success({
+          message: "Connection Successful",
+          description: "Your HubSpot account has been connected successfully!",
+        });
+
+        // Automatically proceed to next step after successful connection
+        setTimeout(() => {
+          if (currentQuestionIndex < questions.length - 1) {
+            setCurrentQuestionIndex(currentQuestionIndex + 1);
+          } else {
+            // If this was the last question, proceed with final submission
+            const finalData = {
+              ...formData,
+              usesHubspot: "Yes",
+              hubspotConnected: true,
+              hubspotAccountInfo: event.data.accountInfo,
+            };
+            onNext(finalData);
+          }
+        }, 1500); // Small delay to show success message
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
         Alert.error({
@@ -140,6 +166,95 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
+
+  // Add this useEffect after the existing one
+  useEffect(() => {
+    // Handle OAuth callback if code parameter is present
+    const handleOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get("code");
+      const error = urlParams.get("error");
+      const errorDescription = urlParams.get("error_description");
+
+      if (error) {
+        setHubspotStatus("disconnected");
+        Alert.error({
+          message: "Connection Failed",
+          description: errorDescription || error || "Unable to connect to HubSpot. Please try again.",
+        });
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
+      if (code && hubspotStatus === "connecting") {
+        try {
+          // Exchange code for token
+          const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              apikey: SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              code,
+              userId: await getCurrentUserId(),
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (data.error) {
+            throw new Error(data.error);
+          }
+
+          // Success - update state
+          setHubspotStatus("connected");
+          setHubspotAccountInfo(data.accountInfo);
+          setShowHubspotModal(false);
+
+          Alert.success({
+            message: "Connection Successful",
+            description: "Your HubSpot account has been connected successfully!",
+          });
+
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+
+          // Auto-proceed to next step after success
+          setTimeout(() => {
+            if (currentQuestionIndex < questions.length - 1) {
+              setCurrentQuestionIndex(currentQuestionIndex + 1);
+            } else {
+              const finalData = {
+                ...formData,
+                usesHubspot: "Yes",
+                hubspotConnected: true,
+                hubspotAccountInfo: data.accountInfo,
+              };
+              onNext(finalData);
+            }
+          }, 1500);
+        } catch (error) {
+          console.error("Token exchange failed:", error);
+          setHubspotStatus("disconnected");
+          Alert.error({
+            message: "Connection Failed",
+            description: error instanceof Error ? error.message : "Token exchange failed",
+          });
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+    };
+
+    handleOAuthCallback();
+  }, [hubspotStatus, currentQuestionIndex, formData, onNext]);
 
   const getCurrentUserId = async () => {
     const user = await getUserData();
@@ -167,16 +282,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
-  // Updated connectToHubSpot and disconnectHubSpot functions
-  // Add these to your React component
   const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
-  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""; // Get this from your Supabase dashboard
+  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
-  // Updated HubSpot connection function
+  // Replace the existing connectToHubSpot function
   const connectToHubSpot = async () => {
     setHubspotStatus("connecting");
     try {
-      // Call your Supabase edge function with proper headers
       const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
         method: "POST",
         headers: {
@@ -185,8 +297,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           apikey: SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          userId: getCurrentUserId(),
-          redirectUrl: window.location.href,
+          userId: await getCurrentUserId(),
+          // Redirect back to the current page
+          redirectUrl: window.location.origin + window.location.pathname,
         }),
       });
 
@@ -201,26 +314,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         throw new Error(data.error);
       }
 
-      // Open popup for OAuth
-      const popup = window.open(data.authUrl, "hubspot-oauth", "width=600,height=700,scrollbars=yes,resizable=yes");
-
-      // Check if popup was blocked
-      if (!popup) {
-        throw new Error("Popup was blocked. Please allow popups for this site.");
-      }
-
-      // Monitor popup closure
-      const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed);
-          // If popup closed without success message, reset status
-          setTimeout(() => {
-            if (hubspotStatus === "connecting") {
-              setHubspotStatus("disconnected");
-            }
-          }, 1000);
-        }
-      }, 1000);
+      // Redirect to HubSpot OAuth in the same window
+      window.location.href = data.authUrl;
     } catch (error) {
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
@@ -242,7 +337,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           apikey: SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          userId: getCurrentUserId(),
+          userId: await getCurrentUserId(),
         }),
       });
 
@@ -318,7 +413,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         });
         return false;
       }
-
       return true;
     } catch (error) {
       console.error("Form validation error:", error);
