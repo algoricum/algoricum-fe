@@ -22,6 +22,11 @@ import { useAuth } from "@/hooks/useAuth";
 import ChatbotSetupStep from "./chatbot-setup-step";
 import { ClientPageRoot } from "next/dist/client/components/client-page";
 
+import { createClient } from "@/utils/supabase/config/client";
+import getLeadSourceId from "@/utils/lead_source";
+import getNormalizedLead from "@/utils/normalizeLeadData";
+import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
+
 const { Text } = Typography;
 
 const BASE_STEPS = [
@@ -41,6 +46,7 @@ const ONBOARDING_COMPLETED_STEPS_KEY = "clinic_onboarding_completed_steps_v2";
 const CHATBOT_STEP = { id: "chatbot-setup", title: "Chatbot", description: "AI Assistant", icon: "🤖" };
 
 export default function MainOnboarding() {
+  const supabase = createClient();
   const router = useRouter();
   const { logout } = useAuth();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -48,8 +54,6 @@ export default function MainOnboarding() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [showChatbotStep, setShowChatbotStep] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [csvLeads, setCsvLeads] = useState<any>([]);
-
 
   // Determine if chatbot step should be shown based on integrations data
   const shouldShowChatbotStep = allData.integrations?.hasChatbot === "No";
@@ -70,28 +74,14 @@ export default function MainOnboarding() {
       if (Array.isArray(savedCompleted)) setCompletedSteps(savedCompleted);
     }
   }, []);
-  
-
-  const handleCsvLeads= (csvLeads:any) => {
-    setCsvLeads(csvLeads);
-  }
-
-  async function uploadLeads(leads:any,clinic_id:string) {
-    
-    await fetch('/api/upload-leads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leads, clinic_id }),
-    });
-  }
-
+   
   const getStoredData = (key: string) => {
     if (!isBrowser) return null;
     try {
       const stored = localStorage.getItem(key);
       return stored ? JSON.parse(stored) : null;
     } catch (error) {
-      console.error("Error reading from localStorage:", error);
+      ErrorToast("Error reading from localStorage:");
       return null;
     }
   };
@@ -101,7 +91,7 @@ export default function MainOnboarding() {
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      console.error("Error writing to localStorage:", error);
+      ErrorToast("Error writing to localStorage:");
     }
   };
 
@@ -112,7 +102,7 @@ export default function MainOnboarding() {
       localStorage.removeItem(ONBOARDING_STEP_KEY);
       localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
     } catch (error) {
-      console.error("Error clearing localStorage:", error);
+      ErrorToast("Error clearing localStorage:");
     }
   };
 
@@ -163,6 +153,28 @@ export default function MainOnboarding() {
       integrations: integrations,
     };
   };
+  // upload csv lead to supabase lead table
+  const handleCsvLeadsUpload = async (clinic_id: string) => {
+    const leadsFileName = localStorage.getItem("leads-file-name");
+      if (leadsFileName) {
+        const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
+        const leads= result?.data;
+        // 1. Get source_id for 'File'
+        try{
+        const source_id = await getLeadSourceId("File");
+        const leadsToInsert = getNormalizedLead(leads,source_id,clinic_id);
+        const { error: insertError } = await supabase
+        .from('lead')
+        .insert(leadsToInsert);
+        if (insertError) {
+          ErrorToast(insertError.message);
+        }
+        }
+        catch(error){
+          ErrorToast("Something wrong in csv lead upload");
+        }
+      }
+  }
 
   // Main submission function (adapted from old flow)
   const handleCompleteOnboarding = async () => {
@@ -285,11 +297,11 @@ export default function MainOnboarding() {
             const result = await response.json();
 
             if (!response.ok) {
-              console.error("Assistant creation error:", result.error);
+              ErrorToast("Assistant creation error:");
               // Continue with onboarding even if assistant creation fails
             }
           } catch (assistantError) {
-            console.error("Failed to create assistant:", assistantError);
+            ErrorToast("Failed to create assistant:");
             // Continue with onboarding even if assistant creation fails
           }
         }
@@ -298,10 +310,9 @@ export default function MainOnboarding() {
       // Clear stored progress after successful completion
       clearStoredProgress();
 
-      if (csvLeads && csvLeads.length > 0) {
-        await uploadLeads(csvLeads, clinic.id);
-      }
-
+      // upload csv lead to supabase lead table
+      await handleCsvLeadsUpload(clinic.id);    
+      
       SuccessToast("You're all set!");
       setTimeout(() => {
         router.push("/dashboard?onboarding=success");
@@ -382,7 +393,6 @@ export default function MainOnboarding() {
         ErrorToast("Logout failed. Please try again.");
       }
     } catch (error) {
-      console.error("Logout error:", error);
       ErrorToast("Logout failed. Please try again.");
     }
   };
@@ -408,7 +418,7 @@ export default function MainOnboarding() {
       case "booking-setup":
         return <BookingSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "integrations":
-        return <IntegrationsStep  onCsv={handleCsvLeads}  onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "chatbot-setup":
         return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       default:

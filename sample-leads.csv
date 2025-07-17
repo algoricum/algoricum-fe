@@ -1,0 +1,4 @@
+first_name,last_name,email,phone,status,notes,interest_level,urgency
+John,Doe,john.doe@example.com,1234567890,new,Interested in services,high,asap
+Jane,Smith,jane.smith@example.com,0987654321,responded,Requested a call,medium,this_month
+Alice,Johnson,alice.johnson@example.com,5551234567,new,Ready to sign up,low,curious 

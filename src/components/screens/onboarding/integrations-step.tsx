@@ -5,7 +5,7 @@ import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Inp
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
 import { getUserData } from "@/utils/supabase/user-helper";
 import { createClient } from "@/utils/supabase/config/client";
-
+import { SuccessToast, ErrorToast } from "@/helpers/toast";
 const { Option } = Select;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -13,12 +13,11 @@ const { TextArea } = Input;
 interface IntegrationsStepProps {
   onNext: (data: any) => void;
   onPrev?: () => void;
-  onCsv?: (leads: any[]) => void;
   initialData?: any;
   isSubmitting?: boolean;
 }
 
-export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
+export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
@@ -34,6 +33,7 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
     hasChatbot: initialData.hasChatbot || "",
     otherTools: initialData.otherTools || "",
   });
+  const [csvLeads, setCsvLeads] = useState<any>([]);
   const supabase = createClient();
 
   const questions = [
@@ -118,8 +118,15 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
 
-  const handleCsvUpload = async (file: File) => {
+  const handleCsvLeads= (csvLeads:any) => {
+    setCsvLeads(csvLeads);
+  }
+
+  const handleCsvUpload = async () => {
     try {
+       if(!csvLeads){
+        throw new Error("No CSV file selected");
+       }
       // Get current user
       const user = await getUserData();
       if (!user) {
@@ -134,7 +141,7 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
       const filePath = `${user.id}/${fileName}`;
 
       // Upload file directly to Supabase Storage
-      const { data, error } = await supabase.storage.from("lead-uploads").upload(filePath, file, {
+      const { data, error } = await supabase.storage.from("lead-uploads").upload(filePath, csvLeads, {
         cacheControl: "3600",
         upsert: false,
       });
@@ -143,35 +150,11 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
         console.error("Upload error:", error);
         throw new Error(`Failed to upload CSV: ${error.message}`);
       }
-
-      // Get the public URL
-      const { data: publicUrlData } = supabase.storage.from("lead-upload").getPublicUrl(filePath);
-
-      const uploadResult = {
-        success: true,
-        path: data.path,
-        publicUrl: publicUrlData.publicUrl,
-        fileName: fileName,
-        userId: user.id,
-      };
-
-      console.log("CSV file uploaded successfully:", uploadResult);
-
-      // onCsv && onCsv(uploadResult);
-
-      // Show success message
-      Alert.success({
-        message: "CSV Uploaded Successfully!",
-        description: `File "${fileName}" has been uploaded to secure storage.`,
-        duration: 5,
-      });
+      
+      localStorage.setItem("leads-file-name",filePath);
+         
     } catch (error) {
       console.error("Error uploading CSV:", error);
-      Alert.error({
-        message: "Upload Failed",
-        description: error instanceof Error ? error.message : "Failed to upload CSV file. Please try again.",
-        duration: 8,
-      });
     }
   };
 
@@ -191,10 +174,10 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
         setShowHubspotModal(false);
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
-        Alert.error({
+        ErrorToast(`
           message: "Connection Failed",
-          description: event.data.error || "Unable to connect to HubSpot. Please try again.",
-        });
+          description: ${event.data.error} || "Unable to connect to HubSpot. Please try again.",
+      `);
       }
     };
 
@@ -289,10 +272,10 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
     } catch (error) {
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
-      Alert.error({
+      ErrorToast(`
         message: "Connection Failed",
-        description: error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again.",
-      });
+        description: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"},
+      `);
     }
   };
 
@@ -326,16 +309,16 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
       setHubspotStatus("disconnected");
       setHubspotAccountInfo(null);
 
-      Alert.success({
+      SuccessToast(`{
         message: "Disconnected Successfully",
         description: "Your HubSpot account has been disconnected.",
-      });
+      }`);
     } catch (error) {
       console.error("Disconnection failed:", error);
-      Alert.error({
+      ErrorToast(`
         message: "Disconnection Failed",
-        description: error instanceof Error ? error.message : "Unable to disconnect from HubSpot. Please try again.",
-      });
+        description: ${error instanceof Error ? error.message : "Unable to disconnect from HubSpot. Please try again."}
+      `);
     }
   };
 
@@ -388,11 +371,11 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
       setZapierStatus("connected");
       setZapierAccountInfo(responseData.accountInfo);
 
-      Alert.success({
+      SuccessToast(`
         message: "Successfully Connected!",
-        description: `Connected to ${responseData.accountInfo.email}. Your Zapier integration is ready for automation.`,
+        description: Connected to ${responseData.accountInfo.email}. Your Zapier integration is ready for automation
         duration: 5,
-      });
+      `);
 
       // Auto-close modal after success
       setTimeout(() => {
@@ -405,11 +388,11 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
       // Show specific error message
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
 
-      Alert.error({
+      ErrorToast(`
         message: "Connection Failed",
-        description: errorMessage,
+        description: ${errorMessage},
         duration: 8,
-      });
+      `);
     }
   };
 
@@ -470,10 +453,10 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
 
       // Test API key format
       if (!formValues.zapierApiKey || formValues.zapierApiKey.length < 32) {
-        Alert.warning({
+        ErrorToast(`
           message: "Invalid API Key",
           description: "Please enter a valid Zapier API key (32+ characters)",
-        });
+        `);
         return false;
       }
 
@@ -522,6 +505,7 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
   };
 
   const handleManualLeadsModalOk = () => {
+    handleCsvUpload()
     setShowManualLeadsModal(false);
     // You might want to proceed to the next step or handle the CSV upload here
     if (currentQuestionIndex < questions.length - 1) {
@@ -1044,10 +1028,14 @@ export default function IntegrationsStep({ onCsv, onNext, onPrev, initialData = 
             <input
               type="file"
               accept=".csv"
-              onChange={e => {
-                if (e.target.files && e.target.files[0]) {
-                  handleCsvUpload(e.target.files[0]);
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                  const file = e.target.files[0];
+                  handleCsvLeads(file);
                 }
+              }}
+              onClick={(e) => {
+                e.target.value = '';
               }}
               className="block w-full text-sm text-gray-500
                 file:mr-4 file:py-2 file:px-4
