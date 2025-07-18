@@ -7,7 +7,6 @@ import { getUserData } from "@/utils/supabase/user-helper";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
-const { TextArea } = Input;
 
 interface IntegrationsStepProps {
   onNext: (data: any) => void;
@@ -150,7 +149,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     // Check for completed steps
     if (
       localStorage.getItem("clinic_onboarding_completed_steps_v2") &&
-      JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(5)
+      JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2") || "").includes(5)
     ) {
       setCurrentQuestionIndex(questions.length - 1);
     }
@@ -205,20 +204,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // Clear saved OAuth state
         clearOAuthState();
 
-        Alert.success({
-          message: "Connection Successful",
-          description: "Your HubSpot account has been connected successfully!",
-        });
-
         // Auto-progress to next question
         autoProgressToNext();
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
         clearOAuthState();
-        Alert.error({
-          message: "Connection Failed",
-          description: event.data.error || "Unable to connect to HubSpot. Please try again.",
-        });
       }
     };
 
@@ -228,86 +218,49 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   // Handle OAuth callback if code parameter is present
   useEffect(() => {
-    const handleOAuthCallback = async () => {
+    const handleOAuthRedirect = () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get("code");
-      const error = urlParams.get("error");
-      const errorDescription = urlParams.get("error_description");
+      const hubspotStatus = urlParams.get("hubspot_status");
+      const errorMessage = urlParams.get("error_message");
+      const accountName = urlParams.get("account_name");
+      const contactCount = urlParams.get("contact_count");
 
-      if (error) {
+      if (hubspotStatus === "success") {
+        console.log("✅ HubSpot OAuth success detected from URL");
+
+        const accountInfo = {
+          accountName: accountName || "Connected Account",
+          contactCount: parseInt(contactCount || "0"),
+          dealCount: 0,
+        };
+
+        setHubspotStatus("connected");
+        setHubspotAccountInfo(accountInfo);
+        setFormData(prevFormData => ({
+          ...prevFormData,
+          usesHubspot: "Yes",
+        }));
+
+        clearOAuthState();
+
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        // Auto-progress to next question
+        autoProgressToNext();
+      } else if (hubspotStatus === "error") {
+        console.log("❌ HubSpot OAuth error detected from URL:", errorMessage);
+
         setHubspotStatus("disconnected");
         clearOAuthState();
-        Alert.error({
-          message: "Connection Failed",
-          description: errorDescription || error || "Unable to connect to HubSpot. Please try again.",
-        });
+
+        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
-        return;
-      }
-
-      const savedStatus = localStorage.getItem("hubspot_oauth_status");
-      if (code && savedStatus === "connecting") {
-        try {
-          const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-              apikey: SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({
-              code,
-              userId: await getCurrentUserId(),
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
-          if (data.error) {
-            throw new Error(data.error);
-          }
-
-          // Success - update state
-          setHubspotStatus("connected");
-          setHubspotAccountInfo(data.accountInfo);
-
-          // Update form data
-          setFormData(prevFormData => ({
-            ...prevFormData,
-            usesHubspot: "Yes",
-          }));
-
-          // Clear saved OAuth state
-          clearOAuthState();
-
-          Alert.success({
-            message: "Connection Successful",
-            description: "Your HubSpot account has been connected successfully!",
-          });
-
-          // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-
-          // Auto-progress to next question
-          autoProgressToNext();
-        } catch (error) {
-          console.error("Token exchange failed:", error);
-          setHubspotStatus("disconnected");
-          clearOAuthState();
-          Alert.error({
-            message: "Connection Failed",
-            description: error instanceof Error ? error.message : "Token exchange failed",
-          });
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
       }
     };
 
-    handleOAuthCallback();
-  }, [onNext, currentQuestionIndex]);
+    handleOAuthRedirect();
+  }, []);
 
   const getCurrentUserId = async () => {
     const user = await getUserData();
@@ -371,7 +324,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         },
         body: JSON.stringify({
           userId: await getCurrentUserId(),
-          redirectUrl: window.location.origin + window.location.pathname,
+          redirectUrl: window.location.href, // Current page URL
         }),
       });
 
@@ -386,59 +339,46 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         throw new Error(data.error);
       }
 
-      // Redirect to HubSpot OAuth
+      console.log("🚀 Redirecting to HubSpot OAuth:", data.authUrl);
+
+      // Simple redirect - no popup!
       window.location.href = data.authUrl;
     } catch (error) {
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
       clearOAuthState();
-      Alert.error({
-        message: "Connection Failed",
-        description: error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again.",
-      });
     }
   };
 
-  const disconnectHubSpot = async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          userId: await getCurrentUserId(),
-        }),
-      });
+  // Keep the message listener for popup communication
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // For security, you can check the origin if needed:
+      // if (!event.origin.includes('supabase.co')) return;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Disconnect error:", response.status, errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
+      console.log("Received message:", event.data); // Debug log
+
+      if (event.data.type === "hubspot_success") {
+        setHubspotStatus("connected");
+        setHubspotAccountInfo(event.data.accountInfo);
+
+        setFormData(prevFormData => ({
+          ...prevFormData,
+          usesHubspot: "Yes",
+        }));
+
+        clearOAuthState();
+
+        autoProgressToNext();
+      } else if (event.data.type === "hubspot_error") {
+        setHubspotStatus("disconnected");
+        clearOAuthState();
       }
+    };
 
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      setHubspotStatus("disconnected");
-      setHubspotAccountInfo(null);
-      clearOAuthState();
-      Alert.success({
-        message: "Disconnected Successfully",
-        description: "Your HubSpot account has been disconnected.",
-      });
-    } catch (error) {
-      console.error("Disconnection failed:", error);
-      Alert.error({
-        message: "Disconnection Failed",
-        description: error instanceof Error ? error.message : "Unable to disconnect from HubSpot. Please try again.",
-      });
-    }
-  };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing]);
 
   const disconnectZapier = async () => {
     try {
@@ -478,10 +418,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     try {
       const formValues = await zapierForm.validateFields();
       if (!formValues.zapierApiKey || formValues.zapierApiKey.length < 32) {
-        Alert.warning({
-          message: "Invalid API Key",
-          description: "Please enter a valid Zapier API key (32+ characters)",
-        });
+        // Alert.warning({
+        //   message: "Invalid API Key",
+        //   description: "Please enter a valid Zapier API key (32+ characters)",
+        // });
         return false;
       }
       return true;
@@ -632,7 +572,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                   className={`rounded-xl border-2 cursor-pointer ${
                     currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"
                   }`}
-                  bodyStyle={{ padding: "16px" }}
+                  styles={{ body: { padding: "16px" } }}
                   onClick={() => !isSubmitting && handleInputChange(option)}
                 >
                   <Radio value={option} className="text-lg text-black" disabled={isSubmitting}>
