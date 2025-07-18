@@ -292,7 +292,7 @@ export default function MainOnboarding() {
           },
           body: JSON.stringify({
             clinic_id: clinic.id,
-            phone: mappedData.phoneNumber,
+            phone_number: mappedData.phoneNumber,
             name: mappedData.legalBusinessName,
           }),
         });
