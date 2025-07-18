@@ -254,7 +254,6 @@ serve(async (req) => {
       twilio_auth_token: twilioAuthToken,
       twilio_phone_number: purchaseData.phone_number,
       status: 'active',
-      sms_enabled: true
     }
     console.log('Preparing to upsert twilio_config', { twilioConfigData, twilio_config_id });
 
