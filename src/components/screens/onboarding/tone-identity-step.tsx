@@ -2,6 +2,7 @@
 
 import { useState ,useEffect} from "react";
 import { Button, Select, Typography } from "antd";
+import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -39,7 +40,7 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
   ];
 
    useEffect(() => {
-    if (localStorage.getItem("clinic_onboarding_completed_steps_v2") && JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(2)) {
+    if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(2)) {
       setCurrentQuestionIndex(questions.length - 1);
     }
    },[])

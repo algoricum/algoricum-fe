@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button, Upload, message, Typography } from "antd";
+import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 
 const { Dragger } = Upload;
 const { Title, Text } = Typography;
@@ -44,7 +45,7 @@ export default function AiAssistantStep({ onNext, onPrev, initialData = {} }: Ai
   useEffect(() => {
     // Check if localStorage is available (for SSR compatibility)
     if (typeof window !== "undefined") {
-      const onboardingCompleted = localStorage.getItem("clinic_onboarding_completed_steps_v2")
+      const onboardingCompleted = localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY)
       if (onboardingCompleted && JSON.parse(onboardingCompleted).includes(3)) {
         // If the key exists, set the current question index to the last one
         setCurrentQuestionIndex(questions.length - 1)

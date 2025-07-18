@@ -6,6 +6,9 @@ import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutline
 import { getUserData } from "@/utils/supabase/user-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { SuccessToast, ErrorToast } from "@/helpers/toast";
+import { Lead} from "@/interfaces/services_type";
+import { ONBOARDING_LEADS_FILE_NAME ,ONBOARDING_COMPLETED_STEPS_KEY} from "@/constants/localStorageKeys";
+
 const { Option } = Select;
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -124,7 +127,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
   const handleCsvUpload = async () => {
     try {
-       if(!csvLeads){
+       if(!(csvLeads.length > 0) ){
         throw new Error("No CSV file selected");
        }
       // Get current user
@@ -151,7 +154,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         throw new Error(`Failed to upload CSV: ${error.message}`);
       }
       
-      localStorage.setItem("leads-file-name",filePath);
+      localStorage.setItem(ONBOARDING_LEADS_FILE_NAME,filePath);
          
     } catch (error) {
       console.error("Error uploading CSV:", error);
@@ -160,10 +163,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
   // Listen for OAuth callback messages
   useEffect(() => {
-    if (
-      localStorage.getItem("clinic_onboarding_completed_steps_v2") &&
-      JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2")).includes(5)
-    ) {
+    if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(5)) {
       setCurrentQuestionIndex(questions.length - 1);
     }
 
@@ -1033,9 +1033,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
                   const file = e.target.files[0];
                   handleCsvLeads(file);
                 }
-              }}
-              onClick={(e) => {
-                e.target.value = '';
               }}
               className="block w-full text-sm text-gray-500
                 file:mr-4 file:py-2 file:px-4

@@ -12,6 +12,7 @@ import IntegrationsStep from "./integrations-step";
 
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
+import { Lead } from "@/interfaces/services_type";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { createClinic } from "@/utils/supabase/clinic-helper";
@@ -27,6 +28,11 @@ import getLeadSourceId from "@/utils/lead_source";
 import getNormalizedLead from "@/utils/normalizeLeadData";
 import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
 
+import { ONBOARDING_STORAGE_KEY,
+         ONBOARDING_STEP_KEY, 
+         ONBOARDING_COMPLETED_STEPS_KEY, 
+         ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
+
 const { Text } = Typography;
 
 const BASE_STEPS = [
@@ -38,10 +44,7 @@ const BASE_STEPS = [
   { id: "integrations", title: "Integrations", description: "Tools", icon: "⚡" },
 ];
 
-// Storage keys for persistence
-const ONBOARDING_STORAGE_KEY = "clinic_onboarding_progress_v2";
-const ONBOARDING_STEP_KEY = "clinic_onboarding_step_v2";
-const ONBOARDING_COMPLETED_STEPS_KEY = "clinic_onboarding_completed_steps_v2";
+
 
 const CHATBOT_STEP = { id: "chatbot-setup", title: "Chatbot", description: "AI Assistant", icon: "🤖" };
 
@@ -101,6 +104,7 @@ export default function MainOnboarding() {
       localStorage.removeItem(ONBOARDING_STORAGE_KEY);
       localStorage.removeItem(ONBOARDING_STEP_KEY);
       localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
+      localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
     } catch (error) {
       ErrorToast("Error clearing localStorage:");
     }
@@ -155,25 +159,27 @@ export default function MainOnboarding() {
   };
   // upload csv lead to supabase lead table
   const handleCsvLeadsUpload = async (clinic_id: string) => {
-    const leadsFileName = localStorage.getItem("leads-file-name");
-      if (leadsFileName) {
-        const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
-        const leads= result?.data;
-        // 1. Get source_id for 'File'
-        try{
+    const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
+    if (leadsFileName) {
+      const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
+      // Properly type and extract data
+      const leads: Partial<Lead>[] = (result && typeof result === 'object' && 'data' in result && Array.isArray((result as any).data))
+        ? (result as { data: Partial<Lead>[] }).data
+        : [];
+      // 1. Get source_id for 'File'
+      try {
         const source_id = await getLeadSourceId("File");
-        const leadsToInsert = getNormalizedLead(leads,source_id,clinic_id);
+        const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
         const { error: insertError } = await supabase
-        .from('lead')
-        .insert(leadsToInsert);
+          .from('lead')
+          .insert(leadsToInsert);
         if (insertError) {
           ErrorToast(insertError.message);
         }
-        }
-        catch(error){
-          ErrorToast("Something wrong in csv lead upload");
-        }
+      } catch (error) {
+        ErrorToast(`${error}`);
       }
+    }
   }
 
   // Main submission function (adapted from old flow)
@@ -387,6 +393,8 @@ export default function MainOnboarding() {
         localStorage.removeItem(ONBOARDING_STORAGE_KEY);
         localStorage.removeItem(ONBOARDING_STEP_KEY);
         localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
+        localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
+
         SuccessToast("Logout Successfully");
         router.push("/login");
       } else {

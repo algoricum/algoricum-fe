@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/config/client";
 import Papa from 'papaparse';
 
-const downloadAndParseCSVWithPapa = async (bucketName, fileName) => {
+const downloadAndParseCSVWithPapa = async (bucketName: string, fileName: string) => {
     const supabase = createClient();
     try {
       const { data, error } = await supabase.storage
@@ -20,12 +20,10 @@ const downloadAndParseCSVWithPapa = async (bucketName, fileName) => {
           skipEmptyLines: true,
           complete: (results) => {
             resolve({
-              data: results.data,
-              errors: results.errors,
-              meta: results.meta
+              data:results.data,
             });
           },
-          error: (error) => {
+          error: (error: any) => {
             reject(error);
           }
         });
