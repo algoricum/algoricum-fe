@@ -5,7 +5,7 @@ import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Inp
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
 import { getUserData } from "@/utils/supabase/user-helper";
 import { createClient } from "@/utils/supabase/config/client";
-import { SuccessToast, ErrorToast } from "@/helpers/toast";
+import { SuccessToast, ErrorToast, InfoToast ,WarningToast} from "@/helpers/toast";
 import { Lead} from "@/interfaces/services_type";
 import { ONBOARDING_LEADS_FILE_NAME ,ONBOARDING_COMPLETED_STEPS_KEY} from "@/constants/localStorageKeys";
 
@@ -20,7 +20,8 @@ interface IntegrationsStepProps {
   isSubmitting?: boolean;
 }
 
-export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
+export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSubmitting = false}: IntegrationsStepProps) {
+  const [showNextButton, setShowNextButton] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
@@ -32,12 +33,11 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   const [zapierForm] = Form.useForm();
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
-    usesAds: initialData.usesAds || "",
-    hasChatbot: initialData.hasChatbot || "",
     otherTools: initialData.otherTools || "",
   });
   const [csvLeads, setCsvLeads] = useState<any>([]);
   const supabase = createClient();
+  const [showCompletionButtons, setShowCompletionButtons] = useState(false);
 
   const questions = [
     {
@@ -103,23 +103,19 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         "Instapage",
         "Other",
       ],
-    },
-    {
-      id: "usesAds",
-      type: "radio",
-      question: "Do you use ads?",
-      options: ["Yes", "No"],
-    },
-    {
-      id: "hasChatbot",
-      type: "radio",
-      question: "Are you already using a chatbot?",
-      options: ["Yes", "No"],
-    },
+    }
   ];
 
-  const currentQuestion = questions[currentQuestionIndex];
-  const currentValue = formData[currentQuestion.id as keyof typeof formData];
+  // Filter questions based on HubSpot answer
+  const filteredQuestions = questions.filter(q => {
+    if (q.id === "otherTools" && formData.usesHubspot === "Yes") {
+      return false; // Skip "otherTools" if HubSpot is Yes
+    }
+    return true;
+  });
+
+  const currentQuestion = filteredQuestions[currentQuestionIndex];
+  const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
   const handleCsvLeads= (csvLeads:any) => {
     setCsvLeads(csvLeads);
@@ -127,9 +123,12 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
   const handleCsvUpload = async () => {
     try {
-       if(!(csvLeads.length > 0) ){
-        throw new Error("No CSV file selected");
+
+       if(csvLeads.length === 0 ){
+        WarningToast("No CSV file selected");
+         return;
        }
+       
       // Get current user
       const user = await getUserData();
       if (!user) {
@@ -163,9 +162,9 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
   // Listen for OAuth callback messages
   useEffect(() => {
-    if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(5)) {
-      setCurrentQuestionIndex(questions.length - 1);
-    }
+    // if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(6)) {
+    //   setCurrentQuestionIndex(filteredQuestions.length - 1);
+    // }
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === "hubspot_success") {
@@ -196,21 +195,28 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
       ...prev,
       [currentQuestion.id]: value,
     }));
+  
+    if (currentQuestion.id === "usesHubspot") {
+      if (value === "Yes") {
+        setShowHubspotModal(true);
+        setShowCompletionButtons(true)
 
-    if (currentQuestion.id === "usesHubspot" && value === "Yes") {
-      setShowHubspotModal(true);
+      } else if (value === "No") {
+        
+        setShowCompletionButtons(false)
+      }
     }
-
-    // Show Zapier modal when tools are selected (with 2-3 second delay)
+  
     if (currentQuestion.id === "otherTools" && value && value.length > 0) {
       const selectedTools = value.split(",").filter((s: string) => s);
       if (selectedTools.length > 0) {
         setTimeout(() => {
           setShowZapierModal(true);
-        }, 2500); // 2.5 second delay
+        }, 2500); // Delay for UX
       }
     }
   };
+  
 
   // Updated connectToHubSpot and disconnectHubSpot functions
   // Add these to your React component
@@ -418,13 +424,11 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
   const handleHubspotModalOk = () => {
     setShowHubspotModal(false);
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
   };
 
   const handleHubspotModalCancel = () => {
     setShowHubspotModal(false);
+    setShowCompletionButtons(false)
     setFormData(prev => ({
       ...prev,
       usesHubspot: "",
@@ -483,7 +487,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   const handleZapierModalOk = async () => {
     if (zapierStatus === "connected") {
       setShowZapierModal(false);
-      if (currentQuestionIndex < questions.length - 1) {
+      if (currentQuestionIndex < filteredQuestions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       }
     } else {
@@ -508,10 +512,18 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
     handleCsvUpload()
     setShowManualLeadsModal(false);
     // You might want to proceed to the next step or handle the CSV upload here
-    if (currentQuestionIndex < questions.length - 1) {
+    if (currentQuestionIndex < filteredQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      onNext(formData); // Or handle final submission
+      // onNext(formData); // Or handle final submission"
+      if(localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0){
+         SuccessToast("Leads uploaded successfully")
+      }
+      setShowCompletionButtons(true)
+
+      setTimeout(() => {
+        InfoToast("Wants to add or remove manual Leads upload? Click previous button")
+      }, 5000)
     }
   };
 
@@ -543,7 +555,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
       return;
     }
 
-    if (currentQuestionIndex < questions.length - 1) {
+    if (currentQuestionIndex < filteredQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       const finalData = {
@@ -563,6 +575,9 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   };
 
   const handlePrevious = () => {
+
+    setShowCompletionButtons(false)
+
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     } else if (onPrev) {
@@ -571,8 +586,10 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   };
 
   const renderPreviousQuestions = () => {
-    return questions.slice(0, currentQuestionIndex).map(q => {
+    
+    return filteredQuestions.slice(0, currentQuestionIndex).map(q => {
       const value = formData[q.id as keyof typeof formData];
+    
 
       return (
         <div key={q.id} className="mb-8">
@@ -632,20 +649,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
             </Space>
           </Radio.Group>
 
-          {currentQuestion.id === "hasChatbot" && currentValue === "No" && (
-            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" bodyStyle={{ padding: "20px" }}>
-              <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
-                  <Text className="text-white text-base">✓</Text>
-                </div>
-                <Text className="text-lg font-semibold text-blue-900">We&apos;ve got you covered!</Text>
-              </div>
-              <Text className="text-blue-900 text-base leading-6">
-                Perfect! We&apos;ll help you set up our intelligent chatbot that can handle patient inquiries, book appointments, and
-                provide information about your services 24/7.
-              </Text>
-            </Card>
-          )}
+      
         </div>
       );
     }
@@ -697,30 +701,53 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
-          {currentQuestion.question}
+          {currentQuestion?.question}
         </Title>
 
         {renderCurrentInput()}
 
-        <div className="flex justify-between">
-          <Button
-            onClick={handlePrevious}
-            className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
-            disabled={(currentQuestionIndex === 0 && !onPrev) || isSubmitting}
-          >
-            Previous
-          </Button>
+        {showCompletionButtons && (
+          <div className="flex justify-between mt-8">
+            <Button
+              onClick={handlePrevious}
+              className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
+              disabled={isSubmitting}
+            >
+              Previous
+            </Button>
 
-          <Button
-            type="primary"
-            onClick={handleNext}
-            disabled={(currentQuestion.type === "radio" ? !currentValue : false) || isSubmitting}
-            loading={isSubmitting && currentQuestionIndex === questions.length - 1}
-            className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
-          >
-            {currentQuestionIndex === questions.length - 1 ? (isSubmitting ? "Setting up your clinic..." : "Continue") : "Continue"}
-          </Button>
-        </div>
+
+            <Button
+              type="primary"
+              onClick={() => onNext(formData)} // or your onboarding completion logic
+              className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
+              loading={isSubmitting}
+            >
+              Complete Onboarding
+            </Button>
+          </div>
+        )}
+
+        {!showCompletionButtons && (
+          <div className="flex justify-between">
+            <Button
+              onClick={handlePrevious}
+              className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
+              disabled={(currentQuestionIndex === 0 && !onPrev) || isSubmitting}
+            >
+              Previous
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleNext}
+              disabled={(currentQuestion.type === "radio" ? !currentValue : false) || isSubmitting}
+              loading={isSubmitting && currentQuestionIndex === filteredQuestions?.length - 1}
+              className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
+            >
+              {currentQuestionIndex === filteredQuestions?.length - 1 ? (isSubmitting ? "Setting up your clinic..." : "Continue") : "Continue"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* HubSpot Connection Modal */}
@@ -1032,6 +1059,8 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
                 if (e.target.files && e.target.files.length > 0) {
                   const file = e.target.files[0];
                   handleCsvLeads(file);
+                }else{
+                  handleCsvLeads([])
                 }
               }}
               className="block w-full text-sm text-gray-500

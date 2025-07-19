@@ -41,12 +41,13 @@ const BASE_STEPS = [
   { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
   { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
   { id: "booking-setup", title: "Booking", description: "Appointments", icon: "⚙️" },
-  { id: "integrations", title: "Integrations", description: "Tools", icon: "⚡" },
+  { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
+  { id: "integrations", title: "CRM-Integrations", description: "Tools", icon: "⚡" },
 ];
 
 
 
-const CHATBOT_STEP = { id: "chatbot-setup", title: "Chatbot", description: "AI Assistant", icon: "🤖" };
+// const CHATBOT_STEP = { id: "chatbot-setup", title: "Chatbot", description: "AI Assistant", icon: "🤖" };
 
 export default function MainOnboarding() {
   const supabase = createClient();
@@ -55,13 +56,10 @@ export default function MainOnboarding() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [allData, setAllData] = useState<Record<string, any>>({});
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [showChatbotStep, setShowChatbotStep] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Determine if chatbot step should be shown based on integrations data
-  const shouldShowChatbotStep = allData.integrations?.hasChatbot === "No";
-  const STEPS = shouldShowChatbotStep ? [...BASE_STEPS, CHATBOT_STEP] : BASE_STEPS;
-
+  // Only use BASE_STEPS for sidebar and navigation
+  const STEPS = BASE_STEPS;
   const currentStep = STEPS[currentStepIndex];
   // Helper functions for localStorage (same as old flow)
   const isBrowser = typeof window !== "undefined";
@@ -117,6 +115,7 @@ export default function MainOnboarding() {
     const toneIdentity = data["tone-identity"] || {};
     const aiAssistant = data["ai-assistant"] || {};
     const bookingSetup = data["booking-setup"] || {};
+    const chatbotSetup = data["chatbot-setup"] || {};
     const integrations = data["integrations"] || {};
 
     // Convert business hours to old format
@@ -351,21 +350,8 @@ export default function MainOnboarding() {
       setStoredData(ONBOARDING_COMPLETED_STEPS_KEY, newCompletedSteps);
     }
 
-    // Check if we need to show chatbot step after integrations
-    if (currentStep.id === "integrations" && stepData.hasChatbot === "No") {
-      setShowChatbotStep(true);
-    }
-
-    // Determine the actual steps array that should be used
-    const actualSteps =
-      currentStep.id === "integrations" && stepData.hasChatbot === "No"
-        ? [...BASE_STEPS, CHATBOT_STEP]
-        : shouldShowChatbotStep
-          ? [...BASE_STEPS, CHATBOT_STEP]
-          : BASE_STEPS;
-
     // Move to next step or complete onboarding
-    if (currentStepIndex < actualSteps.length - 1) {
+    if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
            handleCompleteOnboarding();
@@ -425,10 +411,11 @@ export default function MainOnboarding() {
         return <AiAssistantStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "booking-setup":
         return <BookingSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
-      case "integrations":
-        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "chatbot-setup":
         return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+      case "integrations":
+        // Pass handleCompleteOnboarding to IntegrationsStep for inline Chatbot setup
+        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData}  />;
       default:
         return <div>Unknown step</div>;
     }
