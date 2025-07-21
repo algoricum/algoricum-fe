@@ -11,7 +11,6 @@ import { ONBOARDING_LEADS_FILE_NAME ,ONBOARDING_COMPLETED_STEPS_KEY} from "@/con
 
 const { Option } = Select;
 const { Title, Text } = Typography;
-const { TextArea } = Input;
 
 interface IntegrationsStepProps {
   onNext: (data: any) => void;
@@ -31,6 +30,9 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null);
   const [zapierAccountInfo, setZapierAccountInfo] = useState<any>(null);
   const [zapierForm] = Form.useForm();
+  const [autoProgressing, setAutoProgressing] = useState(false);
+  const [hubspotPrompted, setHubspotPrompted] = useState(false);
+
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
     otherTools: initialData.otherTools || "",
@@ -160,34 +162,170 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
     }
   };
 
-  // Listen for OAuth callback messages
+  const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
+  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+  // Auto-progress to next question after successful HubSpot connection
+  const autoProgressToNext = () => {
+    if (autoProgressing) return; // Prevent multiple calls
+
+    setAutoProgressing(true);
+
+    setTimeout(() => {
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+        setShowHubspotModal(false);
+      } else {
+        // This was the last question, submit the form
+        const finalData = {
+          ...formData,
+          usesHubspot: "Yes",
+          hubspotConnected: true,
+          hubspotAccountInfo,
+        };
+        onNext(finalData);
+      }
+      setAutoProgressing(false);
+    }, 1500); // 1.5 second delay to show success message
+  };
+
+  // Restore state from localStorage on component mount
   useEffect(() => {
     // if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(6)) {
     //   setCurrentQuestionIndex(filteredQuestions.length - 1);
     // }
 
+    // Restore OAuth state if it exists
+    const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
+    const savedQuestionIndex = localStorage.getItem("hubspot_oauth_question_index");
+    const savedFormData = localStorage.getItem("hubspot_oauth_form_data");
+    const savedAccountInfo = localStorage.getItem("hubspot_oauth_account_info");
+
+    if (savedHubspotStatus) {
+      setHubspotStatus(savedHubspotStatus as "disconnected" | "connecting" | "connected");
+    }
+    if (savedQuestionIndex && !isNaN(Number.parseInt(savedQuestionIndex))) {
+      setCurrentQuestionIndex(Number.parseInt(savedQuestionIndex));
+    }
+    if (savedFormData) {
+      try {
+        const parsedFormData = JSON.parse(savedFormData);
+        setFormData(parsedFormData);
+      } catch (error) {
+        console.error("Error parsing saved form data:", error);
+      }
+    }
+    if (savedAccountInfo) {
+      try {
+        const parsedAccountInfo = JSON.parse(savedAccountInfo);
+        setHubspotAccountInfo(parsedAccountInfo);
+      } catch (error) {
+        console.error("Error parsing saved account info:", error);
+      }
+    }
+  }, []);
+
+  // Listen for OAuth callback messages
+  useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
       if (event.data.type === "hubspot_success") {
         setHubspotStatus("connected");
         setHubspotAccountInfo(event.data.accountInfo);
-        setShowHubspotModal(false);
+
+        // Update form data
+        setFormData(prevFormData => ({
+          ...prevFormData,
+          usesHubspot: "Yes",
+        }));
+
+        // Clear saved OAuth state
+        clearOAuthState();
+
+        // Auto-progress to next question
+        autoProgressToNext();
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
         ErrorToast(`
           message: "Connection Failed",
           description: ${event.data.error} || "Unable to connect to HubSpot. Please try again.",
       `);
+        clearOAuthState();
       }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing]);
+
+  // Handle OAuth callback if code parameter is present
+  useEffect(() => {
+    const handleOAuthRedirect = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hubspotStatus = urlParams.get("hubspot_status");
+      const errorMessage = urlParams.get("error_message");
+      const accountName = urlParams.get("account_name");
+      const contactCount = urlParams.get("contact_count");
+
+      if (hubspotStatus === "success") {
+        console.log("✅ HubSpot OAuth success detected from URL");
+
+        const accountInfo = {
+          accountName: accountName || "Connected Account",
+          contactCount: parseInt(contactCount || "0"),
+          dealCount: 0,
+        };
+
+        setHubspotStatus("connected");
+        setHubspotAccountInfo(accountInfo);
+        setFormData(prevFormData => ({
+          ...prevFormData,
+          usesHubspot: "Yes",
+        }));
+
+        clearOAuthState();
+
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        // Auto-progress to next question
+        autoProgressToNext();
+      } else if (hubspotStatus === "error") {
+        console.log("❌ HubSpot OAuth error detected from URL:", errorMessage);
+
+        setHubspotStatus("disconnected");
+        clearOAuthState();
+
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+
+    handleOAuthRedirect();
   }, []);
 
   const getCurrentUserId = async () => {
     const user = await getUserData();
-
     return user?.id;
+  };
+
+  const clearOAuthState = () => {
+    localStorage.removeItem("hubspot_oauth_status");
+    localStorage.removeItem("hubspot_oauth_question_index");
+    localStorage.removeItem("hubspot_oauth_form_data");
+    localStorage.removeItem("hubspot_oauth_account_info");
+  };
+
+  const saveOAuthState = () => {
+    localStorage.setItem("hubspot_oauth_status", "connecting");
+    localStorage.setItem("hubspot_oauth_question_index", currentQuestionIndex.toString());
+    localStorage.setItem("hubspot_oauth_form_data", JSON.stringify(formData));
+    if (hubspotAccountInfo) {
+      localStorage.setItem("hubspot_oauth_account_info", JSON.stringify(hubspotAccountInfo));
+    }
   };
 
   const handleInputChange = (value: string) => {
@@ -218,18 +356,11 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   };
   
 
-  // Updated connectToHubSpot and disconnectHubSpot functions
-  // Add these to your React component
-
-  const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
-  const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""; // Get this from your Supabase dashboard
-
-  // Updated HubSpot connection function
   const connectToHubSpot = async () => {
     setHubspotStatus("connecting");
+    saveOAuthState();
 
     try {
-      // Call your Supabase edge function with proper headers
       const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
         method: "POST",
         headers: {
@@ -238,8 +369,8 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
           apikey: SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          userId: getCurrentUserId(),
-          redirectUrl: window.location.href,
+          userId: await getCurrentUserId(),
+          redirectUrl: window.location.href, // Current page URL
         }),
       });
 
@@ -250,31 +381,14 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
       }
 
       const data = await response.json();
-
       if (data.error) {
         throw new Error(data.error);
       }
 
-      // Open popup for OAuth
-      const popup = window.open(data.authUrl, "hubspot-oauth", "width=600,height=700,scrollbars=yes,resizable=yes");
+      console.log("🚀 Redirecting to HubSpot OAuth:", data.authUrl);
 
-      // Check if popup was blocked
-      if (!popup) {
-        throw new Error("Popup was blocked. Please allow popups for this site.");
-      }
-
-      // Monitor popup closure
-      const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed);
-          // If popup closed without success message, reset status
-          setTimeout(() => {
-            if (hubspotStatus === "connecting") {
-              setHubspotStatus("disconnected");
-            }
-          }, 1000);
-        }
-      }, 1000);
+      // Simple redirect - no popup!
+      window.location.href = data.authUrl;
     } catch (error) {
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
@@ -325,82 +439,39 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         message: "Disconnection Failed",
         description: ${error instanceof Error ? error.message : "Unable to disconnect from HubSpot. Please try again."}
       `);
+      clearOAuthState();
     }
   };
 
-  // Updated Zapier connection function with form data
-  const connectToZapier = async () => {
-    try {
-      // Validate form before making API call
-      const formValues = await zapierForm.validateFields();
-      const userId = getCurrentUserId();
+  // Keep the message listener for popup communication
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // For security, you can check the origin if needed:
+      // if (!event.origin.includes('supabase.co')) return;
 
-      if (!userId) {
-        throw new Error("User not authenticated. Please log in and try again.");
+      console.log("Received message:", event.data); // Debug log
+
+      if (event.data.type === "hubspot_success") {
+        setHubspotStatus("connected");
+        setHubspotAccountInfo(event.data.accountInfo);
+
+        setFormData(prevFormData => ({
+          ...prevFormData,
+          usesHubspot: "Yes",
+        }));
+
+        clearOAuthState();
+
+        autoProgressToNext();
+      } else if (event.data.type === "hubspot_error") {
+        setHubspotStatus("disconnected");
+        clearOAuthState();
       }
+    };
 
-      console.log("Connecting to Zapier with form values:", {
-        accountEmail: formValues.accountEmail,
-        hasApiKey: !!formValues.zapierApiKey,
-        hasWebhookUrl: !!formValues.webhookUrl,
-        integrationGoals: formValues.integrationGoals?.length,
-      });
-
-      setZapierStatus("connecting");
-
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/zapier-integration`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          userId,
-          zapierApiKey: formValues.zapierApiKey,
-          accountEmail: formValues.accountEmail,
-          webhookUrl: formValues.webhookUrl || null,
-          integrationGoals: formValues.integrationGoals,
-          selectedTools: formData.otherTools ? formData.otherTools.split(",").filter((s: string) => s.trim()) : [],
-        }),
-      });
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        console.error("API Error:", responseData);
-        throw new Error(responseData.details || responseData.error || "Failed to connect to Zapier");
-      }
-
-      console.log("Connection successful:", responseData);
-
-      setZapierStatus("connected");
-      setZapierAccountInfo(responseData.accountInfo);
-
-      SuccessToast(`
-        message: "Successfully Connected!",
-        description: Connected to ${responseData.accountInfo.email}. Your Zapier integration is ready for automation
-        duration: 5,
-      `);
-
-      // Auto-close modal after success
-      setTimeout(() => {
-        setShowZapierModal(false);
-      }, 2000);
-    } catch (error) {
-      console.error("Zapier connection failed:", error);
-      setZapierStatus("disconnected");
-
-      // Show specific error message
-      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-
-      ErrorToast(`
-        message: "Connection Failed",
-        description: ${errorMessage},
-        duration: 8,
-      `);
-    }
-  };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing]);
 
   const disconnectZapier = async () => {
     try {
@@ -413,7 +484,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
           userId: "current-user-id",
         }),
       });
-
       setZapierStatus("disconnected");
       setZapierAccountInfo(null);
       zapierForm.resetFields();
@@ -435,27 +505,9 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
     }));
   };
 
-  const testZapierApiKey = async (apiKey: string): Promise<boolean> => {
-    try {
-      const response = await fetch("https://api.zapier.com/v1/me", {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          Accept: "application/json",
-        },
-      });
-
-      return response.ok;
-    } catch {
-      return false;
-    }
-  };
-
-  // Enhanced form validation with API key testing
   const validateZapierForm = async (): Promise<boolean> => {
     try {
       const formValues = await zapierForm.validateFields();
-
-      // Test API key format
       if (!formValues.zapierApiKey || formValues.zapierApiKey.length < 32) {
         ErrorToast(`
           message: "Invalid API Key",
@@ -463,20 +515,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         `);
         return false;
       }
-
-      // Optional: Test API key with Zapier (if you want client-side validation)
-      // Note: This exposes the API key to the client, so use with caution
-      /*
-    const isValidKey = await testZapierApiKey(formValues.zapierApiKey);
-    if (!isValidKey) {
-      Alert.warning({
-        message: "Invalid API Key",
-        description: "The provided API key doesn't work with Zapier. Please check and try again.",
-      });
-      return false;
-    }
-    */
-
       return true;
     } catch (error) {
       console.error("Form validation error:", error);
@@ -491,10 +529,9 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       }
     } else {
-      // Validate form before connecting
       const isValid = await validateZapierForm();
       if (isValid) {
-        await connectToZapier();
+        // await connectToZapier();
       }
     }
   };
@@ -529,27 +566,20 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
   const handleManualLeadsModalCancel = () => {
     setShowManualLeadsModal(false);
-
     setCurrentQuestionIndex(prev => prev + 1);
-    // If the user cancels, you might want to reset the selection or just close the modal
-    // For now, we'll just close it and allow them to continue if they wish.
   };
 
   const handleNext = () => {
-    if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
-      setShowHubspotModal(true);
-      return;
-    }
-
     if (currentQuestion.id === "otherTools" && currentValue && currentValue.length > 0 && zapierStatus !== "connected") {
       setShowZapierModal(true);
       return;
-    } // NEW LOGIC: Manual Leads Modal condition
-    // If on the "otherTools" question, HubSpot is "No", and no other tools are selected
+    }
+
+    // Fixed logic for manual leads modal
     if (
       currentQuestion.id === "otherTools" &&
       formData.usesHubspot === "No" &&
-      (!formData.otherTools || formData.otherTools.length === 0)
+      (!currentValue || currentValue.trim() === "" || currentValue.split(",").filter((s: string) => s.trim()).length === 0)
     ) {
       setShowManualLeadsModal(true);
       return;
@@ -580,6 +610,11 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
+      // Reset HubSpot prompted flag when going back
+      if (currentQuestionIndex - 1 === 0) {
+        // Going back to HubSpot question
+        setHubspotPrompted(false);
+      }
     } else if (onPrev) {
       onPrev();
     }
@@ -638,7 +673,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
                   className={`rounded-xl border-2 cursor-pointer ${
                     currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"
                   }`}
-                  bodyStyle={{ padding: "16px" }}
+                  styles={{ body: { padding: "16px" } }}
                   onClick={() => !isSubmitting && handleInputChange(option)}
                 >
                   <Radio value={option} className="text-lg text-black" disabled={isSubmitting}>
@@ -673,7 +708,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
               </Option>
             ))}
           </Select>
-
           {currentValue && currentValue.length > 0 && (
             <Card className="rounded-xl bg-orange-50 border-2 border-orange-500 mt-6" bodyStyle={{ padding: "20px" }}>
               <div className="flex items-center mb-3">
@@ -694,6 +728,16 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
     return null;
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      const savedStatus = localStorage.getItem("hubspot_oauth_status");
+      if (savedStatus !== "connecting") {
+        clearOAuthState();
+      }
+    };
+  }, []);
 
   return (
     <div className="max-w-4xl">
@@ -781,7 +825,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
                 showIcon
                 className="mb-6"
               />
-
               <div className="text-center">
                 <Button
                   type="primary"
@@ -792,7 +835,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
                 >
                   Connect to HubSpot
                 </Button>
-
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <Text className="text-sm text-gray-600">
                     <strong>What happens next:</strong>
@@ -812,7 +854,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
               <div className="mt-4">
                 <Text className="text-lg">Connecting to HubSpot...</Text>
                 <br />
-                <Text className="text-gray-500">Please complete the authorization in the popup window</Text>
+                <Text className="text-gray-500">Please complete the authorization process</Text>
               </div>
             </div>
           )}
@@ -821,38 +863,17 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
             <>
               <Alert
                 message="Successfully Connected!"
-                description={`Connected to ${hubspotAccountInfo.accountName}. Your contacts and deals will sync automatically.`}
+                description={`Connected to ${hubspotAccountInfo.accountName}. Moving to next step...`}
                 type="success"
                 showIcon
                 className="mb-4"
               />
-
-              <div className="bg-green-50 rounded-lg p-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <Text strong className="text-green-800">
-                      {hubspotAccountInfo.accountName}
-                    </Text>
-                    <br />
-                    <Text className="text-green-600 text-sm">
-                      {hubspotAccountInfo.contactCount} contacts • {hubspotAccountInfo.dealCount} deals
-                    </Text>
-                  </div>
-                  <Button type="link" danger onClick={disconnectHubSpot} className="text-red-500">
-                    Disconnect
-                  </Button>
-                </div>
-              </div>
-
-              <div className="mt-4 text-center">
-                <Text className="text-gray-600">🎉 All set! Your HubSpot data will sync automatically.</Text>
-              </div>
             </>
           )}
         </div>
       </Modal>
 
-      {/* Updated Zapier Connection Modal with Form */}
+      {/* Zapier Modal - keeping existing implementation */}
       <Modal
         title={
           <div className="flex items-center">
@@ -865,13 +886,13 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         open={showZapierModal}
         onOk={handleZapierModalOk}
         onCancel={handleZapierModalCancel}
-        okText={zapierStatus === "connected" ? "Continue" : zapierStatus === "connecting" ? "Connecting..." : "Connect Zapier"}
+        okText={zapierStatus === "connected" ? "Continue" : zapierStatus === "connecting" ? "Connecting..." : "Save Settings"}
         cancelText="Skip for Now"
         okButtonProps={{
           className: "bg-purple-500 border-purple-500",
           loading: zapierStatus === "connecting",
         }}
-        width={700}
+        width={600}
         centered
       >
         <div className="py-6">
@@ -892,77 +913,43 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
                 showIcon
                 className="mb-6"
               />
-
               <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-start">
                   <CalendarOutlined className="text-blue-500 mt-1 mr-3" />
-                  <div>
-                    <Text className="text-blue-800 text-sm font-medium block">Need help with setup?</Text>
-                    <Text className="text-blue-700 text-sm">
-                      If you find this process difficult, you can{" "}
-                      <a
-                        href="https://calendly.com/your-team/zapier-setup"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 underline hover:text-blue-800"
-                      >
-                        book a meeting with our team
-                      </a>{" "}
-                      and we'll set everything up for you.
+                  <div className="flex-1">
+                    <Text className="text-blue-800 text-sm font-medium block mb-2">Need help with setup?</Text>
+                    <Text className="text-blue-700 text-sm mb-3">
+                      If you find this process difficult, our team can set everything up for you.
                     </Text>
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CalendarOutlined />}
+                      onClick={() => window.open("https://calendly.com/your-team/zapier-setup", "_blank")}
+                      className="bg-purple-600 border-purple-600 hover:bg-purple-700"
+                    >
+                      Book a Meeting
+                    </Button>
                   </div>
                 </div>
               </div>
-
               <Form form={zapierForm} layout="vertical" className="space-y-4">
-                <Form.Item
-                  label="Zapier Account Email"
-                  name="accountEmail"
-                  rules={[
-                    { required: true, message: "Please enter your Zapier account email" },
-                    { type: "email", message: "Please enter a valid email address" },
-                  ]}
-                >
-                  <Input placeholder="Enter your Zapier account email" size="large" />
-                </Form.Item>
-
                 <Form.Item
                   label="Zapier API Key"
                   name="zapierApiKey"
                   rules={[{ required: true, message: "Please enter your Zapier API key" }]}
-                  extra={
-                    <Text className="text-gray-500 text-xs">
-                      Find this in your Zapier account under Settings → API Keys.{" "}
-                      <a href="https://zapier.com/app/profile/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-500">
-                        Get your API key
-                      </a>
-                    </Text>
-                  }
                 >
                   <Input.Password placeholder="Enter your Zapier API key" size="large" />
                 </Form.Item>
-
                 <Form.Item
-                  label="Webhook URL (Optional)"
+                  label="Webhook URL"
                   name="webhookUrl"
-                  extra={<Text className="text-gray-500 text-xs">If you have a specific webhook URL for your automations</Text>}
+                  rules={[{ required: true, message: "Please enter your webhook URL" }]}
+                  extra={<Text className="text-gray-500 text-xs">Your Zapier webhook URL for receiving data</Text>}
                 >
                   <Input placeholder="https://hooks.zapier.com/hooks/catch/..." size="large" />
                 </Form.Item>
-
-                <Form.Item
-                  label="What do you want to automate?"
-                  name="integrationGoals"
-                  rules={[{ required: true, message: "Please describe your automation goals" }]}
-                >
-                  <TextArea
-                    placeholder="e.g., Sync leads from forms to CRM, send notifications when new patients book appointments, update contact information across platforms..."
-                    rows={4}
-                    size="large"
-                  />
-                </Form.Item>
               </Form>
-
               {formData.otherTools && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                   <Text className="text-sm text-gray-700">
@@ -997,24 +984,20 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
                 showIcon
                 className="mb-4"
               />
-
               <div className="bg-green-50 rounded-lg p-4">
                 <div className="flex justify-between items-center">
                   <div>
                     <Text strong className="text-green-800">
-                      {zapierAccountInfo.email}
+                      Zapier Integration Active
                     </Text>
                     <br />
-                    <Text className="text-green-600 text-sm">
-                      {zapierAccountInfo.connectedApps} apps ready for automation • {zapierAccountInfo.zapCount} active Zaps
-                    </Text>
+                    <Text className="text-green-600 text-sm">Ready for automation workflows</Text>
                   </div>
                   <Button type="link" danger onClick={disconnectZapier} className="text-red-500">
                     Disconnect
                   </Button>
                 </div>
               </div>
-
               <div className="mt-4 text-center">
                 <Text className="text-gray-600">⚡ Ready to automate! We&apos;ll help you set up workflows next.</Text>
               </div>
@@ -1023,6 +1006,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         </div>
       </Modal>
 
+      {/* Manual Leads Modal - keeping existing implementation */}
       <Modal
         title={
           <div className="flex items-center">

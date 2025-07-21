@@ -1,6 +1,5 @@
 "use client";
-
-import { useState ,useEffect} from "react";
+import { useState, useEffect } from "react";
 import { Button, Select, Typography } from "antd";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 
@@ -25,17 +24,32 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
     {
       id: "toneSelector",
       question: "How warm and approachable should your AI assistant sound?",
-      options: ["friendly", "professional", "casual", "formal"],
+      options: [
+        { value: "friendly", label: "Warm and welcoming" },
+        { value: "professional", label: "Competent and reliable" },
+        { value: "casual", label: "Relaxed and conversational" },
+        { value: "formal", label: "Respectful and structured" },
+      ],
     },
     {
       id: "sentenceLength",
       question: "How detailed should responses be?",
-      options: ["short", "medium", "long"],
+      options: [
+        { value: "short", label: "Quick and concise responses" },
+        { value: "medium", label: "Balanced detail in responses" },
+        { value: "long", label: "Comprehensive explanations" },
+      ],
     },
     {
       id: "formalityLevel",
       question: "How formal should the language be?",
-      options: ["very_casual", "casual", "neutral", "formal", "very_formal"],
+      options: [
+        { value: "very_casual", label: "Like talking to a friend" },
+        { value: "casual", label: "Relaxed but respectful" },
+        { value: "neutral", label: "Balanced approach" },
+        { value: "formal", label: "Professional courtesy" },
+        { value: "very_formal", label: "Traditional business style" },
+      ],
     },
   ];
 
@@ -43,7 +57,7 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
     if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(2)) {
       setCurrentQuestionIndex(questions.length - 1);
     }
-   },[])
+  }, []);
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
@@ -53,19 +67,10 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
       ...prev,
       [currentQuestion.id]: value,
     }));
-
-    // Auto-advance to next question after a short delay
-    // setTimeout(() => {
-    //   if (currentQuestionIndex < questions.length - 1) {
-    //     setCurrentQuestionIndex(currentQuestionIndex + 1);
-    //   } else {
-    //     onNext(formData);
-    //   }
-    // }, 1000);
   };
 
   const handleNext = () => {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    setCurrentQuestionIndex(currentQuestionIndex + 1);
   };
 
   const handlePrevious = () => {
@@ -76,15 +81,20 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
     }
   };
 
+  const getSelectedLabel = (questionId: string, value: string) => {
+    const question = questions.find(q => q.id === questionId);
+    const option = question?.options.find(opt => opt.value === value);
+    return option?.label || value;
+  };
+
   const renderPreviousQuestions = () => {
     return questions.slice(0, currentQuestionIndex).map(q => {
       const value = formData[q.id as keyof typeof formData];
-
       return (
         <div key={q.id} className="mb-8">
           <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">{q.question}</Text>
           <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
-            <Text className="text-gray-700 text-lg">{value}</Text>
+            <Text className="text-gray-700 text-lg">{getSelectedLabel(q.id, value)}</Text>
           </div>
         </div>
       );
@@ -111,8 +121,8 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
           dropdownClassName="text-base"
         >
           {currentQuestion.options.map(option => (
-            <Option key={option} value={option}>
-              {option}
+            <Option key={option.value} value={option.value}>
+              {option.label}
             </Option>
           ))}
         </Select>
@@ -125,25 +135,26 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
           >
             Previous
           </Button>
-          {currentQuestionIndex < questions.length - 1 ? (
-          <Button
-            type="primary"
-            onClick={handleNext}
-            disabled={!currentValue}
-            className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
-          >
-            Next
-          </Button>
-          ) : (
 
-          <Button
-            type="primary"
-            onClick={() => onNext(formData)}
-            disabled={!currentValue}
-            className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
-          >
-            Continue to Next Step
-          </Button>)}
+          {currentQuestionIndex < questions.length - 1 ? (
+            <Button
+              type="primary"
+              onClick={handleNext}
+              disabled={!currentValue}
+              className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
+            >
+              Next
+            </Button>
+          ) : (
+            <Button
+              type="primary"
+              onClick={() => onNext(formData)}
+              disabled={!currentValue}
+              className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
+            >
+              Continue to Next Step
+            </Button>
+          )}
         </div>
       </div>
     </div>

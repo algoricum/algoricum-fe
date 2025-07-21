@@ -1,6 +1,6 @@
 "use client";
 
-import { useState ,useEffect} from "react";
+import { useState, useEffect } from "react";
 import { Typography } from "antd";
 import { useRouter } from "next/navigation";
 import ClinicInfoStep from "./clinic-info-step";
@@ -21,7 +21,6 @@ import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { useAuth } from "@/hooks/useAuth";
 import ChatbotSetupStep from "./chatbot-setup-step";
-import { ClientPageRoot } from "next/dist/client/components/client-page";
 
 import { createClient } from "@/utils/supabase/config/client";
 import getLeadSourceId from "@/utils/lead_source";
@@ -312,6 +311,34 @@ export default function MainOnboarding() {
         }
       }
 
+      try {
+        const session = await getSupabaseSession();
+        if (!session.access_token) {
+          throw new Error("Not authenticated");
+        }
+
+        const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            clinic_id: clinic.id,
+            phone_number: mappedData.phoneNumber,
+            name: mappedData.legalBusinessName,
+          }),
+        });
+
+        const twilioResult = await twilioResponse.json();
+
+        if (!twilioResponse.ok) {
+          console.error("Twilio setup error:", twilioResult.error);
+        }
+      } catch (twilioError) {
+        console.error("Failed to set up Twilio:", twilioError);
+      }
+
       // Clear stored progress after successful completion
       clearStoredProgress();
 
@@ -354,7 +381,7 @@ export default function MainOnboarding() {
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
-           handleCompleteOnboarding();
+      handleCompleteOnboarding();
     }
   };
 
