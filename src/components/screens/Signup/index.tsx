@@ -13,10 +13,10 @@ import { Flex, Form, Typography } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "react-query";
-import { useDispatch } from "react-redux";
+
 const { Text } = Typography;
 const SignupPage = () => {
-  const dispatch = useDispatch(); 
+
   const { push } = useRouter();
   const [form] = Form.useForm();
 
@@ -46,7 +46,7 @@ const SignupPage = () => {
       // Implement social login with Supabase
       const supabase = createClient();
 
-      let { data, error } = await supabase.auth.signInWithOAuth({
+      let { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/oauth-redirect`

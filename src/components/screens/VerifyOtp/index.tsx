@@ -2,8 +2,8 @@
 import { Button } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { ResendOtpProps, VerifyOtpProps } from "@/interfaces/services_type";
-import { Flex, Form, Typography } from "antd";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Flex,Typography } from "antd";
+import { useRouter} from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useMutation } from "react-query";
 import OtpInput from 'react-otp-input';
@@ -14,8 +14,8 @@ const { Title, Text } = Typography;
 
 const VerifyOTPPage = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get("redirectUrl") ?? "/dashboard";
+  // const searchParams = useSearchParams();
+  // const redirectUrl = searchParams.get("redirectUrl") ?? "/dashboard";
   const [otp, setOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
   const [user, setUser] = useState<any>(null);
@@ -87,7 +87,7 @@ useEffect(() => {
       <Flex vertical gap={12} align="center">
         <Title level={2}>Verify Your Email</Title>
         <Text className="text-Gray600 text-center">
-          We've sent a verification code to your email address. Please enter the code below.
+          We&apos;ve sent a verification code to your email address. Please enter the code below.
         </Text>
       </Flex>
 
@@ -118,7 +118,7 @@ useEffect(() => {
           </Text>
         ) : (
           <Text className="text-sm font-helvetica text-Gray600">
-            Didn't receive a code?{" "}
+            Didn&apos;t receive a code?{" "}
             <Button
               type="link"
               className="p-0 font-helvetica-700 !text-Primary1000"

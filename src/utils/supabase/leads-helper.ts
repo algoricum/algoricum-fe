@@ -1,4 +1,3 @@
-import { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "./config/client";
 
 // Updated interfaces to match our new comprehensive status system

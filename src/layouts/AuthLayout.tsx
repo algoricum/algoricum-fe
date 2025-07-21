@@ -35,7 +35,7 @@ const AuthLayout = ({ children, isBack }: Props) => {
             {/* Text positioned at the bottom */}
             <div className="absolute bottom-0 left-0 text-white p-12 z-10 max-w-md">
               <h2 className="text-4xl font-bold mb-4">Turn Clicks Into Care.</h2>
-              <p className="text-xl">Your Clinic's AI Growth Assistant Starts Here.</p>
+              <p className="text-xl">Your Clinic&apos;s AI Growth Assistant Starts Here.</p>
             </div>
           </div>
         </div>

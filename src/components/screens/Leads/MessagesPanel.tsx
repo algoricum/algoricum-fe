@@ -1,43 +1,45 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useRef, useEffect } from "react"
-import { Input, Button } from "antd"
-import { SendOutlined, SmileOutlined, PaperClipOutlined } from "@ant-design/icons"
-import MessageBubble from "./MessageBubble"
-import { Lead } from "@/utils/supabase/leads-helper"
+import { useState, useRef, useEffect } from "react";
+import { Input, Button } from "antd";
+import { SendOutlined, SmileOutlined, PaperClipOutlined } from "@ant-design/icons";
+import MessageBubble from "./MessageBubble";
+import { Lead } from "@/utils/supabase/leads-helper";
+import Image from "next/image";
 
 interface MessagesPanelProps {
-  lead: Lead | null
-  onSendMessage: (content: string) => void
+  lead: Lead | null;
+  // eslint-disable-next-line no-unused-vars
+  onSendMessage: (content: string) => void;
 }
 
 const MessagesPanel = ({ lead, onSendMessage }: MessagesPanelProps) => {
-  const [messageInput, setMessageInput] = useState("")
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [messageInput, setMessageInput] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
-    scrollToBottom()
-  }, [lead?.messages])
+    scrollToBottom();
+  }, [lead?.messages]);
 
   const handleSend = () => {
     if (messageInput.trim()) {
-      onSendMessage(messageInput)
-      setMessageInput("")
+      onSendMessage(messageInput);
+      setMessageInput("");
     }
-  }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+      e.preventDefault();
+      handleSend();
     }
-  }
+  };
 
   if (!lead) {
     return (
@@ -47,7 +49,7 @@ const MessagesPanel = ({ lead, onSendMessage }: MessagesPanelProps) => {
           <p className="text-sm">Select a lead from the list to view messages</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -55,9 +57,11 @@ const MessagesPanel = ({ lead, onSendMessage }: MessagesPanelProps) => {
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center gap-3">
-          <img
-            src={lead.avatar || "/placeholder.svg"}
-            alt={lead.name}
+          <Image
+            src={lead?.avatar || "/placeholder.svg"}
+            alt={lead?.name || "Lead Avatar"}
+            width={40}
+            height={40}
             className="w-10 h-10 rounded-full object-cover"
           />
           <div>
@@ -69,9 +73,9 @@ const MessagesPanel = ({ lead, onSendMessage }: MessagesPanelProps) => {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[400px]">
-        {(lead && lead.messages)&& lead?.messages?.length > 0 ? (
+        {lead && lead.messages && lead?.messages?.length > 0 ? (
           <>
-            {lead.messages.map((message) => (
+            {lead.messages.map(message => (
               <MessageBubble key={message.id} message={message} />
             ))}
             <div ref={messagesEndRef} />
@@ -90,7 +94,7 @@ const MessagesPanel = ({ lead, onSendMessage }: MessagesPanelProps) => {
           <div className="flex-1">
             <Input.TextArea
               value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
+              onChange={e => setMessageInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Enter message"
               autoSize={{ minRows: 1, maxRows: 4 }}
@@ -111,7 +115,7 @@ const MessagesPanel = ({ lead, onSendMessage }: MessagesPanelProps) => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default MessagesPanel
+export default MessagesPanel;

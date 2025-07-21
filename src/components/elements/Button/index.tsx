@@ -5,7 +5,7 @@ interface AntdButtonProps extends ButtonProps {
   light?: boolean;
 }
 const Button = (props: AntdButtonProps) => {
-  const { children, danger, className, outline, light, ...btnProps } = props;
+  const { children,className, ...btnProps } = props;
 
   // const styles = outline
   //   ? "text-Primary1000 hover:!text-Primary800 !font-helvetica bg-white border !border-Primary800"

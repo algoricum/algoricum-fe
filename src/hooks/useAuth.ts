@@ -32,7 +32,8 @@ export const useAuth = () => {
     // Set up auth listener for realtime updates
     const unsubscribe = setupAuthListener(
       // onSignIn callback
-      (userData: User, token: string) => {
+      // eslint-disable-next-line no-unused-vars
+      (_userData: User, _token: string) => {
         dispatch(fetchCurrentUser());
       },
       // onSignOut callback
@@ -104,7 +105,7 @@ export const useAuth = () => {
     } catch (error) {
       return false;
     }
-  }, [dispatch, router]);
+  }, [router]);
 
   // Reset password handler
   const reset = useCallback(async (password: string) => {

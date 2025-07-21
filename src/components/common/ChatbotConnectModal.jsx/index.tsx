@@ -1,6 +1,6 @@
 import React, { FC, useState } from 'react';
-import { Modal, Tabs, Button, Input } from 'antd';
-import { ContactsTwoTone, CopyOutlined } from '@ant-design/icons';
+import { Modal, Button} from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
 import { SuccessToast } from '@/helpers/toast';
 
 type ChatbotConnectModalProps = {
@@ -90,10 +90,7 @@ export default function Home() {
     SuccessToast("Script copied to clipboard");
   };
 
-  const copyApiKey = () => {
-    navigator.clipboard.writeText(apiKey);
-    SuccessToast("API key copied to clipboard");
-  };
+
 
   return (
     <Modal

@@ -8,7 +8,6 @@ import {
   updateLeadStatus,
   getCurrentUserClinic,
   Lead,
-  Message,
   ChannelStats,
   LeadsFilters,
   LEAD_STATUSES,
@@ -98,7 +97,7 @@ const LeadsPage = () => {
     };
 
     loadMessages();
-  }, [selectedLead?.id, clinicId]); // Fixed dependency array
+  }, [selectedLead?.id, clinicId,selectedLead?.messages,selectedLead?.thread_id]); // Fixed dependency array
 
   // OPTIMIZED: Refresh leads data with better filtering
   const refreshLeads = useCallback(async () => {
