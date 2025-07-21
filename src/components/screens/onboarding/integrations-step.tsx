@@ -116,6 +116,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   });
 
   const currentQuestion = filteredQuestions[currentQuestionIndex];
+
+  console.log("currentQuestion......", currentQuestion);
+
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
   const handleCsvLeads = (csvLeads: any) => {
@@ -548,9 +551,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     handleCsvUpload();
     setShowManualLeadsModal(false);
     // You might want to proceed to the next step or handle the CSV upload here
-    if (currentQuestionIndex < filteredQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
+   
       // onNext(formData); // Or handle final submission"
       if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
         SuccessToast("Leads uploaded successfully");
@@ -560,12 +561,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       setTimeout(() => {
         InfoToast("Wants to add or remove manual Leads upload? Click previous button");
       }, 5000);
-    }
+    
   };
 
   const handleManualLeadsModalCancel = () => {
     setShowManualLeadsModal(false);
-    setCurrentQuestionIndex(prev => prev + 1);
+
   };
 
   const handleNext = () => {
@@ -657,7 +658,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const renderCurrentInput = () => {
-    if (currentQuestion.type === "radio") {
+    if (currentQuestion?.type === "radio") {
       return (
         <div className="mb-6">
           <Radio.Group value={currentValue} onChange={e => handleInputChange(e.target.value)} className="w-full">
@@ -683,7 +684,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       );
     }
 
-    if (currentQuestion.type === "multiselect") {
+    if (currentQuestion?.type === "multiselect") {
       return (
         <div className="mb-6">
           <Select

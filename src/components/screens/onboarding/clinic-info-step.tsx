@@ -1,9 +1,10 @@
 "use client";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input, Button, Typography } from "antd";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
+import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -30,6 +31,8 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     clinicPhone: initialData.clinicPhone || "",
     businessAddress: initialData.businessAddress || "",
   });
+
+
 
   const questions = [
     {
@@ -68,6 +71,12 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       required: true,
     },
   ];
+  
+  useEffect(() => {
+      if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(0)) {
+        setCurrentQuestionIndex(questions.length - 1);
+      }
+  }, [questions.length]);
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
