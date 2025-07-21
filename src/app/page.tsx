@@ -1,18 +1,5 @@
 "use client";
-import { BackgroundWrapper, Footer, TransformSupport } from "@/components/common";
-import {
-  Header,
-  HeroSection,
-  HowHashbotWorks,
-  KeyFeatures,
-  OurCustomersSaying,
-  Pricing,
-  StreamlineYourSupport,
-  TrustedLeaders,
-} from "@/components/screens/Home";
-import { Flex } from "antd";
-
-const styles = "z-10 px-3 md:px-5 sm:container";
+import { Header } from "@/components/screens/Home";
 
 export default function Home() {
   return (
@@ -35,9 +22,7 @@ export default function Home() {
     // </BackgroundWrapper>
     <>
       <Header />
-    <div className="flex justify-center h-screen items-center bg-green-200">
-      Algoricum
-    </div>
+      <div className="flex justify-center h-screen items-center bg-green-200">Algoricum</div>
     </>
   );
 }

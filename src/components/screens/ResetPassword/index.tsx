@@ -22,7 +22,7 @@ const ResetPasswordPage = () => {
   useEffect(() => {
     const checkResetSession = async () => {
       const { data, error } = await supabase.auth.getSession();
-      
+
       if (error || !data.session) {
         ErrorToast("Invalid or expired password reset link");
         push("/login");
@@ -30,8 +30,9 @@ const ResetPasswordPage = () => {
     };
 
     checkResetSession();
-  }, [push]);
+  }, [push, supabase.auth]);
 
+  // eslint-disable-next-line no-unused-vars
   const { mutate, isLoading } = useMutation((data: ResetPasswordProps) => resendOtp("email"), {
     onSuccess: () => {
       SuccessToast("Password reset successfully");

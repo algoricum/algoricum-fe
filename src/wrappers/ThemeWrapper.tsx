@@ -1,5 +1,4 @@
-import { selectTheme, updateTheme } from "@/utils/themeUtils";
-import React, { ReactNode, useEffect } from "react";
+import React, { ReactNode } from "react";
 
 interface ThemeWrapperProps {
   children: ReactNode | ReactNode[];

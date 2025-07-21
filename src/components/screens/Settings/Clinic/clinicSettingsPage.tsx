@@ -1,24 +1,22 @@
-import { ColorConfigurator, DeleteModal } from "@/components/common";
+import { ColorConfigurator } from "@/components/common";
 import { Button, Input, PasswordInput } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { CrossIcon, PencilIcon, UploadIcon } from "@/icons";
+import {  PencilIcon, UploadIcon } from "@/icons";
 import { Clinic, UpdateClinicProps, User } from "@/interfaces/services_type";
 import { createClient } from "@/utils/supabase/config/client";
 import { Flex, Form, Upload, UploadFile } from "antd";
 import { useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
 import SettingsCard from "../SettingsCard";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 
 const ClinicSettingsPage = () => {
-  const [form] = Form.useForm();
-  const dispatch = useDispatch();
+  const [form] = Form.useForm()
    const [clinic, setClinic] = useState<Clinic | null>(null);
    const [user, setUser] = useState<User | null>(null);
   const [isUploadHover, setIsUploadHover] = useState<boolean>(false);
-  const [isDeleteModal, setIsDeleteModal] = useState<boolean>(false);
+  const [, setIsDeleteModal] = useState<boolean>(false);
   const [editOpenAI, setEditOpenAI] = useState<boolean>(false);
   const [isOwner, setIsOwner] = useState<boolean>(false);
   const [isLogoChanged, setIsLogoChanged] = useState<boolean>(false);
@@ -66,11 +64,9 @@ const ClinicSettingsPage = () => {
     };
 
     checkOwnership();
-  }, [user, clinic]);
+  }, [user, clinic,supabase]);
 
-  const handleCancel = () => {
-    setIsDeleteModal(false);
-  };
+ 
 
   const handleDeleteClinic = () => {
     setIsDeleteModal(true);
@@ -101,7 +97,7 @@ const ClinicSettingsPage = () => {
 
       // Handle logo upload if changed
       if (isLogoChanged && logoFile && user?.id) {
-        const logoUrl = await uploadClinicLogo(user.id, logoFile);
+         await uploadClinicLogo(user.id, logoFile);
       }
 
       // Prepare dashboard theme data
@@ -125,7 +121,7 @@ const ClinicSettingsPage = () => {
         ...apiKeyUpdate
       };
       
-      SuccessToast("Clinic settings updated successfully");
+      SuccessToast(`Clinic settings updated successfully ${updateData}`);
     } catch (error: any) {
       ErrorToast(error.message || "Failed to update clinic settings");
     } finally {

@@ -7,6 +7,7 @@ interface ColorConfiguratorProps {
   color?: string;
   fieldName: string;
   value: string;
+  // eslint-disable-next-line no-unused-vars
   onChange: (value: string) => void;
 }
 const ColorConfigurator = ({ heading = "", description = "", value, onChange }: ColorConfiguratorProps) => {
