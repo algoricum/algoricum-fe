@@ -31,6 +31,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [zapierForm] = Form.useForm();
   const [autoProgressing, setAutoProgressing] = useState(false);
   // const [hubspotPrompted, setHubspotPrompted] = useState(false);
+  const [showCustomCrmModal, setShowCustomCrmModal] = useState(false);
 
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
@@ -103,7 +104,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         "ClickFunnels",
         "Elementor Forms",
         "Instapage",
-        "Other",
+        "Unable to find my CRM",
       ],
     },
     {
@@ -116,7 +117,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   // Filter questions based on HubSpot answer
   const filteredQuestions = questions.filter(q => {
-    if (q.id === "otherTools" && formData.usesHubspot === "Yes") {
+    if ((q.id === "otherTools" || q.id === "uploadLeads") && formData.usesHubspot === "Yes") {
       return false; // Skip "otherTools" if HubSpot is Yes
     }
     return true;
@@ -357,7 +358,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
     if (currentQuestion.id === "otherTools" && value && value.length > 0) {
       const selectedTools = value.split(",").filter((s: string) => s);
-      if (selectedTools.length > 0) {
+      if (selectedTools.includes("Unable to find my CRM")) {
+        setTimeout(() => {
+          setShowCustomCrmModal(true);
+        }, 500);
+      }
+      // Only show Zapier modal if 'Unable to find my CRM' is NOT selected
+      else if (selectedTools.length > 0) {
         setTimeout(() => {
           setShowZapierModal(true);
         }, 2500); // Delay for UX
@@ -550,7 +557,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
 
     // Handle Zapier modal
-    if (currentQuestion.id === "otherTools" && currentValue && currentValue.length > 0 && zapierStatus !== "connected") {
+    if (
+      currentQuestion.id === "otherTools" &&
+      currentValue &&
+      currentValue.length > 0 &&
+      zapierStatus !== "connected" &&
+      !currentValue.split(",").includes("Unable to find my CRM")
+    ) {
       setShowZapierModal(true);
       return;
     }
@@ -678,8 +691,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 <Text className="text-lg font-semibold text-purple-900">Upload your existing leads!</Text>
               </div>
               <Text className="text-purple-900 text-base leading-6">
-                Great! You can upload a CSV file with your existing leads to import them directly into our platform. We&apos;ll help you map the
-                fields correctly.
+                Great! You can upload a CSV file with your existing leads to import them directly into our platform. We&apos;ll help you map
+                the fields correctly.
               </Text>
             </Card>
           )}
@@ -688,12 +701,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
 
     if (currentQuestion?.type === "multiselect") {
+      const selectedTools = currentValue ? currentValue.split(",").filter((s: string) => s) : [];
       return (
         <div className="mb-6">
           <Select
             mode="multiple"
             placeholder="Select tools you use"
-            value={currentValue ? currentValue.split(",").filter((s: string) => s) : []}
+            value={selectedTools}
             onChange={values => handleInputChange(values.join(","))}
             size="large"
             className="w-full text-lg"
@@ -705,7 +719,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </Option>
             ))}
           </Select>
-          {currentValue && currentValue.length > 0 && (
+          {currentValue && currentValue.length > 0 && !selectedTools.includes("Unable to find my CRM") && (
             <Card className="rounded-xl bg-orange-50 border-2 border-orange-500 mt-6" styles={{ body: { padding: "20px" } }}>
               <div className="flex items-center mb-3">
                 <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
@@ -1071,6 +1085,48 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </Text>
             </div>
           </div>
+        </div>
+      </Modal>
+
+      {/* Custom CRM Modal */}
+      <Modal
+        title={
+          <div className="flex items-center">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3" style={{ backgroundColor: "#A068F1" }}>
+              <Text className="text-white font-bold text-sm">?</Text>
+            </div>
+            <span className="text-xl font-semibold">Can&apos;t find your CRM?</span>
+          </div>
+        }
+        open={showCustomCrmModal}
+        onOk={() => setShowCustomCrmModal(false)}
+        onCancel={() => setShowCustomCrmModal(false)}
+        okText="Close"
+        cancelText="Cancel"
+        width={500}
+        centered
+        footer={null}
+      >
+        <div className="py-6 text-center">
+          <Alert
+            message="We couldn't find your CRM."
+            description="Don't worry! Our team can help you integrate your preferred tool. Book a call with us and we'll guide you through the process."
+            type="info"
+            showIcon
+            className="mb-6 custom-alert-icon"
+          />
+          <Button
+            type="primary"
+            icon={<CalendarOutlined />}
+            className="text-lg font-medium px-8 py-2 mt-2 border-none"
+            style={{
+              backgroundColor: "#A068F1",
+              color: "#fff",
+            }}
+            onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
+          >
+            Book a Call with Our Team
+          </Button>
         </div>
       </Modal>
     </div>

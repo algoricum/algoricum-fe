@@ -1,8 +1,7 @@
 "use client";
-
 import { useState, useEffect } from "react";
-import { Button, Input, Select, Upload, Typography, Card, Flex, Radio, Space } from "antd";
-import { UserOutlined, MessageOutlined, FileTextOutlined } from "@ant-design/icons";
+import { Button, Input, Select, Upload, Typography, Card, Flex, Radio, Space, Modal } from "antd";
+import { UserOutlined, MessageOutlined, FileTextOutlined, RobotOutlined } from "@ant-design/icons";
 import { ColorConfigurator } from "@/components/common";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 
@@ -25,7 +24,6 @@ const getPreviewText = ({ tone, formality, length }: { tone?: string; formality?
     casual: "Hey!",
     formal: "Good day,",
   };
-
   const formalityMap = {
     very_casual: "I'm here to help you out with anything you need!",
     casual: "I'm here to help with any questions you might have.",
@@ -33,7 +31,6 @@ const getPreviewText = ({ tone, formality, length }: { tone?: string; formality?
     formal: "I am here to assist you with your medical inquiries.",
     very_formal: "I am at your service to address your medical consultation needs.",
   };
-
   const lengthMap = {
     short: "How can I help?",
     medium: "How can I help you today? I can answer questions about our services and help you book appointments.",
@@ -61,6 +58,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
     logo: initialData.logo || [],
     chatbotAvatar: initialData.chatbotAvatar || [],
   });
+  const [isModalVisible, setIsModalVisible] = useState(false); // State for modal visibility
 
   const questions = [
     {
@@ -72,7 +70,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
     {
       id: "configuration",
       type: "configuration",
-      question: "Configure Your AI Chatbot",
+      question: "",
       subtitle: "Let's set up your intelligent chatbot to handle patient inquiries 24/7",
       conditional: {
         dependsOn: "hasChatbot",
@@ -114,7 +112,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
       onNext(formData);
       return;
     }
-
     if (currentQuestionIndex < questions.length - 1) {
       // Check if next question should be shown
       const nextQuestion = questions[currentQuestionIndex + 1];
@@ -175,7 +172,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
   const renderCurrentInput = () => {
     if (currentQuestion.type === "radio") {
       const currentValue = formData[currentQuestion.id as keyof typeof formData];
-
       return (
         <div className="mb-6">
           <Radio.Group value={currentValue} onChange={e => handleInputChange(currentQuestion.id, e.target.value)} className="w-full">
@@ -184,9 +180,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                 <Card
                   key={option}
                   hoverable
-                  className={`rounded-xl border-2 cursor-pointer ${
-                    currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"
-                  }`}
+                  className={`rounded-xl border-2 cursor-pointer ${currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"}`}
                   style={{ padding: "16px" }}
                   onClick={() => handleInputChange(currentQuestion.id, option)}
                 >
@@ -197,9 +191,8 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
               ))}
             </Space>
           </Radio.Group>
-
-          {/* Show info card for "Yes" option */}
-          {currentValue === "Yes" && (
+          {/* Show info card for "No" option */}
+          {currentValue === "No" && (
             <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" bodyStyle={{ padding: "20px" }}>
               <div className="flex items-center mb-3">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
@@ -215,7 +208,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
         </div>
       );
     }
-
     if (currentQuestion.type === "configuration") {
       return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
@@ -233,7 +225,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                 size="large"
               />
             </div>
-
             {/* Greeting Message */}
             <div>
               <Text className="block text-base font-medium text-gray-700 mb-2">Greeting Message</Text>
@@ -245,7 +236,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                 className="rounded-lg"
               />
             </div>
-
             {/* Tone Selector */}
             <div>
               <Text className="block text-base font-medium text-gray-700 mb-2">Tone</Text>
@@ -263,7 +253,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                 <Option value="formal">Formal - Respectful and structured</Option>
               </Select>
             </div>
-
             {/* Sentence Length */}
             <div>
               <Text className="block text-base font-medium text-gray-700 mb-2">Response Detail</Text>
@@ -280,7 +269,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                 <Option value="long">Long - Comprehensive explanations</Option>
               </Select>
             </div>
-
             {/* Formality Level */}
             <div>
               <Text className="block text-base font-medium text-gray-700 mb-2">Formality Level</Text>
@@ -299,7 +287,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                 <Option value="very_formal">Very Formal - Traditional business style</Option>
               </Select>
             </div>
-
             {/* Color Configuration */}
             <div>
               <Flex wrap="wrap" gap="middle">
@@ -309,7 +296,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                   value={formData.primaryColor}
                   onChange={value => handleInputChange("primaryColor", value)}
                 />
-
                 <ColorConfigurator
                   fieldName="fontColor"
                   heading="Font color"
@@ -319,9 +305,19 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
               </Flex>
             </div>
           </div>
-
           {/* Right Column - Uploads and Preview */}
           <div className="space-y-6">
+            {/* New Integrate Bot Button */}
+            <Button
+              type="primary"
+              icon={<RobotOutlined />}
+              onClick={() => setIsModalVisible(true)}
+              className="w-full h-13 text-base font-medium rounded-xl px-8 shadow-lg text-white" // Added shadow-lg and text-white
+              style={{ backgroundColor: "#A068F1", borderColor: "#A068F1" }}
+            >
+              Integrate Bot
+            </Button>
+
             {/* Chatbot Avatar Upload */}
             <div>
               <Text className="block text-base font-medium text-gray-700 mb-2">Chatbot Avatar</Text>
@@ -340,7 +336,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                 <p className="text-center text-xs text-gray-500">JPG, PNG, SVG (recommended: square image)</p>
               </Dragger>
             </div>
-
             {/* Logo Upload */}
             <div>
               <Text className="block text-base font-medium text-gray-700 mb-2">Chatbot Logo</Text>
@@ -359,7 +354,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                 <p className="text-center text-xs text-gray-500">JPG, PNG, SVG</p>
               </Dragger>
             </div>
-
             {/* Live Preview */}
             {(formData.toneSelector || formData.sentenceLength || formData.formalityLevel) && (
               <Card className="bg-blue-50 border-blue-200">
@@ -387,7 +381,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
         </div>
       );
     }
-
     return null;
   };
 
@@ -395,17 +388,13 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
     <div className="max-w-4xl">
       {/* Previous Questions */}
       {renderPreviousQuestions()}
-
       {/* Current Question */}
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
           {currentQuestion.question}
         </Title>
-
-        {currentQuestion.subtitle && <Text className="text-gray-600 text-lg block mb-8">{currentQuestion.subtitle}</Text>}
-
+        {currentQuestion.subtitle && <Text className="text-gray-600 text-2xl block mb-8 font-bold">{currentQuestion.subtitle}</Text>}
         {renderCurrentInput()}
-
         {/* Navigation */}
         <div className="flex justify-between">
           <Button
@@ -415,7 +404,6 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
           >
             Previous
           </Button>
-
           <Button
             type="primary"
             onClick={handleNext}
@@ -426,6 +414,43 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
           </Button>
         </div>
       </div>
+
+      {/* Chatbot Integration Guide Modal */}
+      <Modal
+        title="Chatbot Integration Guide"
+        open={isModalVisible}
+        onCancel={() => setIsModalVisible(false)}
+        footer={[
+          <Button key="back" onClick={() => setIsModalVisible(false)}>
+            Close
+          </Button>,
+        ]}
+      >
+        <Typography>
+          <Title level={4}>Follow these steps to integrate your chatbot:</Title>
+          <ol className="list-decimal pl-5 space-y-2">
+            <li>
+              <Text strong>Complete Onboarding:</Text> Ensure you have finished all the onboarding steps.
+            </li>
+            <li>
+              <Text strong>Go to Dashboard:</Text> Navigate to your main dashboard.
+            </li>
+            <li>
+              <Text strong>Go to Profile Settings:</Text> Access your profile settings from the navigation menu.
+            </li>
+            <li>
+              <Text strong>Go to Chatbot Settings:</Text> Find the dedicated "Chatbot Settings" section.
+            </li>
+            <li>
+              <Text strong>Click &quot;Generate Script&quot; and Copy it:</Text> Generate the integration script and copy it to embed your chatbot on
+              your website.
+            </li>
+          </ol>
+          <Text className="mt-4 block text-gray-600">
+            This script will allow your intelligent chatbot to handle patient inquiries 24/7.
+          </Text>
+        </Typography>
+      </Modal>
     </div>
   );
 }
