@@ -35,6 +35,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
     otherTools: initialData.otherTools || "",
+    uploadLeads: initialData.uploadLeads || "", // New field for file upload
   });
   const [csvLeads, setCsvLeads] = useState<any>([]);
   const supabase = createClient();
@@ -104,6 +105,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         "Instapage",
         "Other",
       ],
+    },
+    {
+      id: "uploadLeads",
+      type: "radio",
+      question: "Do you want to upload your existing leads via CSV?",
+      options: ["Yes", "No"],
     },
   ];
 
@@ -353,6 +360,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         }, 2500); // Delay for UX
       }
     }
+
+    // Handle file upload question
+    if (currentQuestion.id === "uploadLeads") {
+      if (value === "Yes") {
+        setTimeout(() => {
+          setShowManualLeadsModal(true);
+        }, 500); // Small delay for better UX
+      }
+    }
   };
 
   const connectToHubSpot = async () => {
@@ -397,50 +413,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       `);
     }
   };
-
-  // Updated HubSpot disconnect function
-  // const disconnectHubSpot = async () => {
-  //   try {
-  //     const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
-  //       method: "DELETE",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-  //         apikey: SUPABASE_ANON_KEY,
-  //       },
-  //       body: JSON.stringify({
-  //         userId: getCurrentUserId(),
-  //       }),
-  //     });
-
-  //     if (!response.ok) {
-  //       const errorText = await response.text();
-  //       console.error("Disconnect error:", response.status, errorText);
-  //       throw new Error(`HTTP error! status: ${response.status}`);
-  //     }
-
-  //     const data = await response.json();
-
-  //     if (data.error) {
-  //       throw new Error(data.error);
-  //     }
-
-  //     setHubspotStatus("disconnected");
-  //     setHubspotAccountInfo(null);
-
-  //     SuccessToast(`{
-  //       message: "Disconnected Successfully",
-  //       description: "Your HubSpot account has been disconnected.",
-  //     }`);
-  //   } catch (error) {
-  //     console.error("Disconnection failed:", error);
-  //     ErrorToast(`
-  //       message: "Disconnection Failed",
-  //       description: ${error instanceof Error ? error.message : "Unable to disconnect from HubSpot. Please try again."}
-  //     `);
-  //     clearOAuthState();
-  //   }
-  // };
 
   // Keep the message listener for popup communication
   useEffect(() => {
@@ -547,43 +519,47 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const handleManualLeadsModalOk = () => {
     handleCsvUpload();
     setShowManualLeadsModal(false);
-    // You might want to proceed to the next step or handle the CSV upload here
+
+    if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
+      SuccessToast("Leads uploaded successfully");
+    }
+
+    // Move to next question or complete
     if (currentQuestionIndex < filteredQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      // onNext(formData); // Or handle final submission"
-      if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
-        SuccessToast("Leads uploaded successfully");
-      }
       setShowCompletionButtons(true);
-
       setTimeout(() => {
-        InfoToast("Wants to add or remove manual Leads upload? Click previous button");
+        InfoToast("Want to add or remove manual leads upload? Click previous button");
       }, 5000);
     }
   };
 
   const handleManualLeadsModalCancel = () => {
     setShowManualLeadsModal(false);
-    setCurrentQuestionIndex(prev => prev + 1);
+    // Don't move to next question, just close modal
   };
 
   const handleNext = () => {
+    // Handle HubSpot modal
+    if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
+      setShowHubspotModal(true);
+      return;
+    }
+
+    // Handle Zapier modal
     if (currentQuestion.id === "otherTools" && currentValue && currentValue.length > 0 && zapierStatus !== "connected") {
       setShowZapierModal(true);
       return;
     }
 
-    // Fixed logic for manual leads modal
-    if (
-      currentQuestion.id === "otherTools" &&
-      formData.usesHubspot === "No" &&
-      (!currentValue || currentValue.trim() === "" || currentValue.split(",").filter((s: string) => s.trim()).length === 0)
-    ) {
+    // Handle file upload modal
+    if (currentQuestion.id === "uploadLeads" && currentValue === "Yes") {
       setShowManualLeadsModal(true);
       return;
     }
 
+    // Continue to next question or complete
     if (currentQuestionIndex < filteredQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
@@ -598,6 +574,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             zapierConnected: zapierStatus === "connected",
             zapierAccountInfo,
           }),
+        ...(formData.uploadLeads === "Yes" && {
+          csvUploaded: localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) !== null,
+        }),
       };
       onNext(finalData);
     }
@@ -650,6 +629,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 </Text>
               </div>
             )}
+            {q.id === "uploadLeads" && value === "Yes" && localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && (
+              <div className="mt-2 p-2 bg-purple-100 rounded-lg">
+                <Text className="text-purple-700 text-sm">
+                  <CheckCircleOutlined className="mr-1" />
+                  CSV file uploaded successfully
+                </Text>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -657,7 +644,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const renderCurrentInput = () => {
-    if (currentQuestion.type === "radio") {
+    console.log("current question is ", currentQuestion);
+
+    if (currentQuestion?.type === "radio") {
       return (
         <div className="mb-6">
           <Radio.Group value={currentValue} onChange={e => handleInputChange(e.target.value)} className="w-full">
@@ -679,11 +668,26 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               ))}
             </Space>
           </Radio.Group>
+          {/* Special info card for upload leads question */}
+          {currentQuestion.id === "uploadLeads" && currentValue === "Yes" && (
+            <Card className="rounded-xl bg-purple-50 border-2 border-purple-500 mt-6" styles={{ body: { padding: "20px" } }}>
+              <div className="flex items-center mb-3">
+                <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+                  <Text className="text-white font-bold text-sm">CSV</Text>
+                </div>
+                <Text className="text-lg font-semibold text-purple-900">Upload your existing leads!</Text>
+              </div>
+              <Text className="text-purple-900 text-base leading-6">
+                Great! You can upload a CSV file with your existing leads to import them directly into our platform. We&apos;ll help you map the
+                fields correctly.
+              </Text>
+            </Card>
+          )}
         </div>
       );
     }
 
-    if (currentQuestion.type === "multiselect") {
+    if (currentQuestion?.type === "multiselect") {
       return (
         <div className="mb-6">
           <Select
@@ -702,7 +706,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             ))}
           </Select>
           {currentValue && currentValue.length > 0 && (
-            <Card className="rounded-xl bg-orange-50 border-2 border-orange-500 mt-6" bodyStyle={{ padding: "20px" }}>
+            <Card className="rounded-xl bg-orange-50 border-2 border-orange-500 mt-6" styles={{ body: { padding: "20px" } }}>
               <div className="flex items-center mb-3">
                 <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
                   <ThunderboltOutlined className="text-white text-base" />
@@ -1002,14 +1006,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         </div>
       </Modal>
 
-      {/* Manual Leads Modal - keeping existing implementation */}
+      {/* Manual Leads Modal */}
       <Modal
         title={
           <div className="flex items-center">
             <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
               <Text className="text-white font-bold text-sm">CSV</Text>
             </div>
-            <span className="text-xl font-semibold">You want to enter manual leads?</span>
+            <span className="text-xl font-semibold">Upload Your Leads</span>
           </div>
         }
         open={showManualLeadsModal}
@@ -1019,6 +1023,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         cancelText="Skip for Now"
         okButtonProps={{
           className: "bg-purple-500 border-purple-500",
+          disabled: csvLeads.length === 0,
         }}
         width={500}
         centered
@@ -1050,6 +1055,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 file:bg-purple-50 file:text-purple-700
                 hover:file:bg-purple-100"
             />
+            {csvLeads.length > 0 && (
+              <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                <Text className="text-green-700 text-sm">
+                  <CheckCircleOutlined className="mr-1" />
+                  File selected: {csvLeads.name}
+                </Text>
+              </div>
+            )}
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
               <Text className="text-sm text-gray-600">
                 <strong>CSV Format:</strong>
