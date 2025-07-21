@@ -8,6 +8,7 @@ import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 const { Title, Text } = Typography;
 
 interface BookingSetupStepProps {
+  // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;

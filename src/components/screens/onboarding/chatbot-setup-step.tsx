@@ -12,6 +12,7 @@ const { Title, Text } = Typography;
 const { Dragger } = Upload;
 
 interface ChatbotSetupStepProps {
+  // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;

@@ -8,6 +8,7 @@ const { Dragger } = Upload;
 const { Title, Text } = Typography;
 
 interface AiAssistantStepProps {
+  // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
@@ -41,17 +42,17 @@ export default function AiAssistantStep({ onNext, onPrev, initialData = {} }: Ai
       required: true,
     },
   ];
-   
+
   useEffect(() => {
     // Check if localStorage is available (for SSR compatibility)
     if (typeof window !== "undefined") {
-      const onboardingCompleted = localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY)
+      const onboardingCompleted = localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY);
       if (onboardingCompleted && JSON.parse(onboardingCompleted).includes(3)) {
         // If the key exists, set the current question index to the last one
-        setCurrentQuestionIndex(questions.length - 1)
+        setCurrentQuestionIndex(questions.length - 1);
       }
     }
-  }, [questions.length]) // Empty dependency array ensures this runs only once on mount 
+  }, [questions.length]); // Empty dependency array ensures this runs only once on mount
   const currentQuestion = questions[currentQuestionIndex];
 
   const handleFileUpload = (info: any, questionId: string) => {
