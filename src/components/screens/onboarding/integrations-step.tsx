@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Input, Form } from "antd";
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
 import { getUserData } from "@/utils/supabase/user-helper";
+import { createClient } from "@/utils/supabase/config/client";
+import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toast";
+import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -26,14 +29,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [zapierAccountInfo, setZapierAccountInfo] = useState<any>(null);
   const [zapierForm] = Form.useForm();
   const [autoProgressing, setAutoProgressing] = useState(false);
-  const [hubspotPrompted, setHubspotPrompted] = useState(false);
+  // const [hubspotPrompted, setHubspotPrompted] = useState(false);
 
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
-    usesAds: initialData.usesAds || "",
-    hasChatbot: initialData.hasChatbot || "",
     otherTools: initialData.otherTools || "",
   });
+  const [csvLeads, setCsvLeads] = useState<any>([]);
+  const supabase = createClient();
+  const [showCompletionButtons, setShowCompletionButtons] = useState(false);
 
   const questions = [
     {
@@ -100,38 +104,71 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         "Other",
       ],
     },
-    {
-      id: "usesAds",
-      type: "radio",
-      question: "Do you use ads?",
-      options: ["Yes", "No"],
-    },
-    {
-      id: "hasChatbot",
-      type: "radio",
-      question: "Are you already using a chatbot?",
-      options: ["Yes", "No"],
-    },
   ];
 
-  const currentQuestion = questions[currentQuestionIndex];
-  const currentValue = formData[currentQuestion.id as keyof typeof formData];
+  // Filter questions based on HubSpot answer
+  const filteredQuestions = questions.filter(q => {
+    if (q.id === "otherTools" && formData.usesHubspot === "Yes") {
+      return false; // Skip "otherTools" if HubSpot is Yes
+    }
+    return true;
+  });
+
+  const currentQuestion = filteredQuestions[currentQuestionIndex];
+  const currentValue = formData[currentQuestion?.id as keyof typeof formData];
+
+  const handleCsvLeads = (csvLeads: any) => {
+    setCsvLeads(csvLeads);
+  };
+
+  const handleCsvUpload = async () => {
+    try {
+      if (csvLeads.length === 0) {
+        WarningToast("No CSV file selected");
+        return;
+      }
+
+      // Get current user
+      const user = await getUserData();
+      if (!user) {
+        throw new Error("User not found. Please log in again.");
+      }
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const fileName = `leads-${user.id}-${timestamp}.csv`;
+
+      // Create file path: user_id/filename.csv
+      const filePath = `${user.id}/${fileName}`;
+
+      // Upload file directly to Supabase Storage
+      const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvLeads, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+      if (error) {
+        console.error("Upload error:", error);
+        throw new Error(`Failed to upload CSV: ${error.message}`);
+      }
+
+      localStorage.setItem(ONBOARDING_LEADS_FILE_NAME, filePath);
+    } catch (error) {
+      console.error("Error uploading CSV:", error);
+    }
+  };
 
   const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
   const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
-  // Auto-progress to next question after successful HubSpot connection
-  const autoProgressToNext = () => {
-    if (autoProgressing) return; // Prevent multiple calls
-
+  const autoProgressToNext = useCallback(() => {
+    if (autoProgressing) return;
     setAutoProgressing(true);
-
     setTimeout(() => {
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
         setShowHubspotModal(false);
       } else {
-        // This was the last question, submit the form
         const finalData = {
           ...formData,
           usesHubspot: "Yes",
@@ -141,18 +178,23 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         onNext(finalData);
       }
       setAutoProgressing(false);
-    }, 1500); // 1.5 second delay to show success message
-  };
+    }, 1500);
+  }, [
+    autoProgressing,
+    currentQuestionIndex,
+    questions.length,
+    setCurrentQuestionIndex,
+    setShowHubspotModal,
+    formData,
+    hubspotAccountInfo,
+    onNext,
+  ]);
 
   // Restore state from localStorage on component mount
   useEffect(() => {
-    // Check for completed steps
-    if (
-      localStorage.getItem("clinic_onboarding_completed_steps_v2") &&
-      JSON.parse(localStorage.getItem("clinic_onboarding_completed_steps_v2") || "").includes(5)
-    ) {
-      setCurrentQuestionIndex(questions.length - 1);
-    }
+    // if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(6)) {
+    //   setCurrentQuestionIndex(filteredQuestions.length - 1);
+    // }
 
     // Restore OAuth state if it exists
     const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
@@ -208,13 +250,17 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         autoProgressToNext();
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
+        ErrorToast(`
+          message: "Connection Failed",
+          description: ${event.data.error} || "Unable to connect to HubSpot. Please try again.",
+      `);
         clearOAuthState();
       }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing]);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing, autoProgressToNext]);
 
   // Handle OAuth callback if code parameter is present
   useEffect(() => {
@@ -260,7 +306,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     };
 
     handleOAuthRedirect();
-  }, []);
+  }, [autoProgressToNext]);
 
   const getCurrentUserId = async () => {
     const user = await getUserData();
@@ -289,23 +335,21 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       [currentQuestion.id]: value,
     }));
 
-    // Reset prompted flag if user changes from Yes to No
-    if (currentQuestion.id === "usesHubspot" && value !== "Yes") {
-      setHubspotPrompted(false);
+    if (currentQuestion.id === "usesHubspot") {
+      if (value === "Yes") {
+        setShowHubspotModal(true);
+        setShowCompletionButtons(true);
+      } else if (value === "No") {
+        setShowCompletionButtons(false);
+      }
     }
 
-    if (currentQuestion.id === "usesHubspot" && value === "Yes" && hubspotStatus !== "connected" && !hubspotPrompted) {
-      setHubspotPrompted(true);
-      setShowHubspotModal(true);
-    }
-
-    // Show Zapier modal when tools are selected (with delay)
     if (currentQuestion.id === "otherTools" && value && value.length > 0) {
       const selectedTools = value.split(",").filter((s: string) => s);
       if (selectedTools.length > 0) {
         setTimeout(() => {
           setShowZapierModal(true);
-        }, 2500);
+        }, 2500); // Delay for UX
       }
     }
   };
@@ -346,9 +390,56 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     } catch (error) {
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
-      clearOAuthState();
+      ErrorToast(`
+        message: "Connection Failed",
+        description: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"},
+      `);
     }
   };
+
+  // Updated HubSpot disconnect function
+  // const disconnectHubSpot = async () => {
+  //   try {
+  //     const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
+  //       method: "DELETE",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  //         apikey: SUPABASE_ANON_KEY,
+  //       },
+  //       body: JSON.stringify({
+  //         userId: getCurrentUserId(),
+  //       }),
+  //     });
+
+  //     if (!response.ok) {
+  //       const errorText = await response.text();
+  //       console.error("Disconnect error:", response.status, errorText);
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
+
+  //     const data = await response.json();
+
+  //     if (data.error) {
+  //       throw new Error(data.error);
+  //     }
+
+  //     setHubspotStatus("disconnected");
+  //     setHubspotAccountInfo(null);
+
+  //     SuccessToast(`{
+  //       message: "Disconnected Successfully",
+  //       description: "Your HubSpot account has been disconnected.",
+  //     }`);
+  //   } catch (error) {
+  //     console.error("Disconnection failed:", error);
+  //     ErrorToast(`
+  //       message: "Disconnection Failed",
+  //       description: ${error instanceof Error ? error.message : "Unable to disconnect from HubSpot. Please try again."}
+  //     `);
+  //     clearOAuthState();
+  //   }
+  // };
 
   // Keep the message listener for popup communication
   useEffect(() => {
@@ -378,7 +469,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing]);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing, autoProgressToNext]);
 
   const disconnectZapier = async () => {
     try {
@@ -401,13 +492,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const handleHubspotModalOk = () => {
     setShowHubspotModal(false);
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
   };
 
   const handleHubspotModalCancel = () => {
     setShowHubspotModal(false);
+    setShowCompletionButtons(false);
     setFormData(prev => ({
       ...prev,
       usesHubspot: "",
@@ -418,10 +507,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     try {
       const formValues = await zapierForm.validateFields();
       if (!formValues.zapierApiKey || formValues.zapierApiKey.length < 32) {
-        // Alert.warning({
-        //   message: "Invalid API Key",
-        //   description: "Please enter a valid Zapier API key (32+ characters)",
-        // });
+        ErrorToast(`
+          message: "Invalid API Key",
+          description: "Please enter a valid Zapier API key (32+ characters)",
+        `);
         return false;
       }
       return true;
@@ -434,7 +523,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const handleZapierModalOk = async () => {
     if (zapierStatus === "connected") {
       setShowZapierModal(false);
-      if (currentQuestionIndex < questions.length - 1) {
+      if (currentQuestionIndex < filteredQuestions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       }
     } else {
@@ -455,23 +544,27 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handleManualLeadsModalOk = () => {
+    handleCsvUpload();
     setShowManualLeadsModal(false);
-    if (currentQuestionIndex < questions.length - 1) {
+    // You might want to proceed to the next step or handle the CSV upload here
+    if (currentQuestionIndex < filteredQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      onNext(formData);
+      // onNext(formData); // Or handle final submission"
+      if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
+        SuccessToast("Leads uploaded successfully");
+      }
+      setShowCompletionButtons(true);
+
+      setTimeout(() => {
+        InfoToast("Wants to add or remove manual Leads upload? Click previous button");
+      }, 5000);
     }
   };
 
   const handleManualLeadsModalCancel = () => {
     setShowManualLeadsModal(false);
     setCurrentQuestionIndex(prev => prev + 1);
-  };
-
-  const handleCsvUpload = (file: File) => {
-    console.log("CSV file selected for upload:", file.name);
-    alert(`CSV file "${file.name}" selected for upload! (Upload logic not implemented)`);
-    return false;
   };
 
   const handleNext = () => {
@@ -490,7 +583,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       return;
     }
 
-    if (currentQuestionIndex < questions.length - 1) {
+    if (currentQuestionIndex < filteredQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       const finalData = {
@@ -510,12 +603,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handlePrevious = () => {
+    setShowCompletionButtons(false);
+
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
       // Reset HubSpot prompted flag when going back
       if (currentQuestionIndex - 1 === 0) {
         // Going back to HubSpot question
-        setHubspotPrompted(false);
+        // setHubspotPrompted(false);
       }
     } else if (onPrev) {
       onPrev();
@@ -523,8 +618,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const renderPreviousQuestions = () => {
-    return questions.slice(0, currentQuestionIndex).map(q => {
+    return filteredQuestions.slice(0, currentQuestionIndex).map(q => {
       const value = formData[q.id as keyof typeof formData];
+
       return (
         <div key={q.id} className="mb-8">
           <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">{q.question}</Text>
@@ -582,20 +678,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               ))}
             </Space>
           </Radio.Group>
-          {currentQuestion.id === "hasChatbot" && currentValue === "No" && (
-            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" bodyStyle={{ padding: "20px" }}>
-              <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
-                  <Text className="text-white text-base">✓</Text>
-                </div>
-                <Text className="text-lg font-semibold text-blue-900">We&apos;ve got you covered!</Text>
-              </div>
-              <Text className="text-blue-900 text-base leading-6">
-                Perfect! We&apos;ll help you set up our intelligent chatbot that can handle patient inquiries, book appointments, and
-                provide information about your services 24/7.
-              </Text>
-            </Card>
-          )}
         </div>
       );
     }
@@ -610,7 +692,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             onChange={values => handleInputChange(values.join(","))}
             size="large"
             className="w-full text-lg"
-            dropdownClassName="text-base"
             disabled={isSubmitting}
           >
             {currentQuestion.options?.map(option => (
@@ -656,36 +737,56 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
-          {currentQuestion.question}
+          {currentQuestion?.question}
         </Title>
 
         {renderCurrentInput()}
 
-        <div className="flex justify-between">
-          <Button
-            onClick={handlePrevious}
-            className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
-            disabled={(currentQuestionIndex === 0 && !onPrev) || isSubmitting}
-          >
-            Previous
-          </Button>
+        {showCompletionButtons && (
+          <div className="flex justify-between mt-8">
+            <Button
+              onClick={handlePrevious}
+              className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
+              disabled={isSubmitting}
+            >
+              Previous
+            </Button>
 
-          <Button
-            type="primary"
-            onClick={handleNext}
-            disabled={(currentQuestion.type === "radio" ? !currentValue : false) || isSubmitting || autoProgressing}
-            loading={(isSubmitting && currentQuestionIndex === questions.length - 1) || autoProgressing}
-            className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
-          >
-            {autoProgressing
-              ? "Moving to next question..."
-              : currentQuestionIndex === questions.length - 1
+            <Button
+              type="primary"
+              onClick={() => onNext(formData)} // or your onboarding completion logic
+              className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
+              loading={isSubmitting}
+            >
+              Complete Onboarding
+            </Button>
+          </div>
+        )}
+
+        {!showCompletionButtons && (
+          <div className="flex justify-between">
+            <Button
+              onClick={handlePrevious}
+              className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
+              disabled={(currentQuestionIndex === 0 && !onPrev) || isSubmitting}
+            >
+              Previous
+            </Button>
+            <Button
+              type="primary"
+              onClick={handleNext}
+              disabled={(currentQuestion.type === "radio" ? !currentValue : false) || isSubmitting}
+              loading={isSubmitting && currentQuestionIndex === filteredQuestions?.length - 1}
+              className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
+            >
+              {currentQuestionIndex === filteredQuestions?.length - 1
                 ? isSubmitting
                   ? "Setting up your clinic..."
                   : "Continue"
                 : "Continue"}
-          </Button>
-        </div>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* HubSpot Connection Modal */}
@@ -934,8 +1035,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               type="file"
               accept=".csv"
               onChange={e => {
-                if (e.target.files && e.target.files[0]) {
-                  handleCsvUpload(e.target.files[0]);
+                if (e.target.files && e.target.files.length > 0) {
+                  const file = e.target.files[0];
+                  handleCsvLeads(file);
+                } else {
+                  handleCsvLeads([]);
                 }
               }}
               className="block w-full text-sm text-gray-500
@@ -948,7 +1052,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
               <Text className="text-sm text-gray-600">
                 <strong>CSV Format:</strong>
-                <br />• Ensure your CSV has columns like 'Name', 'Email', 'Phone', etc.
+                <br />• Ensure your CSV has columns like &apos;Name&apos;, &apos;Email&apos;, &apos;Phone&apos;, etc.
                 <br />• We&apos;ll guide you through mapping fields after upload.
               </Text>
             </div>

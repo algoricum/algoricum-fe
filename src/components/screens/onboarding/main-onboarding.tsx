@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect,useCallback } from "react";
 import { Typography } from "antd";
 import { useRouter } from "next/navigation";
 import ClinicInfoStep from "./clinic-info-step";
@@ -12,6 +12,7 @@ import IntegrationsStep from "./integrations-step";
 
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
+import { Lead } from "@/interfaces/services_type";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { createClinic } from "@/utils/supabase/clinic-helper";
@@ -21,6 +22,18 @@ import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { useAuth } from "@/hooks/useAuth";
 import ChatbotSetupStep from "./chatbot-setup-step";
 
+import { createClient } from "@/utils/supabase/config/client";
+import getLeadSourceId from "@/utils/lead_source";
+import getNormalizedLead from "@/utils/normalizeLeadData";
+import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
+
+import {
+  ONBOARDING_STORAGE_KEY,
+  ONBOARDING_STEP_KEY,
+  ONBOARDING_COMPLETED_STEPS_KEY,
+  ONBOARDING_LEADS_FILE_NAME,
+} from "@/constants/localStorageKeys";
+
 const { Text } = Typography;
 
 const BASE_STEPS = [
@@ -29,33 +42,36 @@ const BASE_STEPS = [
   { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
   { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
   { id: "booking-setup", title: "Booking", description: "Appointments", icon: "⚙️" },
-  { id: "integrations", title: "Integrations", description: "Tools", icon: "⚡" },
+  { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
+  { id: "integrations", title: "CRM-Integrations", description: "Tools", icon: "⚡" },
 ];
 
-// Storage keys for persistence
-const ONBOARDING_STORAGE_KEY = "clinic_onboarding_progress_v2";
-const ONBOARDING_STEP_KEY = "clinic_onboarding_step_v2";
-const ONBOARDING_COMPLETED_STEPS_KEY = "clinic_onboarding_completed_steps_v2";
-
-const CHATBOT_STEP = { id: "chatbot-setup", title: "Chatbot", description: "AI Assistant", icon: "🤖" };
-
 export default function MainOnboarding() {
+  const supabase = createClient();
   const router = useRouter();
   const { logout } = useAuth();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [allData, setAllData] = useState<Record<string, any>>({});
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [showChatbotStep, setShowChatbotStep] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Determine if chatbot step should be shown based on integrations data
-  const shouldShowChatbotStep = allData.integrations?.hasChatbot === "No";
-  const STEPS = shouldShowChatbotStep ? [...BASE_STEPS, CHATBOT_STEP] : BASE_STEPS;
-
+  // Only use BASE_STEPS for sidebar and navigation
+  const STEPS = BASE_STEPS;
   const currentStep = STEPS[currentStepIndex];
   // Helper functions for localStorage (same as old flow)
   const isBrowser = typeof window !== "undefined";
 
+
+  const getStoredData = useCallback((key: string) => {
+      if (!isBrowser) return null;
+      try {
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : null;
+      } catch (error) {
+        ErrorToast("Error reading from localStorage:");
+        return null;
+      }
+    },[isBrowser])
   // restore onboarding progress from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -66,25 +82,14 @@ export default function MainOnboarding() {
       if (typeof savedStep === "number") setCurrentStepIndex(savedStep);
       if (Array.isArray(savedCompleted)) setCompletedSteps(savedCompleted);
     }
-  }, []);
-
-  const getStoredData = (key: string) => {
-    if (!isBrowser) return null;
-    try {
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : null;
-    } catch (error) {
-      console.error("Error reading from localStorage:", error);
-      return null;
-    }
-  };
+  }, [getStoredData]);
 
   const setStoredData = (key: string, data: any) => {
     if (!isBrowser) return;
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      console.error("Error writing to localStorage:", error);
+      ErrorToast("Error writing to localStorage:");
     }
   };
 
@@ -94,8 +99,9 @@ export default function MainOnboarding() {
       localStorage.removeItem(ONBOARDING_STORAGE_KEY);
       localStorage.removeItem(ONBOARDING_STEP_KEY);
       localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
+      localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
     } catch (error) {
-      console.error("Error clearing localStorage:", error);
+      ErrorToast("Error clearing localStorage:");
     }
   };
 
@@ -106,6 +112,7 @@ export default function MainOnboarding() {
     const toneIdentity = data["tone-identity"] || {};
     const aiAssistant = data["ai-assistant"] || {};
     const bookingSetup = data["booking-setup"] || {};
+    // const chatbotSetup = data["chatbot-setup"] || {};
     const integrations = data["integrations"] || {};
 
     // Convert business hours to old format
@@ -145,6 +152,29 @@ export default function MainOnboarding() {
       clinicType: clinicInfo.clinicType || "",
       integrations: integrations,
     };
+  };
+  // upload csv lead to supabase lead table
+  const handleCsvLeadsUpload = async (clinic_id: string) => {
+    const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
+    if (leadsFileName) {
+      const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
+      // Properly type and extract data
+      const leads: Partial<Lead>[] =
+        result && typeof result === "object" && "data" in result && Array.isArray((result as any).data)
+          ? (result as { data: Partial<Lead>[] }).data
+          : [];
+      // 1. Get source_id for 'File'
+      try {
+        const source_id = await getLeadSourceId("File");
+        const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
+        const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
+        if (insertError) {
+          ErrorToast(insertError.message);
+        }
+      } catch (error) {
+        ErrorToast(`${error}`);
+      }
+    }
   };
 
   // Main submission function (adapted from old flow)
@@ -265,14 +295,14 @@ export default function MainOnboarding() {
               body: formDataToSend,
             });
 
-            const result = await response.json();
+             await response.json();
 
             if (!response.ok) {
-              console.error("Assistant creation error:", result.error);
+              ErrorToast("Assistant creation error:");
               // Continue with onboarding even if assistant creation fails
             }
           } catch (assistantError) {
-            console.error("Failed to create assistant:", assistantError);
+            ErrorToast("Failed to create assistant:");
             // Continue with onboarding even if assistant creation fails
           }
         }
@@ -309,6 +339,9 @@ export default function MainOnboarding() {
       // Clear stored progress after successful completion
       clearStoredProgress();
 
+      // upload csv lead to supabase lead table
+      await handleCsvLeadsUpload(clinic.id);
+
       SuccessToast("You're all set!");
       setTimeout(() => {
         router.push("/dashboard?onboarding=success");
@@ -341,21 +374,8 @@ export default function MainOnboarding() {
       setStoredData(ONBOARDING_COMPLETED_STEPS_KEY, newCompletedSteps);
     }
 
-    // Check if we need to show chatbot step after integrations
-    if (currentStep.id === "integrations" && stepData.hasChatbot === "No") {
-      setShowChatbotStep(true);
-    }
-
-    // Determine the actual steps array that should be used
-    const actualSteps =
-      currentStep.id === "integrations" && stepData.hasChatbot === "No"
-        ? [...BASE_STEPS, CHATBOT_STEP]
-        : shouldShowChatbotStep
-          ? [...BASE_STEPS, CHATBOT_STEP]
-          : BASE_STEPS;
-
     // Move to next step or complete onboarding
-    if (currentStepIndex < actualSteps.length - 1) {
+    if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
       handleCompleteOnboarding();
@@ -383,13 +403,14 @@ export default function MainOnboarding() {
         localStorage.removeItem(ONBOARDING_STORAGE_KEY);
         localStorage.removeItem(ONBOARDING_STEP_KEY);
         localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
+        localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
+
         SuccessToast("Logout Successfully");
         router.push("/login");
       } else {
         ErrorToast("Logout failed. Please try again.");
       }
     } catch (error) {
-      console.error("Logout error:", error);
       ErrorToast("Logout failed. Please try again.");
     }
   };
@@ -414,10 +435,11 @@ export default function MainOnboarding() {
         return <AiAssistantStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "booking-setup":
         return <BookingSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
-      case "integrations":
-        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "chatbot-setup":
         return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+      case "integrations":
+        // Pass handleCompleteOnboarding to IntegrationsStep for inline Chatbot setup
+        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       default:
         return <div>Unknown step</div>;
     }

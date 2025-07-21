@@ -1,6 +1,6 @@
 "use client";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input, Button, Typography } from "antd";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
