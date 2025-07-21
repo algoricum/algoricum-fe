@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Input, Form } from "antd";
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
 import { getUserData } from "@/utils/supabase/user-helper";
 import { createClient } from "@/utils/supabase/config/client";
-import { SuccessToast, ErrorToast, InfoToast ,WarningToast} from "@/helpers/toast";
-import { Lead} from "@/interfaces/services_type";
-import { ONBOARDING_LEADS_FILE_NAME ,ONBOARDING_COMPLETED_STEPS_KEY} from "@/constants/localStorageKeys";
+import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toast";
+import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -19,8 +18,7 @@ interface IntegrationsStepProps {
   isSubmitting?: boolean;
 }
 
-export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSubmitting = false}: IntegrationsStepProps) {
-  const [showNextButton, setShowNextButton] = useState(false);
+export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [showZapierModal, setShowZapierModal] = useState(false);
@@ -31,7 +29,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   const [zapierAccountInfo, setZapierAccountInfo] = useState<any>(null);
   const [zapierForm] = Form.useForm();
   const [autoProgressing, setAutoProgressing] = useState(false);
-  const [hubspotPrompted, setHubspotPrompted] = useState(false);
+  // const [hubspotPrompted, setHubspotPrompted] = useState(false);
 
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
@@ -105,7 +103,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         "Instapage",
         "Other",
       ],
-    }
+    },
   ];
 
   // Filter questions based on HubSpot answer
@@ -119,18 +117,17 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
-  const handleCsvLeads= (csvLeads:any) => {
+  const handleCsvLeads = (csvLeads: any) => {
     setCsvLeads(csvLeads);
-  }
+  };
 
   const handleCsvUpload = async () => {
     try {
-
-       if(csvLeads.length === 0 ){
+      if (csvLeads.length === 0) {
         WarningToast("No CSV file selected");
-         return;
-       }
-       
+        return;
+      }
+
       // Get current user
       const user = await getUserData();
       if (!user) {
@@ -145,7 +142,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
       const filePath = `${user.id}/${fileName}`;
 
       // Upload file directly to Supabase Storage
-      const { data, error } = await supabase.storage.from("lead-uploads").upload(filePath, csvLeads, {
+      const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvLeads, {
         cacheControl: "3600",
         upsert: false,
       });
@@ -154,9 +151,8 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         console.error("Upload error:", error);
         throw new Error(`Failed to upload CSV: ${error.message}`);
       }
-      
-      localStorage.setItem(ONBOARDING_LEADS_FILE_NAME,filePath);
-         
+
+      localStorage.setItem(ONBOARDING_LEADS_FILE_NAME, filePath);
     } catch (error) {
       console.error("Error uploading CSV:", error);
     }
@@ -165,18 +161,14 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
   const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
-  // Auto-progress to next question after successful HubSpot connection
-  const autoProgressToNext = () => {
-    if (autoProgressing) return; // Prevent multiple calls
-
+  const autoProgressToNext = useCallback(() => {
+    if (autoProgressing) return;
     setAutoProgressing(true);
-
     setTimeout(() => {
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
         setShowHubspotModal(false);
       } else {
-        // This was the last question, submit the form
         const finalData = {
           ...formData,
           usesHubspot: "Yes",
@@ -186,8 +178,17 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
         onNext(finalData);
       }
       setAutoProgressing(false);
-    }, 1500); // 1.5 second delay to show success message
-  };
+    }, 1500);
+  }, [
+    autoProgressing,
+    currentQuestionIndex,
+    questions.length,
+    setCurrentQuestionIndex,
+    setShowHubspotModal,
+    formData,
+    hubspotAccountInfo,
+    onNext,
+  ]);
 
   // Restore state from localStorage on component mount
   useEffect(() => {
@@ -259,7 +260,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing]);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing, autoProgressToNext]);
 
   // Handle OAuth callback if code parameter is present
   useEffect(() => {
@@ -305,7 +306,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
     };
 
     handleOAuthRedirect();
-  }, []);
+  }, [autoProgressToNext]);
 
   const getCurrentUserId = async () => {
     const user = await getUserData();
@@ -333,18 +334,16 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
       ...prev,
       [currentQuestion.id]: value,
     }));
-  
+
     if (currentQuestion.id === "usesHubspot") {
       if (value === "Yes") {
         setShowHubspotModal(true);
-        setShowCompletionButtons(true)
-
+        setShowCompletionButtons(true);
       } else if (value === "No") {
-        
-        setShowCompletionButtons(false)
+        setShowCompletionButtons(false);
       }
     }
-  
+
     if (currentQuestion.id === "otherTools" && value && value.length > 0) {
       const selectedTools = value.split(",").filter((s: string) => s);
       if (selectedTools.length > 0) {
@@ -354,7 +353,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
       }
     }
   };
-  
 
   const connectToHubSpot = async () => {
     setHubspotStatus("connecting");
@@ -400,48 +398,48 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   };
 
   // Updated HubSpot disconnect function
-  const disconnectHubSpot = async () => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          userId: getCurrentUserId(),
-        }),
-      });
+  // const disconnectHubSpot = async () => {
+  //   try {
+  //     const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
+  //       method: "DELETE",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  //         apikey: SUPABASE_ANON_KEY,
+  //       },
+  //       body: JSON.stringify({
+  //         userId: getCurrentUserId(),
+  //       }),
+  //     });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Disconnect error:", response.status, errorText);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  //     if (!response.ok) {
+  //       const errorText = await response.text();
+  //       console.error("Disconnect error:", response.status, errorText);
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
 
-      const data = await response.json();
+  //     const data = await response.json();
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
+  //     if (data.error) {
+  //       throw new Error(data.error);
+  //     }
 
-      setHubspotStatus("disconnected");
-      setHubspotAccountInfo(null);
+  //     setHubspotStatus("disconnected");
+  //     setHubspotAccountInfo(null);
 
-      SuccessToast(`{
-        message: "Disconnected Successfully",
-        description: "Your HubSpot account has been disconnected.",
-      }`);
-    } catch (error) {
-      console.error("Disconnection failed:", error);
-      ErrorToast(`
-        message: "Disconnection Failed",
-        description: ${error instanceof Error ? error.message : "Unable to disconnect from HubSpot. Please try again."}
-      `);
-      clearOAuthState();
-    }
-  };
+  //     SuccessToast(`{
+  //       message: "Disconnected Successfully",
+  //       description: "Your HubSpot account has been disconnected.",
+  //     }`);
+  //   } catch (error) {
+  //     console.error("Disconnection failed:", error);
+  //     ErrorToast(`
+  //       message: "Disconnection Failed",
+  //       description: ${error instanceof Error ? error.message : "Unable to disconnect from HubSpot. Please try again."}
+  //     `);
+  //     clearOAuthState();
+  //   }
+  // };
 
   // Keep the message listener for popup communication
   useEffect(() => {
@@ -471,7 +469,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing]);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing, autoProgressToNext]);
 
   const disconnectZapier = async () => {
     try {
@@ -498,7 +496,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
 
   const handleHubspotModalCancel = () => {
     setShowHubspotModal(false);
-    setShowCompletionButtons(false)
+    setShowCompletionButtons(false);
     setFormData(prev => ({
       ...prev,
       usesHubspot: "",
@@ -546,21 +544,21 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   };
 
   const handleManualLeadsModalOk = () => {
-    handleCsvUpload()
+    handleCsvUpload();
     setShowManualLeadsModal(false);
     // You might want to proceed to the next step or handle the CSV upload here
     if (currentQuestionIndex < filteredQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       // onNext(formData); // Or handle final submission"
-      if(localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0){
-         SuccessToast("Leads uploaded successfully")
+      if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
+        SuccessToast("Leads uploaded successfully");
       }
-      setShowCompletionButtons(true)
+      setShowCompletionButtons(true);
 
       setTimeout(() => {
-        InfoToast("Wants to add or remove manual Leads upload? Click previous button")
-      }, 5000)
+        InfoToast("Wants to add or remove manual Leads upload? Click previous button");
+      }, 5000);
     }
   };
 
@@ -605,15 +603,14 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   };
 
   const handlePrevious = () => {
-
-    setShowCompletionButtons(false)
+    setShowCompletionButtons(false);
 
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
       // Reset HubSpot prompted flag when going back
       if (currentQuestionIndex - 1 === 0) {
         // Going back to HubSpot question
-        setHubspotPrompted(false);
+        // setHubspotPrompted(false);
       }
     } else if (onPrev) {
       onPrev();
@@ -621,10 +618,8 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
   };
 
   const renderPreviousQuestions = () => {
-    
     return filteredQuestions.slice(0, currentQuestionIndex).map(q => {
       const value = formData[q.id as keyof typeof formData];
-    
 
       return (
         <div key={q.id} className="mb-8">
@@ -683,8 +678,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
               ))}
             </Space>
           </Radio.Group>
-
-      
         </div>
       );
     }
@@ -699,7 +692,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
             onChange={values => handleInputChange(values.join(","))}
             size="large"
             className="w-full text-lg"
-            dropdownClassName="text-base"
             disabled={isSubmitting}
           >
             {currentQuestion.options?.map(option => (
@@ -760,7 +752,6 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
               Previous
             </Button>
 
-
             <Button
               type="primary"
               onClick={() => onNext(formData)} // or your onboarding completion logic
@@ -788,7 +779,11 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
               loading={isSubmitting && currentQuestionIndex === filteredQuestions?.length - 1}
               className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
             >
-              {currentQuestionIndex === filteredQuestions?.length - 1 ? (isSubmitting ? "Setting up your clinic..." : "Continue") : "Continue"}
+              {currentQuestionIndex === filteredQuestions?.length - 1
+                ? isSubmitting
+                  ? "Setting up your clinic..."
+                  : "Continue"
+                : "Continue"}
             </Button>
           </div>
         )}
@@ -1039,12 +1034,12 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
             <input
               type="file"
               accept=".csv"
-              onChange={(e) => {
+              onChange={e => {
                 if (e.target.files && e.target.files.length > 0) {
                   const file = e.target.files[0];
                   handleCsvLeads(file);
-                }else{
-                  handleCsvLeads([])
+                } else {
+                  handleCsvLeads([]);
                 }
               }}
               className="block w-full text-sm text-gray-500
@@ -1057,7 +1052,7 @@ export default function IntegrationsStep({onNext, onPrev, initialData = {}, isSu
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
               <Text className="text-sm text-gray-600">
                 <strong>CSV Format:</strong>
-                <br />• Ensure your CSV has columns like 'Name', 'Email', 'Phone', etc.
+                <br />• Ensure your CSV has columns like &apos;Name&apos;, &apos;Email&apos;, &apos;Phone&apos;, etc.
                 <br />• We&apos;ll guide you through mapping fields after upload.
               </Text>
             </div>

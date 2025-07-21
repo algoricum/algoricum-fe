@@ -53,11 +53,11 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
     },
   ];
 
-   useEffect(() => {
+  useEffect(() => {
     if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(2)) {
       setCurrentQuestionIndex(questions.length - 1);
     }
-  }, []);
+  }, [questions.length]);
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
@@ -118,7 +118,7 @@ export default function ToneIdentityStep({ onNext, onPrev, initialData = {} }: T
           onChange={handleSelectChange}
           size="large"
           className="w-full text-lg mb-6"
-          dropdownClassName="text-base"
+          style={{ fontSize: "1rem" }}
         >
           {currentQuestion.options.map(option => (
             <Option key={option.value} value={option.value}>

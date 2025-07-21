@@ -88,7 +88,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
         setCurrentQuestionIndex(questions.length - 1);
       }
     }
-  }, [formData.hasChatbot]);
+  }, [formData.hasChatbot, questions.length]);
 
   const currentQuestion = questions[currentQuestionIndex];
 
@@ -144,10 +144,10 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
     }
     if (currentQuestion.id === "configuration") {
       return (
-        formData.chatbotName.trim() && 
-        formData.greeting.trim() && 
-        formData.toneSelector && 
-        formData.sentenceLength && 
+        formData.chatbotName.trim() &&
+        formData.greeting.trim() &&
+        formData.toneSelector &&
+        formData.sentenceLength &&
         formData.formalityLevel
       );
     }
@@ -174,7 +174,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
   const renderCurrentInput = () => {
     if (currentQuestion.type === "radio") {
       const currentValue = formData[currentQuestion.id as keyof typeof formData];
-      
+
       return (
         <div className="mb-6">
           <Radio.Group value={currentValue} onChange={e => handleInputChange(currentQuestion.id, e.target.value)} className="w-full">
@@ -186,7 +186,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                   className={`rounded-xl border-2 cursor-pointer ${
                     currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"
                   }`}
-                  bodyStyle={{ padding: "16px" }}
+                  style={{ padding: "16px" }}
                   onClick={() => handleInputChange(currentQuestion.id, option)}
                 >
                   <Radio value={option} className="text-lg text-black">
@@ -204,10 +204,10 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
                   <Text className="text-white text-base">✓</Text>
                 </div>
-                <Text className="text-lg font-semibold text-blue-900">Great! We'll help you integrate it</Text>
+                <Text className="text-lg font-semibold text-blue-900">Great! We&apos;ll help you integrate it</Text>
               </div>
               <Text className="text-blue-900 text-base leading-6">
-                Perfect! We'll help you integrate your existing chatbot solution with our platform for a seamless patient experience.
+                Perfect! We&apos;ll help you integrate your existing chatbot solution with our platform for a seamless patient experience.
               </Text>
             </Card>
           )}
@@ -308,7 +308,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                   value={formData.primaryColor}
                   onChange={value => handleInputChange("primaryColor", value)}
                 />
-                
+
                 <ColorConfigurator
                   fieldName="fontColor"
                   heading="Font color"
@@ -368,13 +368,13 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
                     <Text className="text-sm font-medium text-blue-900 block mb-2">Preview: How your assistant will greet patients</Text>
                     <div className="bg-white p-3 rounded border border-blue-200">
                       <Text className="text-gray-800 italic">
-                        "
+                        &quot;
                         {getPreviewText({
                           tone: formData.toneSelector,
                           formality: formData.formalityLevel,
                           length: formData.sentenceLength,
                         })}
-                        "
+                        &quot;
                       </Text>
                     </div>
                     <Text className="text-xs text-blue-700 mt-2">This preview updates as you change your settings above</Text>
@@ -401,9 +401,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
           {currentQuestion.question}
         </Title>
 
-        {currentQuestion.subtitle && (
-          <Text className="text-gray-600 text-lg block mb-8">{currentQuestion.subtitle}</Text>
-        )}
+        {currentQuestion.subtitle && <Text className="text-gray-600 text-lg block mb-8">{currentQuestion.subtitle}</Text>}
 
         {renderCurrentInput()}
 

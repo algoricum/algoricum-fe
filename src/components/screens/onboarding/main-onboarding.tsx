@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect,useCallback } from "react";
 import { Typography } from "antd";
 import { useRouter } from "next/navigation";
 import ClinicInfoStep from "./clinic-info-step";
@@ -27,10 +27,12 @@ import getLeadSourceId from "@/utils/lead_source";
 import getNormalizedLead from "@/utils/normalizeLeadData";
 import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
 
-import { ONBOARDING_STORAGE_KEY,
-         ONBOARDING_STEP_KEY, 
-         ONBOARDING_COMPLETED_STEPS_KEY, 
-         ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
+import {
+  ONBOARDING_STORAGE_KEY,
+  ONBOARDING_STEP_KEY,
+  ONBOARDING_COMPLETED_STEPS_KEY,
+  ONBOARDING_LEADS_FILE_NAME,
+} from "@/constants/localStorageKeys";
 
 const { Text } = Typography;
 
@@ -43,10 +45,6 @@ const BASE_STEPS = [
   { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
   { id: "integrations", title: "CRM-Integrations", description: "Tools", icon: "⚡" },
 ];
-
-
-
-// const CHATBOT_STEP = { id: "chatbot-setup", title: "Chatbot", description: "AI Assistant", icon: "🤖" };
 
 export default function MainOnboarding() {
   const supabase = createClient();
@@ -63,6 +61,17 @@ export default function MainOnboarding() {
   // Helper functions for localStorage (same as old flow)
   const isBrowser = typeof window !== "undefined";
 
+
+  const getStoredData = useCallback((key: string) => {
+      if (!isBrowser) return null;
+      try {
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : null;
+      } catch (error) {
+        ErrorToast("Error reading from localStorage:");
+        return null;
+      }
+    },[isBrowser])
   // restore onboarding progress from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -73,18 +82,7 @@ export default function MainOnboarding() {
       if (typeof savedStep === "number") setCurrentStepIndex(savedStep);
       if (Array.isArray(savedCompleted)) setCompletedSteps(savedCompleted);
     }
-  }, []);
-   
-  const getStoredData = (key: string) => {
-    if (!isBrowser) return null;
-    try {
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : null;
-    } catch (error) {
-      ErrorToast("Error reading from localStorage:");
-      return null;
-    }
-  };
+  }, [getStoredData]);
 
   const setStoredData = (key: string, data: any) => {
     if (!isBrowser) return;
@@ -114,7 +112,7 @@ export default function MainOnboarding() {
     const toneIdentity = data["tone-identity"] || {};
     const aiAssistant = data["ai-assistant"] || {};
     const bookingSetup = data["booking-setup"] || {};
-    const chatbotSetup = data["chatbot-setup"] || {};
+    // const chatbotSetup = data["chatbot-setup"] || {};
     const integrations = data["integrations"] || {};
 
     // Convert business hours to old format
@@ -161,16 +159,15 @@ export default function MainOnboarding() {
     if (leadsFileName) {
       const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
       // Properly type and extract data
-      const leads: Partial<Lead>[] = (result && typeof result === 'object' && 'data' in result && Array.isArray((result as any).data))
-        ? (result as { data: Partial<Lead>[] }).data
-        : [];
+      const leads: Partial<Lead>[] =
+        result && typeof result === "object" && "data" in result && Array.isArray((result as any).data)
+          ? (result as { data: Partial<Lead>[] }).data
+          : [];
       // 1. Get source_id for 'File'
       try {
         const source_id = await getLeadSourceId("File");
         const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
-        const { error: insertError } = await supabase
-          .from('lead')
-          .insert(leadsToInsert);
+        const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
         if (insertError) {
           ErrorToast(insertError.message);
         }
@@ -178,7 +175,7 @@ export default function MainOnboarding() {
         ErrorToast(`${error}`);
       }
     }
-  }
+  };
 
   // Main submission function (adapted from old flow)
   const handleCompleteOnboarding = async () => {
@@ -298,7 +295,7 @@ export default function MainOnboarding() {
               body: formDataToSend,
             });
 
-            const result = await response.json();
+             await response.json();
 
             if (!response.ok) {
               ErrorToast("Assistant creation error:");
@@ -343,8 +340,8 @@ export default function MainOnboarding() {
       clearStoredProgress();
 
       // upload csv lead to supabase lead table
-      await handleCsvLeadsUpload(clinic.id);    
-      
+      await handleCsvLeadsUpload(clinic.id);
+
       SuccessToast("You're all set!");
       setTimeout(() => {
         router.push("/dashboard?onboarding=success");
@@ -442,7 +439,7 @@ export default function MainOnboarding() {
         return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "integrations":
         // Pass handleCompleteOnboarding to IntegrationsStep for inline Chatbot setup
-        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData}  />;
+        return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       default:
         return <div>Unknown step</div>;
     }

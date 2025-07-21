@@ -2,7 +2,7 @@
 
 import { useState,useEffect } from "react";
 import { Button, Input, Radio, Card, Space, Typography } from "antd";
-import { forEach } from "lodash";
+// import { forEach } from "lodash";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 
 const { Title, Text } = Typography;
@@ -48,7 +48,7 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
         setCurrentQuestionIndex(0);
       }
     }
-  },[formData.hasBookingLink])
+  },[formData.hasBookingLink,questions.length])
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
@@ -123,7 +123,7 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
                   className={`rounded-xl border-2 cursor-pointer ${
                     currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"
                   }`}
-                  bodyStyle={{ padding: "16px" }}
+                  style={{ padding: "16px" }}
                   onClick={() => handleInputChange(option)}
                 >
                   <Radio value={option} className="text-lg text-black">
@@ -136,7 +136,7 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
 
           {/* Show info card for "No" option */}
           {currentValue === "No, I don't have one" && (
-            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" bodyStyle={{ padding: "20px" }}>
+            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" style={{ padding: "20px" }}>
               <div className="flex items-center mb-3">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
                   <Text className="text-white text-base">✓</Text>

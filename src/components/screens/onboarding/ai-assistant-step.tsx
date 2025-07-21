@@ -51,7 +51,7 @@ export default function AiAssistantStep({ onNext, onPrev, initialData = {} }: Ai
         setCurrentQuestionIndex(questions.length - 1)
       }
     }
-  }, []) // Empty dependency array ensures this runs only once on mount 
+  }, [questions.length]) // Empty dependency array ensures this runs only once on mount 
   const currentQuestion = questions[currentQuestionIndex];
 
   const handleFileUpload = (info: any, questionId: string) => {
