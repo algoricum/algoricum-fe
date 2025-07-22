@@ -45,6 +45,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const getClinicId = async () => {
     const clinic = await getClinicData();
+
     if (!clinic || !clinic?.id) {
       return null;
     } else {
@@ -401,6 +402,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const connectToHubSpot = async () => {
     setHubspotStatus("connecting");
     saveOAuthState();
+    const clinicId = await getClinicId();
 
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/hubspot-integration`, {
@@ -412,6 +414,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         },
         body: JSON.stringify({
           userId: await getCurrentUserId(),
+          clinic_id: clinicId,
           redirectUrl: window.location.href, // Current page URL
         }),
       });

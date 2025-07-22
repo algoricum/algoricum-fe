@@ -11,7 +11,7 @@ serve(async (req) => {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
   const url = new URL(req.url);
-  
+
   console.log(`[${requestId}] 🚀 PUBLIC REQUEST`, {
     method: req.method,
     url: req.url,
@@ -65,7 +65,7 @@ serve(async (req) => {
     );
   }
 
-  // For authenticated operations (POST, DELETE), we'll handle auth separately
+  // For authenticated operations (POST, DELETE)
   if (req.method === "POST" || req.method === "DELETE") {
     return await handleAuthenticatedRequest(req, requestId);
   }
@@ -89,8 +89,6 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
   if (error) {
     console.error(`[${requestId}] OAuth error: ${error}`);
-    
-    // Redirect back to frontend with OAuth error
     let redirectUrl = "http://localhost:3001/onboarding";
     try {
       if (state) {
@@ -116,8 +114,6 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
   if (!code || !state) {
     console.error(`[${requestId}] Missing parameters`, { hasCode: !!code, hasState: !!state });
-    
-    // Redirect back to frontend with missing params error
     const redirectUrl = "http://localhost:3001/onboarding";
     const redirectUrlWithError = new URL(redirectUrl);
     redirectUrlWithError.searchParams.set("hubspot_status", "error");
@@ -132,7 +128,6 @@ async function processOAuthCallback(req: Request, requestId: string) {
     });
   }
 
-  // Get environment variables
   const clientId = Deno.env.get("HUBSPOT_CLIENT_ID");
   const clientSecret = Deno.env.get("HUBSPOT_CLIENT_SECRET");
   const redirectUri = Deno.env.get("HUBSPOT_REDIRECT_URI");
@@ -148,9 +143,19 @@ async function processOAuthCallback(req: Request, requestId: string) {
   }
 
   try {
-    // Decode state
     const stateData = JSON.parse(atob(state));
-    console.log(`[${requestId}] State decoded`, { userId: stateData.userId });
+    console.log(`[${requestId}] State decoded`, { 
+      userId: stateData.userId, 
+      clinic_id: stateData.clinic_id 
+    });
+
+    // Get clinic_id from state instead of request body
+    const clinic_id = stateData.clinic_id;
+
+    if (!clinic_id) {
+      console.error(`[${requestId}] Missing clinic_id in state`);
+      throw new Error("Missing clinic_id in OAuth state");
+    }
 
     // Exchange code for tokens
     console.log(`[${requestId}] Exchanging code for tokens`);
@@ -188,20 +193,106 @@ async function processOAuthCallback(req: Request, requestId: string) {
       accountData = await accountResponse.json();
     }
 
-    // Get contacts count
-    const contactsResponse = await fetch("https://api.hubapi.com/crm/v3/objects/contacts?limit=1", {
-      headers: { Authorization: `Bearer ${tokens.access_token}` },
-    });
+    // Initial full contacts sync
+    let totalContacts = 0;
+    const contacts = [];
+    let after = null;
 
-    let contactsData = { total: 0 };
-    if (contactsResponse.ok) {
-      contactsData = await contactsResponse.json();
+    console.log(`[${requestId}] Starting initial full contacts sync`);
+    do {
+      const contactsResponse = await fetch(
+        `https://api.hubapi.com/crm/v3/objects/contacts?limit=100${after ? `&after=${after}` : ''}&properties=email,firstname,lastname,createdate,lastmodifieddate,phone`,
+        {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        }
+      );
+
+      if (!contactsResponse.ok) {
+        console.error(`[${requestId}] Contacts fetch failed`, { status: contactsResponse.status });
+        throw new Error(`Contacts fetch failed: ${contactsResponse.status}`);
+      }
+
+      const contactsData = await contactsResponse.json();
+      totalContacts = contactsData.total || 0;
+      contacts.push(...contactsData.results);
+      after = contactsData.paging?.next?.after || null;
+    } while (after);
+
+    console.log(`[${requestId}] Fetched ${contacts.length} contacts`);
+
+    // Save contacts to lead table
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    if (contacts.length > 0) {
+      // Fetch source_id for 'HubSpot'
+      const { data: sourceData, error: sourceError } = await supabase
+        .from('lead_source')
+        .select('id')
+        .eq('name', 'Hubspot')
+        .single();
+
+      if (sourceError || !sourceData) {
+        console.error(`[${requestId}] Error fetching lead source:`, sourceError);
+        throw new Error("Could not find HubSpot in lead_source table");
+      }
+
+      const source_id = sourceData.id;
+
+      console.log(`[${requestId}] Using clinic_id from state: ${clinic_id}`);
+
+      const leadsToInsert = contacts.map((contact) => {
+        if (!contact.id || !stateData.userId) {
+          console.warn(`[${requestId}] Invalid contact data`, { contactId: contact.id, userId: stateData.userId });
+          return null;
+        }
+
+        return {
+          clinic_id: clinic_id,
+          first_name: contact.properties.firstname || null,
+          last_name: contact.properties.lastname || null,
+          email: contact.properties.email || null,
+          phone: contact.properties.phone || null,
+          status: 'new',
+          source_id,
+          created_at: contact.properties.createdate ? new Date(contact.properties.createdate).toISOString() : null,
+          updated_at: contact.properties.lastmodifieddate ? new Date(contact.properties.lastmodifieddate).toISOString() : null,
+        };
+      }).filter(lead => lead !== null);
+
+      if (leadsToInsert.length === 0) {
+        console.warn(`[${requestId}] No valid leads to insert`);
+      } else {
+        let retries = 3;
+        let leadError = null;
+        while (retries > 0) {
+          try {
+            const { error } = await supabase
+              .from("lead")
+              .upsert(leadsToInsert);
+            
+            if (error) {
+              console.error(`[${requestId}] Lead save error`, { error: JSON.stringify(error), leadSample: leadsToInsert[0] });
+              leadError = error;
+              retries--;
+              if (retries === 0) throw new Error(`Lead save failed after retries: ${JSON.stringify(error)}`);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+            console.log(`[${requestId}] Successfully saved ${leadsToInsert.length} leads`);
+            break;
+          } catch (err) {
+            console.error(`[${requestId}] Lead save attempt failed`, { error: err.message });
+            leadError = err;
+            retries--;
+            if (retries === 0) throw new Error(`Lead save failed after retries: ${err.message}`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        if (leadError) throw leadError;
+      }
     }
 
-    // Save to database
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Save connection details
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
-    
     const { error: dbError } = await supabase
       .from("hubspot_connections")
       .upsert({
@@ -210,7 +301,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
         refresh_token: tokens.refresh_token,
         token_expires_at: expiresAt.toISOString(),
         account_name: accountData.companyName || `Hub ${accountData.portalId}`,
-        contact_count: contactsData.total || 0,
+        contact_count: totalContacts,
         hub_id: accountData.portalId?.toString(),
         connection_status: "connected",
         last_sync_at: new Date().toISOString(),
@@ -219,22 +310,19 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
     if (dbError) {
       console.error(`[${requestId}] Database error`, dbError);
-      throw new Error("Database save failed");
+      throw new Error(`Connection save failed: ${JSON.stringify(dbError)}`);
     }
 
-    console.log(`[${requestId}] ✅ Success - Connection saved`);
+    console.log(`[${requestId}] ✅ Success - Connection saved and initial sync completed`);
 
     const accountInfo = {
       accountName: accountData.companyName || `Hub ${accountData.portalId}`,
-      contactCount: contactsData.total || 0,
+      contactCount: totalContacts,
       dealCount: 0,
     };
 
-    // Instead of returning HTML, redirect back to frontend with success data
     const redirectUrl = stateData.redirectUrl || "http://localhost:3001/onboarding";
     const redirectUrlWithParams = new URL(redirectUrl);
-    
-    // Add success parameters
     redirectUrlWithParams.searchParams.set("hubspot_status", "success");
     redirectUrlWithParams.searchParams.set("account_name", accountInfo.accountName);
     redirectUrlWithParams.searchParams.set("contact_count", accountInfo.contactCount.toString());
@@ -242,7 +330,6 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
     console.log(`[${requestId}] Redirecting to: ${redirectUrlWithParams.toString()}`);
 
-    // Return a redirect response
     return new Response(null, {
       status: 302,
       headers: {
@@ -252,9 +339,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
     });
 
   } catch (error) {
-    console.error(`[${requestId}] Callback processing error`, error);
-    
-    // Redirect back to frontend with error
+    console.error(`[${requestId}] Callback processing error`, { error: error.message, stack: error.stack });
     let redirectUrl = "http://localhost:3001/onboarding";
     try {
       const stateData = JSON.parse(atob(state));
@@ -282,7 +367,6 @@ async function processOAuthCallback(req: Request, requestId: string) {
 async function handleAuthenticatedRequest(req: Request, requestId: string) {
   console.log(`[${requestId}] Handling authenticated request`);
   
-  // Check for authorization header
   const authHeader = req.headers.get("authorization");
   if (!authHeader) {
     return new Response(
@@ -307,6 +391,10 @@ async function handleAuthenticatedRequest(req: Request, requestId: string) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   if (req.method === "POST") {
+    const url = new URL(req.url);
+    if (url.pathname === "/sync-contacts") {
+      return await handleSyncContacts(req, supabase, requestId);
+    }
     return await handleConnect(req, supabase, clientId, redirectUri, requestId);
   }
 
@@ -320,114 +408,179 @@ async function handleAuthenticatedRequest(req: Request, requestId: string) {
   );
 }
 
-// Helper functions for HTML responses
-function createSuccessHtml(accountInfo: any, redirectUrl: string) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Connected Successfully</title>
-  <style>
-    body { 
-      font-family: Arial, sans-serif; 
-      text-align: center; 
-      padding: 50px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      margin: 0;
+async function handleSyncContacts(req: Request, supabase: any, requestId: string) {
+  console.log(`[${requestId}] Handling contacts sync`);
+  
+  const { userId, clinic_id } = await req.json();
+
+  console.log("data is ", userId, clinic_id)
+  
+  if (!userId) {
+    return new Response(
+      JSON.stringify({ error: "Missing userId" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Get connection details
+  const { data: connection, error: connError } = await supabase
+    .from("hubspot_connections")
+    .select("access_token, hub_id, last_sync_at")
+    .eq("user_id", userId)
+    .single();
+
+  if (connError || !connection) {
+    console.error(`[${requestId}] Connection fetch error`, connError);
+    return new Response(
+      JSON.stringify({ error: "No active HubSpot connection found" }),
+      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  if (!connection.first_sync_completed) {
+    return new Response(
+      JSON.stringify({ error: "Initial sync not completed" }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Check token expiration and refresh if needed (placeholder)
+  let accessToken = connection.access_token;
+
+  // Fetch contacts from last 24 hours
+  const afterDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const contacts = [];
+  let after = null;
+
+  console.log(`[${requestId}] Fetching contacts modified since ${afterDate}`);
+  do {
+    const searchBody = {
+      filterGroups: [{
+        filters: [{
+          propertyName: "lastmodifieddate",
+          operator: "GTE",
+          value: afterDate,
+        }],
+      }],
+      properties: ["email", "firstname", "lastname", "createdate", "lastmodifieddate", "phone"],
+      limit: 100,
+      after: after || undefined,
+    };
+
+    const contactsResponse = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/search", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(searchBody),
+    });
+
+    if (!contactsResponse.ok) {
+      console.error(`[${requestId}] Contacts search failed`, { status: contactsResponse.status });
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch contacts" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-    .container {
-      background: white;
-      color: #333;
-      padding: 40px;
-      border-radius: 15px;
-      max-width: 400px;
-      margin: 0 auto;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+
+    const contactsData = await contactsResponse.json();
+    contacts.push(...contactsData.results);
+    after = contactsData.paging?.next?.after || null;
+  } while (after);
+
+  console.log(`[${requestId}] Fetched ${contacts.length} contacts modified in last 24 hours`);
+
+  // Save contacts to lead table
+  if (contacts.length > 0) {
+    const { data: sourceData, error: sourceError } = await supabase
+      .from('lead_source')
+      .select('id')
+      .eq('name', 'Hubspot')
+      .single();
+
+    if (sourceError || !sourceData) {
+      console.error(`[${requestId}] Error fetching lead source:`, sourceError);
+      return new Response(
+        JSON.stringify({ error: "Could not find HubSpot in lead_source table" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-    .success { color: #4caf50; font-size: 48px; margin-bottom: 20px; }
-    .loading { color: #666; margin-top: 20px; }
-    .close-btn {
-      background: #4caf50;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-      margin-top: 15px;
-    }
-    .close-btn:hover { background: #45a049; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="success">✓</div>
-    <h1>Successfully Connected!</h1>
-    <p>Connected to <strong>${accountInfo.accountName}</strong></p>
-    <p>${accountInfo.contactCount} contacts</p>
-    <p class="loading">This window will close automatically...</p>
-    <button class="close-btn" onclick="closeWindow()" style="display: none;">Close Window</button>
-  </div>
-  <script>
-    console.log('🎯 Sending success message to parent');
-    
-    function sendMessage() {
-      try {
-        if (window.opener && !window.opener.closed) {
-          console.log('📡 Posting message to opener');
-          window.opener.postMessage({
-            type: 'hubspot_success',
-            accountInfo: ${JSON.stringify(accountInfo)}
-          }, '${redirectUrl}');
-          console.log('✅ Message sent successfully');
-        } else {
-          console.warn('⚠️ No opener window available');
-        }
-      } catch (e) {
-        console.error('❌ Failed to post message:', e);
+
+    const source_id = sourceData.id;
+
+    const leadsToInsert = contacts.map((contact) => {
+      if (!contact.id || !userId) {
+        console.warn(`[${requestId}] Invalid contact data`, { contactId: contact.id, userId });
+        return null;
       }
-    }
-    
-    function closeWindow() {
-      console.log('🔄 Attempting to close window');
-      try {
-        if (window.opener) {
-          window.close();
-          console.log('✅ Window close requested');
-        } else {
-          console.log('ℹ️ Manual close required - no opener reference');
-          showManualCloseOption();
+
+      console.log("clinic id is sdfsdafsdfsd", clinic_id)
+
+      return {
+        first_name: contact.properties.firstname || null,
+        last_name: contact.properties.lastname || null,
+        email: contact.properties.email || null,
+        phone: contact.properties.phone || null,
+        status: 'new',
+        clinic_id: clinic_id,
+        source_id,
+        created_at: contact.properties.createdate ? new Date(contact.properties.createdate).toISOString() : null,
+        updated_at: contact.properties.lastmodifieddate ? new Date(contact.properties.lastmodifieddate).toISOString() : null,
+      };
+    }).filter(lead => lead !== null);
+
+    if (leadsToInsert.length === 0) {
+      console.warn(`[${requestId}] No valid leads to insert`);
+    } else {
+      let retries = 3;
+      let leadError = null;
+      while (retries > 0) {
+        try {
+          const { error } = await supabase
+            .from("lead")
+            .upsert(leadsToInsert);
+     
+          if (error) {
+            console.error(`[${requestId}] Lead save error`, { error: JSON.stringify(error), leadSample: leadsToInsert[0] });
+            leadError = error;
+            retries--;
+            if (retries === 0) throw new Error(`Lead save failed after retries: ${JSON.stringify(error)}`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            continue;
+          }
+          console.log(`[${requestId}] Successfully saved ${leadsToInsert.length} leads`);
+          break;
+        } catch (err) {
+          console.error(`[${requestId}] Lead save attempt failed`, { error: err.message });
+          leadError = err;
+          retries--;
+          if (retries === 0) throw new Error(`Lead save failed after retries: ${err.message}`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
-      } catch (e) {
-        console.error('❌ Cannot close window:', e);
-        showManualCloseOption();
       }
+      if (leadError) throw leadError;
     }
-    
-    function showManualCloseOption() {
-      document.querySelector('.loading').innerHTML = 'Please close this window manually';
-      document.querySelector('.close-btn').style.display = 'inline-block';
-    }
-    
-    // Send message immediately
-    sendMessage();
-    
-    // Try to close after 2 seconds
-    setTimeout(() => {
-      closeWindow();
-      // If window is still open after 3 more seconds, show manual option
-      setTimeout(() => {
-        if (!window.closed) {
-          showManualCloseOption();
-        }
-      }, 3000);
-    }, 2000);
-    
-    // Also try to close when user clicks anywhere (backup)
-    document.addEventListener('click', closeWindow);
-  </script>
-</body></html>`;
+  }
+
+  // Update last_sync_at
+  const { error: updateError } = await supabase
+    .from("hubspot_connections")
+    .update({ last_sync_at: new Date().toISOString() })
+    .eq("user_id", userId);
+
+  if (updateError) {
+    console.error(`[${requestId}] Update last_sync_at error`, updateError);
+  }
+
+  return new Response(
+    JSON.stringify({ 
+      success: true, 
+      message: `Synced ${contacts.length} leads`, 
+      contactCount: contacts.length 
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 }
 
 function createErrorHtml(title: string, message: string) {
@@ -483,11 +636,10 @@ function createTestSuccessHtml() {
 </body></html>`;
 }
 
-// Connect and disconnect handlers (simplified versions)
 async function handleConnect(req: Request, supabase: any, clientId: string, redirectUri: string, requestId: string) {
   console.log(`[${requestId}] Connect handler`);
   
-  const { userId, redirectUrl } = await req.json();
+  const { userId, redirectUrl, clinic_id } = await req.json(); // Extract clinic_id here
   
   if (!userId || !redirectUrl) {
     return new Response(
@@ -505,9 +657,15 @@ async function handleConnect(req: Request, supabase: any, clientId: string, redi
       error_message: null,
     });
 
-  // Create auth URL
-  const state = btoa(JSON.stringify({ userId, redirectUrl, timestamp: Date.now() }));
-  const scopes = ["crm.objects.contacts.read"].join(" ");
+  // Create auth URL with clinic_id included in state
+  const state = btoa(JSON.stringify({ 
+    userId, 
+    redirectUrl, 
+    clinic_id, // Include clinic_id in state
+    timestamp: Date.now() 
+  }));
+  
+  const scopes = ["crm.objects.contacts.read", "crm.objects.leads.read"].join(" ");
   
   const authUrl = new URL("https://app.hubspot.com/oauth/authorize");
   authUrl.searchParams.set("client_id", clientId);
@@ -543,6 +701,7 @@ async function handleDisconnect(req: Request, supabase: any, requestId: string) 
       refresh_token: null,
       token_expires_at: null,
       error_message: null,
+      first_sync_completed: false,
     })
     .eq("user_id", userId);
 
