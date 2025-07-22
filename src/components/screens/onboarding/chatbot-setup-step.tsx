@@ -1,6 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Button, Input, Select, Upload, Typography, Card, Flex, Radio, Space, Modal } from "antd";
+import { useState, useEffect, useRef } from "react";
+import { Button, Input, Select, Upload, Typography, Card, Flex, Radio, Space, Modal, Spin } from "antd";
 import { UserOutlined, MessageOutlined, FileTextOutlined, RobotOutlined } from "@ant-design/icons";
 import { ColorConfigurator } from "@/components/common";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
@@ -59,6 +59,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
     chatbotAvatar: initialData.chatbotAvatar || [],
   });
   const [isModalVisible, setIsModalVisible] = useState(false); // State for modal visibility
+  const [isBuffering, setIsBuffering] = useState(true);
 
   const questions = [
     {
@@ -89,6 +90,14 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
     }
   }, [formData.hasChatbot, questions.length]);
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = 1.5;
+    }
+  },[isModalVisible]);
+
   const currentQuestion = questions[currentQuestionIndex];
 
   const handleInputChange = (field: string, value: any) => {
@@ -112,6 +121,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
       onNext(formData);
       return;
     }
+
     if (currentQuestionIndex < questions.length - 1) {
       // Check if next question should be shown
       const nextQuestion = questions[currentQuestionIndex + 1];
@@ -193,7 +203,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
           </Radio.Group>
           {/* Show info card for "No" option */}
           {currentValue === "No" && (
-            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" bodyStyle={{ padding: "20px" }}>
+            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" style={{ padding: "20px" }}>
               <div className="flex items-center mb-3">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
                   <Text className="text-white text-base">✓</Text>
@@ -208,6 +218,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
         </div>
       );
     }
+
     if (currentQuestion.type === "configuration") {
       return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
@@ -308,16 +319,22 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
           {/* Right Column - Uploads and Preview */}
           <div className="space-y-6">
             {/* New Integrate Bot Button */}
-            <Button
-              type="primary"
-              icon={<RobotOutlined />}
-              onClick={() => setIsModalVisible(true)}
-              className="w-full h-13 text-base font-medium rounded-xl px-8 shadow-lg text-white" // Added shadow-lg and text-white
-              style={{ backgroundColor: "#A068F1", borderColor: "#A068F1" }}
-            >
-              Integrate Bot
-            </Button>
-
+            <div className="flex justify-end">
+              <Button
+                type="primary"
+                icon={<RobotOutlined />}
+                onClick={() => setIsModalVisible(true)}
+                className=" h-15 text-base py-4 font-medium rounded-xl px-8 shadow-lg text-white" // Added shadow-lg and text-white
+                style={{
+                  backgroundColor: "#A068F1",
+                  borderColor: "#A068F1",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                Integrate Bot
+              </Button>
+            </div>
             {/* Chatbot Avatar Upload */}
             <div>
               <Text className="block text-base font-medium text-gray-700 mb-2">Chatbot Avatar</Text>
@@ -388,6 +405,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
     <div className="max-w-4xl">
       {/* Previous Questions */}
       {renderPreviousQuestions()}
+
       {/* Current Question */}
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
@@ -395,6 +413,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
         </Title>
         {currentQuestion.subtitle && <Text className="text-gray-600 text-2xl block mb-8 font-bold">{currentQuestion.subtitle}</Text>}
         {renderCurrentInput()}
+
         {/* Navigation */}
         <div className="flex justify-between">
           <Button
@@ -425,6 +444,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
             Close
           </Button>,
         ]}
+        width={720} // Adjust modal width to better fit video
       >
         <Typography>
           <Title level={4}>Follow these steps to integrate your chatbot:</Title>
@@ -439,17 +459,43 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
               <Text strong>Go to Profile Settings:</Text> Access your profile settings from the navigation menu.
             </li>
             <li>
-              <Text strong>Go to Chatbot Settings:</Text> Find the dedicated "Chatbot Settings" section.
+              <Text strong>Go to Chatbot Settings:</Text> Find the dedicated &quot;Chatbot Settings&quot; section.
             </li>
             <li>
-              <Text strong>Click &quot;Generate Script&quot; and Copy it:</Text> Generate the integration script and copy it to embed your chatbot on
-              your website.
+              <Text strong>Click &quot;Generate Script&quot; and Copy it:</Text> Generate the integration script and copy it to embed your
+              chatbot on your website.
             </li>
           </ol>
           <Text className="mt-4 block text-gray-600">
             This script will allow your intelligent chatbot to handle patient inquiries 24/7.
           </Text>
         </Typography>
+        {/* Video at the end of the modal */}
+        <div className="mt-6 relative">
+          <Title level={5}>Watch the integration guide:</Title>
+          <div className="relative w-full">
+            <video
+              ref={videoRef}
+              autoPlay
+              loop
+              muted
+              controls
+              className="w-full rounded-lg shadow-md"
+              onCanPlay={() => setIsBuffering(false)}
+              onPlaying={() => setIsBuffering(false)}
+              onWaiting={() => setIsBuffering(true)}
+            >
+              <source src="/videos/chatbot-setup-video.webm" type="video/webm" />
+              <source src="/videos/chatbot-setup-video.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+            {isBuffering && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 z-10">
+                <Spin size="large" />
+              </div>
+            )}
+          </div>
+        </div>
       </Modal>
     </div>
   );

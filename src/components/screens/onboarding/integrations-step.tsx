@@ -389,6 +389,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         }, 500); // Small delay for better UX
       }
     }
+
+    //show onboarding completion buttons
+    if (currentQuestion.id === "uploadLeads") {
+      if (value === "Yes" || value === "No") {
+        setShowCompletionButtons(true);
+      }
+    }
   };
 
   const connectToHubSpot = async () => {
@@ -524,16 +531,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
       SuccessToast("Leads uploaded successfully");
     }
-
-    // Move to next question or complete
-    if (currentQuestionIndex < filteredQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      setShowCompletionButtons(true);
-      setTimeout(() => {
-        InfoToast("Want to add or remove manual leads upload? Click previous button");
-      }, 5000);
-    }
+    setShowCompletionButtons(true);
+    setTimeout(() => {
+      InfoToast("Want to add or remove manual leads upload? Click previous button");
+    }, 5000);
   };
 
   const handleManualLeadsModalCancel = () => {
@@ -924,13 +925,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                   <div className="flex-1">
                     <Text className="text-blue-800 text-sm font-medium block mb-2">How to Set Up Zapier</Text>
                     <Text className="text-blue-700 text-sm mb-3">
-                      1. Click "Connect with Zapier" to open Zapier in a new tab.
+                      1. Click &quot;Connect with Zapier&quot; to open Zapier in a new tab.
                       <br />
-                      2. Sign in to your Zapier account or create one (it's free!).
+                      2. Sign in to your Zapier account or create one (it&apos;s free!).
                       <br />
                       3. Follow Zapier’s prompts to connect your tools.
                       <br />
-                      4. Return here and click "Continue" when done.
+                      4. Return here and click &quot;Continue&quot; when done.
                       <br />
                       Need help? Book a meeting with our team!
                     </Text>
@@ -1123,7 +1124,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               backgroundColor: "#A068F1",
               color: "#fff",
             }}
-            onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
+            onClick={() => {
+              window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank");
+              setShowCustomCrmModal(false);
+            }}
           >
             Book a Call with Our Team
           </Button>
