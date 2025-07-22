@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Input, Form } from "antd";
+import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Form } from "antd";
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
 import { getUserData } from "@/utils/supabase/user-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toast";
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -41,6 +42,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [csvLeads, setCsvLeads] = useState<any>([]);
   const supabase = createClient();
   const [showCompletionButtons, setShowCompletionButtons] = useState(false);
+
+  const getClinicId = async () => {
+    const clinic = await getClinicData();
+    if (!clinic || !clinic?.id) {
+      return null;
+    } else {
+      return clinic.id;
+    }
+  };
 
   const questions = [
     {
@@ -453,25 +463,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing, autoProgressToNext]);
-
-  const disconnectZapier = async () => {
-    try {
-      await fetch("/api/zapier/disconnect", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: "current-user-id",
-        }),
-      });
-      setZapierStatus("disconnected");
-      setZapierAccountInfo(null);
-      zapierForm.resetFields();
-    } catch (error) {
-      console.error("Zapier disconnection failed:", error);
-    }
-  };
 
   const handleHubspotModalOk = () => {
     setShowHubspotModal(false);
@@ -900,7 +891,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         open={showZapierModal}
         onOk={handleZapierModalOk}
         onCancel={handleZapierModalCancel}
-        okText={zapierStatus === "connected" ? "Continue" : zapierStatus === "connecting" ? "Connecting..." : "Save Settings"}
+        okText={zapierStatus === "connected" ? "Continue" : zapierStatus === "connecting" ? "Connecting..." : "Connect with Zapier"}
         cancelText="Skip for Now"
         okButtonProps={{
           className: "bg-purple-500 border-purple-500",
@@ -913,8 +904,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           {zapierStatus === "disconnected" && (
             <>
               <Alert
-                message="Set up your Zapier automation"
-                description={`We'll help you connect ${
+                message="Connect Zapier for Automation"
+                description={`Click the button below to connect ${
                   formData.otherTools
                     ? formData.otherTools
                         .split(",")
@@ -922,7 +913,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                         .slice(0, 3)
                         .join(", ") + (formData.otherTools.split(",").filter((s: string) => s).length > 3 ? " and more" : "")
                     : "your tools"
-                } for seamless data sync and automation.`}
+                } with Zapier for seamless automation.`}
                 type="info"
                 showIcon
                 className="mb-6"
@@ -931,9 +922,17 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 <div className="flex items-start">
                   <CalendarOutlined className="text-blue-500 mt-1 mr-3" />
                   <div className="flex-1">
-                    <Text className="text-blue-800 text-sm font-medium block mb-2">Need help with setup?</Text>
+                    <Text className="text-blue-800 text-sm font-medium block mb-2">How to Set Up Zapier</Text>
                     <Text className="text-blue-700 text-sm mb-3">
-                      If you find this process difficult, our team can set everything up for you.
+                      1. Click "Connect with Zapier" to open Zapier in a new tab.
+                      <br />
+                      2. Sign in to your Zapier account or create one (it's free!).
+                      <br />
+                      3. Follow Zapier’s prompts to connect your tools.
+                      <br />
+                      4. Return here and click "Continue" when done.
+                      <br />
+                      Need help? Book a meeting with our team!
                     </Text>
                     <Button
                       type="primary"
@@ -942,28 +941,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                       onClick={() => window.open("https://calendly.com/your-team/zapier-setup", "_blank")}
                       className="bg-purple-600 border-purple-600 hover:bg-purple-700"
                     >
-                      Book a Meeting
+                      Book a Support Meeting
                     </Button>
                   </div>
                 </div>
               </div>
-              <Form form={zapierForm} layout="vertical" className="space-y-4">
-                <Form.Item
-                  label="Zapier API Key"
-                  name="zapierApiKey"
-                  rules={[{ required: true, message: "Please enter your Zapier API key" }]}
-                >
-                  <Input.Password placeholder="Enter your Zapier API key" size="large" />
-                </Form.Item>
-                <Form.Item
-                  label="Webhook URL"
-                  name="webhookUrl"
-                  rules={[{ required: true, message: "Please enter your webhook URL" }]}
-                  extra={<Text className="text-gray-500 text-xs">Your Zapier webhook URL for receiving data</Text>}
-                >
-                  <Input placeholder="https://hooks.zapier.com/hooks/catch/..." size="large" />
-                </Form.Item>
-              </Form>
               {formData.otherTools && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                   <Text className="text-sm text-gray-700">
@@ -984,7 +966,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               <div className="mt-4">
                 <Text className="text-lg">Setting up Zapier integration...</Text>
                 <br />
-                <Text className="text-gray-500">This may take a few moments</Text>
+                <Text className="text-gray-500">Please complete the setup in Zapier and return here.</Text>
               </div>
             </div>
           )}
@@ -993,7 +975,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             <>
               <Alert
                 message="Successfully Connected!"
-                description="Your Zapier integration is set up. We'll help you create automated workflows for your selected tools."
+                description="Your Zapier integration is set up. Your tools are now ready for automated workflows."
                 type="success"
                 showIcon
                 className="mb-4"
@@ -1007,13 +989,31 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                     <br />
                     <Text className="text-green-600 text-sm">Ready for automation workflows</Text>
                   </div>
-                  <Button type="link" danger onClick={disconnectZapier} className="text-red-500">
+                  <Button
+                    type="link"
+                    danger
+                    onClick={() => {
+                      setZapierStatus("disconnected");
+                      setZapierAccountInfo(null);
+                    }}
+                    className="text-red-500"
+                  >
                     Disconnect
                   </Button>
                 </div>
               </div>
               <div className="mt-4 text-center">
-                <Text className="text-gray-600">⚡ Ready to automate! We&apos;ll help you set up workflows next.</Text>
+                <Text className="text-gray-600">⚡ Your automation is ready! Need further help? Book a support meeting.</Text>
+                <br />
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<CalendarOutlined />}
+                  onClick={() => window.open("https://calendly.com/your-team/zapier-setup", "_blank")}
+                  className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
+                >
+                  Book a Support Meeting
+                </Button>
               </div>
             </>
           )}
