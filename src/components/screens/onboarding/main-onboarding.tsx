@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect,useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Typography } from "antd";
 import { useRouter } from "next/navigation";
 import ClinicInfoStep from "./clinic-info-step";
@@ -15,7 +15,7 @@ import apiKeyService from "@/services/apiKey";
 import { Lead } from "@/interfaces/services_type";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
-import { createClinic } from "@/utils/supabase/clinic-helper";
+import { updateClinic, getClinicData } from "@/utils/supabase/clinic-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
@@ -61,18 +61,21 @@ export default function MainOnboarding() {
   // Helper functions for localStorage (same as old flow)
   const isBrowser = typeof window !== "undefined";
 
-
-  const getStoredData = useCallback((key: string) => {
+  const getStoredData = useCallback(
+    (key: string) => {
       if (!isBrowser) return null;
       try {
         const stored = localStorage.getItem(key);
         return stored ? JSON.parse(stored) : null;
       } catch (error) {
-        ErrorToast("Error reading from localStorage:");
+        ErrorToast("Error reading from localStorage");
         return null;
       }
-    },[isBrowser])
-  // restore onboarding progress from localStorage on mount
+    },
+    [isBrowser],
+  );
+
+  // Restore onboarding progress from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedData = getStoredData(ONBOARDING_STORAGE_KEY);
@@ -89,7 +92,7 @@ export default function MainOnboarding() {
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      ErrorToast("Error writing to localStorage:");
+      ErrorToast("Error writing to localStorage");
     }
   };
 
@@ -101,7 +104,7 @@ export default function MainOnboarding() {
       localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
       localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
     } catch (error) {
-      ErrorToast("Error clearing localStorage:");
+      ErrorToast("Error clearing localStorage");
     }
   };
 
@@ -112,7 +115,6 @@ export default function MainOnboarding() {
     const toneIdentity = data["tone-identity"] || {};
     const aiAssistant = data["ai-assistant"] || {};
     const bookingSetup = data["booking-setup"] || {};
-    // const chatbotSetup = data["chatbot-setup"] || {};
     const integrations = data["integrations"] || {};
 
     // Convert business hours to old format
@@ -153,7 +155,8 @@ export default function MainOnboarding() {
       integrations: integrations,
     };
   };
-  // upload csv lead to supabase lead table
+
+  // Upload CSV leads to Supabase lead table
   const handleCsvLeadsUpload = async (clinic_id: string) => {
     const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
     if (leadsFileName) {
@@ -163,7 +166,7 @@ export default function MainOnboarding() {
         result && typeof result === "object" && "data" in result && Array.isArray((result as any).data)
           ? (result as { data: Partial<Lead>[] }).data
           : [];
-      // 1. Get source_id for 'File'
+      // Get source_id for 'File'
       try {
         const source_id = await getLeadSourceId("File");
         const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
@@ -177,7 +180,7 @@ export default function MainOnboarding() {
     }
   };
 
-  // Main submission function (adapted from old flow)
+  // Main submission function (updated to use updateClinic)
   const handleCompleteOnboarding = async () => {
     try {
       setIsSubmitting(true);
@@ -193,41 +196,41 @@ export default function MainOnboarding() {
         return;
       }
 
-      // First, upload the logo if provided
+      // Get existing clinic
+      const clinic = await getClinicData();
+      if (!clinic || !clinic.id) {
+        ErrorToast("No clinic found for user. Please try logging in again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Upload the logo if provided
       let logoUrl = undefined;
       if (mappedData.logo) {
         logoUrl = await uploadClinicLogo(user.id, mappedData.logo);
       }
 
       const clinicData = {
-        // Map form fields to database fields
-        name: mappedData.legalBusinessName,
-        legal_business_name: mappedData.legalBusinessName,
+        id: clinic.id, // Include clinic ID for update
+        owner_id: user.id,
+        name: mappedData.legalBusinessName || `${user.email?.split("@")[0] || "User"}'s Clinic`,
+        legal_business_name: mappedData.legalBusinessName || `${user.email?.split("@")[0] || "User"}'s Clinic`,
         dba_name: mappedData.dbaName,
         address: mappedData.clinicAddress,
         phone: mappedData.phoneNumber,
         email: mappedData.emailAddress || user.email,
         language: "en",
-        owner_id: user.id,
         business_hours: mappedData.businessHours,
         calendly_link: mappedData.calendlyLink,
         logo: logoUrl,
-
-        // Brand settings
         tone_selector: mappedData.tone_selector,
         sentence_length: mappedData.sentence_length,
         formality_level: mappedData.formality_level,
-
-        // Additional fields from new flow
         clinic_type: mappedData.clinicType,
-
-        // Integrations data
         uses_hubspot: mappedData.integrations.usesHubspot === "Yes",
         uses_ads: mappedData.integrations.usesAds === "Yes",
         has_chatbot: mappedData.integrations.hasChatbot === "Yes",
         other_tools: mappedData.integrations.otherTools || "",
-
-        // Keeping existing theming structure
         widget_theme: {
           primary_color: "#2563EB",
           font_family: "Inter, sans-serif",
@@ -238,25 +241,27 @@ export default function MainOnboarding() {
         },
       };
 
-      // Create clinic
-      const clinic = await createClinic(clinicData);
+      console.log("MainOnboarding clinicData:", clinicData);
+
+      // Update clinic
+      const updatedClinic = await updateClinic(clinicData);
 
       // Generate API key for the clinic
       const apiKeyName = `${mappedData.legalBusinessName} Primary Key`;
       await apiKeyService.create({
         name: apiKeyName,
-        clinicId: clinic.id,
+        clinicId: updatedClinic.id,
       });
 
       // Handle document upload and assistant creation if we have a clinic ID
-      if (clinic.id && mappedData.clinic_document) {
+      if (updatedClinic.id && mappedData.clinic_document) {
         const hasDocument = !!mappedData.clinic_document;
 
         if (hasDocument) {
           // Prepare form data for the edge function
           const formDataToSend = new FormData();
           formDataToSend.append("clinic_document", mappedData.clinic_document);
-          formDataToSend.append("clinic_id", clinic.id);
+          formDataToSend.append("clinic_id", updatedClinic.id);
           formDataToSend.append("name", mappedData.legalBusinessName);
           formDataToSend.append("description", `AI Assistant for ${mappedData.legalBusinessName}`);
 
@@ -295,14 +300,14 @@ export default function MainOnboarding() {
               body: formDataToSend,
             });
 
-             await response.json();
+            await response.json();
 
             if (!response.ok) {
-              ErrorToast("Assistant creation error:");
+              ErrorToast("Assistant creation error");
               // Continue with onboarding even if assistant creation fails
             }
           } catch (assistantError) {
-            ErrorToast("Failed to create assistant:");
+            ErrorToast("Failed to create assistant");
             // Continue with onboarding even if assistant creation fails
           }
         }
@@ -321,7 +326,7 @@ export default function MainOnboarding() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            clinic_id: clinic.id,
+            clinic_id: updatedClinic.id,
             phone_number: mappedData.phoneNumber,
             name: mappedData.legalBusinessName,
           }),
@@ -339,15 +344,15 @@ export default function MainOnboarding() {
       // Clear stored progress after successful completion
       clearStoredProgress();
 
-      // upload csv lead to supabase lead table
-      await handleCsvLeadsUpload(clinic.id);
+      // Upload CSV leads to Supabase lead table
+      await handleCsvLeadsUpload(updatedClinic.id);
 
       SuccessToast("You're all set!");
       setTimeout(() => {
         router.push("/dashboard?onboarding=success");
       }, 2000);
     } catch (error: any) {
-      ErrorToast(error.message || "Failed to create clinic");
+      ErrorToast(error.message || "Failed to update clinic");
     } finally {
       setIsSubmitting(false);
     }
@@ -438,7 +443,6 @@ export default function MainOnboarding() {
       case "chatbot-setup":
         return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "integrations":
-        // Pass handleCompleteOnboarding to IntegrationsStep for inline Chatbot setup
         return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       default:
         return <div>Unknown step</div>;

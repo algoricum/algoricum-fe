@@ -7,6 +7,7 @@ import { getUserData } from "@/utils/supabase/user-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toast";
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -40,6 +41,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [csvLeads, setCsvLeads] = useState<any>([]);
   const supabase = createClient();
   const [showCompletionButtons, setShowCompletionButtons] = useState(false);
+
+  const getClinicId = async () => {
+    const clinic = await getClinicData();
+    if (!clinic || !clinic?.id) {
+      return null;
+    } else {
+      return clinic.id;
+    }
+  };
 
   const questions = [
     {
@@ -678,8 +688,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 <Text className="text-lg font-semibold text-purple-900">Upload your existing leads!</Text>
               </div>
               <Text className="text-purple-900 text-base leading-6">
-                Great! You can upload a CSV file with your existing leads to import them directly into our platform. We&apos;ll help you map the
-                fields correctly.
+                Great! You can upload a CSV file with your existing leads to import them directly into our platform. We&apos;ll help you map
+                the fields correctly.
               </Text>
             </Card>
           )}
