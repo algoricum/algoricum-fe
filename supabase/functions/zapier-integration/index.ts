@@ -1,5 +1,3 @@
-// File: supabase/functions/zapier-connect/index.ts
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
 
@@ -12,103 +10,29 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-interface ZapierConnectionRequest {
-  userId: string
-  zapierApiKey: string
-  accountEmail: string
-  webhookUrl?: string
-  integrationGoals: string
-  selectedTools: string[]
+interface LeadRequest {
+  name: string
+  email: string
+  phone_number: string
+  clinic_id: string
+  message: string
 }
 
-// Simple encryption function - replace with proper encryption in production
-function encryptApiKey(apiKey: string): string {
-  const salt = Deno.env.get('ENCRYPTION_SALT') || 'default-salt'
-  const encoder = new TextEncoder()
-  const data = encoder.encode(apiKey + salt)
-  return btoa(String.fromCharCode(...new Uint8Array(data)))
-}
-
-async function validateZapierApiKey(apiKey: string): Promise<{ isValid: boolean; accountInfo?: any }> {
+async function handleLeadCreation(request: Request): Promise<Response> {
   try {
-    console.log('Validating Zapier API key...')
-    
-    // Test the API key by making a request to Zapier's API
-    const response = await fetch('https://api.zapier.com/v1/me', {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      console.error('Zapier API validation failed:', response.status, response.statusText)
-      return { isValid: false }
-    }
-    
-    const accountInfo = await response.json()
-    console.log('Zapier account info received:', { email: accountInfo.email, name: accountInfo.name })
-    
-    // Get Zaps count
-    let zapCount = 0
-    try {
-      const zapsResponse = await fetch('https://api.zapier.com/v1/zaps', {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Accept': 'application/json'
-        }
-      })
-      
-      if (zapsResponse.ok) {
-        const zapsData = await zapsResponse.json()
-        zapCount = zapsData.objects?.length || 0
-      }
-    } catch (error) {
-      console.warn('Failed to get Zaps count:', error)
-    }
-    
-    return {
-      isValid: true,
-      accountInfo: {
-        email: accountInfo.email,
-        name: accountInfo.name,
-        zapCount,
-        accountId: accountInfo.id
-      }
-    }
-  } catch (error) {
-    console.error('Error validating Zapier API key:', error)
-    return { isValid: false }
-  }
-}
+    console.log('Processing lead creation request...')
 
-async function handleConnect(request: Request): Promise<Response> {
-  try {
-    console.log('Processing Zapier connection request...')
-    
-    const body: ZapierConnectionRequest = await request.json()
-    const { userId, zapierApiKey, accountEmail, webhookUrl, integrationGoals, selectedTools } = body
+    const body: LeadRequest = await request.json()
+        console.log('Processing lead creation request...', body)
+
+    const { name, email, phone_number, clinic_id, message } = body[0]
 
     // Validate required fields
-    if (!userId || !zapierApiKey || !accountEmail || !integrationGoals) {
+    if (!name || !email || !clinic_id) {
       return new Response(
         JSON.stringify({ 
           error: 'Missing required fields',
-          details: 'userId, zapierApiKey, accountEmail, and integrationGoals are required' 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Validate API key format
-    if (zapierApiKey.length < 32 || zapierApiKey.length > 50) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid API key format',
-          details: 'Zapier API keys should be 32-50 characters long' 
+          details: 'name, email, and clinic_id are required' 
         }),
         { 
           status: 400, 
@@ -119,7 +43,7 @@ async function handleConnect(request: Request): Promise<Response> {
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(accountEmail)) {
+    if (!emailRegex.test(email)) {
       return new Response(
         JSON.stringify({ 
           error: 'Invalid email format',
@@ -132,57 +56,72 @@ async function handleConnect(request: Request): Promise<Response> {
       )
     }
 
-    console.log('Validating Zapier API key with Zapier API...')
-    
-    // Validate Zapier API key and get account info
-    const validation = await validateZapierApiKey(zapierApiKey)
-    if (!validation.isValid) {
+    // Validate clinic_id format (UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(clinic_id)) {
       return new Response(
         JSON.stringify({ 
-          error: 'Invalid Zapier API key', 
-          details: 'Please check your API key and try again. Make sure it has the correct permissions.' 
+          error: 'Invalid clinic_id format',
+          details: 'clinic_id must be a valid UUID' 
         }),
         { 
-          status: 401, 
+          status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
     }
 
-    console.log('API key validated successfully. Saving to database...')
+    // Split name into firstname and lastname
+    const [first_name, ...lastnameParts] = name.trim().split(' ')
+    const last_name = lastnameParts.join(' ') || ''
 
-    // Create Supabase client with service role for database operations
+    // Create Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Encrypt the API key before storing
-    const encryptedApiKey = encryptApiKey(zapierApiKey)
+    // Fetch source_id from lead_source where name = 'Zapier'
+    const { data: sourceData, error: sourceError } = await supabase
+      .from('lead_source')
+      .select('id')
+      .eq('name', 'Zapier')
+      .single()
 
-    // Upsert integration record (insert or update if exists)
-    const { data: integration, error: dbError } = await supabase
-      .from('zapier_integrations')
-      .upsert({
-        user_id: userId,
-        account_email: accountEmail,
-        zapier_api_key: encryptedApiKey,
-        webhook_url: webhookUrl || null,
-        integration_goals: integrationGoals,
-        selected_tools: selectedTools || [],
-        status: 'connected',
-        connection_data: validation.accountInfo,
-        last_sync_at: new Date().toISOString(),
-        error_message: null // Clear any previous errors
-      }, {
-        onConflict: 'user_id'
+    if (sourceError || !sourceData) {
+      console.error('Error fetching lead source:', sourceError)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Lead source not found',
+          details: 'Could not find Zapier in lead_source table' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    const source_id = sourceData.id
+
+    // Insert lead into lead table
+    const { data: lead, error: leadError } = await supabase
+      .from('lead')
+      .insert({
+        first_name,
+        last_name,
+        email,
+        phone: phone_number || null,
+        status: 'new',
+        clinic_id,
+        source_id,
       })
       .select()
       .single()
 
-    if (dbError) {
-      console.error('Database error:', dbError)
+    if (leadError) {
+      console.error('Error inserting lead:', leadError)
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to save integration', 
-          details: 'Database error occurred while saving your integration' 
+          error: 'Failed to save lead',
+          details: leadError.message 
         }),
         { 
           status: 500, 
@@ -191,20 +130,24 @@ async function handleConnect(request: Request): Promise<Response> {
       )
     }
 
-    console.log('Integration saved successfully:', integration.id)
+    console.log('Lead saved successfully:', lead.id)
 
-    // Return success response with account info
+    // Return success response
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Zapier integration connected successfully',
-        accountInfo: {
-          email: validation.accountInfo?.email,
-          name: validation.accountInfo?.name,
-          zapCount: validation.accountInfo?.zapCount || 0,
-          connectedApps: selectedTools?.length || 0
-        },
-        integrationId: integration.id
+        message: 'Lead created successfully',
+        lead: {
+          id: lead.id,
+          firstname: lead.firstname,
+          lastname: lead.lastname,
+          email: lead.email,
+          phone: lead.phone,
+          status: lead.status,
+          clinic_id: lead.clinic_id,
+          source_id: lead.source_id,
+          message // Include message in response for reference
+        }
       }),
       { 
         status: 200, 
@@ -213,24 +156,11 @@ async function handleConnect(request: Request): Promise<Response> {
     )
 
   } catch (error) {
-    console.error('Connection error:', error)
-    
-    // Return different error messages based on the error type
-    let errorMessage = 'Failed to connect to Zapier'
-    let errorDetails = 'An unexpected error occurred'
-    
-    if (error.message.includes('fetch')) {
-      errorMessage = 'Network error'
-      errorDetails = 'Failed to connect to Zapier API. Please check your internet connection.'
-    } else if (error.message.includes('JSON')) {
-      errorMessage = 'Invalid request format'
-      errorDetails = 'The request data format is invalid'
-    }
-    
+    console.error('Error processing lead:', error)
     return new Response(
       JSON.stringify({ 
-        error: errorMessage,
-        details: errorDetails
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'An unexpected error occurred'
       }),
       { 
         status: 500, 
@@ -246,12 +176,12 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Only handle POST requests for connection
+  // Only handle POST requests
   if (req.method !== 'POST') {
     return new Response(
       JSON.stringify({ 
         error: 'Method not allowed',
-        details: 'Only POST requests are supported for this endpoint' 
+        details: 'Only POST requests are supported' 
       }),
       { 
         status: 405, 
@@ -260,19 +190,5 @@ serve(async (req) => {
     )
   }
 
-  try {
-    return await handleConnect(req)
-  } catch (error) {
-    console.error('Unhandled error:', error)
-    return new Response(
-      JSON.stringify({ 
-        error: 'Internal server error',
-        details: 'An unexpected error occurred while processing your request'
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
-  }
+  return await handleLeadCreation(req)
 })
