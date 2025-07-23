@@ -9,7 +9,6 @@ const corsHeaders = {
 
 serve(async (req) => {
   const requestId = crypto.randomUUID();
-  const startTime = Date.now();
   const url = new URL(req.url);
 
   console.log(`[${requestId}] 🚀 PUBLIC REQUEST`, {
@@ -65,8 +64,31 @@ serve(async (req) => {
     );
   }
 
-  // For authenticated operations (POST, DELETE)
-  if (req.method === "POST" || req.method === "DELETE") {
+  // Handle POST requests (both authenticated and cron)
+  if (req.method === "POST") {
+    try {
+      const body = await req.json();
+      
+      // Handle cron job for syncing all connections (no auth required for service role)
+      if (body.mode === 'sync_all_connections') {
+        console.log(`[${requestId}] 🕐 Starting cron job - sync all HubSpot connections`);
+        return await handleSyncAllConnections(req, requestId);
+      }
+      
+      // All other POST requests require authentication
+      return await handleAuthenticatedRequest(req, requestId);
+      
+    } catch (error) {
+      console.error(`[${requestId}] Error parsing POST body:`, error);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+  }
+
+  // For authenticated DELETE operations
+  if (req.method === "DELETE") {
     return await handleAuthenticatedRequest(req, requestId);
   }
 
@@ -76,6 +98,123 @@ serve(async (req) => {
     { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 });
+
+async function handleSyncAllConnections(req: Request, requestId: string) {
+  console.log(`[${requestId}] 🔄 Processing sync for all HubSpot connections`);
+  
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error(`[${requestId}] Missing Supabase environment variables`);
+    return new Response(
+      JSON.stringify({ error: "Configuration error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
+  try {
+    // Get all active HubSpot connections
+    const { data: connections, error: connError } = await supabase
+      .from("hubspot_connections")
+      .select("user_id, clinic_id, access_token, last_sync_at")
+      .eq("connection_status", "connected");
+      
+    if (connError) {
+      console.error(`[${requestId}] Failed to fetch connections:`, connError);
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch connections" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (!connections || connections.length === 0) {
+      console.log(`[${requestId}] No active HubSpot connections found`);
+      return new Response(
+        JSON.stringify({ message: "No active connections to sync", syncedCount: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    console.log(`[${requestId}] Found ${connections.length} active connections to sync`);
+    
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+    
+    // Sync contacts for each connection
+    for (const connection of connections) {
+      try {
+        console.log(`[${requestId}] Syncing contacts for user ${connection.user_id}, clinic ${connection.clinic_id}`);
+        
+        // Create a mock request for the existing sync function
+        const mockRequest = new Request("http://localhost/sync-contacts", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "authorization": `Bearer ${supabaseServiceKey}`
+          },
+          body: JSON.stringify({
+            userId: connection.user_id,
+            clinic_id: connection.clinic_id
+          })
+        });
+        
+        const syncResponse = await handleSyncContacts(mockRequest, supabase, `${requestId}-${connection.user_id}`);
+        
+        if (syncResponse.status === 200) {
+          successCount++;
+          console.log(`[${requestId}] ✅ Successfully synced user ${connection.user_id}`);
+        } else {
+          errorCount++;
+          const errorText = await syncResponse.text();
+          errors.push({ userId: connection.user_id, error: errorText });
+          console.error(`[${requestId}] ❌ Failed to sync user ${connection.user_id}:`, errorText);
+        }
+        
+      } catch (error) {
+        errorCount++;
+        errors.push({ userId: connection.user_id, error: error.message });
+        console.error(`[${requestId}] ❌ Exception syncing user ${connection.user_id}:`, error.message);
+      }
+      
+      // Add small delay between syncs to avoid rate limits
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    const summary = {
+      totalConnections: connections.length,
+      successCount,
+      errorCount,
+      errors: errors.length > 0 ? errors : undefined,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log(`[${requestId}] ✅ Cron job completed:`, summary);
+    
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: "Sync completed for all connections",
+        ...summary
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+    
+  } catch (error) {
+    console.error(`[${requestId}] Cron job failed:`, error.message);
+    return new Response(
+      JSON.stringify({ 
+        error: "Cron job failed", 
+        message: error.message,
+        timestamp: new Date().toISOString()
+      }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
 
 async function processOAuthCallback(req: Request, requestId: string) {
   console.log(`[${requestId}] 🔄 Processing OAuth callback`);
