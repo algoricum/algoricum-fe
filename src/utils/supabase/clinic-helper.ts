@@ -219,71 +219,51 @@ export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => 
 };
 
 export const createEmailSettings = async (clinic_id: string): Promise<EmailSettings> => {
-  const data = {
-    clinic_id: clinic_id,
-    smtp_host: "smtp.gmail.com",
-    smtp_port: 587,
-    smtp_user: "abdullah.salman@hashlogics.com",
-    smtp_sender_name: "Algoricum",
-    smtp_sender_email: "abdullah.salman@hashlogics.com",
-    smtp_use_tls: true,
-    imap_server: "imap.gmail.com",
-    imap_port: 993,
-    imap_user: "abdullah.salman@hashlogics.com", 
-    imap_use_ssl: true
-  }
-
   try {
-    // Get SMTP password from vault
-    const { data: smtpPasswordData, error: smtpPasswordError } = await supabase
-      .from('vault.decrypted_secrets')
-      .select('decrypted_secret')
-      .eq('name', 'smtp_password')
-      .single();
+    console.log("Creating email settings with vault password...");
+    
+    // Call the database function that handles vault access internally
+    const { data: settingsId, error: functionError } = await supabase
+      .rpc('create_email_settings_with_vault', {
+        p_clinic_id: clinic_id,
+        p_smtp_host: "smtp.gmail.com",
+        p_smtp_port: 587,
+        p_smtp_user: "abdullah.salman@hashlogics.com",
+        p_smtp_sender_name: "Algoricum",
+        p_smtp_sender_email: "abdullah.salman@hashlogics.com",
+        p_smtp_use_tls: true,
+        p_imap_server: "imap.gmail.com",
+        p_imap_port: 993,
+        p_imap_user: "abdullah.salman@hashlogics.com",
+        p_imap_use_ssl: true,
+        p_imap_folder: "INBOX",
+        p_check_frequency_minutes: 5,
+        p_sms_auto_reply_enabled: true
+      });
 
-    if (smtpPasswordError || !smtpPasswordData) {
-      console.error("Failed to retrieve SMTP password from vault:", smtpPasswordError);
-      throw new Error("SMTP password not found in vault");
+    if (functionError) {
+      console.error("Failed to create email settings:", functionError);
+      throw new Error(`Database function failed: ${functionError.message}`);
     }
 
-    // Get IMAP password from vault (assuming same password, or create separate vault entry)
-    const { data: imapPasswordData, error: imapPasswordError } = await supabase
-      .from('vault.decrypted_secrets')
-      .select('decrypted_secret')
-      .eq('name', 'smtp_password') // Using same password, change to 'imap_password' if different
-      .single();
-
-    if (imapPasswordError || !imapPasswordData) {
-      console.error("Failed to retrieve IMAP password from vault:", imapPasswordError);
-      throw new Error("IMAP password not found in vault");
+    if (!settingsId) {
+      throw new Error("No settings ID returned from database function");
     }
 
-    // Create the email settings record with passwords from vault
-    const { data: emailSettingsResult, error: emailSettingsError } = await supabase
+    console.log("Email settings created successfully with ID:", settingsId);
+
+    // Fetch the created record to return it
+    const { data: emailSettingsResult, error: fetchError } = await supabase
       .from('email_settings')
-      .insert([
-        {
-          ...data,
-          smtp_password: smtpPasswordData.decrypted_secret,
-          imap_password: imapPasswordData.decrypted_secret,
-          // Set defaults
-          check_frequency_minutes: 5,
-          imap_folder: 'INBOX',
-          last_processed_uid: 0,
-          sms_auto_reply_enabled: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ])
-      .select()
+      .select('*')
+      .eq('id', settingsId)
       .single();
 
-    if (emailSettingsError) {
-      console.error("Failed to create email settings:", emailSettingsError);
-      throw emailSettingsError;
+    if (fetchError) {
+      console.error("Failed to fetch created email settings:", fetchError);
+      throw fetchError;
     }
 
-    console.log("Email settings created successfully:", emailSettingsResult.id);
     return emailSettingsResult;
 
   } catch (error) {
