@@ -1035,6 +1035,49 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         }}
         onCancel={() => setShowManualLeadsModal(false)}
       />
+      <Modal
+        title={
+          <div className="flex items-center">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3" style={{ backgroundColor: "#A068F1" }}>
+              <Text className="text-white font-bold text-sm">?</Text>
+            </div>
+            <span className="text-xl font-semibold">Can&apos;t find your CRM?</span>
+          </div>
+        }
+        open={showCustomCrmModal}
+        onOk={() => setShowCustomCrmModal(false)}
+        onCancel={() => setShowCustomCrmModal(false)}
+        okText="Close"
+        cancelText="Cancel"
+        width={500}
+        centered
+        footer={null}
+      >
+        <div className="py-6 text-center">
+          <Alert
+            message="We couldn't find your CRM."
+            description="Don't worry! Our team can help you integrate your preferred tool. Book a call with us and we'll guide you through the process."
+            type="info"
+            showIcon
+            className="mb-6 custom-alert-icon"
+          />
+          <Button
+            type="primary"
+            icon={<CalendarOutlined />}
+            className="text-lg font-medium px-8 py-2 mt-2 border-none"
+            style={{
+              backgroundColor: "#A068F1",
+              color: "#fff",
+            }}
+            onClick={() => {
+              window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank");
+              setShowCustomCrmModal(false);
+            }}
+          >
+            Book a Call with Our Team
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
