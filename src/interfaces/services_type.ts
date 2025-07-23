@@ -245,3 +245,46 @@ export interface UpdateWidgetProps {
     font_color?: string;
   };
 }
+
+export interface CreateEmailSettingsProps {
+  clinic_id: string;
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password?: string;
+  smtp_sender_name?: string;
+  smtp_sender_email?: string;
+  smtp_use_tls?: boolean;
+  imap_server?: string;
+  imap_port?: number;
+  imap_user?: string;
+  imap_password?: string;
+  imap_use_ssl?: boolean;
+  imap_folder?: string;
+  check_frequency_minutes?: number;
+  sms_auto_reply_enabled?: boolean;
+}
+
+export interface EmailSettings {
+  id: string;
+  clinic_id: string;
+  last_email_check: string | null;
+  check_frequency_minutes: number;
+  created_at: string;
+  updated_at: string;
+  imap_folder: string;
+  last_processed_uid: number;
+  sms_auto_reply_enabled: boolean;
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_user: string | null;
+  smtp_password: string | null;
+  smtp_sender_name: string | null;
+  smtp_sender_email: string | null;
+  smtp_use_tls: boolean | null;
+  imap_server: string | null;
+  imap_port: number | null;
+  imap_user: string | null;
+  imap_password: string | null;
+  imap_use_ssl: boolean | null;
+}

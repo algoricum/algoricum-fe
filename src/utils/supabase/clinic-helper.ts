@@ -2,7 +2,7 @@
 import { getLocalClinicData, setLocalClinicData } from '@/helpers/storage-helper';
 import { createClient } from './config/client';
 import { getUserData } from './user-helper';
-import type { Clinic, CreateClinicProps, UpdateClinicProps } from '@/interfaces/services_type';
+import type { Clinic, CreateClinicProps, UpdateClinicProps, EmailSettings } from '@/interfaces/services_type';
 
 const supabase = createClient();
 
@@ -216,6 +216,80 @@ export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => 
   }
 
   return clinicData;
+};
+
+export const createEmailSettings = async (clinic_id: string): Promise<EmailSettings> => {
+  const data = {
+    clinic_id: clinic_id,
+    smtp_host: "smtp.gmail.com",
+    smtp_port: 587,
+    smtp_user: "abdullah.salman@hashlogics.com",
+    smtp_sender_name: "Algoricum",
+    smtp_sender_email: "abdullah.salman@hashlogics.com",
+    smtp_use_tls: true,
+    imap_server: "imap.gmail.com",
+    imap_port: 993,
+    imap_user: "abdullah.salman@hashlogics.com", 
+    imap_use_ssl: true
+  }
+
+  try {
+    // Get SMTP password from vault
+    const { data: smtpPasswordData, error: smtpPasswordError } = await supabase
+      .from('vault.decrypted_secrets')
+      .select('decrypted_secret')
+      .eq('name', 'smtp_password')
+      .single();
+
+    if (smtpPasswordError || !smtpPasswordData) {
+      console.error("Failed to retrieve SMTP password from vault:", smtpPasswordError);
+      throw new Error("SMTP password not found in vault");
+    }
+
+    // Get IMAP password from vault (assuming same password, or create separate vault entry)
+    const { data: imapPasswordData, error: imapPasswordError } = await supabase
+      .from('vault.decrypted_secrets')
+      .select('decrypted_secret')
+      .eq('name', 'smtp_password') // Using same password, change to 'imap_password' if different
+      .single();
+
+    if (imapPasswordError || !imapPasswordData) {
+      console.error("Failed to retrieve IMAP password from vault:", imapPasswordError);
+      throw new Error("IMAP password not found in vault");
+    }
+
+    // Create the email settings record with passwords from vault
+    const { data: emailSettingsResult, error: emailSettingsError } = await supabase
+      .from('email_settings')
+      .insert([
+        {
+          ...data,
+          smtp_password: smtpPasswordData.decrypted_secret,
+          imap_password: imapPasswordData.decrypted_secret,
+          // Set defaults
+          check_frequency_minutes: 5,
+          imap_folder: 'INBOX',
+          last_processed_uid: 0,
+          sms_auto_reply_enabled: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+      ])
+      .select()
+      .single();
+
+    if (emailSettingsError) {
+      console.error("Failed to create email settings:", emailSettingsError);
+      throw emailSettingsError;
+    }
+
+    console.log("Email settings created successfully:", emailSettingsResult.id);
+    return emailSettingsResult;
+
+  } catch (error) {
+    console.error("Error creating email settings:", error);
+    throw error;
+  }
 };
 
 /**

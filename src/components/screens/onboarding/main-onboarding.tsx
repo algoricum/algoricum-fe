@@ -15,7 +15,7 @@ import apiKeyService from "@/services/apiKey";
 import { Lead } from "@/interfaces/services_type";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
-import { updateClinic, getClinicData } from "@/utils/supabase/clinic-helper";
+import { updateClinic, getClinicData, createEmailSettings } from "@/utils/supabase/clinic-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
@@ -158,27 +158,23 @@ export default function MainOnboarding() {
 
   // Upload CSV leads to Supabase lead table
   const handleCsvLeadsUpload = async (clinic_id: string) => {
- 
     const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
-   
+
     if (leadsFileName) {
       const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
 
-      
       // Properly type and extract data
       const leads: Partial<Lead>[] =
         result && typeof result === "object" && "data" in result && Array.isArray((result as any).data)
           ? (result as { data: Partial<Lead>[] }).data
           : [];
 
-      
       // Get source_id for 'File'
       try {
         const source_id = await getLeadSourceId("File");
         const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
         const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
         if (insertError) {
-         
           ErrorToast(insertError.message);
         }
       } catch (error) {
@@ -350,9 +346,8 @@ export default function MainOnboarding() {
         console.error("Failed to set up Twilio:", twilioError);
       }
 
-      // Upload CSV leads to Supabase lead table
+      await createEmailSettings(clinic.id);
       await handleCsvLeadsUpload(clinic.id);
-      // Clear stored progress after successful completion
       clearStoredProgress();
 
       SuccessToast("You're all set!");
