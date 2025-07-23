@@ -10,6 +10,7 @@ const { Text } = Typography;
 
 interface CsvUploadModalProps {
   open: boolean;
+  // eslint-disable-next-line no-unused-vars
   onOk: (leads: any[]) => void;
   onCancel: () => void;
   okText?: string;

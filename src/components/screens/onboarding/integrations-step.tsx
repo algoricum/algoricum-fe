@@ -9,7 +9,6 @@ import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toa
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
-import Papa from "papaparse";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -56,7 +55,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
-  
   const questions = [
     {
       id: "usesHubspot",
@@ -799,7 +797,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           </div>
         )}
       </div>
-
 
       {/* HubSpot Connection Modal */}
       <Modal
