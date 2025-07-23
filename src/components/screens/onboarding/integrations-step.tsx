@@ -8,6 +8,8 @@ import { createClient } from "@/utils/supabase/config/client";
 import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toast";
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
+import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
+import Papa from "papaparse";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -33,6 +35,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [autoProgressing, setAutoProgressing] = useState(false);
   // const [hubspotPrompted, setHubspotPrompted] = useState(false);
   const [showCustomCrmModal, setShowCustomCrmModal] = useState(false);
+  // const [csvValidationError, setCsvValidationError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     usesHubspot: initialData.usesHubspot || "",
@@ -53,6 +56,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
+  
   const questions = [
     {
       id: "usesHubspot",
@@ -136,13 +140,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const currentQuestion = filteredQuestions[currentQuestionIndex];
 
-  console.log("currentQuestion......", currentQuestion);
-
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
-
-  const handleCsvLeads = (csvLeads: any) => {
-    setCsvLeads(csvLeads);
-  };
 
   const handleCsvUpload = async () => {
     try {
@@ -527,22 +525,22 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }));
   };
 
-  const handleManualLeadsModalOk = () => {
-    handleCsvUpload();
-    setShowManualLeadsModal(false);
+  // const handleManualLeadsModalOk = () => {
+  //   handleCsvUpload();
+  //   setShowManualLeadsModal(false);
 
-    if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
-      SuccessToast("Leads uploaded successfully");
-    }
-    setShowCompletionButtons(true);
-    setTimeout(() => {
-      InfoToast("Want to add or remove manual leads upload? Click previous button");
-    }, 5000);
-  };
+  //   if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
+  //     SuccessToast("Leads uploaded successfully");
+  //   }
+  //   setShowCompletionButtons(true);
+  //   setTimeout(() => {
+  //     InfoToast("Want to add or remove manual leads upload? Click previous button");
+  //   }, 5000);
+  // };
 
-  const handleManualLeadsModalCancel = () => {
-    setShowManualLeadsModal(false);
-  };
+  // const handleManualLeadsModalCancel = () => {
+  //   setShowManualLeadsModal(false);
+  // };
 
   const handleNext = () => {
     // Handle HubSpot modal
@@ -564,10 +562,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
 
     // Handle file upload modal
-    if (currentQuestion.id === "uploadLeads" && currentValue === "Yes") {
-      setShowManualLeadsModal(true);
-      return;
-    }
+    // if (currentQuestion.id === "uploadLeads" && currentValue === "Yes") {
+    //   setShowManualLeadsModal(true);
+    //   return;
+    // }
 
     // Continue to next question or complete
     if (currentQuestionIndex < filteredQuestions.length - 1) {
@@ -748,7 +746,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   return (
     <div className="max-w-4xl">
       {renderPreviousQuestions()}
-
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
           {currentQuestion?.question}
@@ -768,7 +765,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
             <Button
               type="primary"
-              onClick={() => onNext(formData)} // or your onboarding completion logic
+              onClick={handleNext} // or your onboarding completion logic
               className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
               loading={isSubmitting}
             >
@@ -802,6 +799,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           </div>
         )}
       </div>
+
 
       {/* HubSpot Connection Modal */}
       <Modal
@@ -881,7 +879,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           )}
         </div>
       </Modal>
-
       {/* Zapier Modal - keeping existing implementation */}
       <Modal
         title={
@@ -1025,117 +1022,22 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       </Modal>
 
       {/* Manual Leads Modal */}
-      <Modal
-        title={
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
-              <Text className="text-white font-bold text-sm">CSV</Text>
-            </div>
-            <span className="text-xl font-semibold">Upload Your Leads</span>
-          </div>
-        }
+      <CsvUploadModal
         open={showManualLeadsModal}
-        onOk={handleManualLeadsModalOk}
-        onCancel={handleManualLeadsModalCancel}
-        okText="Upload CSV"
-        cancelText="Skip for Now"
-        okButtonProps={{
-          className: "bg-purple-500 border-purple-500",
-          disabled: csvLeads.length === 0,
+        onOk={leads => {
+          setCsvLeads(leads);
+          setShowManualLeadsModal(false);
+          handleCsvUpload();
+          if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
+            SuccessToast("Leads uploaded successfully");
+          }
+          setShowCompletionButtons(true);
+          setTimeout(() => {
+            InfoToast("Want to add or remove manual leads upload? Click previous button");
+          }, 5000);
         }}
-        width={500}
-        centered
-      >
-        <div className="py-6">
-          <Alert
-            message="Upload your leads via CSV"
-            description="You can upload a CSV file with your existing leads to import them into our platform."
-            type="info"
-            showIcon
-            className="mb-6"
-          />
-          <div className="text-center">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={e => {
-                if (e.target.files && e.target.files.length > 0) {
-                  const file = e.target.files[0];
-                  handleCsvLeads(file);
-                } else {
-                  handleCsvLeads([]);
-                }
-              }}
-              className="block w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-full file:border-0
-                file:text-sm file:font-semibold
-                file:bg-purple-50 file:text-purple-700
-                hover:file:bg-purple-100"
-            />
-            {csvLeads.length > 0 && (
-              <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                <Text className="text-green-700 text-sm">
-                  <CheckCircleOutlined className="mr-1" />
-                  File selected: {csvLeads.name}
-                </Text>
-              </div>
-            )}
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <Text className="text-sm text-gray-600">
-                <strong>CSV Format:</strong>
-                <br />• Ensure your CSV has columns like &apos;Name&apos;, &apos;Email&apos;, &apos;Phone&apos;, etc.
-                <br />• We&apos;ll guide you through mapping fields after upload.
-              </Text>
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Custom CRM Modal */}
-      <Modal
-        title={
-          <div className="flex items-center">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center mr-3" style={{ backgroundColor: "#A068F1" }}>
-              <Text className="text-white font-bold text-sm">?</Text>
-            </div>
-            <span className="text-xl font-semibold">Can&apos;t find your CRM?</span>
-          </div>
-        }
-        open={showCustomCrmModal}
-        onOk={() => setShowCustomCrmModal(false)}
-        onCancel={() => setShowCustomCrmModal(false)}
-        okText="Close"
-        cancelText="Cancel"
-        width={500}
-        centered
-        footer={null}
-      >
-        <div className="py-6 text-center">
-          <Alert
-            message="We couldn't find your CRM."
-            description="Don't worry! Our team can help you integrate your preferred tool. Book a call with us and we'll guide you through the process."
-            type="info"
-            showIcon
-            className="mb-6 custom-alert-icon"
-          />
-          <Button
-            type="primary"
-            icon={<CalendarOutlined />}
-            className="text-lg font-medium px-8 py-2 mt-2 border-none"
-            style={{
-              backgroundColor: "#A068F1",
-              color: "#fff",
-            }}
-            onClick={() => {
-              window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank");
-              setShowCustomCrmModal(false);
-            }}
-          >
-            Book a Call with Our Team
-          </Button>
-        </div>
-      </Modal>
+        onCancel={() => setShowManualLeadsModal(false)}
+      />
     </div>
   );
 }

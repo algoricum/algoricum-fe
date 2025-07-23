@@ -2,7 +2,7 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Input, Button, Typography } from "antd";
-import PhoneInput from "react-phone-number-input";
+import PhoneInput, { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 
@@ -22,6 +22,49 @@ const validateEmail = (email: string) => {
   return emailRegex.test(email);
 };
 
+const validatePhoneNumber = (phoneNumber: string) => {
+  if (!phoneNumber || !phoneNumber.trim()) {
+    return { isValid: false, error: "Phone number is required" };
+  }
+
+  try {
+    // Check if the phone number is valid according to international standards
+    const isValid = isValidPhoneNumber(phoneNumber);
+
+    if (!isValid) {
+      // Try to parse the phone number to get more specific error info
+      try {
+        const parsedPhone = parsePhoneNumber(phoneNumber);
+        if (parsedPhone) {
+          // If we can parse it but it's not valid, it's likely incomplete
+          return {
+            isValid: false,
+            error: `Please enter a complete phone number for ${parsedPhone.country || "the selected country"}`,
+          };
+        }
+      } catch (parseError) {
+        // If parsing fails, it's an invalid format
+        return {
+          isValid: false,
+          error: "Please enter a valid phone number format",
+        };
+      }
+
+      return {
+        isValid: false,
+        error: "Please enter a complete phone number for the selected country",
+      };
+    }
+
+    return { isValid: true, error: null };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: "Please enter a valid phone number",
+    };
+  }
+};
+
 export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showAllQuestions = false }: ClinicInfoStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [formData, setFormData] = useState({
@@ -31,8 +74,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     clinicPhone: initialData.clinicPhone || "",
     businessAddress: initialData.businessAddress || "",
   });
-
-
 
   const questions = [
     {
@@ -71,11 +112,11 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       required: true,
     },
   ];
-  
+
   useEffect(() => {
-      if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(0)) {
-        setCurrentQuestionIndex(questions.length - 1);
-      }
+    if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(0)) {
+      setCurrentQuestionIndex(questions.length - 1);
+    }
   }, [questions.length]);
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -106,8 +147,11 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       return "Please enter a valid email address";
     }
 
-    if (currentQuestion.type === "phone" && currentQuestion.required && !currentValue?.trim()) {
-      return "Please enter a valid phone number";
+    if (currentQuestion.type === "phone" && currentQuestion.required) {
+      const phoneValidation = validatePhoneNumber(currentValue);
+      if (!phoneValidation.isValid) {
+        return phoneValidation.error;
+      }
     }
 
     return null;
@@ -137,7 +181,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
   };
 
   const renderPreviousQuestions = () => {
-    
     return questions.slice(0, currentQuestionIndex).map(q => {
       const value = formData[q.id as keyof typeof formData];
       return (
@@ -172,16 +215,25 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
 
   const renderAllQuestions = () => (
     <div className="mb-8">
-      <Typography.Title level={4} className="mb-4">All Answers</Typography.Title>
+      <Typography.Title level={4} className="mb-4">
+        All Answers
+      </Typography.Title>
       {questions.map(q => {
         const value = formData[q.id as keyof typeof formData];
         return (
           <div key={q.id} className="mb-4">
             <Text className="text-gray-700 font-medium block mb-1">{q.question}</Text>
             {q.type === "textarea" ? (
-              <TextArea value={value} disabled rows={3} className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700" />
+              <TextArea
+                value={value}
+                disabled
+                rows={3}
+                className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700"
+              />
             ) : q.type === "phone" ? (
-              <div className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700 text-xs">{value || "No phone number entered"}</div>
+              <div className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700 text-xs">
+                {value || "No phone number entered"}
+              </div>
             ) : (
               <Input value={value} disabled className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700" />
             )}
@@ -234,6 +286,8 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             }
           />
           {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
+          {/* Real-time validation feedback */}
+          {currentValue && !hasError && <p className="text-green-600 text-sm mt-2">✓ Valid phone number</p>}
           <style jsx>{`
             :global(.phone-input-custom) {
               display: flex;
