@@ -19,6 +19,9 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
 
   const isSelected = useCallback(
     (route: string) => {
+      if (route === "profileSettings") {
+        return path.includes("/settings");
+      }
       return path.includes(route);
     },
     [path],
@@ -26,12 +29,22 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
 
   const menuHandler = (key: string) => {
     switch (key) {
+      case "leads":
+        return push("/leads");
+      case "dashboard":
+        return push("/dashboard");
+      case "appointments":
+        return push("/appointments");
+      case "staff":
+        return push("/staff");
+      case "profileSettings":
+        return push("/settings/lead-capturing-form");
       case "content":
         return push("/content/articles");
       case "settings":
         return push("/settings/lead-capturing-form");
       default:
-        return push("/settings/lead-capturing-form");
+        return push("/dashboard");
     }
   };
 
