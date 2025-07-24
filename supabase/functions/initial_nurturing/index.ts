@@ -226,6 +226,11 @@ async function processInitialContact(supabase: any) {
                   sender_type: 'assistant'
                 })
 
+              const { error: updateError } = await supabase
+                .from('lead')
+                .update({ status: 'Engaged', updated_at: now.toISOString() })
+                .eq('id', lead.id)
+
               totalProcessed++
               logInfo(`Initial contact SMS sent to lead ${lead.id}`)
               

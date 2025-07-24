@@ -29,7 +29,6 @@ serve(async (req) => {
     const openai = new OpenAI({ apiKey: openaiKey });
     const requestData = await req.json();
 
-    // Handle cron job for all clinics
     if (requestData.cron_job && requestData.process_all_clinics) {
       console.log('🤖 Processing all clinics via cron job...');
       
@@ -72,7 +71,6 @@ serve(async (req) => {
             error: result.error || null
           });
 
-          // Delay between clinics
           await new Promise(resolve => setTimeout(resolve, 3000));
           
         } catch (error) {
@@ -94,7 +92,6 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Handle manual single clinic processing (if needed)
     return new Response(JSON.stringify({
       success: false,
       error: 'Manual processing not supported in simplified version'
@@ -109,7 +106,6 @@ serve(async (req) => {
   }
 });
 
-// Process emails for a single clinic
 async function processClinicEmails(emailConfig: any, clinic: any, openai: any, supabaseClient: any) {
   try {
     const imapResult = await processEmails({
@@ -148,7 +144,419 @@ async function processClinicEmails(emailConfig: any, clinic: any, openai: any, s
   }
 }
 
-// Simplified email processing
+function parseEmailData(fetchResponse: string) {
+  console.log('Parsing email data from IMAP response...');
+  
+  const headers: { [key: string]: string } = {};
+  let body = '';
+  
+  try {
+    const lines = fetchResponse.split('\n');
+    let headerSection = '';
+    let bodySection = '';
+    let inHeaderSection = false;
+    let inBodySection = false;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (line.includes('BODY[HEADER.FIELDS')) {
+        console.log('Found BODY[HEADER.FIELDS] section');
+        inHeaderSection = true;
+        inBodySection = false;
+        continue;
+      }
+      
+      if (line.includes('BODY[TEXT]')) {
+        console.log('Found BODY[TEXT] section');
+        inHeaderSection = false;
+        inBodySection = true;
+        continue;
+      }
+      
+      if (line.startsWith('A004 OK') || (line.trim() === ')' && !inHeaderSection && !inBodySection)) {
+        console.log('Found end of fetch response');
+        break;
+      }
+      
+      if (inHeaderSection && line.trim() && line.trim() !== ')') {
+        headerSection += line + '\n';
+      }
+      
+      if (inBodySection && !line.startsWith('A004')) {
+        bodySection += line + '\n';
+      }
+    }
+    
+    console.log(`Header section length: ${headerSection.length}`);
+    console.log(`Body section length: ${bodySection.length}`);
+    
+    if (headerSection) {
+      parseHeaders(headerSection, headers);
+    }
+    
+    if (bodySection) {
+      body = parseEmailBody(bodySection);
+    }
+    
+    console.log('Parsed headers:', Object.keys(headers));
+    console.log('From header:', headers.from);
+    console.log('Subject header:', headers.subject);
+    console.log('Body preview:', body.substring(0, 100));
+    
+    if (headers.from) {
+      headers.from = extractEmailAddress(headers.from);
+    }
+    
+    return {
+      headers,
+      body: body.trim()
+    };
+    
+  } catch (error) {
+    console.error('Error parsing email data:', error);
+    console.error('Raw response preview:', fetchResponse.substring(0, 1000));
+    
+    return {
+      headers: {
+        from: extractFallbackEmail(fetchResponse),
+        subject: extractFallbackSubject(fetchResponse) || 'Parse Error'
+      },
+      body: extractFallbackBody(fetchResponse)
+    };
+  }
+}
+
+function parseHeaders(headerSection: string, headers: { [key: string]: string }) {
+  const headerLines = headerSection.split('\n');
+  let currentHeader = '';
+  let currentValue = '';
+  
+  for (const headerLine of headerLines) {
+    const line = headerLine.trim();
+    if (!line || line === ')') continue;
+    
+    if (line.includes(':') && !headerLine.startsWith(' ') && !headerLine.startsWith('\t')) {
+      if (currentHeader && currentValue) {
+        headers[currentHeader.toLowerCase().trim()] = currentValue.trim();
+      }
+      
+      const colonIndex = line.indexOf(':');
+      currentHeader = line.substring(0, colonIndex).trim();
+      currentValue = line.substring(colonIndex + 1).trim();
+    } else if (currentHeader && line) {
+      currentValue += ' ' + line;
+    }
+  }
+  
+  if (currentHeader && currentValue) {
+    headers[currentHeader.toLowerCase().trim()] = currentValue.trim();
+  }
+}
+
+function parseEmailBody(bodySection: string): string {
+  const lines = bodySection.split('\n');
+  let cleanedBody = '';
+  let inHeaders = true;
+  let skipUntilBlankLine = false;
+  let boundary: string | null = null;
+  let inTextPart = false;
+  let textPartFound = false;
+  
+  const multipartMatch = bodySection.match(/Content-Type:\s*multipart\/[^;]+;\s*boundary[=:]\s*["']?([^"'\s;]+)["']?/i);
+  if (multipartMatch) {
+    boundary = multipartMatch[1];
+    console.log(`Detected multipart boundary: ${boundary}`);
+  }
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    
+    if (trimmed.match(/^\d+\s+FETCH/) || 
+        trimmed.match(/BODY\[TEXT\]\s*\{\d+\}/) || 
+        trimmed === ')' ||
+        trimmed.startsWith('A004')) {
+      continue;
+    }
+    
+    if (boundary && trimmed.includes(`--${boundary}`)) {
+      if (trimmed === `--${boundary}--`) {
+        break;
+      } else if (trimmed === `--${boundary}`) {
+        inHeaders = true;
+        inTextPart = false;
+        skipUntilBlankLine = false;
+        continue;
+      }
+    }
+    
+    if (inHeaders) {
+      if (trimmed === '') {
+        inHeaders = false;
+        continue;
+      }
+      
+      if (trimmed.match(/Content-Type:\s*text\/plain/i)) {
+        inTextPart = true;
+        textPartFound = true;
+      }
+      
+      if (trimmed.match(/Content-Transfer-Encoding:/i) ||
+          trimmed.match(/Content-Disposition:/i) ||
+          trimmed.match(/Content-ID:/i)) {
+        skipUntilBlankLine = true;
+      }
+      
+      continue;
+    }
+    
+    if (boundary && textPartFound && !inTextPart) {
+      continue;
+    }
+    
+    if (!trimmed || 
+        trimmed.match(/^[A-Za-z0-9+\/=]{40,}$/) || 
+        trimmed.match(/^=\?[^?]+\?[BQ]\?[^?]+\?=$/)) {
+      continue;
+    }
+    
+    cleanedBody += line + '\n';
+  }
+  
+  return cleanedBody.trim();
+}
+
+function extractEmailAddress(fromHeader: string): string {
+  const emailMatch = fromHeader.match(/<([^>]+)>/) || 
+                    fromHeader.match(/([^\s<>]+@[^\s<>]+)/);
+  return emailMatch ? emailMatch[1].trim() : fromHeader.trim();
+}
+
+function extractFallbackEmail(response: string): string {
+  const emailMatch = response.match(/From:\s*[^<]*<([^>]+)>/) ||
+                    response.match(/From:\s*([^\s<>]+@[^\s<>]+)/) ||
+                    response.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  return emailMatch ? emailMatch[1] : 'unknown@example.com';
+}
+
+function extractFallbackSubject(response: string): string | null {
+  const subjectMatch = response.match(/Subject:\s*(.+?)(?:\r?\n|\r)/i);
+  return subjectMatch ? subjectMatch[1].trim() : null;
+}
+
+function extractFallbackBody(response: string): string {
+  const lines = response.split('\n');
+  let body = '';
+  let foundText = false;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    
+    if (trimmed.match(/^\d+\s+FETCH/) ||
+        trimmed.match(/BODY\[/) ||
+        trimmed.match(/^[A-Z][a-z-]+:/) ||
+        trimmed.startsWith('A00') ||
+        !trimmed) {
+      continue;
+    }
+    
+    if (trimmed.length > 10 && 
+        !trimmed.match(/^[A-Za-z0-9+\/=]{40,}$/) &&
+        !trimmed.includes('Content-Type') &&
+        !trimmed.includes('boundary=')) {
+      body += trimmed + ' ';
+      foundText = true;
+    }
+  }
+  
+  return foundText ? body.trim() : 'Email content could not be parsed';
+}
+
+async function sendReplySimple(originalEmail: any, replyContent: string, smtpConfig: any) {
+  try {
+    console.log('Sending simple reply email...');
+    console.log('Original reply content:', replyContent);
+
+    // Validate inputs
+    if (!replyContent || replyContent.trim().length === 0) {
+      console.error('No valid reply content provided');
+      throw new Error('Reply content is empty or invalid');
+    }
+    if (!originalEmail?.headers?.from) {
+      console.error('Missing sender email address');
+      throw new Error('Missing sender email address');
+    }
+    if (!smtpConfig?.smtp_host || !smtpConfig?.smtp_port || !smtpConfig?.smtp_sender_email) {
+      console.error('Invalid SMTP configuration:', smtpConfig);
+      throw new Error('Invalid SMTP configuration');
+    }
+
+    // Clean and prepare content - improved subject removal
+    let cleanContent = replyContent.trim();
+    
+    // Remove any "Subject:" prefix and following content more aggressively
+    cleanContent = cleanContent.replace(/^Subject:\s*[^\r\n]*[\r\n]+/i, '');
+    cleanContent = cleanContent.replace(/^Subject:\s*[^\r\n]*/i, '');
+    
+    // Clean up line endings and normalize whitespace
+    cleanContent = cleanContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    cleanContent = cleanContent.trim();
+    
+    // Ensure we have content after cleaning
+    if (!cleanContent || cleanContent.length === 0) {
+      console.error('Content is empty after cleaning');
+      throw new Error('Content is empty after processing');
+    }
+
+    console.log('Cleaned content:', cleanContent);
+    console.log('Cleaned content length:', cleanContent.length);
+
+    // Try multiple SMTP client configurations
+    const configurations = [
+      // Configuration 1: Standard TLS
+      {
+        connection: {
+          hostname: smtpConfig.smtp_host,
+          port: smtpConfig.smtp_port,
+          tls: smtpConfig.smtp_use_tls,
+          auth: {
+            username: smtpConfig.smtp_user,
+            password: smtpConfig.smtp_password
+          }
+        }
+      },
+      // Configuration 2: STARTTLS explicit
+      {
+        connection: {
+          hostname: smtpConfig.smtp_host,
+          port: smtpConfig.smtp_port,
+          tls: false,
+          auth: {
+            username: smtpConfig.smtp_user,
+            password: smtpConfig.smtp_password
+          }
+        }
+      },
+      // Configuration 3: Different port with TLS
+      {
+        connection: {
+          hostname: smtpConfig.smtp_host,
+          port: 465, // Try SSL port
+          tls: true,
+          auth: {
+            username: smtpConfig.smtp_user,
+            password: smtpConfig.smtp_password
+          }
+        }
+      }
+    ];
+
+    const emailData = {
+      from: `${smtpConfig.smtp_sender_name || 'Clinic Support'} <${smtpConfig.smtp_sender_email}>`,
+      to: originalEmail.headers.from,
+      subject: `Re: ${originalEmail.headers.subject || 'Your inquiry'}`,
+      content: cleanContent,
+    };
+
+    console.log('Attempting to send email with data:', {
+      from: emailData.from,
+      to: emailData.to,
+      subject: emailData.subject,
+      contentLength: cleanContent.length,
+      contentPreview: cleanContent.substring(0, 150)
+    });
+
+    // Try each configuration
+    for (let i = 0; i < configurations.length; i++) {
+      const config = configurations[i];
+      console.log(`Trying SMTP configuration ${i + 1}:`, {
+        hostname: config.connection.hostname,
+        port: config.connection.port,
+        tls: config.connection.tls
+      });
+
+      try {
+        const smtpClient = new SMTPClient(config);
+        
+        // Try different content field names
+        const emailVariations = [
+          { ...emailData, content: cleanContent },
+          { ...emailData, text: cleanContent },
+          { ...emailData, html: cleanContent.replace(/\n/g, '<br>') },
+          { ...emailData, body: cleanContent }
+        ];
+
+        for (const emailVariation of emailVariations) {
+          try {
+            console.log('Trying email variation with fields:', Object.keys(emailVariation));
+            await smtpClient.send(emailVariation);
+            await smtpClient.close();
+            console.log('✅ Email sent successfully');
+            return { success: true };
+          } catch (sendError) {
+            console.log(`Email variation failed: ${sendError.message}`);
+            continue;
+          }
+        }
+        
+        await smtpClient.close();
+        
+      } catch (configError) {
+        console.log(`Configuration ${i + 1} failed: ${configError.message}`);
+        continue;
+      }
+    }
+
+    throw new Error('All SMTP configurations and email formats failed');
+
+  } catch (error) {
+    console.error('❌ Failed to send simple reply:', error.message);
+    console.error('SMTP Config:', {
+      host: smtpConfig?.smtp_host,
+      port: smtpConfig?.smtp_port,
+      user: smtpConfig?.smtp_user,
+      sender: smtpConfig?.smtp_sender_email,
+      tls: smtpConfig?.smtp_use_tls
+    });
+    
+    // Fallback: Try with minimal SMTP client setup
+    try {
+      console.log('Attempting fallback with minimal configuration...');
+      
+      const fallbackClient = new SMTPClient({
+        connection: {
+          hostname: smtpConfig.smtp_host,
+          port: 587,
+          tls: false, // Start without TLS
+          auth: {
+            username: smtpConfig.smtp_user,
+            password: smtpConfig.smtp_password
+          }
+        }
+      });
+
+      // Ultra-simple email format
+      const simpleEmailData = {
+        from: smtpConfig.smtp_sender_email,
+        to: originalEmail.headers.from,
+        subject: `Re: ${originalEmail.headers.subject || 'Your inquiry'}`,
+        text: cleanContent // Use only text field
+      };
+
+      await fallbackClient.send(simpleEmailData);
+      await fallbackClient.close();
+      
+      console.log('✅ Fallback method succeeded');
+      return { success: true };
+      
+    } catch (fallbackError) {
+      console.error('❌ Fallback also failed:', fallbackError.message);
+      throw new Error(`All email sending attempts failed. Last error: ${error.message}`);
+    }
+  }
+}
+
 async function processEmails(imapConfig: any, smtpConfig: any, aiConfig: any) {
   let conn: Deno.Conn | Deno.TlsConn;
   const textDecoder = new TextDecoder();
@@ -156,7 +564,6 @@ async function processEmails(imapConfig: any, smtpConfig: any, aiConfig: any) {
   const processedEmails = [];
   
   try {
-    // Connect to IMAP
     if (imapConfig.useSsl) {
       conn = await Deno.connectTls({
         hostname: imapConfig.hostname,
@@ -170,7 +577,6 @@ async function processEmails(imapConfig: any, smtpConfig: any, aiConfig: any) {
       });
     }
 
-    // Helper functions
     const readBuffer = async (timeoutMs = 10000): Promise<string> => {
       const buffer = new Uint8Array(8192);
       let result = '';
@@ -226,9 +632,8 @@ async function processEmails(imapConfig: any, smtpConfig: any, aiConfig: any) {
       return response;
     };
 
-    // IMAP authentication
     console.log('Reading IMAP server greeting...');
-    await readBuffer(5000); // greeting
+    await readBuffer(5000);
     
     console.log('Authenticating...');
     const loginResponse = await sendCommand('A001', `LOGIN "${imapConfig.username}" "${imapConfig.password}"`);
@@ -239,87 +644,92 @@ async function processEmails(imapConfig: any, smtpConfig: any, aiConfig: any) {
     console.log('Selecting INBOX...');
     await sendCommand('A002', 'SELECT INBOX');
     
-    // Search for unread emails
     console.log('Searching for unread emails...');
     const searchResponse = await sendCommand('A003', 'SEARCH UNSEEN');
     const messageIds = parseSearchResults(searchResponse);
     
     console.log(`Found ${messageIds.length} unread emails`);
 
-    // Process each email
     for (const messageId of messageIds) {
       try {
         console.log(`Processing email ${messageId}...`);
         
-        // Fetch email with better command
         const fetchResponse = await sendCommand('A004', `FETCH ${messageId} (BODY[HEADER.FIELDS (FROM SUBJECT DATE)] BODY[TEXT])`);
-        console.log(`Raw fetch response for ${messageId}:`, fetchResponse.substring(0, 500));
         
-        const emailData = parseEmailData(fetchResponse);
+        let emailData;
+        try {
+          emailData = parseEmailData(fetchResponse);
+        } catch (parseError) {
+          console.error(`Parse error for email ${messageId}:`, parseError);
+          processedEmails.push({
+            message_id: messageId,
+            reply_sent: false,
+            error: `Parse error: ${parseError.message}`
+          });
+          await sendCommand('A005', `STORE ${messageId} +FLAGS (\\Seen)`);
+          continue;
+        }
+        
         console.log(`Parsed email data:`, {
           from: emailData.headers.from,
           subject: emailData.headers.subject,
           bodyLength: emailData.body?.length || 0
         });
         
-        if (!emailData.headers.from) {
-          console.log(`Skipping email ${messageId} - no sender`);
-          continue;
-        }
-
-        if (!emailData.body || emailData.body.trim().length === 0) {
-          console.log(`Skipping email ${messageId} - no body content`);
-          continue;
-        }
-
-        const wordCount = emailData.body?.trim().split(/\s+/).length || 0;
-      if (!emailData.body || emailData.body.trim().length === 0 || wordCount < 3) {
-        console.log(`Skipping email ${messageId} - body too short (${wordCount} words)`);
-        processedEmails.push({
-          message_id: messageId,
-          from: emailData.headers.from,
-          subject: emailData.headers.subject || 'No subject',
-          reply_sent: false,
-          error: 'Email body too short to process'
-        });
-        // Optionally mark as read
-        await sendCommand('A005', `STORE ${messageId} +FLAGS (\\Seen)`);
-        continue;
-      }
-
-        // Generate AI response
-        const aiResponse = await generateAIResponse(emailData, aiConfig);
-
-        if (aiResponse && aiResponse.trim().length > 0) {
-          // Send reply
-          await sendReply(emailData, aiResponse, smtpConfig);
-          
-          // Mark as read
-          await sendCommand('A005', `STORE ${messageId} +FLAGS (\\Seen)`);
-          
+        if (!emailData.headers.from || !emailData.body || emailData.body.trim().length < 10) {
+          console.log(`Skipping email ${messageId} - insufficient data`);
           processedEmails.push({
             message_id: messageId,
-            from: emailData.headers.from,
+            from: emailData.headers.from || 'unknown',
             subject: emailData.headers.subject || 'No subject',
-            reply_sent: true,
-            processed_at: new Date().toISOString()
+            reply_sent: false,
+            error: 'Insufficient email data'
           });
-          
-          console.log(`Successfully processed email ${messageId}`);
+          await sendCommand('A005', `STORE ${messageId} +FLAGS (\\Seen)`);
+          continue;
+        }
+
+        const aiResponse = await generateAIResponse(emailData, aiConfig);
+        
+        console.log('AI Response:', aiResponse); // Log AI response for debugging
+
+        if (aiResponse && aiResponse.trim().length > 0) {
+          try {
+            await sendReplySimple(emailData, aiResponse, smtpConfig);
+            await sendCommand('A005', `STORE ${messageId} +FLAGS (\\Seen)`);
+            
+            processedEmails.push({
+              message_id: messageId,
+              from: emailData.headers.from,
+              subject: emailData.headers.subject || 'No subject',
+              reply_sent: true,
+              processed_at: new Date().toISOString()
+            });
+            
+            console.log(`Successfully processed email ${messageId}`);
+          } catch (sendError) {
+            console.error(`Failed to send reply for email ${messageId}:`, sendError.message);
+            processedEmails.push({
+              message_id: messageId,
+              from: emailData.headers.from,
+              reply_sent: false,
+              error: `Send error: ${sendError.message}`
+            });
+          }
         } else {
-          console.log(`Failed to generate AI response for email ${messageId}`);
+          console.log(`No valid AI response for email ${messageId}`);
           processedEmails.push({
             message_id: messageId,
             from: emailData.headers.from,
             reply_sent: false,
-            error: 'Failed to generate AI response'
+            error: 'No valid AI response generated'
           });
         }
         
         await new Promise(resolve => setTimeout(resolve, 2000));
         
       } catch (emailError) {
-        console.error(`Error processing email ${messageId}:`, emailError);
+        console.error(`Error processing email ${messageId}:`, emailError.message);
         processedEmails.push({
           message_id: messageId,
           reply_sent: false,
@@ -353,12 +763,10 @@ async function processEmails(imapConfig: any, smtpConfig: any, aiConfig: any) {
   }
 }
 
-// Generate AI response
 async function generateAIResponse(emailData: any, aiConfig: any): Promise<string | null> {
   try {
-    const { openai, assistant, clinicName, clinic } = aiConfig;
+    const { openai, clinicName, clinic } = aiConfig;
     
-    // Build clinic info
     let clinicInfo = '';
     if (clinic?.business_hours) {
       clinicInfo += `\nBusiness Hours: ${JSON.stringify(clinic.business_hours)}`;
@@ -370,13 +778,12 @@ async function generateAIResponse(emailData: any, aiConfig: any): Promise<string
       clinicInfo += `\nScheduling: ${clinic.calendly_link}`;
     }
 
-    // Use chat completion for simplicity
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: `You are a customer service representative for ${clinicName}. Respond professionally to patient emails. Keep responses under 200 words.${clinicInfo}`
+          content: `You are a customer service representative for ${clinicName}. Respond professionally to patient emails in plain text. Keep responses under 200 words. Avoid special characters, formatting, or symbols that might cause encoding issues.${clinicInfo}`
         },
         {
           role: "user",
@@ -390,12 +797,15 @@ Message: ${emailData.body || 'No content'}`
       temperature: 0.7
     });
 
-    return completion.choices[0]?.message?.content?.trim() || null;
+    const response = completion.choices[0]?.message?.content?.trim();
+    if (!response) {
+      throw new Error('No response content from AI');
+    }
+    return response;
     
   } catch (error) {
     console.error('AI response generation failed:', error);
     
-    // Fallback response
     return `Dear patient,
 
 Thank you for contacting ${aiConfig.clinicName}. We have received your message and will respond as soon as possible during our business hours.
@@ -407,66 +817,6 @@ ${aiConfig.clinicName} Team`;
   }
 }
 
-// Send reply email
-async function sendReply(originalEmail: any, replyContent: string, smtpConfig: any) {
-  try {
-    console.log('Sending reply email...');
-    console.log('Reply content length:', replyContent?.length || 0);
-    console.log('SMTP config:', {
-      host: smtpConfig.smtp_host,
-      port: smtpConfig.smtp_port,
-      sender: smtpConfig.smtp_sender_email
-    });
-
-    // Validate we have content
-    if (!replyContent || replyContent.trim().length === 0) {
-      throw new Error('No reply content provided');
-    }
-
-    const smtpClient = new SMTPClient({
-      connection: {
-        hostname: smtpConfig.smtp_host,
-        port: smtpConfig.smtp_port,
-        tls: smtpConfig.smtp_use_tls,
-        auth: {
-          username: smtpConfig.smtp_user,
-          password: smtpConfig.smtp_password
-        }
-      }
-    });
-
-    const subject = originalEmail.headers.subject || 'Your inquiry';
-    const replySubject = subject.startsWith('Re: ') ? subject : `Re: ${subject}`;
-
-    const emailData = {
-      from: `${smtpConfig.smtp_sender_name} <${smtpConfig.smtp_sender_email}>`,
-      to: originalEmail.headers.from,
-      subject: replySubject,
-      text: replyContent.trim(),
-      html: `<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        ${replyContent.replace(/\n/g, '<br>')}
-      </div>`
-    };
-
-    console.log('Sending email with data:', {
-      from: emailData.from,
-      to: emailData.to,
-      subject: emailData.subject,
-      textLength: emailData.text.length
-    });
-
-    await smtpClient.send(emailData);
-    await smtpClient.close();
-    
-    console.log('✅ Reply sent successfully');
-    
-  } catch (error) {
-    console.error('❌ Failed to send reply:', error);
-    throw error;
-  }
-}
-
-// Parse search results for message IDs
 function parseSearchResults(searchResponse: string): number[] {
   const messageIds: number[] = [];
   const lines = searchResponse.split('\n');
@@ -486,177 +836,4 @@ function parseSearchResults(searchResponse: string): number[] {
   }
   
   return messageIds;
-}
-
-function parseEmailData(fetchResponse: string) {
-  console.log('Parsing email data from IMAP response...');
-  
-  const headers: { [key: string]: string } = {};
-  let body = '';
-  
-  try {
-    // Split the response into lines
-    const lines = fetchResponse.split('\n');
-    let headerSection = '';
-    let bodySection = '';
-    let inHeaderSection = false;
-    let inBodySection = false;
-    let expectedBodyLength = 0;
-    let currentBodyBytes = 0;
-    let boundary: string | null = null;
-    let inPlainTextPart = false;
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      
-      // Check for BODY[HEADER.FIELDS] section start
-      if (line.includes('BODY[HEADER.FIELDS')) {
-        console.log('Found BODY[HEADER.FIELDS] section');
-        inHeaderSection = true;
-        inBodySection = false;
-        continue;
-      }
-      
-      // Check for BODY[TEXT] section start
-      if (line.includes('BODY[TEXT]')) {
-        console.log('Found BODY[TEXT] section');
-        inHeaderSection = false;
-        inBodySection = true;
-        
-        // Check for literal length indicator (e.g., {230})
-        const literalMatch = line.match(/BODY\[TEXT\]\s*\{(\d+)\}/);
-        if (literalMatch) {
-          expectedBodyLength = parseInt(literalMatch[1], 10);
-          console.log(`Expected body length: ${expectedBodyLength}`);
-        }
-        continue;
-      }
-      
-      // Check for end of fetch response
-      if (line.startsWith('A004 OK') || line === ')') {
-        console.log('Found end of fetch response');
-        break;
-      }
-      
-      // Collect header data
-      if (inHeaderSection && line && line !== ')') {
-        headerSection += line + '\n';
-      }
-      
-      // Collect body data
-      if (inBodySection && line && !line.startsWith('A004')) {
-        if (expectedBodyLength > 0) {
-          bodySection += line + '\n';
-          currentBodyBytes += line.length + 1;
-          if (currentBodyBytes >= expectedBodyLength) {
-            inBodySection = false;
-          }
-        } else {
-          bodySection += line + '\n';
-        }
-      }
-    }
-    
-    console.log(`Header section length: ${headerSection.length}`);
-    console.log(`Body section length: ${bodySection.length}`);
-    
-    // Parse headers
-    if (headerSection) {
-      const headerLines = headerSection.split('\n');
-      let currentHeader = '';
-      let currentValue = '';
-      
-      for (const headerLine of headerLines) {
-        if (!headerLine.trim() || headerLine.trim() === ')') continue;
-        
-        if (headerLine.includes(':') && !headerLine.startsWith(' ') && !headerLine.startsWith('\t')) {
-          if (currentHeader && currentValue) {
-            headers[currentHeader.toLowerCase().trim()] = currentValue.trim();
-          }
-          const colonIndex = headerLine.indexOf(':');
-          currentHeader = headerLine.substring(0, colonIndex).trim();
-          currentValue = headerLine.substring(colonIndex + 1).trim();
-        } else if (currentHeader && headerLine.trim()) {
-          currentValue += ' ' + headerLine.trim();
-        }
-      }
-      
-      if (currentHeader && currentValue) {
-        headers[currentHeader.toLowerCase().trim()] = currentValue.trim();
-      }
-    }
-    
-    // Parse MIME structure for body
-    if (bodySection) {
-      const bodyLines = bodySection.split('\n');
-      body = '';
-      inPlainTextPart = false;
-      
-      // Look for Content-Type to detect multipart and boundary
-      const contentTypeMatch = bodySection.match(/Content-Type: multipart\/[a-z]+; boundary="([^"]+)"/i);
-      if (contentTypeMatch) {
-        boundary = contentTypeMatch[1];
-        console.log(`Detected multipart email with boundary: ${boundary}`);
-      }
-      
-      for (const line of bodyLines) {
-        const trimmed = line.trim();
-        
-        // Skip empty lines or protocol markers
-        if (!trimmed || trimmed === ')' || trimmed.match(/^\d+\s+FETCH/) || trimmed.match(/BODY\[TEXT\]\s*\{\d+\}/)) {
-          continue;
-        }
-        
-        // Check for boundary
-        if (boundary && trimmed.includes(`--${boundary}`)) {
-          if (trimmed.includes(`--${boundary}--`)) {
-            // End of multipart
-            break;
-          }
-          inPlainTextPart = false;
-          continue;
-        }
-        
-        // Check for Content-Type within part
-        if (trimmed.match(/Content-Type: text\/plain/i)) {
-          inPlainTextPart = true;
-          continue;
-        }
-        
-        // Collect plain text content
-        if (inPlainTextPart && trimmed) {
-          body += line + '\n';
-        }
-      }
-      
-      body = body.trim();
-    }
-    
-    console.log('Parsed headers:', Object.keys(headers));
-    console.log('From header:', headers.from);
-    console.log('Subject header:', headers.subject);
-    console.log('Body length:', body.length);
-    console.log('Body preview:', body.substring(0, 100));
-    
-    // Clean up email addresses
-    if (headers.from) {
-      const emailMatch = headers.from.match(/<([^>]+)>/) || headers.from.match(/([^\s<>]+@[^\s<>]+)/);
-      if (emailMatch) {
-        headers.from = emailMatch[1];
-      }
-    }
-    
-    return {
-      headers,
-      body: body.trim()
-    };
-    
-  } catch (error) {
-    console.error('Error parsing email data:', error);
-    console.error('Raw response preview:', fetchResponse.substring(0, 1000));
-    return {
-      headers,
-      body: ''
-    };
-  }
 }
