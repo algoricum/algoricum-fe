@@ -128,11 +128,11 @@ async function processInitialContact(supabase: any) {
         const { data: newLeads, error: leadsError } = await supabase
           .from('lead')
           .select('*')
-          .eq('clinic_id', clinic.id)
-          .eq('status', 'New')
-          .not('phone', 'is', null)
-          .neq('phone', '')
-          .gte('created_at', fiveMinutesAgo.toISOString())
+          .eq('clinic_id', clinic.id) // Filters by clinic_id
+          .or('status.eq.New,created_at.gte.' + fiveMinutesAgo.toISOString()) // Selects leads where status is 'New' OR created_at is within the last 5 minutes
+          .not('phone', 'is', null) // Filters out leads with null phone
+          .neq('phone', ''); // Filters out leads with empty phone
+
 
         if (leadsError) {
           logError(`Error fetching leads for clinic ${clinic.id}`, leadsError)

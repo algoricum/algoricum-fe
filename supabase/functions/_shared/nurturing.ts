@@ -1,4 +1,4 @@
-
+// _shared/nurturing.ts
 interface Lead {
   id: string
   first_name?: string
@@ -687,5 +687,348 @@ async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email
   }
 }
 
-// Export the main function for testing
-export { processAllLeads, FOLLOW_UP_RULES, determineFollowUpsForLead }
+
+// Generate intelligent responses based on conversation history
+async function generateIntelligentResponse(
+  lead: Lead,
+  clinic: Clinic,
+  conversationHistory: Conversation[],
+  isEmail: boolean = false
+): Promise<string | { subject: string, body: string }> {
+  logInfo(`Generating intelligent response for lead ${lead.id} in clinic ${clinic.name}`)
+  
+  // Use clinic-specific OpenAI key or fallback to global
+  const OPENAI_API_KEY = clinic.openai_api_key || Deno.env.get('OPENAI_API_KEY')
+
+  if (!OPENAI_API_KEY) {
+    logInfo('No OpenAI API key found, using fallback message')
+    const fallbackMessage = `Hi ${lead.first_name || 'there'}, thank you for your interest in ${clinic.name}. We're here to help with any questions you might have about our services.`
+    
+    if (isEmail) {
+      return {
+        subject: `Thank you for your interest in ${clinic.name}`,
+        body: fallbackMessage
+      }
+    }
+    return fallbackMessage
+  }
+
+  try {
+    // Build conversation context from history
+    const conversationContext = conversationHistory
+      .map(msg => `${msg.sender_type === 'user' ? `Patient (${lead.first_name || 'Patient'})` : clinic.name}: ${msg.message}`)
+      .join('\n')
+
+    // Use clinic-specific assistant prompt if available
+    const basePrompt = clinic.assistant_prompt || `You are a helpful AI assistant for ${clinic.name}, a healthcare clinic.`
+    
+    let systemPrompt = ''
+    let userPrompt = ''
+
+    if (isEmail) {
+      systemPrompt = `${basePrompt}
+
+You are responding to a patient via email. Based on the conversation history, generate an appropriate email response that:
+1. Addresses any questions or concerns the patient has raised
+2. Provides helpful and accurate information about healthcare services
+3. Maintains a professional, caring, and empathetic tone
+4. Includes relevant next steps or call-to-action if appropriate
+5. Keeps the response concise but thorough (under 300 words)
+
+Format your response as:
+SUBJECT: [appropriate email subject line]
+BODY: [email body content]`
+
+      userPrompt = `Please generate an email response for ${lead.first_name || 'this patient'} based on the following conversation history at ${clinic.name}:
+
+${conversationContext || 'No previous conversation - this is an initial follow-up email.'}
+
+Patient Details:
+- Name: ${lead.first_name || ''} ${lead.last_name || ''}
+- Email: ${lead.email || 'N/A'}
+- Phone: ${lead.phone || 'N/A'}
+- Interest Level: ${lead.interest_level || 'N/A'}
+- Urgency: ${lead.urgency || 'N/A'}`
+
+    } else {
+      systemPrompt = `${basePrompt}
+
+You are responding to a patient via SMS. Based on the conversation history, generate an appropriate SMS response that:
+1. Addresses any questions or concerns the patient has raised
+2. Provides helpful information in a concise format (under 160 characters)
+3. Maintains a friendly, professional tone
+4. Includes a call-to-action if appropriate
+
+Keep the response short and conversational for SMS format.`
+
+      userPrompt = `Please generate an SMS response for ${lead.first_name || 'this patient'} based on the following conversation history at ${clinic.name}:
+
+${conversationContext || 'No previous conversation - this is an initial welcome message.'}
+
+Patient Details:
+- Name: ${lead.first_name || ''} ${lead.last_name || ''}
+- Interest Level: ${lead.interest_level || 'N/A'}
+- Urgency: ${lead.urgency || 'N/A'}`
+    }
+
+    logInfo('Calling OpenAI API for intelligent response generation')
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: clinic.assistant_model || 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: isEmail ? 500 : 150,
+        temperature: 0.7
+      })
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      const generatedContent = data.choices[0]?.message?.content
+      
+      if (generatedContent) {
+        if (isEmail) {
+          // Parse email response
+          const lines = generatedContent.split('\n')
+          let subject = ''
+          let body = ''
+          let isBody = false
+
+          for (const line of lines) {
+            if (line.startsWith('SUBJECT:')) {
+              subject = line.replace('SUBJECT:', '').trim()
+            } else if (line.startsWith('BODY:')) {
+              body = line.replace('BODY:', '').trim()
+              isBody = true
+            } else if (isBody) {
+              body += '\n' + line
+            }
+          }
+
+          if (subject && body) {
+            logInfo('Successfully generated intelligent email response via OpenAI')
+            return { subject, body: body.trim() }
+          }
+        } else {
+          logInfo('Successfully generated intelligent SMS response via OpenAI')
+          return generatedContent.trim()
+        }
+      }
+    } else {
+      logError('OpenAI API call failed', await response.text())
+    }
+  } catch (error) {
+    logError('Error generating intelligent response with OpenAI', error)
+  }
+
+  // Fallback to simple response
+  logInfo('Using fallback intelligent response')
+  const fallbackMessage = `Hi ${lead.first_name || 'there'}, thank you for your interest in ${clinic.name}. We're here to help with any questions you might have about our services.`
+  
+  if (isEmail) {
+    return {
+      subject: `Thank you for your interest in ${clinic.name}`,
+      body: fallbackMessage
+    }
+  }
+  return fallbackMessage
+}
+
+// Enhanced sendSMS function
+async function sendSMS(
+  toPhone: string, 
+  message: string, 
+  clinicId: string, 
+  supabase: any,
+  twilioSettings?: any
+): Promise<{ success: boolean, error?: string }> {
+  logInfo(`Attempting to send SMS to ${toPhone} for clinic ${clinicId}`)
+  
+  try {
+    let smsSettings = twilioSettings;
+    
+    if (!smsSettings) {
+      const { data: fetchedSettings, error: settingsError } = await supabase
+        .from('twilio_config')
+        .select('twilio_account_sid, twilio_auth_token, twilio_phone_number')
+        .eq('clinic_id', clinicId)
+        .eq('status', 'active')
+        .single()
+        
+      if (settingsError) {
+        logError('Error fetching Twilio settings', { clinicId, error: settingsError })
+        return { success: false, error: `Error fetching Twilio settings: ${settingsError.message}` }
+      }
+      
+      smsSettings = fetchedSettings
+    }
+
+    const missingFields = []
+    if (!smsSettings?.twilio_account_sid) missingFields.push('twilio_account_sid')
+    if (!smsSettings?.twilio_auth_token) missingFields.push('twilio_auth_token') 
+    if (!smsSettings?.twilio_phone_number) missingFields.push('twilio_phone_number')
+
+    if (missingFields.length > 0) {
+      logError('Incomplete Twilio settings for clinic', { 
+        clinicId, 
+        missingFields
+      })
+      return { 
+        success: false, 
+        error: `Incomplete Twilio settings for clinic. Missing: ${missingFields.join(', ')}` 
+      }
+    }
+
+    const { twilio_account_sid, twilio_auth_token, twilio_phone_number } = smsSettings
+
+    const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilio_account_sid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(`${twilio_account_sid}:${twilio_auth_token}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        From: twilio_phone_number,
+        To: toPhone,
+        Body: message
+      })
+    })
+
+    if (response.ok) {
+      const responseData = await response.json()
+      logInfo('SMS sent successfully', { messageSid: responseData.sid })
+      return { success: true }
+    } else {
+      const errorText = await response.text()
+      logError('Twilio API call failed', { status: response.status, error: errorText })
+      return { success: false, error: `Twilio API error (${response.status}): ${errorText}` }
+    }
+  } catch (error: any) {
+    logError('Error sending SMS', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Handle Twilio webhook - save incoming messages and update lead status
+async function handleTwilioWebhook(formData: FormData, supabase: any) {
+  logInfo('Handling Twilio webhook')
+  
+  const twilioData = {
+    from: formData.get('From') as string,
+    to: formData.get('To') as string,
+    body: formData.get('Body') as string,
+    messageSid: formData.get('MessageSid') as string,
+    accountSid: formData.get('AccountSid') as string
+  }
+
+  logInfo('Twilio webhook data', twilioData)
+
+  if (!twilioData.from || !twilioData.to || !twilioData.body || !twilioData.messageSid || !twilioData.accountSid) {
+    throw new Error('Invalid Twilio webhook data: missing required fields')
+  }
+
+  // Find the clinic based on the Twilio phone number
+  const { data: clinicSettings } = await supabase
+    .from('twilio_config')
+    .select('clinic_id, twilio_account_sid, twilio_auth_token, twilio_phone_number')
+    .eq('twilio_phone_number', twilioData.to)
+    .eq('status', 'active')
+    .single()
+
+  if (!clinicSettings) {
+    throw new Error('No clinic found with active Twilio settings for phone number: ' + twilioData.to)
+  }
+
+  // Find the lead by phone number
+  const { data: lead } = await supabase
+    .from('lead')
+    .select('*')
+    .eq('phone', twilioData.from)
+    .eq('clinic_id', clinicSettings.clinic_id)
+    .single()
+
+  if (!lead) {
+    logError(`No lead found with phone ${twilioData.from} for clinic ${clinicSettings.clinic_id}`)
+    throw new Error('No lead found for this phone number')
+  }
+
+  // Get or create thread
+  let thread = null
+  const { data: existingThread } = await supabase
+    .from('threads')
+    .select('*')
+    .eq('lead_id', lead.id)
+    .eq('clinic_id', clinicSettings.clinic_id)
+    .single()
+
+  if (existingThread) {
+    thread = existingThread
+    logInfo('Using existing thread', { threadId: thread.id })
+  } else {
+    logInfo('Creating new thread for incoming message')
+    const { data: createdThread, error: threadError } = await supabase
+      .from('threads')
+      .insert({
+        lead_id: lead.id,
+        clinic_id: clinicSettings.clinic_id,
+        status: 'new'
+      })
+      .select()
+      .single()
+
+    if (threadError) throw threadError
+    thread = createdThread
+    logInfo('New thread created', { threadId: thread.id })
+  }
+
+  // Save the incoming message
+  logInfo('Saving incoming message to conversation')
+  await supabase
+    .from('conversation')
+    .insert({
+      thread_id: thread.id,
+      message: twilioData.body,
+      timestamp: new Date().toISOString(),
+      is_from_user: true,
+      sender_type: 'user'
+    })
+
+  // Update lead status to "Engaged" if currently "New"
+  if (lead.status === 'New') {
+    await supabase
+      .from('lead')
+      .update({ 
+        status: 'Engaged',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', lead.id)
+    
+    logInfo(`Updated lead ${lead.id} status from New to Engaged`)
+  }
+
+  logInfo('Twilio webhook processed successfully')
+  return {
+    success: true,
+    lead_id: lead.id,
+    thread_id: thread.id,
+    message: 'Message saved successfully'
+  }
+}
+
+// Update the export statement at the bottom
+export { 
+  processAllLeads, 
+  FOLLOW_UP_RULES, 
+  determineFollowUpsForLead,
+  generateIntelligentResponse,
+  sendSMS,
+  handleTwilioWebhook
+}
+
