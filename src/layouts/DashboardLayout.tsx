@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/common";
 import MobileFooter from "@/components/common/MobileFooter";
 import { Flex, Layout, type LayoutProps } from "antd";
 import type { ReactNode } from "react";
+import { useState } from "react";
 
 const { Content } = Layout;
 
@@ -10,10 +11,12 @@ interface DashboardLayoutProps extends LayoutProps {
 }
 
 const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
     <div className="h-screen overflow-hidden">
       <Layout className="h-full flex flex-row">
-        <Sidebar />
+        {/* <Sidebar /> */}
+        <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         <Layout className="flex-1">
           {header && (
             <Flex className="w-full border-b border-Gray400" style={{ height: "60px", flexShrink: 0 }}>
