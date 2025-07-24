@@ -272,6 +272,21 @@ async function processEmails(imapConfig: any, smtpConfig: any, aiConfig: any) {
           continue;
         }
 
+        const wordCount = emailData.body?.trim().split(/\s+/).length || 0;
+      if (!emailData.body || emailData.body.trim().length === 0 || wordCount < 3) {
+        console.log(`Skipping email ${messageId} - body too short (${wordCount} words)`);
+        processedEmails.push({
+          message_id: messageId,
+          from: emailData.headers.from,
+          subject: emailData.headers.subject || 'No subject',
+          reply_sent: false,
+          error: 'Email body too short to process'
+        });
+        // Optionally mark as read
+        await sendCommand('A005', `STORE ${messageId} +FLAGS (\\Seen)`);
+        continue;
+      }
+
         // Generate AI response
         const aiResponse = await generateAIResponse(emailData, aiConfig);
 
@@ -357,7 +372,7 @@ async function generateAIResponse(emailData: any, aiConfig: any): Promise<string
 
     // Use chat completion for simplicity
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
@@ -473,7 +488,6 @@ function parseSearchResults(searchResponse: string): number[] {
   return messageIds;
 }
 
-// Parse email data from IMAP response
 function parseEmailData(fetchResponse: string) {
   console.log('Parsing email data from IMAP response...');
   
@@ -487,114 +501,135 @@ function parseEmailData(fetchResponse: string) {
     let bodySection = '';
     let inHeaderSection = false;
     let inBodySection = false;
+    let expectedBodyLength = 0;
+    let currentBodyBytes = 0;
+    let boundary: string | null = null;
+    let inPlainTextPart = false;
     
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
+      const line = lines[i].trim();
       
-      // Check for BODY[HEADER] or BODY[HEADER.FIELDS] section start
-      if (trimmed.includes('BODY[HEADER') || line.includes('BODY[HEADER')) {
-        console.log('Found BODY[HEADER] section');
+      // Check for BODY[HEADER.FIELDS] section start
+      if (line.includes('BODY[HEADER.FIELDS')) {
+        console.log('Found BODY[HEADER.FIELDS] section');
         inHeaderSection = true;
         inBodySection = false;
-        
-        // The header data might be on the same line
-        const headerStart = line.indexOf('BODY[HEADER');
-        if (headerStart !== -1) {
-          const bracketEnd = line.indexOf(']', headerStart);
-          if (bracketEnd !== -1) {
-            const remainingLine = line.substring(bracketEnd + 1);
-            if (remainingLine.trim()) {
-              headerSection += remainingLine + '\n';
-            }
-          }
-        }
         continue;
       }
       
       // Check for BODY[TEXT] section start
-      if (trimmed.includes('BODY[TEXT]') || line.includes('BODY[TEXT]')) {
+      if (line.includes('BODY[TEXT]')) {
         console.log('Found BODY[TEXT] section');
         inHeaderSection = false;
         inBodySection = true;
         
-        // The body data might be on the same line
-        const bodyStart = line.indexOf('BODY[TEXT]');
-        if (bodyStart !== -1) {
-          const remainingLine = line.substring(bodyStart + 'BODY[TEXT]'.length);
-          if (remainingLine.trim()) {
-            bodySection += remainingLine + '\n';
-          }
+        // Check for literal length indicator (e.g., {230})
+        const literalMatch = line.match(/BODY\[TEXT\]\s*\{(\d+)\}/);
+        if (literalMatch) {
+          expectedBodyLength = parseInt(literalMatch[1], 10);
+          console.log(`Expected body length: ${expectedBodyLength}`);
         }
         continue;
       }
       
       // Check for end of fetch response
-      if (trimmed.startsWith('A004 OK') || trimmed === ')') {
+      if (line.startsWith('A004 OK') || line === ')') {
         console.log('Found end of fetch response');
         break;
       }
       
       // Collect header data
-      if (inHeaderSection && line.trim() && line.trim() !== ')') {
+      if (inHeaderSection && line && line !== ')') {
         headerSection += line + '\n';
       }
       
-      // Collect body data  
-      if (inBodySection && line.trim() && line.trim() !== ')' && !line.trim().startsWith('A004')) {
-        bodySection += line + '\n';
+      // Collect body data
+      if (inBodySection && line && !line.startsWith('A004')) {
+        if (expectedBodyLength > 0) {
+          bodySection += line + '\n';
+          currentBodyBytes += line.length + 1;
+          if (currentBodyBytes >= expectedBodyLength) {
+            inBodySection = false;
+          }
+        } else {
+          bodySection += line + '\n';
+        }
       }
     }
     
     console.log(`Header section length: ${headerSection.length}`);
     console.log(`Body section length: ${bodySection.length}`);
     
-    // Parse headers from header section
+    // Parse headers
     if (headerSection) {
       const headerLines = headerSection.split('\n');
       let currentHeader = '';
       let currentValue = '';
       
       for (const headerLine of headerLines) {
-        // Skip empty lines and lines that don't look like headers
         if (!headerLine.trim() || headerLine.trim() === ')') continue;
         
-        // Check if this line starts a new header (contains a colon and doesn't start with whitespace)
         if (headerLine.includes(':') && !headerLine.startsWith(' ') && !headerLine.startsWith('\t')) {
-          // Save the previous header if we have one
           if (currentHeader && currentValue) {
             headers[currentHeader.toLowerCase().trim()] = currentValue.trim();
           }
-          
-          // Start new header
           const colonIndex = headerLine.indexOf(':');
           currentHeader = headerLine.substring(0, colonIndex).trim();
           currentValue = headerLine.substring(colonIndex + 1).trim();
         } else if (currentHeader && headerLine.trim()) {
-          // This is a continuation of the previous header (folded header)
           currentValue += ' ' + headerLine.trim();
         }
       }
       
-      // Don't forget the last header
       if (currentHeader && currentValue) {
         headers[currentHeader.toLowerCase().trim()] = currentValue.trim();
       }
     }
     
-    // Clean up body section
+    // Parse MIME structure for body
     if (bodySection) {
-      body = bodySection
-        .split('\n')
-        .filter(line => {
-          const trimmed = line.trim();
-          return trimmed !== ')' && 
-                 !trimmed.startsWith('A004') && 
-                 trimmed !== '' &&
-                 !trimmed.match(/^\d+\s+FETCH/);
-        })
-        .join('\n')
-        .trim();
+      const bodyLines = bodySection.split('\n');
+      body = '';
+      inPlainTextPart = false;
+      
+      // Look for Content-Type to detect multipart and boundary
+      const contentTypeMatch = bodySection.match(/Content-Type: multipart\/[a-z]+; boundary="([^"]+)"/i);
+      if (contentTypeMatch) {
+        boundary = contentTypeMatch[1];
+        console.log(`Detected multipart email with boundary: ${boundary}`);
+      }
+      
+      for (const line of bodyLines) {
+        const trimmed = line.trim();
+        
+        // Skip empty lines or protocol markers
+        if (!trimmed || trimmed === ')' || trimmed.match(/^\d+\s+FETCH/) || trimmed.match(/BODY\[TEXT\]\s*\{\d+\}/)) {
+          continue;
+        }
+        
+        // Check for boundary
+        if (boundary && trimmed.includes(`--${boundary}`)) {
+          if (trimmed.includes(`--${boundary}--`)) {
+            // End of multipart
+            break;
+          }
+          inPlainTextPart = false;
+          continue;
+        }
+        
+        // Check for Content-Type within part
+        if (trimmed.match(/Content-Type: text\/plain/i)) {
+          inPlainTextPart = true;
+          continue;
+        }
+        
+        // Collect plain text content
+        if (inPlainTextPart && trimmed) {
+          body += line + '\n';
+        }
+      }
+      
+      body = body.trim();
     }
     
     console.log('Parsed headers:', Object.keys(headers));
@@ -603,7 +638,7 @@ function parseEmailData(fetchResponse: string) {
     console.log('Body length:', body.length);
     console.log('Body preview:', body.substring(0, 100));
     
-    // Clean up email addresses - remove < > brackets if present
+    // Clean up email addresses
     if (headers.from) {
       const emailMatch = headers.from.match(/<([^>]+)>/) || headers.from.match(/([^\s<>]+@[^\s<>]+)/);
       if (emailMatch) {
@@ -618,11 +653,9 @@ function parseEmailData(fetchResponse: string) {
     
   } catch (error) {
     console.error('Error parsing email data:', error);
-    console.error('Raw response was:', fetchResponse.substring(0, 1000));
-    
-    // Return empty data on parsing error
+    console.error('Raw response preview:', fetchResponse.substring(0, 1000));
     return {
-      headers: {},
+      headers,
       body: ''
     };
   }
