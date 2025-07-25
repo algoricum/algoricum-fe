@@ -4,7 +4,7 @@ import footerItems from "@/constants/footerItems";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { signOut } from "@/utils/supabase/auth-helper";
 import menuItems from "@/constants/menuItems";
 

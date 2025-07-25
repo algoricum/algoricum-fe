@@ -1,42 +1,37 @@
-"use client"
-import { useState, useEffect } from "react"
-import { Flex, Form, Input, Select, Upload } from "antd"
-import { Button } from "@/components/elements"
-import { FileTextOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons"
-import { SuccessToast, ErrorToast } from "@/helpers/toast"
-import { ColorConfigurator, WidgetPreview } from "@/components/common"
-import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx"
-import { getAssistantByClinicId, getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper"
-import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads"
-import { getUserData } from "@/utils/supabase/user-helper"
-import generateClinicInstructions from "@/utils/generateClinicInstructions"
-import { getSupabaseSession } from "@/utils/supabase/auth-helper"
-import { getPreviewText } from "@/utils/getPreviewChatbot"
+"use client";
+import { useState, useEffect } from "react";
+import { Flex, Form, Input, Select, Upload } from "antd";
+import { Button } from "@/components/elements";
+import { FileTextOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons";
+import { SuccessToast, ErrorToast } from "@/helpers/toast";
+import { ColorConfigurator, WidgetPreview } from "@/components/common";
+import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx";
+import { getAssistantByClinicId, getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
+import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
+import { getUserData } from "@/utils/supabase/user-helper";
+import generateClinicInstructions from "@/utils/generateClinicInstructions";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+import { getPreviewText } from "@/utils/getPreviewChatbot";
 
-const { TextArea } = Input
+const { TextArea } = Input;
 
 const ChatbotSettings = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState<string>("");
-
-  // Form state management
   const [formData, setFormData] = useState({
     primaryColor: "#2563EB",
     fontColor: "#000000",
   });
-
   const primaryColor = Form.useWatch("primary_color", form);
   const toneSelector = Form.useWatch("toneSelector", form);
   const sentenceLength = Form.useWatch("sentenceLength", form);
   const formalityLevel = Form.useWatch("formalityLevel", form);
-  const [fileList, setFileList] = useState([]);
-  const [avatarFileList, setAvatarFileList] = useState([]);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [clinicData, setClinicData] = useState<any>();
-  const [dataLoaded, setDataLoaded] = useState(false); // Add this state
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Helper function to normalize values from database to match dropdown options
+  // ... (rest of the code remains unchanged until the Form.Item sections)
   const normalizeValue = (value: string | null | undefined, validOptions: string[]) => {
     if (!value) return validOptions[0]; // Return first option as default
 
@@ -226,7 +221,7 @@ const ChatbotSettings = () => {
     return e?.fileList;
   };
 
-  // Don't render the form until data is loaded to prevent empty dropdowns
+  // ... (rest of the code remains unchanged)
   if (loading && !dataLoaded) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -237,7 +232,6 @@ const ChatbotSettings = () => {
       </div>
     );
   }
-
   return (
     <div className="flex flex-col md:flex-row gap-6">
       <div className="flex-1 rounded-[20px] border border-gray-200 p-4 bg-Gray100 gap-4">
@@ -252,27 +246,22 @@ const ChatbotSettings = () => {
               Generate Script
             </Button>
           </div>
-
           <Form.Item label="Chatbot Name" name="chatbotName" rules={[{ required: true, message: "Please enter a chatbot name" }]}>
             <Input
               placeholder="Enter your chatbot's name (e.g., Dr. Smith Assistant, MedBot)"
               prefix={<UserOutlined className="text-gray-400" />}
             />
           </Form.Item>
-
-          <Form.Item label="Chatbot Avatar" valuePropName="fileList" getValueFromEvent={normFile}>
+          <Form.Item label="Chatbot Avatar" name="chatbotAvatar" valuePropName="fileList" getValueFromEvent={normFile}>
             <Upload.Dragger
               name="chatbotAvatar"
-              fileList={avatarFileList}
               accept=".jpg,.jpeg,.png,.svg"
               beforeUpload={file => {
                 const isJpgOrPngOrSvg = file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/svg+xml";
-
                 if (!isJpgOrPngOrSvg) {
                   ErrorToast("You can only upload JPG, PNG, or SVG files!");
                 }
-
-                return false; // Return false to prevent automatic upload
+                return false; // Prevent automatic upload
               }}
               maxCount={1}
               className="bg-white rounded-md"
@@ -286,7 +275,6 @@ const ChatbotSettings = () => {
               <p className="text-center text-xs text-gray-500">JPG, PNG, SVG (recommended: square image)</p>
             </Upload.Dragger>
           </Form.Item>
-
           <Form.Item
             label="Greeting Message For Visitors"
             name="greeting"
@@ -294,20 +282,16 @@ const ChatbotSettings = () => {
           >
             <TextArea rows={4} placeholder="Enter a friendly greeting message" />
           </Form.Item>
-
           <Form.Item name="logo" label="Upload Chatbot Logo" valuePropName="fileList" getValueFromEvent={normFile}>
             <Upload.Dragger
               name="logo"
-              fileList={fileList}
               accept=".jpg,.jpeg,.png,.svg"
               beforeUpload={file => {
                 const isJpgOrPngOrSvg = file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/svg+xml";
-
                 if (!isJpgOrPngOrSvg) {
                   ErrorToast("You can only upload JPG, PNG, or SVG files!");
                 }
-
-                return false; // Return false to prevent automatic upload
+                return false; // Prevent automatic upload
               }}
               maxCount={1}
               className="bg-white rounded-md"
@@ -321,7 +305,7 @@ const ChatbotSettings = () => {
               <p className="text-center text-xs text-gray-500">JPG, PNG, SVG</p>
             </Upload.Dragger>
           </Form.Item>
-
+          {/* ... (rest of the Form remains unchanged) */}
           <Form.Item label="Widget Appearance">
             <Flex wrap="wrap" gap="middle">
               <ColorConfigurator
@@ -339,7 +323,6 @@ const ChatbotSettings = () => {
               />
             </Flex>
           </Form.Item>
-
           <Form.Item label="Tone Selector" name="toneSelector" rules={[{ required: true, message: "Please select a tone" }]}>
             <div className="mb-2">
               <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
@@ -357,7 +340,6 @@ const ChatbotSettings = () => {
               ]}
             />
           </Form.Item>
-
           <Form.Item label="Sentence Length" name="sentenceLength" rules={[{ required: true, message: "Please select a sentence length" }]}>
             <div className="mb-2">
               <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
@@ -374,7 +356,6 @@ const ChatbotSettings = () => {
               ]}
             />
           </Form.Item>
-
           <Form.Item label="Formality Level" name="formalityLevel" rules={[{ required: true, message: "Please select a formality level" }]}>
             <div className="mb-2">
               <p className="text-xs text-gray-500 mb-2">How formal should the language be?</p>
@@ -393,7 +374,6 @@ const ChatbotSettings = () => {
               ]}
             />
           </Form.Item>
-
           {/* Live Preview Section */}
           {(toneSelector || sentenceLength || formalityLevel) && (
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -417,7 +397,6 @@ const ChatbotSettings = () => {
               </div>
             </div>
           )}
-
           <Form.Item>
             <Button
               type="primary"
@@ -427,7 +406,7 @@ const ChatbotSettings = () => {
             >
               Save Changes
             </Button>
-          </Form.Item>
+          </Form.Item>{" "}
         </Form>
       </div>
 
@@ -435,10 +414,9 @@ const ChatbotSettings = () => {
         <WidgetPreview primaryColor={primaryColor} />
       </Flex>
 
-      {/* Chatbot Connect Modal */}
       <ChatbotConnectModal apiKey={apiKey} isOpen={isConnectModalOpen} onClose={() => setIsConnectModalOpen(false)} />
     </div>
   );
-}
+};
 
-export default ChatbotSettings
+export default ChatbotSettings;
