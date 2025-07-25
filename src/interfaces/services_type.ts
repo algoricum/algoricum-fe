@@ -155,8 +155,7 @@ export interface UserClinic {
   id: string;
   user_id: string;
   clinic_id: string;
-  role: 'owner' | 'admin' | 'staff';
-  position?: string;
+  role_id: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

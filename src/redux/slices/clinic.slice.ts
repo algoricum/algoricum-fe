@@ -89,6 +89,18 @@ export const fetchClinicById = createAsyncThunk(
   }
 );
 
+export const getRoleId = async () => {
+  const { data, error } = await supabase.from("role").select("id").eq("type", "owner").single(); // ✅ ensures only one record is returned
+
+  if (error) {
+    console.error("Error fetching role:", error.message);
+    return null;
+  }
+
+  return data.id; // ✅ returns the role ID
+};
+
+
 export const createClinic = createAsyncThunk(
   'clinic/createClinic',
   async (clinicData: CreateClinicProps, { rejectWithValue }) => {
@@ -106,12 +118,14 @@ export const createClinic = createAsyncThunk(
       
       // Create user_clinic relationship if userId is provided
       if (clinicData.owner_id) {
+
+        const role_id= await getRoleId()
         const { error: relationError } = await supabase
           .from('user_clinic')
           .insert([{
             user_id: clinicData.owner_id,
             clinic_id: data.id,
-            role: 'owner',
+            role_id,
             is_active: true
           }]);
           
