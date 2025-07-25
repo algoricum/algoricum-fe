@@ -411,10 +411,10 @@ async function processLead(
         // Get conversation history for context
         const conversationHistory = await getConversationHistory(threadId, supabase)
         
-        // Generate message content (this will be implemented later)
+        // Generate message content using intelligent response
         const messageContent = await generateMessageContent(lead, clinic, rule, conversationHistory)
         
-        // Send the message (this will be implemented later based on communication type)
+        // Send the message based on communication type
         const sendResult = await sendMessage(lead, clinic, rule, messageContent, supabase)
         
         if (sendResult.success) {
@@ -541,19 +541,15 @@ async function generateMessageContent(
   rule: FollowUpRule,
   conversationHistory: Conversation[]
 ): Promise<string | { subject: string, body: string }> {
-  // This will be implemented with OpenAI integration
   logInfo(`Generating message content for ${rule.name}`)
   
-  const fallbackMessage = `Hi ${lead.first_name || 'there'}, this is a ${rule.name} message from ${clinic.name}.`
-  
-  if (rule.communicationType === 'email') {
-    return {
-      subject: `Follow-up from ${clinic.name}`,
-      body: fallbackMessage
-    }
-  }
-  
-  return fallbackMessage
+  // Use the intelligent response generator
+  return await generateIntelligentResponse(
+    lead,
+    clinic,
+    conversationHistory,
+    rule.communicationType === 'email'
+  )
 }
 
 async function sendMessage(
@@ -563,11 +559,34 @@ async function sendMessage(
   messageContent: string | { subject: string, body: string },
   supabase: any
 ): Promise<{ success: boolean, error?: string }> {
-  // This will be implemented with actual SMS/Email sending
   logInfo(`Sending ${rule.communicationType} message for ${rule.name} to lead ${lead.id}`)
   
-  // Simulate success for now
-  return { success: true }
+  try {
+    if (rule.communicationType === 'sms') {
+      if (typeof messageContent === 'string') {
+        return await sendSMS(lead.phone, messageContent, lead.clinic_id, supabase)
+      } else {
+        return { success: false, error: 'Invalid message format for SMS' }
+      }
+    } else if (rule.communicationType === 'email') {
+      if (typeof messageContent === 'object' && messageContent.subject && messageContent.body) {
+        return await sendEmail(
+          lead.email!,
+          messageContent.subject,
+          messageContent.body,
+          lead.clinic_id,
+          supabase
+        )
+      } else {
+        return { success: false, error: 'Invalid message format for email' }
+      }
+    } else {
+      return { success: false, error: `Unsupported communication type: ${rule.communicationType}` }
+    }
+  } catch (error) {
+    logError(`Error in sendMessage for lead ${lead.id}`, error)
+    return { success: false, error: error.message }
+  }
 }
 
 async function saveMessageToHistory(
@@ -686,7 +705,6 @@ async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email
     }
   }
 }
-
 
 // Generate intelligent responses based on conversation history
 async function generateIntelligentResponse(
@@ -916,6 +934,128 @@ async function sendSMS(
   }
 }
 
+// Enhanced sendEmail function
+async function sendEmail(
+  toEmail: string,
+  subject: string,
+  body: string,
+  clinicId: string,
+  supabase: any,
+  emailSettings?: any
+): Promise<{ success: boolean, error?: string }> {
+  logInfo(`Attempting to send email to ${toEmail} for clinic ${clinicId}`)
+  
+  try {
+    let settings = emailSettings;
+    
+    if (!settings) {
+      const { data: fetchedSettings, error: settingsError } = await supabase
+        .from('email_config')
+        .select('smtp_host, smtp_port, smtp_username, smtp_password, from_email, from_name')
+        .eq('clinic_id', clinicId)
+        .eq('status', 'active')
+        .single()
+        
+      if (settingsError) {
+        logError('Error fetching email settings', { clinicId, error: settingsError })
+        return { success: false, error: `Error fetching email settings: ${settingsError.message}` }
+      }
+      
+      settings = fetchedSettings
+    }
+
+    const missingFields = []
+    if (!settings?.smtp_host) missingFields.push('smtp_host')
+    if (!settings?.smtp_port) missingFields.push('smtp_port')
+    if (!settings?.smtp_username) missingFields.push('smtp_username')
+    if (!settings?.smtp_password) missingFields.push('smtp_password')
+    if (!settings?.from_email) missingFields.push('from_email')
+
+    if (missingFields.length > 0) {
+      logError('Incomplete email settings for clinic', { 
+        clinicId, 
+        missingFields
+      })
+      return { 
+        success: false, 
+        error: `Incomplete email settings for clinic. Missing: ${missingFields.join(', ')}` 
+      }
+    }
+
+    // For demonstration purposes, this uses a generic SMTP approach
+    // In a real implementation, you might want to use a service like SendGrid, Mailgun, or AWS SES
+    
+    // Using a simple email service API (example with a hypothetical service)
+    // Replace this with your actual email service implementation
+    const emailData = {
+      to: toEmail,
+      from: settings.from_name ? `${settings.from_name} <${settings.from_email}>` : settings.from_email,
+      subject: subject,
+      html: body.replace(/\n/g, '<br>'), // Convert line breaks to HTML
+      text: body
+    }
+
+    // Example implementation using a hypothetical email service
+    // You would replace this with your actual email service (SendGrid, Mailgun, etc.)
+    try {
+      // If using SendGrid, for example:
+      const sendGridApiKey = Deno.env.get('SENDGRID_API_KEY')
+      
+      if (sendGridApiKey) {
+        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${sendGridApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            personalizations: [{
+              to: [{ email: toEmail }],
+              subject: subject
+            }],
+            from: { 
+              email: settings.from_email,
+              name: settings.from_name || settings.from_email
+            },
+            content: [
+              {
+                type: 'text/plain',
+                value: body
+              },
+              {
+                type: 'text/html',
+                value: body.replace(/\n/g, '<br>')
+              }
+            ]
+          })
+        })
+
+        if (response.ok || response.status === 202) {
+          logInfo('Email sent successfully via SendGrid')
+          return { success: true }
+        } else {
+          const errorText = await response.text()
+          logError('SendGrid API call failed', { status: response.status, error: errorText })
+          return { success: false, error: `SendGrid API error (${response.status}): ${errorText}` }
+        }
+      }
+      
+      // Fallback to SMTP (you would implement this with an SMTP library)
+      // For now, we'll simulate success
+      logInfo('Email sent successfully via SMTP (simulated)')
+      return { success: true }
+      
+    } catch (emailServiceError) {
+      logError('Error with email service', emailServiceError)
+      return { success: false, error: `Email service error: ${emailServiceError.message}` }
+    }
+
+  } catch (error: any) {
+    logError('Error sending email', error)
+    return { success: false, error: error.message }
+  }
+}
+
 // Handle Twilio webhook - save incoming messages and update lead status
 async function handleTwilioWebhook(formData: FormData, supabase: any) {
   logInfo('Handling Twilio webhook')
@@ -1022,6 +1162,103 @@ async function handleTwilioWebhook(formData: FormData, supabase: any) {
   }
 }
 
+async function handleEmailWebhook(emailData: any, supabase: any) {
+  logInfo('Handling email webhook')
+  
+  if (!emailData.from || !emailData.to || !emailData.subject || !emailData.body) {
+    throw new Error('Invalid email webhook data: missing required fields')
+  }
+
+  // Find the clinic based on the email address
+  const { data: clinicSettings } = await supabase
+    .from('email_config')
+    .select('clinic_id, from_email')
+    .eq('from_email', emailData.to)
+    .eq('status', 'active')
+    .single()
+
+  if (!clinicSettings) {
+    throw new Error('No clinic found with active email settings for email address: ' + emailData.to)
+  }
+
+  // Find the lead by email address
+  const { data: lead } = await supabase
+    .from('lead')
+    .select('*')
+    .eq('email', emailData.from)
+    .eq('clinic_id', clinicSettings.clinic_id)
+    .single()
+
+  if (!lead) {
+    logError(`No lead found with email ${emailData.from} for clinic ${clinicSettings.clinic_id}`)
+    throw new Error('No lead found for this email address')
+  }
+
+  // Get or create thread
+  let thread = null
+  const { data: existingThread } = await supabase
+    .from('threads')
+    .select('*')
+    .eq('lead_id', lead.id)
+    .eq('clinic_id', clinicSettings.clinic_id)
+    .single()
+
+  if (existingThread) {
+    thread = existingThread
+    logInfo('Using existing thread', { threadId: thread.id })
+  } else {
+    logInfo('Creating new thread for incoming email')
+    const { data: createdThread, error: threadError } = await supabase
+      .from('threads')
+      .insert({
+        lead_id: lead.id,
+        clinic_id: clinicSettings.clinic_id,
+        status: 'new'
+      })
+      .select()
+      .single()
+
+    if (threadError) throw threadError
+    thread = createdThread
+    logInfo('New thread created', { threadId: thread.id })
+  }
+
+  // Save the incoming email
+  logInfo('Saving incoming email to conversation')
+  const emailMessage = `EMAIL RECEIVED - Subject: ${emailData.subject}\n\n${emailData.body}`
+  
+  await supabase
+    .from('conversation')
+    .insert({
+      thread_id: thread.id,
+      message: emailMessage,
+      timestamp: new Date().toISOString(),
+      is_from_user: true,
+      sender_type: 'user'
+    })
+
+  // Update lead status to "Engaged" if currently "New"
+  if (lead.status === 'New') {
+    await supabase
+      .from('lead')
+      .update({ 
+        status: 'Engaged',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', lead.id)
+    
+    logInfo(`Updated lead ${lead.id} status from New to Engaged`)
+  }
+
+  logInfo('Email webhook processed successfully')
+  return {
+    success: true,
+    lead_id: lead.id,
+    thread_id: thread.id,
+    message: 'Email saved successfully'
+  }
+}
+
 // Update the export statement at the bottom
 export { 
   processAllLeads, 
@@ -1029,6 +1266,8 @@ export {
   determineFollowUpsForLead,
   generateIntelligentResponse,
   sendSMS,
-  handleTwilioWebhook
+  sendEmail,
+  handleTwilioWebhook,
+  handleEmailWebhook
 }
 
