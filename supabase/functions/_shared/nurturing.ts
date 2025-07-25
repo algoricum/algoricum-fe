@@ -1,4 +1,7 @@
 // _shared/nurturing.ts
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+
+
 interface Lead {
   id: string
   first_name?: string
@@ -943,116 +946,234 @@ async function sendEmail(
   supabase: any,
   emailSettings?: any
 ): Promise<{ success: boolean, error?: string }> {
-  logInfo(`Attempting to send email to ${toEmail} for clinic ${clinicId}`)
-  
+  logInfo(`Attempting to send email to ${toEmail} for clinic ${clinicId}`);
+
   try {
     let settings = emailSettings;
-    
+
+    // Fetch settings from email_settings table if not provided
     if (!settings) {
       const { data: fetchedSettings, error: settingsError } = await supabase
-        .from('email_config')
-        .select('smtp_host, smtp_port, smtp_username, smtp_password, from_email, from_name')
+        .from('email_settings')
+        .select('smtp_host, smtp_port, smtp_user, smtp_password, smtp_sender_email, smtp_sender_name, smtp_use_tls')
         .eq('clinic_id', clinicId)
-        .eq('status', 'active')
-        .single()
-        
+        .single();
+
       if (settingsError) {
-        logError('Error fetching email settings', { clinicId, error: settingsError })
-        return { success: false, error: `Error fetching email settings: ${settingsError.message}` }
+        logError('Error fetching email settings', { clinicId, error: settingsError });
+        return { success: false, error: `Error fetching email settings: ${settingsError.message}` };
       }
-      
-      settings = fetchedSettings
+
+      settings = fetchedSettings;
+    
     }
 
-    const missingFields = []
-    if (!settings?.smtp_host) missingFields.push('smtp_host')
-    if (!settings?.smtp_port) missingFields.push('smtp_port')
-    if (!settings?.smtp_username) missingFields.push('smtp_username')
-    if (!settings?.smtp_password) missingFields.push('smtp_password')
-    if (!settings?.from_email) missingFields.push('from_email')
+    logInfo('Incomplete email settings for clinic -------------', { 
+        settings, 
+        emailSettings
+      });
+
+    // Validate required fields
+    const missingFields = [];
+    if (!settings?.smtp_host) missingFields.push('smtp_host');
+    if (!settings?.smtp_port) missingFields.push('smtp_port');
+    if (!settings?.smtp_user) missingFields.push('smtp_user');
+    if (!settings?.smtp_password) missingFields.push('smtp_password');
+    if (!settings?.smtp_sender_email) missingFields.push('smtp_sender_email');
 
     if (missingFields.length > 0) {
       logError('Incomplete email settings for clinic', { 
         clinicId, 
         missingFields
-      })
+      });
       return { 
         success: false, 
         error: `Incomplete email settings for clinic. Missing: ${missingFields.join(', ')}` 
-      }
+      };
     }
 
-    // For demonstration purposes, this uses a generic SMTP approach
-    // In a real implementation, you might want to use a service like SendGrid, Mailgun, or AWS SES
-    
-    // Using a simple email service API (example with a hypothetical service)
-    // Replace this with your actual email service implementation
-    const emailData = {
-      to: toEmail,
-      from: settings.from_name ? `${settings.from_name} <${settings.from_email}>` : settings.from_email,
-      subject: subject,
-      html: body.replace(/\n/g, '<br>'), // Convert line breaks to HTML
-      text: body
-    }
-
-    // Example implementation using a hypothetical email service
-    // You would replace this with your actual email service (SendGrid, Mailgun, etc.)
-    try {
-      // If using SendGrid, for example:
-      const sendGridApiKey = Deno.env.get('SENDGRID_API_KEY')
-      
-      if (sendGridApiKey) {
-        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${sendGridApiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            personalizations: [{
-              to: [{ email: toEmail }],
-              subject: subject
-            }],
-            from: { 
-              email: settings.from_email,
-              name: settings.from_name || settings.from_email
-            },
-            content: [
-              {
-                type: 'text/plain',
-                value: body
-              },
-              {
-                type: 'text/html',
-                value: body.replace(/\n/g, '<br>')
-              }
-            ]
-          })
-        })
-
-        if (response.ok || response.status === 202) {
-          logInfo('Email sent successfully via SendGrid')
-          return { success: true }
-        } else {
-          const errorText = await response.text()
-          logError('SendGrid API call failed', { status: response.status, error: errorText })
-          return { success: false, error: `SendGrid API error (${response.status}): ${errorText}` }
+    // Gmail SMTP configuration
+    const smtpConfig = {
+      connection: {
+        hostname: settings.smtp_host || 'smtp.gmail.com',
+        port: settings.smtp_port || 587,
+        tls: settings.smtp_use_tls !== false, // Default to true for Gmail
+        auth: {
+          username: settings.smtp_user,
+          password: settings.smtp_password
         }
       }
-      
-      // Fallback to SMTP (you would implement this with an SMTP library)
-      // For now, we'll simulate success
-      logInfo('Email sent successfully via SMTP (simulated)')
-      return { success: true }
-      
-    } catch (emailServiceError) {
-      logError('Error with email service', emailServiceError)
-      return { success: false, error: `Email service error: ${emailServiceError.message}` }
+    };
+
+    // Prepare email data
+    const emailData = {
+      from: settings.smtp_sender_name 
+        ? `${settings.smtp_sender_name} <${settings.smtp_sender_email}>`
+        : settings.smtp_sender_email,
+      to: toEmail,
+      subject: subject,
+      html: body.replace(/\n/g, '<br>'), // Convert line breaks to HTML
+      text: body // Include plain text version
+    };
+
+    logInfo('Attempting to send email with data', {
+      from: emailData.from,
+      to: emailData.to,
+      subject: emailData.subject,
+      contentLength: body.length,
+      contentPreview: body.substring(0, 150)
+    });
+
+    // Try multiple configurations (similar to sendReplySimple)
+    const configurations = [
+      // Configuration 1: Standard TLS as specified
+      smtpConfig,
+      // Configuration 2: STARTTLS explicit
+      {
+        connection: {
+          hostname: settings.smtp_host || 'smtp.gmail.com',
+          port: settings.smtp_port || 587,
+          tls: false,
+          auth: {
+            username: settings.smtp_user,
+            password: settings.smtp_password
+          }
+        }
+      },
+      // Configuration 3: SSL on port 465
+      {
+        connection: {
+          hostname: settings.smtp_host || 'smtp.gmail.com',
+          port: 465,
+          tls: true,
+          auth: {
+            username: settings.smtp_user,
+            password: settings.smtp_password
+          }
+        }
+      }
+    ];
+
+    // Try each configuration
+    for (let i = 0; i < configurations.length; i++) {
+      const config = configurations[i];
+      logInfo(`Trying SMTP configuration ${i + 1}`, {
+        hostname: config.connection.hostname,
+        port: config.connection.port,
+        tls: config.connection.tls
+      });
+
+      try {
+        const smtpClient = new SMTPClient(config);
+
+        // Try different content field variations (matching sendReplySimple)
+        const emailVariations = [
+          { ...emailData, content: body },
+          { ...emailData, text: body },
+          { ...emailData, html: body.replace(/\n/g, '<br>') },
+          { ...emailData, body: body }
+        ];
+
+        for (const emailVariation of emailVariations) {
+          try {
+            logInfo('Trying email variation with fields', Object.keys(emailVariation));
+            await smtpClient.send(emailVariation);
+            await smtpClient.close();
+            logInfo('Email sent successfully');
+            return { success: true };
+          } catch (sendError) {
+            logInfo(`Email variation failed: ${sendError.message}`);
+            continue;
+          }
+        }
+
+        await smtpClient.close();
+
+      } catch (configError) {
+        logInfo(`Configuration ${i + 1} failed: ${configError.message}`);
+        continue;
+      }
+    }
+
+    // Fallback: Try minimal configuration
+    logInfo('Attempting fallback with minimal configuration');
+    try {
+      const fallbackClient = new SMTPClient({
+        connection: {
+          hostname: settings.smtp_host || 'smtp.gmail.com',
+          port: 587,
+          tls: false, // Start without TLS
+          auth: {
+            username: settings.smtp_user,
+            password: settings.smtp_password
+          }
+        }
+      });
+
+      const simpleEmailData = {
+        from: settings.smtp_sender_email,
+        to: toEmail,
+        subject: subject,
+        text: body // Use only text field
+      };
+
+      await fallbackClient.send(simpleEmailData);
+      await fallbackClient.close();
+
+      logInfo('Fallback method succeeded');
+      return { success: true };
+
+    } catch (fallbackError) {
+      logError('Fallback also failed', fallbackError);
+      return {
+        success: false,
+        error: `All email sending attempts failed: ${fallbackError.message}`,
+        troubleshooting: {
+          issues: [
+            {
+              issue: 'SMTP connection failure',
+              solutions: [
+                'Ensure smtp_user is a valid Gmail address',
+                'Verify smtp_password is a valid app-specific password',
+                'Check Gmail security settings for 2FA or less secure apps',
+                'Confirm network connectivity to smtp.gmail.com'
+              ]
+            }
+          ],
+          tips: [
+            'Use an app-specific password if 2FA is enabled (myaccount.google.com/security)',
+            'Check Gmail sending limits (typically 2,000 emails/day)',
+            'Verify port 587 or 465 is open',
+            'Ensure correct SMTP settings in email_settings table'
+          ]
+        }
+      };
     }
 
   } catch (error: any) {
-    logError('Error sending email', error)
-    return { success: false, error: error.message }
+    logError('Error sending email', error);
+    return {
+      success: false,
+      error: error.message,
+      troubleshooting: {
+        issues: [
+          {
+            issue: 'General email sending failure',
+            solutions: [
+              'Check Supabase database connection',
+              'Verify clinic_id exists in email_settings',
+              'Ensure all required fields are populated',
+              'Check server logs for detailed errors'
+            ]
+          }
+        ],
+        tips: [
+          'Review email_settings table configuration',
+          'Confirm Supabase authentication',
+          'Monitor Gmail sending limits'
+        ]
+      }
+    };
   }
 }
 

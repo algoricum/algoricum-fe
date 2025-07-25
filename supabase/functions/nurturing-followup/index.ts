@@ -130,8 +130,10 @@ async function processNurturingFollowups(supabase: any) {
                       clinic.twilio_config[0]?.status === 'active'
         
         const hasEmail = clinic.email_settings && 
-                        clinic.email_settings.length > 0 && 
-                        clinic.email_settings[0]?.smtp_host
+                        clinic.email_settings.smtp_host
+
+        logInfo(`Clinic ${clinic.name} email capabilities: ${JSON.stringify(clinic.email_settings)}`)
+
 
         logInfo(`Clinic ${clinic.name} capabilities: SMS=${hasSMS}, Email=${hasEmail}`)
 
@@ -259,9 +261,8 @@ async function processNurturingFollowups(supabase: any) {
                     emailContent.subject,
                     emailContent.body,
                     lead.clinic_id,
-                    clinic,
                     supabase,
-                    clinic.email_settings[0]
+                    clinic.email_settings
                   )
                 }
 
