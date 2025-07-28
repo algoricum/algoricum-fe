@@ -10,11 +10,10 @@ const supabase = createClient();
 export const createUserClinicRelationship = async (params: {
   userId: string;
   clinicId: string;
-  role: string;
-  position?: string;
+  role_id: string;
   isActive?: boolean;
 }) => {
-  const { userId, clinicId, role, position, isActive = true } = params;
+  const { userId, clinicId, role_id, isActive = true } = params;
   
   // Check if relationship already exists
   const { data: existingRelationship, error: checkError } = await supabase
@@ -40,8 +39,7 @@ export const createUserClinicRelationship = async (params: {
         id: uuidv4(),
         user_id: userId,
         clinic_id: clinicId,
-        role,
-        position: position || null,
+        role_id,
         is_active: isActive,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -96,7 +94,7 @@ export const getUserClinics = async (userId: string) => {
   // Get all clinic associations
   const { data: userClinics, error: userClinicsError } = await supabase
     .from("user_clinic")
-    .select("clinic_id, role, position, is_active")
+    .select("clinic_id, role_id, is_active")
     .eq("user_id", userId);
 
   if (userClinicsError || !userClinics?.length) {
@@ -121,8 +119,7 @@ export const getUserClinics = async (userId: string) => {
     const userClinic = userClinics.find(uc => uc.clinic_id === clinic.id);
     return {
       ...clinic,
-      userRole: userClinic?.role,
-      userPosition: userClinic?.position,
+      userRole: userClinic?.role_id,
       isActive: userClinic?.is_active
     };
   });
