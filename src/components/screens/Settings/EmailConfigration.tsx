@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, JSX } from "react";
+import React, { useState, useEffect, JSX, useCallback } from "react";
 import { Form, Input, Switch, InputNumber, Card, Space, Alert, Modal } from "antd";
 import { Button } from "@/components/elements";
 import {
@@ -46,90 +46,95 @@ const CommunicationConfiguration: React.FC = () => {
 
   const [smsTestResults, setSmsTestResults] = useState<SMSTestResult | null>(null);
   const [showSMSTestModal, setShowSMSTestModal] = useState<boolean>(false);
+  
+  const fetchCommunicationSettings = useCallback( async (clinicId: string): Promise<void> => {
+      try {
+        setLoading(true);
+
+        const { data, error } = await getEmailSettings(clinicId);
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          // Set form values with all fields (email + SMS)
+          form.setFieldsValue({
+            // SMTP Settings
+            smtp_host: data.smtp_host,
+            smtp_port: data.smtp_port || 465,
+            smtp_user: data.smtp_user,
+            smtp_password: data.smtp_password,
+            smtp_sender_name: data.smtp_sender_name,
+            smtp_sender_email: data.smtp_sender_email,
+            smtp_use_tls: data.smtp_use_tls !== false,
+
+            // IMAP Settings
+            imap_server: data.imap_server,
+            imap_port: data.imap_port || 993,
+            imap_user: data.imap_user,
+            imap_password: data.imap_password,
+            imap_use_ssl: data.imap_use_ssl !== false,
+
+            // Email Processing Settings
+            auto_reply_enabled: data.auto_reply_enabled !== false,
+            check_frequency_minutes: data.check_frequency_minutes || 5,
+
+            // Twilio SMS Settings
+            twilio_account_sid: data.twilio_account_sid,
+            twilio_auth_token: data.twilio_auth_token,
+            twilio_phone_number: data.twilio_phone_number,
+            sms_enabled: data.sms_enabled !== false,
+            sms_auto_reply_enabled: data.sms_auto_reply_enabled !== false,
+            twilio_webhook_url: data.twilio_webhook_url,
+          });
+
+          // Check if email is configured (has required SMTP and IMAP settings)
+          setIsEmailConfigured(
+            !!data.smtp_host && !!data.smtp_user && !!data.smtp_password && !!data.imap_server && !!data.imap_user && !!data.imap_password,
+          );
+
+          // Check if SMS is configured (has required Twilio settings)
+          setIsSMSConfigured(!!data.twilio_account_sid && !!data.twilio_auth_token && !!data.twilio_phone_number);
+
+          setLastChecked(data.last_email_check || null);
+        } else {
+          // Set default values for new configuration
+          const defaultSettings = getDefaultEmailSettings();
+          form.setFieldsValue(defaultSettings);
+          setIsEmailConfigured(false);
+          setIsSMSConfigured(false);
+        }
+      } catch (error: any) {
+        console.error("Error fetching communication settings:", error);
+        ErrorToast("Failed to load communication settings");
+      } finally {
+        setLoading(false);
+      }
+    
+    },[form])
+
+   const initializeComponent = useCallback( async (): Promise<void> => {
+     try {
+       const clinicRes = await getClinicData();
+       setClinicData(clinicRes);
+
+       if (clinicRes?.id) {
+         await fetchCommunicationSettings(clinicRes.id);
+       }
+     } catch (error) {
+       console.error("Error initializing component:", error);
+       ErrorToast("Failed to load clinic data");
+     }
+   },[fetchCommunicationSettings]);
 
   useEffect(() => {
     initializeComponent();
-  }, []);
+  }, [initializeComponent]);
 
-  const initializeComponent = async (): Promise<void> => {
-    try {
-      const clinicRes = await getClinicData();
-      setClinicData(clinicRes);
+ 
 
-      if (clinicRes?.id) {
-        await fetchCommunicationSettings(clinicRes.id);
-      }
-    } catch (error) {
-      console.error("Error initializing component:", error);
-      ErrorToast("Failed to load clinic data");
-    }
-  };
 
-  const fetchCommunicationSettings = async (clinicId: string): Promise<void> => {
-    try {
-      setLoading(true);
-
-      const { data, error } = await getEmailSettings(clinicId);
-
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        // Set form values with all fields (email + SMS)
-        form.setFieldsValue({
-          // SMTP Settings
-          smtp_host: data.smtp_host,
-          smtp_port: data.smtp_port || 465,
-          smtp_user: data.smtp_user,
-          smtp_password: data.smtp_password,
-          smtp_sender_name: data.smtp_sender_name,
-          smtp_sender_email: data.smtp_sender_email,
-          smtp_use_tls: data.smtp_use_tls !== false,
-
-          // IMAP Settings
-          imap_server: data.imap_server,
-          imap_port: data.imap_port || 993,
-          imap_user: data.imap_user,
-          imap_password: data.imap_password,
-          imap_use_ssl: data.imap_use_ssl !== false,
-
-          // Email Processing Settings
-          auto_reply_enabled: data.auto_reply_enabled !== false,
-          check_frequency_minutes: data.check_frequency_minutes || 5,
-
-          // Twilio SMS Settings
-          twilio_account_sid: data.twilio_account_sid,
-          twilio_auth_token: data.twilio_auth_token,
-          twilio_phone_number: data.twilio_phone_number,
-          sms_enabled: data.sms_enabled !== false,
-          sms_auto_reply_enabled: data.sms_auto_reply_enabled !== false,
-          twilio_webhook_url: data.twilio_webhook_url,
-        });
-
-        // Check if email is configured (has required SMTP and IMAP settings)
-        setIsEmailConfigured(
-          !!data.smtp_host && !!data.smtp_user && !!data.smtp_password && !!data.imap_server && !!data.imap_user && !!data.imap_password,
-        );
-
-        // Check if SMS is configured (has required Twilio settings)
-        setIsSMSConfigured(!!data.twilio_account_sid && !!data.twilio_auth_token && !!data.twilio_phone_number);
-
-        setLastChecked(data.last_email_check || null);
-      } else {
-        // Set default values for new configuration
-        const defaultSettings = getDefaultEmailSettings();
-        form.setFieldsValue(defaultSettings);
-        setIsEmailConfigured(false);
-        setIsSMSConfigured(false);
-      }
-    } catch (error: any) {
-      console.error("Error fetching communication settings:", error);
-      ErrorToast("Failed to load communication settings");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSaveSettings = async (values: EmailSettingsInput): Promise<void> => {
     try {

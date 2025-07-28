@@ -57,7 +57,7 @@ const LoginPage = () => {
     try {
       const supabase = createClient()
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback?redirectUrl=${redirectUrl}`,
@@ -143,7 +143,7 @@ const LoginPage = () => {
 
       <div className="text-center mt-2">
         <Text className="text-sm text-gray-600">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/signup" className="!text-brand-primary font-medium hover:underline">
             Sign Up
           </Link>

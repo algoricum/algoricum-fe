@@ -83,7 +83,7 @@ export const uploadLogo = async (userId: string, file: File, dispatch: Dispatch)
       const fileName = `${userId}-${Date.now()}.${fileExt}`;
       const filePath = `clinic-logos/${fileName}`;
       
-      const { data, error } = await supabase.storage
+      const {error } = await supabase.storage
         .from('public')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -129,11 +129,11 @@ export const fetchUserClinic = (userId: string) => async (dispatch: any) => {
         const { data, error } = await supabase
             .from('user_clinic')
             .select(`
-        clinic_id,
-        role,
-        position,
-        clinic (*)
-      `)
+                clinic_id,
+                role_id,
+                position,
+                clinic (*)
+              `)
             .eq('user_id', userId)
             .eq('is_active', true)
             .single();

@@ -2,7 +2,8 @@
 import { getLocalClinicData, setLocalClinicData } from '@/helpers/storage-helper';
 import { createClient } from './config/client';
 import { getUserData } from './user-helper';
-import type { Clinic, CreateClinicProps, UpdateClinicProps } from '@/interfaces/services_type';
+import type { Clinic, CreateClinicProps, UpdateClinicProps, EmailSettings } from '@/interfaces/services_type';
+import { getRoleId } from "@/redux/slices/clinic.slice";
 
 const supabase = createClient();
 
@@ -24,22 +25,18 @@ export const getClinicData = async (): Promise<Clinic | null> => {
 
     if (userData) {
       // Get user-clinic mapping
-      const { data: userClinicData } = await supabase
-        .from('user_clinic')
-        .select('clinic_id')
-        .eq('user_id', userData.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
+     const { data: userClinicData } = await supabase
+        .from("user_clinic")
+        .select("clinic_id")
+        .eq("user_id", userData.id)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
         .limit(1)
         .single();
 
       if (userClinicData) {
         // Get clinic data
-        const { data: clinicData } = await supabase
-          .from('clinic')
-          .select('*')
-          .eq('id', userClinicData.clinic_id)
-          .single();
+        const { data: clinicData } = await supabase.from("clinic").select("*").eq("id", userClinicData.clinic_id).single();
 
         if (clinicData) {
           const clinic = clinicData as Clinic;
@@ -64,11 +61,7 @@ export const getAssistantByClinicId = async (clinicId:string) => {
     }
 
     // Query the assistants table to get the assistant for this clinic
-    const { data: assistant, error } = await supabase
-      .from('assistants')
-      .select('*')
-      .eq('clinic_id', clinicId)
-      .single(); // Use single() since each clinic should have one assistant
+    const { data: assistant, error } = await supabase.from("assistants").select("*").eq("clinic_id", clinicId).single(); // Use single() since each clinic should have one assistant
 
     if (error) {
       if (error.code === 'PGRST116') {
@@ -87,13 +80,7 @@ export const getAssistantByClinicId = async (clinicId:string) => {
 export const getClincApiKey = async (clinicId: string): Promise<String | null> => {
   try {
     // Get user-clinic mapping
-    const { data: apiKeyData } = await supabase
-      .from('api_key')
-      .select('api_key')
-      .eq('clinic_id', clinicId)
-      .limit(1)
-      .single();
-
+    const { data: apiKeyData } = await supabase.from("api_key").select("api_key").eq("clinic_id", clinicId).limit(1).single();
 
     if (apiKeyData) {
       return apiKeyData.api_key;
@@ -111,10 +98,7 @@ export const getClincApiKey = async (clinicId: string): Promise<String | null> =
 export const getUserClinics = async (userId: string): Promise<Clinic[]> => {
   try {
     // Get user-clinic mappings
-    const { data: userClinics, error: mappingError } = await supabase
-      .from('user_clinic')
-      .select('clinic_id')
-      .eq('user_id', userId);
+    const { data: userClinics, error: mappingError } = await supabase.from("user_clinic").select("clinic_id").eq("user_id", userId);
 
     if (mappingError) throw mappingError;
 
@@ -126,10 +110,7 @@ export const getUserClinics = async (userId: string): Promise<Clinic[]> => {
     const clinicIds = userClinics.map(mapping => mapping.clinic_id);
 
     // Get clinic data
-    const { data: clinics, error: clinicsError } = await supabase
-      .from('clinic')
-      .select('*')
-      .in('id', clinicIds);
+    const { data: clinics, error: clinicsError } = await supabase.from("clinic").select("*").in("id", clinicIds);
 
     if (clinicsError) throw clinicsError;
 
@@ -160,18 +141,20 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
   if (clinicError) {
     throw clinicError;
   }
-  const { error: userClinicError } = await supabase
-    .from('user_clinic')
-    .insert([
-      {
-        user_id: owner_id,
-        clinic_id: clinicResult.id,
-        role: 'owner', // Assuming you have a role field
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ]);
+
+  const role_id=await getRoleId()
+
+  const { error: userClinicError } = await supabase.from("user_clinic").insert([
+    {
+      user_id: owner_id,
+      clinic_id: clinicResult.id,
+      role_id,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  ]);
+
   if (userClinicError) {
     console.error("Failed to create user-clinic relationship:", userClinicError);
     throw userClinicError;
@@ -204,18 +187,67 @@ export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => 
     updateObject.widget_theme = updateData.widget_theme;
   }
 
-  const { data: clinicData, error } = await supabase
-    .from('clinic')
-    .update(updateObject)
-    .eq('id', id)
-    .select()
-    .single();
+  const { data: clinicData, error } = await supabase.from("clinic").update(updateObject).eq("id", id).select().single();
 
   if (error) {
     throw error;
   }
 
   return clinicData;
+};
+
+export const createEmailSettings = async (clinic_id: string): Promise<EmailSettings> => {
+  try {
+    console.log("Creating email settings with vault password...");
+    
+    // Call the database function that handles vault access internally
+    const { data: settingsId, error: functionError } = await supabase
+      .rpc('create_email_settings_with_vault', {
+        p_clinic_id: clinic_id,
+        p_smtp_host: "smtp.gmail.com",
+        p_smtp_port: 587,
+        p_smtp_user: "abdullah.salman@hashlogics.com",
+        p_smtp_sender_name: "Algoricum",
+        p_smtp_sender_email: "abdullah.salman@hashlogics.com",
+        p_smtp_use_tls: true,
+        p_imap_server: "imap.gmail.com",
+        p_imap_port: 993,
+        p_imap_user: "abdullah.salman@hashlogics.com",
+        p_imap_use_ssl: true,
+        p_imap_folder: "INBOX",
+        p_check_frequency_minutes: 5,
+        p_sms_auto_reply_enabled: true
+      });
+
+    if (functionError) {
+      console.error("Failed to create email settings:", functionError);
+      throw new Error(`Database function failed: ${functionError.message}`);
+    }
+
+    if (!settingsId) {
+      throw new Error("No settings ID returned from database function");
+    }
+
+    console.log("Email settings created successfully with ID:", settingsId);
+
+    // Fetch the created record to return it
+    const { data: emailSettingsResult, error: fetchError } = await supabase
+      .from('email_settings')
+      .select('*')
+      .eq('id', settingsId)
+      .single();
+
+    if (fetchError) {
+      console.error("Failed to fetch created email settings:", fetchError);
+      throw fetchError;
+    }
+
+    return emailSettingsResult;
+
+  } catch (error) {
+    console.error("Error creating email settings:", error);
+    throw error;
+  }
 };
 
 /**

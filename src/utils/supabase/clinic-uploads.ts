@@ -10,7 +10,7 @@ export const uploadClinicLogo = async (userId: string, file: File): Promise<stri
   const fileExt = file.name.split('.').pop();
   const fileName = `${userId}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-  const { data: uploadData, error: uploadError } = await supabase.storage
+  const { error: uploadError } = await supabase.storage
     .from('clinic-logos')
     .upload(fileName, file, {
     contentType: file.type,
@@ -31,7 +31,7 @@ export const uploadWidgetLogo = async (userId: string, file: File): Promise<stri
   const fileExt = file.name.split('.').pop();
   const fileName = `${userId}-${Math.random().toString(36).substring(2)}.${fileExt}`;
   // Upload the file
-  const { data: uploadData, error: uploadError } = await supabase.storage
+  const { error: uploadError } = await supabase.storage
     .from('clinic-logos')
     .upload(fileName, file, {
     contentType: file.type,

@@ -125,9 +125,12 @@ export async function middleware(request: NextRequest) {
 }
 
 // Helper function to check if user has an associated clinic
-async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>, userId: string): Promise<boolean> {
+async function checkIfUserHasClinic(
+  supabase: SupabaseClient<any, "public", any>,
+  userId: string
+): Promise<boolean> {
   try {
-    // Use select with limit and single() can cause issues, use maybeSingle() instead
+    // Get the user's most recent active clinic link
     const { data: userClinicData, error: clinicUserError } = await supabase
       .from("user_clinic")
       .select("clinic_id")
@@ -135,21 +138,26 @@ async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(1)
-      .maybeSingle(); // Use maybeSingle() instead of single()
+      .maybeSingle();
 
-    // No clinic found
+    // No clinic relationship found
     if (clinicUserError || !userClinicData) {
       return false;
     }
 
-    // Verify clinic exists
+    // Fetch the clinic data
     const { data: clinicData, error: clinicError } = await supabase
       .from("clinic")
-      .select("id")
+      .select("id, email")
       .eq("id", userClinicData.clinic_id)
-      .maybeSingle(); // Use maybeSingle() instead of single()
+      .maybeSingle();
 
-    return !!(clinicData && !clinicError);
+    // Return false if no clinic found, there's an error, or email is empty
+    if (clinicError || !clinicData || !clinicData.email || clinicData.email.trim() === "") {
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.error("Error checking clinic association:", error);
     return false;
@@ -160,6 +168,6 @@ async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>
 export const config = {
   matcher: [
     // Match all routes except for these:
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)',
   ],
 };

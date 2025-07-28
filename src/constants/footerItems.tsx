@@ -1,5 +1,4 @@
-import { SettingIcon, SetupIcon } from "@/icons";
-import LogoutIcon from "@/icons/LogoutIcon";
+import { SettingIcon, LogoutIcon } from "@/icons";
 
 const footerItems = [
   {

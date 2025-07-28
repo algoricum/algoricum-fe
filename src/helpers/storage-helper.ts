@@ -93,4 +93,6 @@ export const clearAll = (): void => {
   clearApiKeyData();
   clearUserData();
   clearClinicData();
+
+
 };

@@ -20,7 +20,7 @@ const Header = ({ title = "", description = "" }: HeaderProps) => {
   const menuHandler = async (key: string) => {
     switch (key) {
       case "settings":
-        return push("/settings/chatbot");
+        return push("/settings/lead-capturing-form");
       case "logout":
         try {
           setIsLoggingOut(true);
@@ -61,16 +61,8 @@ const Header = ({ title = "", description = "" }: HeaderProps) => {
         <Text className="text-xl sm:text-header font-helvetica-700 text-Gray900">{title}</Text>
         <Text className="text-xs sm:text-sm font-helvetica text-Gray600">{description}</Text>
       </Flex>
-      <Dropdown
-        menu={{ items: dropdownItems, onClick: ({ key }) => menuHandler(key) }}
-        placement="bottomRight"
-        arrow
-      >
-        <Avatar
-          className="cursor-pointer"
-          size="large"
-          icon={<UserOutlined />}
-        />
+      <Dropdown menu={{ items: dropdownItems, onClick: ({ key }) => menuHandler(key) }} placement="bottomRight" arrow>
+        <Avatar className="cursor-pointer" size="large" icon={<UserOutlined />} />
       </Dropdown>
     </Flex>
   );

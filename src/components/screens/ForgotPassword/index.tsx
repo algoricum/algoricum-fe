@@ -34,7 +34,7 @@ const ForgotPasswordPage = () => {
       <Flex vertical gap={12} align="start">
         <Title level={2}>Forgot Password</Title>
         <Text className="text-Gray600 text-center">
-          Enter your email address below and we'll send you instructions to reset your password.
+          Enter your email address below and we&apos;ll send you instructions to reset your password.
         </Text>
       </Flex>
 

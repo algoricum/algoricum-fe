@@ -1,15 +1,17 @@
 // hooks/useClinicCheck.ts
-import { SupabaseClient } from '@supabase/supabase-js';
-import { getUserActiveClinic } from '@/utils/supabase/clinic-relationships';
+import { SupabaseClient } from "@supabase/supabase-js";
+import { getUserActiveClinic } from "@/utils/supabase/clinic-relationships";
 
 export function useClinicCheck() {
   return {
     checkAndRedirectIfNoClinic: async (
       supabase: SupabaseClient,
       userId: string,
+      // eslint-disable-next-line no-unused-vars
       router: { push: (url: string) => void },
-      targetUrl: string = '/dashboard',
-      setClinicData?: (data: any) => void
+      targetUrl: string = "/dashboard",
+      // eslint-disable-next-line no-unused-vars
+      setClinicData?: (data: any) => void,
     ) => {
       try {
         // Get the user's active clinic
@@ -39,15 +41,18 @@ export function useClinicCheck() {
         router.push("/onboarding");
         return true; // Redirect performed
       }
-    }
+    },
   };
 }
 
 export async function ensureUserHasClinic(
+  
   supabase: SupabaseClient,
   userId: string,
+  
+  // eslint-disable-next-line no-unused-vars
   redirectFunction: (url: string) => void,
-  targetUrl: string = '/dashboard'
+  targetUrl: string = "/dashboard",
 ): Promise<boolean> {
   try {
     // Get the user's active clinic
