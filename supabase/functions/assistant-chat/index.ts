@@ -50,18 +50,10 @@ const parseLeadAssessment = (message)=>{
   }
   // Validate values are from allowed lists
   const validStatuses = [
-    'new',
-    'responded',
-    'needs-follow-up',
-    'in-nurture',
-    'cold',
-    'reactivated',
-    'booked',
-    'confirmed',
-    'no-show',
-    'converted',
-    'not-interested',
-    'archived'
+    'New',
+    'Engaged',
+    'Booked',
+    'Cold'
   ];
   const validInterestLevels = [
     'high',

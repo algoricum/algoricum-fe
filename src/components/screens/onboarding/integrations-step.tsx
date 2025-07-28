@@ -41,7 +41,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     otherTools: initialData.otherTools || "",
     uploadLeads: initialData.uploadLeads || "", // New field for file upload
   });
-  const [csvLeads, setCsvLeads] = useState<any>([]);
   const supabase = createClient();
   const [showCompletionButtons, setShowCompletionButtons] = useState(false);
 
@@ -140,11 +139,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
-  const handleCsvUpload = async () => {
+  const handleCsvUpload = async (leadsData: any) => {
     try {
-      if (csvLeads.length === 0) {
+      console.log("CSV state update issue", leadsData.length);
+      if (leadsData.length === 0) {
         WarningToast("No CSV file selected");
-        return;
       }
 
       // Get current user
@@ -161,7 +160,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       const filePath = `${user.id}/${fileName}`;
 
       // Upload file directly to Supabase Storage
-      const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvLeads, {
+      const { error } = await supabase.storage.from("lead-uploads").upload(filePath, leadsData, {
         cacheControl: "3600",
         upsert: false,
       });
@@ -212,7 +211,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   // Restore state from localStorage on component mount
   useEffect(() => {
     // if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(6)) {
-    //   setCurrentQuestionIndex(filteredQuestions.length - 1);
+    // setCurrentQuestionIndex(filteredQuestions.length - 1);
     // }
 
     // Restore OAuth state if it exists
@@ -270,9 +269,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
         ErrorToast(`
-          message: "Connection Failed",
-          description: ${event.data.error} || "Unable to connect to HubSpot. Please try again.",
-      `);
+ message: "Connection Failed",
+ description: ${event.data.error} || "Unable to connect to HubSpot. Please try again.",
+ `);
         clearOAuthState();
       }
     };
@@ -434,9 +433,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
       ErrorToast(`
-        message: "Connection Failed",
-        description: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"},
-      `);
+ message: "Connection Failed",
+ description: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"},
+ `);
     }
   };
 
@@ -488,9 +487,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       const formValues = await zapierForm.validateFields();
       if (!formValues.zapierApiKey || formValues.zapierApiKey.length < 32) {
         ErrorToast(`
-          message: "Invalid API Key",
-          description: "Please enter a valid Zapier API key (32+ characters)",
-        `);
+ message: "Invalid API Key",
+ description: "Please enter a valid Zapier API key (32+ characters)",
+ `);
         return false;
       }
       return true;
@@ -523,23 +522,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }));
   };
 
-  // const handleManualLeadsModalOk = () => {
-  //   handleCsvUpload();
-  //   setShowManualLeadsModal(false);
-
-  //   if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
-  //     SuccessToast("Leads uploaded successfully");
-  //   }
-  //   setShowCompletionButtons(true);
-  //   setTimeout(() => {
-  //     InfoToast("Want to add or remove manual leads upload? Click previous button");
-  //   }, 5000);
-  // };
-
-  // const handleManualLeadsModalCancel = () => {
-  //   setShowManualLeadsModal(false);
-  // };
-
   const handleNext = () => {
     // Handle HubSpot modal
     if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
@@ -558,12 +540,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       setShowZapierModal(true);
       return;
     }
-
-    // Handle file upload modal
-    // if (currentQuestion.id === "uploadLeads" && currentValue === "Yes") {
-    //   setShowManualLeadsModal(true);
-    //   return;
-    // }
 
     // Continue to next question or complete
     if (currentQuestionIndex < filteredQuestions.length - 1) {
@@ -1022,11 +998,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       <CsvUploadModal
         open={showManualLeadsModal}
         onOk={leads => {
-          setCsvLeads(leads);
           setShowManualLeadsModal(false);
-          handleCsvUpload();
-          if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
-            SuccessToast("Leads uploaded successfully");
+          handleCsvUpload(leads);
+          if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads.length > 0) {
+            SuccessToast("Leads saved successfully");
           }
           setShowCompletionButtons(true);
           setTimeout(() => {
