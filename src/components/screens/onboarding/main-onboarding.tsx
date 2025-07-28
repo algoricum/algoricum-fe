@@ -285,7 +285,7 @@ export default function MainOnboarding() {
           });
 
           formDataToSend.append("instructions", clinicInstructions);
-          formDataToSend.append("model", "gpt-3.5-turbo");
+          formDataToSend.append("model", "gpt-4o");
           formDataToSend.append("tools", JSON.stringify([{ type: "file_search" }]));
 
           // Get the token for authorization
