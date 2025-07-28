@@ -1,8 +1,8 @@
 // utils/supabase/clinic-helper.ts
-import { getLocalClinicData, setLocalClinicData } from "@/helpers/storage-helper";
-import { createClient } from "./config/client";
-import { getUserData } from "./user-helper";
-import type { Clinic, CreateClinicProps, UpdateClinicProps, EmailSettings } from "@/interfaces/services_type";
+import { getLocalClinicData, setLocalClinicData } from '@/helpers/storage-helper';
+import { createClient } from './config/client';
+import { getUserData } from './user-helper';
+import type { Clinic, CreateClinicProps, UpdateClinicProps, EmailSettings } from '@/interfaces/services_type';
 import { getRoleId } from "@/redux/slices/clinic.slice";
 
 const supabase = createClient();
@@ -25,7 +25,7 @@ export const getClinicData = async (): Promise<Clinic | null> => {
 
     if (userData) {
       // Get user-clinic mapping
-      const { data: userClinicData } = await supabase
+     const { data: userClinicData } = await supabase
         .from("user_clinic")
         .select("clinic_id")
         .eq("user_id", userData.id)
@@ -49,22 +49,22 @@ export const getClinicData = async (): Promise<Clinic | null> => {
       }
     }
   } catch (error) {
-    console.error("Error fetching clinic data from Supabase:", error);
+    console.error('Error fetching clinic data from Supabase:', error);
   }
 
   return null;
 };
-export const getAssistantByClinicId = async (clinicId: string) => {
+export const getAssistantByClinicId = async (clinicId:string) => {
   try {
     if (!clinicId) {
-      throw new Error("Clinic ID is required");
+      throw new Error('Clinic ID is required');
     }
 
     // Query the assistants table to get the assistant for this clinic
     const { data: assistant, error } = await supabase.from("assistants").select("*").eq("clinic_id", clinicId).single(); // Use single() since each clinic should have one assistant
 
     if (error) {
-      if (error.code === "PGRST116") {
+      if (error.code === 'PGRST116') {
         // No assistant found for this clinic
         return null;
       }
@@ -73,7 +73,7 @@ export const getAssistantByClinicId = async (clinicId: string) => {
 
     return assistant;
   } catch (error) {
-    console.error("Error fetching assistant for clinic:", error);
+    console.error('Error fetching assistant for clinic:', error);
     throw error;
   }
 };
@@ -86,7 +86,7 @@ export const getClincApiKey = async (clinicId: string): Promise<String | null> =
       return apiKeyData.api_key;
     }
   } catch (error) {
-    console.error("Error fetching clinic data from Supabase:", error);
+    console.error('Error fetching clinic data from Supabase:', error);
   }
 
   return null;
@@ -116,26 +116,24 @@ export const getUserClinics = async (userId: string): Promise<Clinic[]> => {
 
     return clinics as Clinic[];
   } catch (error) {
-    console.error("Error fetching user clinics:", error);
+    console.error('Error fetching user clinics:', error);
     return [];
   }
 };
-
-
 
 export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => {
   const { owner_id, ...clinicData } = data;
 
   // Create the clinic record
   const { data: clinicResult, error: clinicError } = await supabase
-    .from("clinic")
+    .from('clinic')
     .insert([
       {
         ...clinicData,
         owner_id: owner_id,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
+        updated_at: new Date().toISOString()
+      }
     ])
     .select()
     .single();
@@ -156,6 +154,7 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
       updated_at: new Date().toISOString(),
     },
   ]);
+
   if (userClinicError) {
     console.error("Failed to create user-clinic relationship:", userClinicError);
     throw userClinicError;
@@ -175,7 +174,7 @@ export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => 
   // Prepare update data
   const updateObject: any = {
     ...updateData,
-    updated_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   };
 
   // Process dashboard_theme if provided
@@ -198,72 +197,53 @@ export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => 
 };
 
 export const createEmailSettings = async (clinic_id: string): Promise<EmailSettings> => {
-  const data = {
-    clinic_id: clinic_id,
-    smtp_host: "smtp.gmail.com",
-    smtp_port: 587,
-    smtp_user: "abdullah.salman@hashlogics.com",
-    smtp_sender_name: "Algoricum",
-    smtp_sender_email: "abdullah.salman@hashlogics.com",
-    smtp_use_tls: true,
-    imap_server: "imap.gmail.com",
-    imap_port: 993,
-    imap_user: "abdullah.salman@hashlogics.com",
-    imap_use_ssl: true,
-  };
-
   try {
-    // Get SMTP password from vault
-    const { data: smtpPasswordData, error: smtpPasswordError } = await supabase
-      .from("vault.decrypted_secrets")
-      .select("decrypted_secret")
-      .eq("name", "smtp_password")
-      .single();
+    console.log("Creating email settings with vault password...");
+    
+    // Call the database function that handles vault access internally
+    const { data: settingsId, error: functionError } = await supabase
+      .rpc('create_email_settings_with_vault', {
+        p_clinic_id: clinic_id,
+        p_smtp_host: "smtp.gmail.com",
+        p_smtp_port: 587,
+        p_smtp_user: "abdullah.salman@hashlogics.com",
+        p_smtp_sender_name: "Algoricum",
+        p_smtp_sender_email: "abdullah.salman@hashlogics.com",
+        p_smtp_use_tls: true,
+        p_imap_server: "imap.gmail.com",
+        p_imap_port: 993,
+        p_imap_user: "abdullah.salman@hashlogics.com",
+        p_imap_use_ssl: true,
+        p_imap_folder: "INBOX",
+        p_check_frequency_minutes: 5,
+        p_sms_auto_reply_enabled: true
+      });
 
-    if (smtpPasswordError || !smtpPasswordData) {
-      console.error("Failed to retrieve SMTP password from vault:", smtpPasswordError);
-      throw new Error("SMTP password not found in vault");
+    if (functionError) {
+      console.error("Failed to create email settings:", functionError);
+      throw new Error(`Database function failed: ${functionError.message}`);
     }
 
-    // Get IMAP password from vault (assuming same password, or create separate vault entry)
-    const { data: imapPasswordData, error: imapPasswordError } = await supabase
-      .from("vault.decrypted_secrets")
-      .select("decrypted_secret")
-      .eq("name", "smtp_password") // Using same password, change to 'imap_password' if different
-      .single();
-
-    if (imapPasswordError || !imapPasswordData) {
-      console.error("Failed to retrieve IMAP password from vault:", imapPasswordError);
-      throw new Error("IMAP password not found in vault");
+    if (!settingsId) {
+      throw new Error("No settings ID returned from database function");
     }
 
-    // Create the email settings record with passwords from vault
-    const { data: emailSettingsResult, error: emailSettingsError } = await supabase
-      .from("email_settings")
-      .insert([
-        {
-          ...data,
-          smtp_password: smtpPasswordData.decrypted_secret,
-          imap_password: imapPasswordData.decrypted_secret,
-          // Set defaults
-          check_frequency_minutes: 5,
-          imap_folder: "INBOX",
-          last_processed_uid: 0,
-          sms_auto_reply_enabled: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ])
-      .select()
+    console.log("Email settings created successfully with ID:", settingsId);
+
+    // Fetch the created record to return it
+    const { data: emailSettingsResult, error: fetchError } = await supabase
+      .from('email_settings')
+      .select('*')
+      .eq('id', settingsId)
       .single();
 
-    if (emailSettingsError) {
-      console.error("Failed to create email settings:", emailSettingsError);
-      throw emailSettingsError;
+    if (fetchError) {
+      console.error("Failed to fetch created email settings:", fetchError);
+      throw fetchError;
     }
 
-    console.log("Email settings created successfully:", emailSettingsResult.id);
     return emailSettingsResult;
+
   } catch (error) {
     console.error("Error creating email settings:", error);
     throw error;
@@ -274,7 +254,11 @@ export const createEmailSettings = async (clinic_id: string): Promise<EmailSetti
  * Get a clinic by ID
  */
 export const getClinicById = async (id: string): Promise<Clinic> => {
-  const { data, error } = await supabase.from("clinic").select("*").eq("id", id).single();
+  const { data, error } = await supabase
+    .from('clinic')
+    .select('*')
+    .eq('id', id)
+    .single();
 
   if (error) {
     throw error;
@@ -292,16 +276,18 @@ export const getClinicById = async (id: string): Promise<Clinic> => {
 /**
  * Fetch clinics with pagination and search
  */
-export const fetchClinics = async (page: number = 1, perPage: number = 10, search: string = "") => {
+export const fetchClinics = async (page: number = 1, perPage: number = 10, search: string = '') => {
   // Calculate range for pagination
   const from = (page - 1) * perPage;
   const to = from + perPage - 1;
 
-  let query = supabase.from("clinic").select("*", { count: "exact" });
+  let query = supabase
+    .from('clinic')
+    .select('*', { count: 'exact' });
 
   // Add search filter if provided
   if (search) {
-    query = query.ilike("name", `%${search}%`);
+    query = query.ilike('name', `%${search}%`);
   }
 
   // Execute the query with range
@@ -326,8 +312,8 @@ export const fetchClinics = async (page: number = 1, perPage: number = 10, searc
     pagination: {
       total: count || 0,
       page,
-      perPage,
-    },
+      perPage
+    }
   };
 };
 
@@ -335,7 +321,10 @@ export const fetchClinics = async (page: number = 1, perPage: number = 10, searc
  * Delete a clinic
  */
 export const deleteClinic = async (id: string): Promise<{ success: boolean }> => {
-  const { error } = await supabase.from("clinic").delete().eq("id", id);
+  const { error } = await supabase
+    .from('clinic')
+    .delete()
+    .eq('id', id);
 
   if (error) {
     throw error;
