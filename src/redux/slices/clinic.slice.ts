@@ -90,14 +90,25 @@ export const fetchClinicById = createAsyncThunk(
 );
 
 export const getRoleId = async () => {
-  const { data, error } = await supabase.from("role").select("id").eq("type", "owner").single(); // ✅ ensures only one record is returned
+    console.log("🔍 Fetching role ID for type: owner");
 
-  if (error) {
-    console.error("Error fetching role:", error.message);
-    return null;
-  }
+    const { data, error } = await supabase.from("role").select("id").eq("type", "owner").limit(1); // Get first owner role instead of using .single()
 
-  return data.id; // ✅ returns the role ID
+    console.log("📊 Role query result:", { data, error });
+
+    if (error) {
+      console.error("❌ Error fetching role:", error.message);
+      throw new Error(`Failed to fetch role: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      console.error("❌ No owner role found");
+      throw new Error("No owner role found in database");
+    }
+
+    const roleId = data[0].id;
+    console.log("✅ Role ID found:", roleId);
+    return roleId;
 };
 
 
