@@ -129,11 +129,11 @@ export const fetchUserClinic = (userId: string) => async (dispatch: any) => {
         const { data, error } = await supabase
             .from('user_clinic')
             .select(`
-        clinic_id,
-        role,
-        position,
-        clinic (*)
-      `)
+                clinic_id,
+                role_id,
+                position,
+                clinic (*)
+              `)
             .eq('user_id', userId)
             .eq('is_active', true)
             .single();
