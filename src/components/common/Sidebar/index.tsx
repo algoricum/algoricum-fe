@@ -1,5 +1,4 @@
 "use client";
-import type React from "react";
 import footerItems from "@/constants/footerItems";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { X } from "lucide-react";
