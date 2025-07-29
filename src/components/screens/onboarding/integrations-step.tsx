@@ -143,7 +143,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     try {
       if (!leadsData) {
         WarningToast("No CSV file selected");
-        return;
       }
 
       // Get current user
@@ -217,7 +216,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   // Restore state from localStorage on component mount
   useEffect(() => {
     // if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(6)) {
-    //   setCurrentQuestionIndex(filteredQuestions.length - 1);
+    // setCurrentQuestionIndex(filteredQuestions.length - 1);
     // }
 
     // Restore OAuth state if it exists
@@ -275,9 +274,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
         ErrorToast(`
-          message: "Connection Failed",
-          description: ${event.data.error} || "Unable to connect to HubSpot. Please try again.",
-      `);
+ message: "Connection Failed",
+ description: ${event.data.error} || "Unable to connect to HubSpot. Please try again.",
+ `);
         clearOAuthState();
       }
     };
@@ -439,9 +438,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
       ErrorToast(`
-        message: "Connection Failed",
-        description: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"},
-      `);
+ message: "Connection Failed",
+ description: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"},
+ `);
     }
   };
 
@@ -493,9 +492,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       const formValues = await zapierForm.validateFields();
       if (!formValues.zapierApiKey || formValues.zapierApiKey.length < 32) {
         ErrorToast(`
-          message: "Invalid API Key",
-          description: "Please enter a valid Zapier API key (32+ characters)",
-        `);
+ message: "Invalid API Key",
+ description: "Please enter a valid Zapier API key (32+ characters)",
+ `);
         return false;
       }
       return true;
