@@ -7,6 +7,7 @@ import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
 import { UserPlus, Calendar, TrendingUp, Users, Plus, X, CheckCircle, Upload } from "lucide-react";
 import ConversionFunnel from "@/components/common/charts/conversion-funnel";
 import LeadSourcesLineChart from "@/components/common/charts/lead-sources-line-chart";
+import { Header } from "@/components/common";
 
 export default function DashboardPage() {
   const [appointmentFilter, setAppointmentFilter] = useState("month");
@@ -166,13 +167,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <DashboardLayout>
+    <DashboardLayout
+      header={<Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." />}
+    >
       <div>
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-          <p className="text-gray-600 mt-2">Welcome back! Here&apos;s what&apos;s happening with your clinic today.</p>
-        </div>
-
         {/* Integration Banners */}
         {showHubspotBanner && (
           <div className={`mb-4 p-4 rounded-lg border ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
@@ -403,144 +401,6 @@ export default function DashboardPage() {
           <div className="card">
             <h3 className="text-lg font-semibold mb-6">Lead Sources Trends</h3>
             <LeadSourcesLineChart leadsData={leadsData} />
-          </div>
-        </div>
-
-        {/* Demographics Charts - Small and Compact */}
-        <div className="grid grid-cols-1 gap-6 mb-8">
-          <div className="card">
-            <h3 className="text-lg font-semibold mb-6">Patient Demographics</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Small Gender Chart */}
-              <div className="flex flex-col items-center">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Gender Distribution</h4>
-                <div className="w-32 h-32 flex flex-col items-center justify-center">
-                  <div className="relative w-24 h-24 mb-2">
-                    <svg width="96" height="96" viewBox="0 0 42 42" className="transform -rotate-90">
-                      <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#e5e7eb" strokeWidth="3" />
-                      {/* Male - Blue */}
-                      <circle
-                        cx="21"
-                        cy="21"
-                        r="15.915"
-                        fill="transparent"
-                        stroke="#3b82f6"
-                        strokeWidth="3"
-                        strokeDasharray="50 50"
-                        strokeDashoffset="0"
-                      />
-                      {/* Female - Pink */}
-                      <circle
-                        cx="21"
-                        cy="21"
-                        r="15.915"
-                        fill="transparent"
-                        stroke="#ec4899"
-                        strokeWidth="3"
-                        strokeDasharray="50 50"
-                        strokeDashoffset="-50"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-gray-900">12</div>
-                        <div className="text-xs text-gray-500">Total</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    <div className="flex items-center justify-between min-w-[120px]">
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 mr-2 rounded-full bg-blue-500"></div>
-                        <span>Male</span>
-                      </div>
-                      <span className="font-semibold">6</span>
-                    </div>
-                    <div className="flex items-center justify-between min-w-[120px]">
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 mr-2 rounded-full bg-pink-500"></div>
-                        <span>Female</span>
-                      </div>
-                      <span className="font-semibold">6</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Small Age Chart */}
-              <div className="flex flex-col items-center">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Age Distribution</h4>
-                <div className="w-32 h-32 flex flex-col items-center justify-center">
-                  <div className="relative w-24 h-24 mb-2">
-                    <svg width="96" height="96" viewBox="0 0 42 42" className="transform -rotate-90">
-                      <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#e5e7eb" strokeWidth="3" />
-                      {/* 45-59 - Light teal */}
-                      <circle
-                        cx="21"
-                        cy="21"
-                        r="15.915"
-                        fill="transparent"
-                        stroke="#14b8a6"
-                        strokeWidth="3"
-                        strokeDasharray="25 75"
-                        strokeDashoffset="0"
-                      />
-                      {/* 30-44 - Medium teal */}
-                      <circle
-                        cx="21"
-                        cy="21"
-                        r="15.915"
-                        fill="transparent"
-                        stroke="#0891b2"
-                        strokeWidth="3"
-                        strokeDasharray="50 50"
-                        strokeDashoffset="-25"
-                      />
-                      {/* 18-29 - Dark teal */}
-                      <circle
-                        cx="21"
-                        cy="21"
-                        r="15.915"
-                        fill="transparent"
-                        stroke="#0e7490"
-                        strokeWidth="3"
-                        strokeDasharray="25 75"
-                        strokeDashoffset="-75"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-gray-900">12</div>
-                        <div className="text-xs text-gray-500">Total</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    <div className="flex items-center justify-between min-w-[120px]">
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 mr-2 rounded-full bg-teal-500"></div>
-                        <span>45-59</span>
-                      </div>
-                      <span className="font-semibold">3</span>
-                    </div>
-                    <div className="flex items-center justify-between min-w-[120px]">
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 mr-2 rounded-full bg-cyan-600"></div>
-                        <span>30-44</span>
-                      </div>
-                      <span className="font-semibold">6</span>
-                    </div>
-                    <div className="flex items-center justify-between min-w-[120px]">
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 mr-2 rounded-full bg-cyan-700"></div>
-                        <span>18-29</span>
-                      </div>
-                      <span className="font-semibold">3</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

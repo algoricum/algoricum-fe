@@ -3,7 +3,7 @@ import type React from "react";
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { Calendar, CheckCircle, Clock, X, Search, Plus } from "lucide-react";
-
+import {Header} from "@/components/common"
 interface Appointment {
   id: string;
   patient: string;
@@ -139,12 +139,8 @@ export default function AppointmentsPage() {
   }, [appointmentsData]);
 
   return (
-    <DashboardLayout>
+    <DashboardLayout header={<Header title="Appointments" description="Manage patient appointments and scheduling." />}>
       <div>
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Appointments</h1>
-          <p className="text-gray-600 mt-2">Manage patient appointments and scheduling.</p>
-        </div>
 
         {/* Appointment Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

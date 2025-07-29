@@ -9,7 +9,7 @@ import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toa
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
-
+import Papa from 'papaparse'
 const { Option } = Select;
 const { Title, Text } = Typography;
 
@@ -41,7 +41,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     otherTools: initialData.otherTools || "",
     uploadLeads: initialData.uploadLeads || "", // New field for file upload
   });
-  const [csvLeads, setCsvLeads] = useState<any>([]);
   const supabase = createClient();
   const [showCompletionButtons, setShowCompletionButtons] = useState(false);
 
@@ -140,9 +139,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
-  const handleCsvUpload = async () => {
+  const handleCsvUpload = async (leadsData:any) => {
     try {
-      if (csvLeads.length === 0) {
+      if (!leadsData) {
         WarningToast("No CSV file selected");
         return;
       }
@@ -159,9 +158,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
       // Create file path: user_id/filename.csv
       const filePath = `${user.id}/${fileName}`;
-
+      
+      let csvData;
+      if(Array.isArray(leadsData)){
+        csvData=Papa.unparse(leadsData)   
+      }else{
+        csvData=leadsData
+      }
       // Upload file directly to Supabase Storage
-      const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvLeads, {
+      const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvData, {
         cacheControl: "3600",
         upsert: false,
       });
@@ -523,23 +528,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }));
   };
 
-  // const handleManualLeadsModalOk = () => {
-  //   handleCsvUpload();
-  //   setShowManualLeadsModal(false);
-
-  //   if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
-  //     SuccessToast("Leads uploaded successfully");
-  //   }
-  //   setShowCompletionButtons(true);
-  //   setTimeout(() => {
-  //     InfoToast("Want to add or remove manual leads upload? Click previous button");
-  //   }, 5000);
-  // };
-
-  // const handleManualLeadsModalCancel = () => {
-  //   setShowManualLeadsModal(false);
-  // };
-
   const handleNext = () => {
     // Handle HubSpot modal
     if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
@@ -558,12 +546,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       setShowZapierModal(true);
       return;
     }
-
-    // Handle file upload modal
-    // if (currentQuestion.id === "uploadLeads" && currentValue === "Yes") {
-    //   setShowManualLeadsModal(true);
-    //   return;
-    // }
 
     // Continue to next question or complete
     if (currentQuestionIndex < filteredQuestions.length - 1) {
@@ -1022,11 +1004,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       <CsvUploadModal
         open={showManualLeadsModal}
         onOk={leads => {
-          setCsvLeads(leads);
           setShowManualLeadsModal(false);
-          handleCsvUpload();
-          if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && csvLeads.length > 0) {
-            SuccessToast("Leads uploaded successfully");
+          handleCsvUpload(leads);
+          if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) &&  (leads)) {
+            SuccessToast("Leads saved successfully");
           }
           setShowCompletionButtons(true);
           setTimeout(() => {

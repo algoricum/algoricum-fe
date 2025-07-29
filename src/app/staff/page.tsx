@@ -17,7 +17,7 @@ import type React from "react";
 import { useState } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { Users, UserPlus, Calendar, Search, Plus, X } from "lucide-react";
-
+import {Header} from "@/components/common"
 interface Staff {
   id: string;
   name: string;
@@ -91,12 +91,8 @@ export default function StaffPage() {
   };
 
   return (
-    <DashboardLayout>
+    <DashboardLayout header={<Header title="Staff Management" description="Manage your healthcare team and staff information." />}>
       <div>
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
-          <p className="text-gray-600 mt-2">Manage your healthcare team and staff information.</p>
-        </div>
 
         {/* Staff Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
