@@ -1,13 +1,14 @@
 "use client";
-import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { UserPlus, CheckCircle, Clock, Search } from "lucide-react";
-import {Header} from "@/components/common"
+import { UserPlus, CheckCircle, Clock, Search, ChevronDown } from "lucide-react";
+import { Header } from "@/components/common";
+
 // Import your helper functions
 import {
   fetchLeadsForClinic,
   getCurrentUserClinic,
+  updateLeadStatus,
   formatStatus,
   getStatusColor,
   getInterestColor,
@@ -40,9 +41,28 @@ export default function LeadsPage() {
   const [selectedUrgency, setSelectedUrgency] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // State for dropdown status updates
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   // Load leads data
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpenDropdownId(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   const loadData = async () => {
@@ -55,7 +75,6 @@ export default function LeadsPage() {
 
       // Fetch leads for this clinic
       const leads = await fetchLeadsForClinic(currentClinicId);
-
       setLeadsData(leads);
     } catch (err) {
       console.error("Error loading data:", err);
@@ -65,11 +84,40 @@ export default function LeadsPage() {
     }
   };
 
+  // Handle status update
+  const handleUpdateStatus = async (leadId: string, newStatus: string) => {
+    if (updatingStatus === leadId) return;
+
+    try {
+      setUpdatingStatus(leadId);
+      setOpenDropdownId(null);
+
+      // Update status in database
+      await updateLeadStatus(leadId, { status: newStatus });
+
+      // Update local state
+      setLeadsData(prevLeads =>
+        prevLeads.map(lead => (lead.id === leadId ? { ...lead, status: newStatus, updated_at: new Date().toISOString() } : lead)),
+      );
+    } catch (err) {
+      console.error("Error updating status:", err);
+      setError(err instanceof Error ? err.message : "Failed to update status");
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  // Toggle dropdown
+  const toggleDropdown = (leadId: string) => {
+    setOpenDropdownId(openDropdownId === leadId ? null : leadId);
+  };
+
   // Filter leads based on current filters
   const filteredLeads = leadsData.filter(lead => {
     if (selectedLeadStatus !== "all" && lead.status !== selectedLeadStatus) return false;
     if (selectedInterestLevel !== "all" && lead.interest_level !== selectedInterestLevel) return false;
     if (selectedUrgency !== "all" && lead.urgency !== selectedUrgency) return false;
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -78,6 +126,7 @@ export default function LeadsPage() {
         (lead.phone && lead.phone.toLowerCase().includes(query))
       );
     }
+
     return true;
   });
 
@@ -113,7 +162,6 @@ export default function LeadsPage() {
   return (
     <DashboardLayout header={<Header title="Lead Management" description="Manage and track your leads through the conversion process." />}>
       <div>
-
         {/* Lead Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
@@ -258,17 +306,71 @@ export default function LeadsPage() {
                           </div>
                         </div>
                       </td>
+
                       <td className="py-3 px-4 text-gray-900">{lead.phone || "No phone"}</td>
+
                       <td className="py-3 px-4">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(lead.status)}`}>
-                          {formatStatus(lead.status)}
-                        </span>
+                        <div className="relative" ref={openDropdownId === lead.id ? dropdownRef : null}>
+                          <button
+                            onClick={() => toggleDropdown(lead.id)}
+                            disabled={updatingStatus === lead.id}
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium hover:opacity-80 transition-all duration-200 disabled:opacity-50 ${getStatusColor(lead.status)}`}
+                          >
+                            {updatingStatus === lead.id ? (
+                              <span className="flex items-center">
+                                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1"></div>
+                                Updating...
+                              </span>
+                            ) : (
+                              <>
+                                {formatStatus(lead.status)}
+                                <ChevronDown className="w-3 h-3 ml-1" />
+                              </>
+                            )}
+                          </button>
+
+                          {/* Status Dropdown */}
+                          {openDropdownId === lead.id && (
+                            <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                              <div className="py-1">
+                                {LEAD_STATUSES.map(status => (
+                                  <button
+                                    key={status}
+                                    onClick={() => handleUpdateStatus(lead.id, status)}
+                                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${
+                                      lead.status === status ? "bg-purple-50 text-purple-700 font-medium" : "text-gray-700"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                                        getStatusColor(status).includes("bg-green")
+                                          ? "bg-green-500"
+                                          : getStatusColor(status).includes("bg-yellow")
+                                            ? "bg-yellow-500"
+                                            : getStatusColor(status).includes("bg-blue")
+                                              ? "bg-blue-500"
+                                              : getStatusColor(status).includes("bg-purple")
+                                                ? "bg-purple-500"
+                                                : getStatusColor(status).includes("bg-red")
+                                                  ? "bg-red-500"
+                                                  : "bg-gray-500"
+                                      }`}
+                                    ></span>
+                                    {formatStatus(status)}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </td>
+
                       <td className="py-3 px-4">
                         <span className={`font-medium ${getInterestColor(lead.interest_level || "")}`}>
                           {lead.interest_level ? lead.interest_level.charAt(0).toUpperCase() + lead.interest_level.slice(1) : "Not set"}
                         </span>
                       </td>
+
                       <td className="py-3 px-4">
                         <span className={`font-medium ${getUrgencyColor(lead.urgency || "")}`}>
                           {lead.urgency
@@ -276,6 +378,7 @@ export default function LeadsPage() {
                             : "Not set"}
                         </span>
                       </td>
+
                       <td className="py-3 px-4 text-gray-900">{new Date(lead.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))
