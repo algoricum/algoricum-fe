@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { UserPlus, CheckCircle, Clock, Search, ChevronDown } from "lucide-react";
 import { Header } from "@/components/common";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { LeadsTableSkeleton, StatsCardsSkeleton } from "@/components/common/Loaders/skeleton-loader";
 
 // Import your helper functions
 import {
@@ -12,10 +14,8 @@ import {
   formatStatus,
   getStatusColor,
   getInterestColor,
-  getUrgencyColor,
   LEAD_STATUSES,
   INTEREST_LEVELS,
-  URGENCY_LEVELS,
 } from "@/utils/supabase/leads-helper";
 
 interface Lead {
@@ -27,7 +27,6 @@ interface Lead {
   phone: string | null;
   status: string;
   interest_level: string | null;
-  urgency: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +37,6 @@ export default function LeadsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedLeadStatus, setSelectedLeadStatus] = useState("all");
   const [selectedInterestLevel, setSelectedInterestLevel] = useState("all");
-  const [selectedUrgency, setSelectedUrgency] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   // State for dropdown status updates
@@ -116,7 +114,6 @@ export default function LeadsPage() {
   const filteredLeads = leadsData.filter(lead => {
     if (selectedLeadStatus !== "all" && lead.status !== selectedLeadStatus) return false;
     if (selectedInterestLevel !== "all" && lead.interest_level !== selectedInterestLevel) return false;
-    if (selectedUrgency !== "all" && lead.urgency !== selectedUrgency) return false;
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -138,9 +135,19 @@ export default function LeadsPage() {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg">Loading leads...</div>
+      <DashboardLayout
+        header={<Header title="Lead Management" description="Manage and track your leads through the conversion process." />}
+      >
+        <div>
+          <StatsCardsSkeleton />
+          <LeadsTableSkeleton />
+
+          {/* Centered loading spinner overlay */}
+          <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-lg p-8">
+              <LoadingSpinner message="Loading your leads..." size="lg" />
+            </div>
+          </div>
         </div>
       </DashboardLayout>
     );
@@ -148,12 +155,33 @@ export default function LeadsPage() {
 
   if (error) {
     return (
-      <DashboardLayout>
+      <DashboardLayout
+        header={<Header title="Lead Management" description="Manage and track your leads through the conversion process." />}
+      >
         <div className="flex flex-col items-center justify-center h-64">
-          <div className="text-red-600 text-lg mb-4">Error: {error}</div>
-          <button onClick={loadData} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-            Retry
-          </button>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md text-center">
+            <div className="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-red-800 mb-2">Something went wrong</h3>
+            <p className="text-red-600 mb-4">{error}</p>
+            <button
+              onClick={loadData}
+              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center mx-auto"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Try Again
+            </button>
+          </div>
         </div>
       </DashboardLayout>
     );
@@ -164,7 +192,7 @@ export default function LeadsPage() {
       <div>
         {/* Lead Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-6 transform hover:scale-105 transition-transform duration-200">
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-blue-100">
                 <UserPlus className="w-6 h-6 text-blue-600" />
@@ -176,7 +204,7 @@ export default function LeadsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-6 transform hover:scale-105 transition-transform duration-200">
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-green-100">
                 <CheckCircle className="w-6 h-6 text-green-600" />
@@ -188,7 +216,7 @@ export default function LeadsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-6 transform hover:scale-105 transition-transform duration-200">
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-yellow-100">
                 <Clock className="w-6 h-6 text-yellow-600" />
@@ -200,7 +228,7 @@ export default function LeadsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-6 transform hover:scale-105 transition-transform duration-200">
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-purple-100">
                 <CheckCircle className="w-6 h-6 text-purple-600" />
@@ -253,19 +281,6 @@ export default function LeadsPage() {
                   </option>
                 ))}
               </select>
-
-              <select
-                value={selectedUrgency}
-                onChange={e => setSelectedUrgency(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="all">All Urgency</option>
-                {URGENCY_LEVELS.map(urgency => (
-                  <option key={urgency} value={urgency}>
-                    {urgency.replace("_", " ").charAt(0).toUpperCase() + urgency.replace("_", " ").slice(1)}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
 
@@ -277,14 +292,13 @@ export default function LeadsPage() {
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Contact</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Interest</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Urgency</th>
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Created</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 px-4 text-center text-gray-500">
+                    <td colSpan={5} className="py-8 px-4 text-center text-gray-500">
                       {leadsData.length === 0 ? "No leads found in database" : "No leads match your filters"}
                     </td>
                   </tr>
@@ -368,14 +382,6 @@ export default function LeadsPage() {
                       <td className="py-3 px-4">
                         <span className={`font-medium ${getInterestColor(lead.interest_level || "")}`}>
                           {lead.interest_level ? lead.interest_level.charAt(0).toUpperCase() + lead.interest_level.slice(1) : "Not set"}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <span className={`font-medium ${getUrgencyColor(lead.urgency || "")}`}>
-                          {lead.urgency
-                            ? lead.urgency.replace("_", " ").charAt(0).toUpperCase() + lead.urgency.replace("_", " ").slice(1)
-                            : "Not set"}
                         </span>
                       </td>
 
