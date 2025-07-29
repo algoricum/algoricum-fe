@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/config/client";
 import { getCountries, getCountryCallingCode } from "react-phone-number-input/input";
 import type { CountryCode } from "libphonenumber-js"; // add this import
@@ -19,10 +18,8 @@ type FormData = {
   [key: string]: string | number;
 };
 
-const LeadGenerationForm = () => {
-  const params = useParams();
-  const clinicId = params.clinic_id as string;
-
+const LeadGenerationForm = ({ clinicId }: { clinicId: string }) => {
+  
   const [fields, setFields] = useState<FormField[]>([]);
   const [formData, setFormData] = useState<FormData>({});
   const [countryCode, setCountryCode] = useState<CountryCode>("US");

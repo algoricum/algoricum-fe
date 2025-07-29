@@ -5,7 +5,8 @@ import { UserPlus, CheckCircle, Clock, Search, ChevronDown } from "lucide-react"
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { LeadsTableSkeleton, StatsCardsSkeleton } from "@/components/common/Loaders/skeleton-loader";
-
+import { Modal } from "antd";
+import LeadGenerationForm from "@/app/lead-form/[clinic_id]/page"; // adjust path if needed
 // Import your helper functions
 import {
   fetchLeadsForClinic,
@@ -38,6 +39,8 @@ export default function LeadsPage() {
   const [selectedLeadStatus, setSelectedLeadStatus] = useState("all");
   const [selectedInterestLevel, setSelectedInterestLevel] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [clinicId, setClinicId] = useState<string | null>(null);
 
   // State for dropdown status updates
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
@@ -281,6 +284,16 @@ export default function LeadsPage() {
                   </option>
                 ))}
               </select>
+              <button
+                onClick={async () => {
+                  const currentClinicId = await getCurrentUserClinic();
+                  setClinicId(currentClinicId);
+                  setShowLeadForm(true);
+                }}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
+              >
+                Generate Lead
+              </button>
             </div>
           </div>
 
@@ -394,6 +407,10 @@ export default function LeadsPage() {
           </div>
         </div>
       </div>
+
+      <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} title="Generate New Lead" width={600}>
+        {clinicId && <LeadGenerationForm clinicId={clinicId} />}
+      </Modal>
     </DashboardLayout>
   );
 }
