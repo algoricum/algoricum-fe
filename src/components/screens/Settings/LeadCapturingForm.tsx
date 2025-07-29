@@ -6,9 +6,9 @@ import { PlusOutlined, EyeOutlined } from "@ant-design/icons";
 import { SuccessToast, ErrorToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
 import { getLocalClinicData } from "@/helpers/storage-helper";
-import {getCurrentUserClinic} from "@/utils/supabase/leads-helper"
+import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
 import { Modal } from "@/components/common";
-import LeadGenerationForm from "@/app/lead-form/[clinic_id]/page";
+import LeadGenerationForm from "@/components/Leads/LeadGenerationForm"; // adjust path if needed
 
 const { TextArea } = Input;
 
@@ -209,11 +209,10 @@ const LeadCapturingForm = () => {
 
   const handlePreviewForm = async () => {
     if (!clinicData?.id) {
-        const currentClinicId = await getCurrentUserClinic();
-        setClinicId(currentClinicId);
-        
-    }else{
-        setClinicId(clinicData.id);
+      const currentClinicId = await getCurrentUserClinic();
+      setClinicId(currentClinicId);
+    } else {
+      setClinicId(clinicData.id);
     }
     setShowLeadForm(true);
   };
@@ -307,9 +306,9 @@ const LeadCapturingForm = () => {
           Save Form Configuration
         </Button>
       </div>
-        <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} title="Generate New Lead" width={600}>
-          {clinicId && <LeadGenerationForm clinicId={clinicId} />}
-        </Modal>
+      <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} title="Generate New Lead" width={600}>
+        {clinicId && <LeadGenerationForm clinicId={clinicId} />}
+      </Modal>
     </div>
   );
 };

@@ -6,7 +6,7 @@ import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { LeadsTableSkeleton, StatsCardsSkeleton } from "@/components/common/Loaders/skeleton-loader";
 import { Modal } from "antd";
-import LeadGenerationForm from "@/app/lead-form/[clinic_id]/page"; // adjust path if needed
+import LeadGenerationForm from "@/components/Leads/LeadGenerationForm"; // adjust path if needed
 // Import your helper functions
 import {
   fetchLeadsForClinic,
