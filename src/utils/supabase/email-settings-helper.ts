@@ -2,6 +2,7 @@
 
 import { createClient } from "./config/client"
 
+const supabase=createClient()
 // Types and Interfaces - Extended for SMS
 export interface EmailSettings {
   id?: string
@@ -175,7 +176,7 @@ export interface SaveEmailSettingsResponse extends EmailSettingsResponse {
  */
 export const getEmailSettings = async (clinicId: string): Promise<EmailSettingsResponse> => {
   try {
-    const supabase = createClient()
+   
     
     const { data, error } = await supabase
       .from("email_settings")
@@ -202,7 +203,7 @@ export const saveEmailSettings = async (
   settings: EmailSettingsInput
 ): Promise<SaveEmailSettingsResponse> => {
   try {
-    const supabase = createClient()
+    
 
     // First check if settings exist
     const { data: existingSettings } = await supabase
@@ -286,7 +287,7 @@ export const testEmailConnection = async (
   settings: EmailSettingsInput, 
   clinicId: string
 ): Promise<EmailTestResult> => {
-    const supabase = createClient()
+    
     const { data: { session } } = await supabase.auth.getSession()
 
     if (!session) {
@@ -317,7 +318,7 @@ export const testSMSConnection = async (
   clinicId: string
 ): Promise<SMSTestResult> => {
   try {
-    const supabase = createClient()
+    
     const { data: { session } } = await supabase.auth.getSession()
 
     if (!session) {
@@ -371,7 +372,7 @@ export const updateEmailProcessingSettings = async (
   processingSettings: Pick<EmailSettingsInput, 'auto_reply_enabled' | 'check_frequency_minutes'>
 ): Promise<EmailSettingsResponse> => {
   try {
-    const supabase = createClient()
+    
 
     const { data, error } = await supabase
       .from("email_settings")
@@ -401,7 +402,7 @@ export const updateEmailProcessingSettings = async (
  */
 export const updateLastEmailCheck = async (clinicId: string): Promise<EmailSettingsResponse> => {
   try {
-    const supabase = createClient()
+    
 
     const { data, error } = await supabase
       .from("email_settings")
@@ -430,7 +431,7 @@ export const updateLastEmailCheck = async (clinicId: string): Promise<EmailSetti
  */
 export const deleteEmailSettings = async (clinicId: string): Promise<{ error: any }> => {
   try {
-    const supabase = createClient()
+    
 
     const { error } = await supabase
       .from("email_settings")
@@ -454,7 +455,7 @@ export const deleteEmailSettings = async (clinicId: string): Promise<{ error: an
  */
 export const getAllEmailSettings = async (): Promise<EmailSettingsResponse<EmailSettingsWithClinic[]>> => {
   try {
-    const supabase = createClient()
+  
 
     const { data, error } = await supabase
       .from("email_settings")

@@ -27,6 +27,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const supabase = createClient();
 
   const countries = getCountries();
   const countryOptions = countries.map(c => ({
@@ -37,7 +38,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
   useEffect(() => {
     const fetchFormFields = async () => {
       try {
-        const supabase = createClient();
+        
         const { data, error } = await supabase
           .from("clinic_lead_form")
           .select("*")
@@ -63,6 +64,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
     };
 
     if (clinicId) fetchFormFields();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicId]);
 
   useEffect(() => {
@@ -111,7 +113,6 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
 
     setSubmitting(true);
     try {
-      const supabase = createClient();
       const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Phone").single();
 
       if (sourceError) throw sourceError;
@@ -122,9 +123,9 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
         email: formData.email || null,
         phone: formData.phone || null,
         form_data: { ...formData, country_code: countryCode, phone_number: phoneNumber },
-        interest_level: "high",
+        interest_level: "medium",
         urgency: "curious",
-        status: "new",
+        status: "New",
       };
 
       const { error: insertError } = await supabase.from("lead").insert([submissionData]);

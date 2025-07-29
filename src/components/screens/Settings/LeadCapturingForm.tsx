@@ -23,6 +23,7 @@ type FormField = {
 };
 
 const LeadCapturingForm = () => {
+  const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const clinicData = getLocalClinicData();
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -98,7 +99,6 @@ const LeadCapturingForm = () => {
 
       try {
         setLoading(true);
-        const supabase = createClient();
         const { data, error } = await supabase
           .from("clinic_lead_form")
           .select("*")
@@ -141,8 +141,6 @@ const LeadCapturingForm = () => {
 
     try {
       setLoading(true);
-      const supabase = createClient();
-
       // Delete existing fields
       const { error: deleteError } = await supabase.from("clinic_lead_form").delete().eq("clinic_id", clinicData.id);
 
