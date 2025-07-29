@@ -12,9 +12,9 @@ import { getUserData } from "@/utils/supabase/user-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 
 const ClinicSettingsPage = () => {
-  const [form] = Form.useForm()
-   const [clinic, setClinic] = useState<Clinic | null>(null);
-   const [user, setUser] = useState<User | null>(null);
+  const [form] = Form.useForm();
+  const [clinic, setClinic] = useState<Clinic | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isUploadHover, setIsUploadHover] = useState<boolean>(false);
   const [, setIsDeleteModal] = useState<boolean>(false);
   const [editOpenAI, setEditOpenAI] = useState<boolean>(false);
@@ -22,23 +22,28 @@ const ClinicSettingsPage = () => {
   const [isLogoChanged, setIsLogoChanged] = useState<boolean>(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [formData, setFormData] = useState({
+    primaryColor: "#2563EB",
+    fontColor: "#000000",
+  });
+
   const supabase = createClient();
-    useEffect(() => {
-      const fetchClinic = async () => {
-        const data = await getClinicData();
-        setClinic(data);
-        setLoading(false);
-      };
-  
-      const fetchUser = async () => {
-        const data = await getUserData();
-        setUser(data);
-        setLoading(false);
-      };
-      
-      fetchClinic();
-      fetchUser();
-    }, []);
+  useEffect(() => {
+    const fetchClinic = async () => {
+      const data = await getClinicData();
+      setClinic(data);
+      setLoading(false);
+    };
+
+    const fetchUser = async () => {
+      const data = await getUserData();
+      setUser(data);
+      setLoading(false);
+    };
+
+    fetchClinic();
+    fetchUser();
+  }, []);
   // Check if current user is the owner of the clinic
   useEffect(() => {
     const checkOwnership = async () => {
@@ -48,13 +53,13 @@ const ClinicSettingsPage = () => {
         } else {
           // Check for admin role in user_clinic
           const { data, error } = await supabase
-            .from('user_clinic')
-            .select('role')
-            .eq('user_id', user.id)
-            .eq('clinic_id', clinic.id)
+            .from("user_clinic")
+            .select("role")
+            .eq("user_id", user.id)
+            .eq("clinic_id", clinic.id)
             .single();
 
-          if (!error && data && data.role === 'admin') {
+          if (!error && data && data.role === "admin") {
             setIsOwner(true);
           } else {
             setIsOwner(false);
@@ -64,14 +69,22 @@ const ClinicSettingsPage = () => {
     };
 
     checkOwnership();
-  }, [user, clinic,supabase]);
+  }, [user, clinic, supabase]);
 
- 
+  // Handle form state updates
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    // Also update the form field
+    form.setFieldValue(field === "primaryColor" ? "primary_color" : field === "fontColor" ? "font_color" : field, value);
+  };
 
   const handleDeleteClinic = () => {
     setIsDeleteModal(true);
   };
-
 
   const handleImageUpload = (file: any) => {
     const isImage = file.type.startsWith("image/");
@@ -97,16 +110,14 @@ const ClinicSettingsPage = () => {
 
       // Handle logo upload if changed
       if (isLogoChanged && logoFile && user?.id) {
-         await uploadClinicLogo(user.id, logoFile);
+        await uploadClinicLogo(user.id, logoFile);
       }
 
       // Prepare dashboard theme data
       const { domain, name, openai_api_key, primary_color } = values;
 
       // Only include API key if it was changed (not asterisks)
-      const apiKeyUpdate = !openai_api_key?.includes("*")
-        ? { openai_api_key }
-        : {};
+      const apiKeyUpdate = !openai_api_key?.includes("*") ? { openai_api_key } : {};
 
       // Prepare update data
       const updateData: UpdateClinicProps = {
@@ -116,11 +127,11 @@ const ClinicSettingsPage = () => {
         logo: logoUrl,
         dashboard_theme: {
           ...clinic?.dashboard_theme,
-          primary_color
+          primary_color,
         },
-        ...apiKeyUpdate
+        ...apiKeyUpdate,
       };
-      
+
       SuccessToast(`Clinic settings updated successfully ${updateData}`);
     } catch (error: any) {
       ErrorToast(error.message || "Failed to update clinic settings");
@@ -132,11 +143,11 @@ const ClinicSettingsPage = () => {
   useEffect(() => {
     if (clinic) {
       // Mask API key if exists
-        
+
       form.setFieldsValue({
-        domain: clinic?.domain || '',
+        domain: clinic?.domain || "",
         primary_color: clinic?.dashboard_theme?.primary_color || "#4C2EEB",
-        name: clinic?.name || ''
+        name: clinic?.name || "",
       });
     }
   }, [clinic, form]);
@@ -158,10 +169,7 @@ const ClinicSettingsPage = () => {
           <Input className="!rounded-xl !h-[36px] brand-input" placeholder="Clinic name" />
         </Form.Item>
 
-        <SettingsCard
-          title="Import Your Brand"
-          description="Give us your web domain and we will import your brand color and logo for you."
-        >
+        <SettingsCard title="Import Your Brand" description="Give us your web domain and we will import your brand color and logo for you.">
           <Form.Item name="domain" label="Enter your website domain">
             <Input className="w-full !rounded-xl !h-[36px] brand-input" placeholder="example.com" />
           </Form.Item>
@@ -185,8 +193,8 @@ const ClinicSettingsPage = () => {
                 disabled={!editOpenAI}
               />
             </Form.Item>
-            <Button 
-              icon={<PencilIcon width={16} height={16} />} 
+            <Button
+              icon={<PencilIcon width={16} height={16} />}
               className="!min-w-[48px] !h-[36px]"
               onClick={() => setEditOpenAI(!editOpenAI)}
             />
@@ -194,7 +202,12 @@ const ClinicSettingsPage = () => {
         </SettingsCard>
 
         <SettingsCard title="Shared elements">
-          <ColorConfigurator fieldName="primary_color" heading="Primary color" description="Applies to all pages" />
+          <ColorConfigurator
+            fieldName="primaryColor"
+            heading="Primary color"
+            value={formData.primaryColor}
+            onChange={value => handleInputChange("primaryColor", value)}
+          />
           <Form.Item label="Logo" name="logo">
             <Upload
               name="file"
@@ -202,21 +215,27 @@ const ClinicSettingsPage = () => {
               listType="picture"
               maxCount={1}
               showUploadList={{ showPreviewIcon: true, showRemoveIcon: true }}
-              fileList={logoFile ? [
-                {
-                  uid: '-1',
-                  name: logoFile.name,
-                  status: 'done',
-                  url: URL.createObjectURL(logoFile)
-                } as UploadFile
-              ] : clinic?.logo ? [
-                {
-                  uid: '-1',
-                  name: 'Current Logo',
-                  status: 'done',
-                  url: clinic.logo
-                } as UploadFile
-              ] : []}
+              fileList={
+                logoFile
+                  ? [
+                      {
+                        uid: "-1",
+                        name: logoFile.name,
+                        status: "done",
+                        url: URL.createObjectURL(logoFile),
+                      } as UploadFile,
+                    ]
+                  : clinic?.logo
+                    ? [
+                        {
+                          uid: "-1",
+                          name: "Current Logo",
+                          status: "done",
+                          url: clinic.logo,
+                        } as UploadFile,
+                      ]
+                    : []
+              }
               onRemove={() => {
                 setLogoFile(null);
                 setIsLogoChanged(true);
@@ -244,7 +263,6 @@ const ClinicSettingsPage = () => {
           </Button>
         )}
       </Form>
-      
     </Flex>
   );
 };

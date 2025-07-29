@@ -3,6 +3,9 @@ import { createClient } from "@/utils/supabase/config/client";
 import { Clinic, UpdateClinicProps } from "@/interfaces/services_type";
 import { getClinicData, setClinicData } from "@/utils/supabase/clinic-helper";
 
+
+const supabase=createClient()
+
 interface ClinicState {
     clinic: Clinic | null;
     loading: boolean;
@@ -51,7 +54,7 @@ export const saveClinic = (clinic: Clinic | null) => {
 export const updateClinicData = async (updateData: UpdateClinicProps, dispatch: Dispatch) => {
     try {
       dispatch(setLoading(true));
-      const supabase = createClient();
+      
       
       const { data, error } = await supabase
         .from('clinic')
@@ -78,7 +81,6 @@ export const updateClinicData = async (updateData: UpdateClinicProps, dispatch: 
 export const uploadLogo = async (userId: string, file: File, dispatch: Dispatch) => {
     try {
       dispatch(setLoading(true));
-      const supabase = createClient();
       const fileExt = file.name.split('.').pop();
       const fileName = `${userId}-${Date.now()}.${fileExt}`;
       const filePath = `clinic-logos/${fileName}`;
@@ -123,8 +125,7 @@ export const useClinic = () => {
 export const fetchUserClinic = (userId: string) => async (dispatch: any) => {
     try {
         dispatch(setLoading(true));
-        const supabase = createClient();
-
+      
         // Get the clinic this user is part of
         const { data, error } = await supabase
             .from('user_clinic')

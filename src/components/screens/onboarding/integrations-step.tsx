@@ -9,7 +9,7 @@ import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toa
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
-
+import Papa from 'papaparse'
 const { Option } = Select;
 const { Title, Text } = Typography;
 
@@ -139,10 +139,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
-  const handleCsvUpload = async (leadsData: any) => {
+  const handleCsvUpload = async (leadsData:any) => {
     try {
-      console.log("CSV state update issue", leadsData.length);
-      if (leadsData.length === 0) {
+      if (!leadsData) {
         WarningToast("No CSV file selected");
       }
 
@@ -158,9 +157,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
       // Create file path: user_id/filename.csv
       const filePath = `${user.id}/${fileName}`;
-
+      
+      let csvData;
+      if(Array.isArray(leadsData)){
+        csvData=Papa.unparse(leadsData)   
+      }else{
+        csvData=leadsData
+      }
       // Upload file directly to Supabase Storage
-      const { error } = await supabase.storage.from("lead-uploads").upload(filePath, leadsData, {
+      const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvData, {
         cacheControl: "3600",
         upsert: false,
       });
@@ -1000,7 +1005,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         onOk={leads => {
           setShowManualLeadsModal(false);
           handleCsvUpload(leads);
-          if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads.length > 0) {
+          if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) &&  (leads)) {
             SuccessToast("Leads saved successfully");
           }
           setShowCompletionButtons(true);

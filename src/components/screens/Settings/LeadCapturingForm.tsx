@@ -5,8 +5,10 @@ import { Button } from "@/components/elements";
 import { PlusOutlined, EyeOutlined } from "@ant-design/icons";
 import { SuccessToast, ErrorToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
-import { useRouter } from "next/navigation";
 import { getLocalClinicData } from "@/helpers/storage-helper";
+import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
+import { Modal } from "@/components/common";
+import LeadGenerationForm from "@/components/Leads/LeadGenerationForm"; // adjust path if needed
 
 const { TextArea } = Input;
 
@@ -21,9 +23,11 @@ type FormField = {
 };
 
 const LeadCapturingForm = () => {
+  const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const clinicData = getLocalClinicData();
-  const router = useRouter();
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [clinicId, setClinicId] = useState<string | null>(null);
 
   const [fields, setFields] = useState<FormField[]>([
     {
@@ -95,7 +99,6 @@ const LeadCapturingForm = () => {
 
       try {
         setLoading(true);
-        const supabase = createClient();
         const { data, error } = await supabase
           .from("clinic_lead_form")
           .select("*")
@@ -138,8 +141,6 @@ const LeadCapturingForm = () => {
 
     try {
       setLoading(true);
-      const supabase = createClient();
-
       // Delete existing fields
       const { error: deleteError } = await supabase.from("clinic_lead_form").delete().eq("clinic_id", clinicData.id);
 
@@ -204,12 +205,14 @@ const LeadCapturingForm = () => {
     setFields(updatedFields);
   };
 
-  const handlePreviewForm = () => {
+  const handlePreviewForm = async () => {
     if (!clinicData?.id) {
-      ErrorToast("No clinic ID found");
-      return;
+      const currentClinicId = await getCurrentUserClinic();
+      setClinicId(currentClinicId);
+    } else {
+      setClinicId(clinicData.id);
     }
-    router.push(`/lead-form/${clinicData.id}`);
+    setShowLeadForm(true);
   };
 
   if (!clinicData?.id) {
@@ -301,6 +304,9 @@ const LeadCapturingForm = () => {
           Save Form Configuration
         </Button>
       </div>
+      <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} title="Generate New Lead" width={600}>
+        {clinicId && <LeadGenerationForm clinicId={clinicId} />}
+      </Modal>
     </div>
   );
 };
