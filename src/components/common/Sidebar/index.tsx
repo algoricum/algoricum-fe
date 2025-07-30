@@ -28,6 +28,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
         return push("/appointments");
       case "staff":
         return push("/staff");
+      case "billing":
+        return push("/billing");
       case "profileSettings":
         return push("/settings/lead-capturing-form");
       case "setup":

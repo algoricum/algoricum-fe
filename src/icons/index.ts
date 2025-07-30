@@ -42,7 +42,7 @@ import TicketIcon from "./TicketIcon";
 import TwitterIcon from "./TwitterIcon";
 import UploadIcon from "./UploadIcon";
 import StaffManagementIcon from "./StaffManagmentIcons";
-
+import BillingIcon from "./BillingIcon";
 
 export {
   AllHelpCenterIcon,
@@ -88,4 +88,5 @@ export {
   TwitterIcon,
   UploadIcon,
   StaffManagementIcon,
+  BillingIcon,
 };
