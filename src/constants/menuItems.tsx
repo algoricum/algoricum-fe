@@ -1,7 +1,8 @@
-import { ChatIcon,TicketIcon} from "@/icons";
+import { ChatIcon, TicketIcon } from "@/icons";
 import { DashboardIcon } from "@/icons";
 import { StaffManagementIcon } from "@/icons";
 // import { CalendarIcon } from "@/icons";
+import { BillingIcon } from "@/icons";
 
 const menuItems = [
   {
@@ -30,6 +31,13 @@ const menuItems = [
     icon: <StaffManagementIcon />,
     selectedicon: <StaffManagementIcon color="var(--color-primary-1000)" />,
     label: "Staff Management",
+    disabled: false,
+  },
+  {
+    key: "billing",
+    icon: <BillingIcon />,
+    selectedicon: <BillingIcon color="var(--color-primary-1000)" />,
+    label: "Billing",
     disabled: false,
   },
 ];
