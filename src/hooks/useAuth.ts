@@ -8,14 +8,14 @@ import {
   signupUser,
   verifyOtp,
   resendOtp,
-  forgotPassword,
   resetPassword,
   clearError
 } from '@/redux/slices/user.slice';
-import { clearAll, logoutUser, setupAuthListener } from '@/services/auth';
 import { RootState } from '@/redux/store';
 import { User } from '@/interfaces/services_type';
 import { AppDispatch } from '@/redux/store';
+import { setupAuthListener, signOut } from '@/utils/supabase/auth-helper';
+import { clearAll } from '@/helpers/storage-helper';
 
 export const useAuth = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -32,7 +32,8 @@ export const useAuth = () => {
     // Set up auth listener for realtime updates
     const unsubscribe = setupAuthListener(
       // onSignIn callback
-      (userData: User, token: string) => {
+      // eslint-disable-next-line no-unused-vars
+      (_userData: User, _token: string) => {
         dispatch(fetchCurrentUser());
       },
       // onSignOut callback
@@ -98,13 +99,13 @@ export const useAuth = () => {
   // Forgot password handler
   const forgot = useCallback(async (email: string) => {
     try {
-      await dispatch(forgotPassword(email)).unwrap();
+      // await dispatch(forgotPassword(email)).unwrap();
       router.push(`/reset-password?email=${encodeURIComponent(email)}`);
       return true;
     } catch (error) {
       return false;
     }
-  }, [dispatch, router]);
+  }, [router]);
 
   // Reset password handler
   const reset = useCallback(async (password: string) => {
@@ -118,16 +119,25 @@ export const useAuth = () => {
   }, [dispatch, router]);
 
   // Logout handler
-  const logout = useCallback(async () => {
+const logout = useCallback(async () => {
+  try {
+    
+    // First ensure the Supabase signOut succeeds
+    await signOut();    
+    // Then clear local storage data
+    clearAll();    
+    return true;
+  } catch (error) {
+    console.error("Detailed logout error:", error);
+    // Try to clear data anyway in case of partial logout
     try {
-      clearAll()
-      await logoutUser();
-      router.push('/login');
-      return true;
-    } catch (error) {
-      return false;
+      clearAll();
+    } catch (clearError) {
+      console.error("Failed to clear storage:", clearError);
     }
-  }, [dispatch]);
+    return false;
+  }
+}, []);
 
   // Clear error state
   const clearAuthError = useCallback(() => {

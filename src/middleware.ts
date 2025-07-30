@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/middleware';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from './utils/supabase/config/middleware';
 
 // List of public routes that don't require authentication
 const publicRoutes = [
@@ -10,7 +10,8 @@ const publicRoutes = [
   '/reset-password',
   '/verify-otp',
   '/auth/callback',
-  '/auth/oauth-redirect'
+  '/auth/oauth-redirect',
+  '/schedule-meeting'
 ];
 
 // Paths that should redirect to dashboard if already authenticated
@@ -22,13 +23,10 @@ const authRoutes = [
 ];
 
 export async function middleware(request: NextRequest) {
-  // Update the response with the Supabase session
-  const response = createClient(request);
-
   try {
-  
     // Get the pathname from the URL
     const { pathname } = request.nextUrl;
+    
     // Create helper function for redirects
     const redirect = (path: string) => {
       return NextResponse.redirect(new URL(path, request.url));
@@ -45,27 +43,25 @@ export async function middleware(request: NextRequest) {
 
     const isOnboardingRoute = pathname === '/onboarding';
 
-    const { createServerClient } = await import('@supabase/ssr');
+    // Create Supabase client with proper error handling
+    const { supabase, response } = createClient(request);
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll: () => request.cookies.getAll(),
-          setAll: (cookies) => {
-            cookies.forEach(({ name, value, options }) => {
-              response.cookies.set(name, value, options);
-            });
-          },
-        },
-      }
+    // Add timeout to prevent hanging
+    const userPromise = supabase.auth.getUser();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Auth timeout')), 5000)
     );
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    let user, userError;
+    try {
+      const result = await Promise.race([userPromise, timeoutPromise]);
+      ({ data: { user }, error: userError } = result as any);
+    } catch (error) {
+      console.error("Auth timeout or error:", error);
+      // If auth check fails, treat as unauthenticated
+      user = null;
+      userError = error;
+    }
 
     // CASE 1: User is not logged in
     if (!user || userError) {
@@ -79,9 +75,8 @@ export async function middleware(request: NextRequest) {
       return response;
     }
 
-
+    // Check email verification
     if (!user?.email_confirmed_at) {
-      // Still unverified, send to OTP page
       return redirect('/verify-otp');
     }
 
@@ -89,37 +84,53 @@ export async function middleware(request: NextRequest) {
     if (isAuthRoute) {
       return redirect('/dashboard');
     }
-    // Skip clinic check for the onboarding route itself
 
-    // Check if user has an associated clinic
-    const hasClinic = await checkIfUserHasClinic(supabase, user.id);
+    // Check if user has an associated clinic with timeout
+    let hasClinic = false;
+    try {
+      const clinicPromise = checkIfUserHasClinic(supabase, user.id);
+      const clinicTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Clinic check timeout')), 3000)
+      );
+      
+      hasClinic = await Promise.race([clinicPromise, clinicTimeoutPromise]) as boolean;
+    } catch (error) {
+      console.error("Clinic check timeout or error:", error);
+      // If clinic check fails, allow to continue but log the error
+      hasClinic = false;
+    }
+
+    // Handle onboarding logic
     if (isOnboardingRoute && hasClinic) {
       return redirect('/dashboard');
     }
 
-    // If no clinic associated, redirect to onboarding
+    // If no clinic associated, redirect to onboarding (except for onboarding page)
     if (!hasClinic && pathname !== '/onboarding') {
       return redirect('/onboarding');
     }
 
     // If user has clinic and is on a public route (like homepage), redirect to dashboard
-    if (isPublicRoute) {
+    if (isPublicRoute && hasClinic) {
       return redirect('/dashboard');
     }
 
-    // For all other cases (logged in, has clinic, private route) allow access
+    // For all other cases allow access
     return response;
-  } catch (e) {
-    console.error("Middleware error:", e);
-    // If there's an error, continue with the response
-    return response;
+  } catch (error) {
+    console.error("Middleware error:", error);
+    // On any critical error, continue with minimal response
+    return NextResponse.next();
   }
 }
 
 // Helper function to check if user has an associated clinic
-async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>, userId: string) {
+async function checkIfUserHasClinic(
+  supabase: SupabaseClient<any, "public", any>,
+  userId: string
+): Promise<boolean> {
   try {
-    // Get clinic_id from user_clinic
+    // Get the user's most recent active clinic link
     const { data: userClinicData, error: clinicUserError } = await supabase
       .from("user_clinic")
       .select("clinic_id")
@@ -127,21 +138,26 @@ async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    // No clinic found
+    // No clinic relationship found
     if (clinicUserError || !userClinicData) {
       return false;
     }
 
-    // Verify clinic exists
+    // Fetch the clinic data
     const { data: clinicData, error: clinicError } = await supabase
       .from("clinic")
-      .select("id")
+      .select("id, email")
       .eq("id", userClinicData.clinic_id)
-      .single();
+      .maybeSingle();
 
-    return !(clinicError || !clinicData);
+    // Return false if no clinic found, there's an error, or email is empty
+    if (clinicError || !clinicData || !clinicData.email || clinicData.email.trim() === "") {
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.error("Error checking clinic association:", error);
     return false;
@@ -152,6 +168,6 @@ async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>
 export const config = {
   matcher: [
     // Match all routes except for these:
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)',
   ],
 };

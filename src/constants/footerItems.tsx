@@ -1,17 +1,16 @@
-import { SetupIcon } from "@/icons";
-import LogoutIcon from "@/icons/LogoutIcon";
+import { SettingIcon, LogoutIcon } from "@/icons";
 
 const footerItems = [
   {
-    key: "setup",
-    icon: <SetupIcon />,
-    selectedIcon: <SetupIcon color="var(--color-primary-1000)" />,
-    label: "Setup",
+    key: "profileSettings",
+    icon: <SettingIcon />,
+    selectedicon: <SettingIcon color="var(--color-primary-1000)" />,
+    label: "Profile Settings",
   },
   {
     key: "logout",
     icon: <LogoutIcon />,
-    selectedIcon: <LogoutIcon color="var(--color-primary-1000)" />,
+    selectedicon: <LogoutIcon color="var(--color-primary-1000)" />,
     label: "Logout",
   },
 ];

@@ -1,46 +1,69 @@
-import { ColorConfigurator, DeleteModal } from "@/components/common";
+import { ColorConfigurator } from "@/components/common";
 import { Button, Input, PasswordInput } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { CrossIcon, PencilIcon, UploadIcon } from "@/icons";
+import { PencilIcon, UploadIcon } from "@/icons";
 import { Clinic, UpdateClinicProps, User } from "@/interfaces/services_type";
-import { saveClinic, updateClinicData, uploadLogo, useClinic } from "@/redux/accessors/clinic.accessors";
-import { getUser } from "@/redux/accessors/user.accessors";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/config/client";
 import { Flex, Form, Upload, UploadFile } from "antd";
-import { useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
+import { useEffect, useState, useRef } from "react";
 import SettingsCard from "../SettingsCard";
-import { getClinicData, getUserData } from "@/services/auth";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { getUserData } from "@/utils/supabase/user-helper";
+import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 
 const ClinicSettingsPage = () => {
   const [form] = Form.useForm();
-  const dispatch = useDispatch();
-   const [clinic, setClinic] = useState<Clinic | null>(null);
-   const [user, setUser] = useState<User | null>(null);
+  const [clinic, setClinic] = useState<Clinic | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isUploadHover, setIsUploadHover] = useState<boolean>(false);
-  const [isDeleteModal, setIsDeleteModal] = useState<boolean>(false);
+  const [, setIsDeleteModal] = useState<boolean>(false);
   const [editOpenAI, setEditOpenAI] = useState<boolean>(false);
   const [isOwner, setIsOwner] = useState<boolean>(false);
   const [isLogoChanged, setIsLogoChanged] = useState<boolean>(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [formData, setFormData] = useState({
+    primaryColor: "#2563EB",
+    fontColor: "#000000",
+  });
+
+  // Ref to keep track of created object URLs for cleanup
+  const logoObjectUrlRef = useRef<string | null>(null);
+
   const supabase = createClient();
-    useEffect(() => {
-      const fetchClinic = async () => {
-        const data = await getClinicData();
-        setClinic(data);
-        setLoading(false);
-      };
-  
-      const fetchUser = async () => {
-        const data = await getUserData();
-        setUser(data);
-        setLoading(false);
-      };
-      
-      fetchClinic();
-      fetchUser();
-    }, []);
+
+  // Cleanup function to revoke object URLs
+  const cleanupObjectUrl = () => {
+    if (logoObjectUrlRef.current) {
+      URL.revokeObjectURL(logoObjectUrlRef.current);
+      logoObjectUrlRef.current = null;
+    }
+  };
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      cleanupObjectUrl();
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchClinic = async () => {
+      const data = await getClinicData();
+      setClinic(data);
+      setLoading(false);
+    };
+
+    const fetchUser = async () => {
+      const data = await getUserData();
+      setUser(data);
+      setLoading(false);
+    };
+
+    fetchClinic();
+    fetchUser();
+  }, []);
+
   // Check if current user is the owner of the clinic
   useEffect(() => {
     const checkOwnership = async () => {
@@ -50,13 +73,13 @@ const ClinicSettingsPage = () => {
         } else {
           // Check for admin role in user_clinic
           const { data, error } = await supabase
-            .from('user_clinic')
-            .select('role')
-            .eq('user_id', user.id)
-            .eq('clinic_id', clinic.id)
+            .from("user_clinic")
+            .select("role")
+            .eq("user_id", user.id)
+            .eq("clinic_id", clinic.id)
             .single();
 
-          if (!error && data && data.role === 'admin') {
+          if (!error && data && data.role === "admin") {
             setIsOwner(true);
           } else {
             setIsOwner(false);
@@ -66,16 +89,22 @@ const ClinicSettingsPage = () => {
     };
 
     checkOwnership();
-  }, [user, clinic]);
+  }, [user, clinic, supabase]);
 
-  const handleCancel = () => {
-    setIsDeleteModal(false);
+  // Handle form state updates
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    // Also update the form field
+    form.setFieldValue(field === "primaryColor" ? "primary_color" : field === "fontColor" ? "font_color" : field, value);
   };
 
   const handleDeleteClinic = () => {
     setIsDeleteModal(true);
   };
-
 
   const handleImageUpload = (file: any) => {
     const isImage = file.type.startsWith("image/");
@@ -83,6 +112,9 @@ const ClinicSettingsPage = () => {
       ErrorToast("You can only upload image files!");
       return false;
     }
+
+    // Cleanup previous object URL before creating a new one
+    cleanupObjectUrl();
 
     setIsLogoChanged(true);
     setLogoFile(file);
@@ -101,16 +133,16 @@ const ClinicSettingsPage = () => {
 
       // Handle logo upload if changed
       if (isLogoChanged && logoFile && user?.id) {
-        const logoUrl = await uploadLogo(user.id, logoFile, dispatch);
+        await uploadClinicLogo(user.id, logoFile);
+        // Cleanup object URL after successful upload
+        cleanupObjectUrl();
       }
 
       // Prepare dashboard theme data
       const { domain, name, openai_api_key, primary_color } = values;
 
       // Only include API key if it was changed (not asterisks)
-      const apiKeyUpdate = !openai_api_key?.includes("*")
-        ? { openai_api_key }
-        : {};
+      const apiKeyUpdate = !openai_api_key?.includes("*") ? { openai_api_key } : {};
 
       // Prepare update data
       const updateData: UpdateClinicProps = {
@@ -120,15 +152,12 @@ const ClinicSettingsPage = () => {
         logo: logoUrl,
         dashboard_theme: {
           ...clinic?.dashboard_theme,
-          primary_color
+          primary_color,
         },
-        ...apiKeyUpdate
+        ...apiKeyUpdate,
       };
 
-      // Update clinic in Supabase and Redux
-      const updatedClinic = await updateClinicData(updateData, dispatch);
-      
-      SuccessToast("Clinic settings updated successfully");
+      SuccessToast(`Clinic settings updated successfully ${updateData}`);
     } catch (error: any) {
       ErrorToast(error.message || "Failed to update clinic settings");
     } finally {
@@ -139,14 +168,22 @@ const ClinicSettingsPage = () => {
   useEffect(() => {
     if (clinic) {
       // Mask API key if exists
-        
+
       form.setFieldsValue({
-        domain: clinic?.domain || '',
+        domain: clinic?.domain || "",
         primary_color: clinic?.dashboard_theme?.primary_color || "#4C2EEB",
-        name: clinic?.name || ''
+        name: clinic?.name || "",
       });
     }
   }, [clinic, form]);
+
+  // Create object URL for logo file and store reference for cleanup
+  const getLogoObjectUrl = (file: File): string => {
+    cleanupObjectUrl(); // Clean up any existing URL
+    const objectUrl = URL.createObjectURL(file);
+    logoObjectUrlRef.current = objectUrl;
+    return objectUrl;
+  };
 
   return (
     <Flex vertical gap={18} className="bg-white max-w-[535px] w-full rounded-xl p-3">
@@ -165,10 +202,7 @@ const ClinicSettingsPage = () => {
           <Input className="!rounded-xl !h-[36px] brand-input" placeholder="Clinic name" />
         </Form.Item>
 
-        <SettingsCard
-          title="Import Your Brand"
-          description="Give us your web domain and we will import your brand color and logo for you."
-        >
+        <SettingsCard title="Import Your Brand" description="Give us your web domain and we will import your brand color and logo for you.">
           <Form.Item name="domain" label="Enter your website domain">
             <Input className="w-full !rounded-xl !h-[36px] brand-input" placeholder="example.com" />
           </Form.Item>
@@ -192,8 +226,8 @@ const ClinicSettingsPage = () => {
                 disabled={!editOpenAI}
               />
             </Form.Item>
-            <Button 
-              icon={<PencilIcon width={16} height={16} />} 
+            <Button
+              icon={<PencilIcon width={16} height={16} />}
               className="!min-w-[48px] !h-[36px]"
               onClick={() => setEditOpenAI(!editOpenAI)}
             />
@@ -201,7 +235,12 @@ const ClinicSettingsPage = () => {
         </SettingsCard>
 
         <SettingsCard title="Shared elements">
-          <ColorConfigurator fieldName="primary_color" heading="Primary color" description="Applies to all pages" />
+          <ColorConfigurator
+            fieldName="primaryColor"
+            heading="Primary color"
+            value={formData.primaryColor}
+            onChange={value => handleInputChange("primaryColor", value)}
+          />
           <Form.Item label="Logo" name="logo">
             <Upload
               name="file"
@@ -209,22 +248,29 @@ const ClinicSettingsPage = () => {
               listType="picture"
               maxCount={1}
               showUploadList={{ showPreviewIcon: true, showRemoveIcon: true }}
-              fileList={logoFile ? [
-                {
-                  uid: '-1',
-                  name: logoFile.name,
-                  status: 'done',
-                  url: URL.createObjectURL(logoFile)
-                } as UploadFile
-              ] : clinic?.logo ? [
-                {
-                  uid: '-1',
-                  name: 'Current Logo',
-                  status: 'done',
-                  url: clinic.logo
-                } as UploadFile
-              ] : []}
+              fileList={
+                logoFile
+                  ? [
+                      {
+                        uid: "-1",
+                        name: logoFile.name,
+                        status: "done",
+                        url: getLogoObjectUrl(logoFile),
+                      } as UploadFile,
+                    ]
+                  : clinic?.logo
+                    ? [
+                        {
+                          uid: "-1",
+                          name: "Current Logo",
+                          status: "done",
+                          url: clinic.logo,
+                        } as UploadFile,
+                      ]
+                    : []
+              }
               onRemove={() => {
+                cleanupObjectUrl(); // Clean up object URL when removing
                 setLogoFile(null);
                 setIsLogoChanged(true);
               }}
@@ -251,7 +297,6 @@ const ClinicSettingsPage = () => {
           </Button>
         )}
       </Form>
-      
     </Flex>
   );
 };

@@ -1,5 +1,5 @@
 // services/apiKey.ts
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '@/utils/supabase/config/client';
 import { v4 as uuidv4 } from 'uuid';
 
 // Initialize Supabase client
@@ -65,7 +65,7 @@ const apiKeyService = {
       key_expires_at.setDate(now.getDate() + API_KEY_EXPIRATION_DAYS);
 
       // Insert the API key record
-      const { data: apiKey, error } = await supabase
+      const { error } = await supabase
         .from('api_key')
         .insert({
           id: uuidv4(),

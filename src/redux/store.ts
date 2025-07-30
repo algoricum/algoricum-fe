@@ -24,8 +24,8 @@ const persistConfig = {
 // Root reducer
 const rootReducer = combineReducers({
   user: userReducer,
-  clinic: clinicReducer,
-  // Add other reducers here as needed
+  clinic: clinicReducer
+    // Add other reducers here as needed
 });
 
 // Create persisted reducer

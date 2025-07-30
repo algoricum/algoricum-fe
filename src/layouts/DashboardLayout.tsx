@@ -1,50 +1,40 @@
-import { SecondaryMenusMobile, SecondarySidebar, Sidebar } from "@/components/common";
+import { Sidebar } from "@/components/common";
 import MobileFooter from "@/components/common/MobileFooter";
-import contentMenuItems from "@/constants/contentMenuItems";
-import settingMenuItems from "@/constants/settingMenu";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { Flex, Layout, LayoutProps } from "antd";
-import { usePathname } from "next/navigation";
-import { ReactNode, useEffect } from "react";
+import { Flex, Layout, type LayoutProps } from "antd";
+import type { ReactNode } from "react";
+import { useState } from "react";
 
 const { Content } = Layout;
 
 interface DashboardLayoutProps extends LayoutProps {
-  header?: ReactNode; // Optional header prop
+  header?: ReactNode;
 }
 
 const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
-  const path = usePathname();
-  const { user } = useSupabaseAuth();
-
-  useEffect(() => {
-    if (window.BOTSDK && user) {
-      window.BOTSDK.initialize({
-        apiKey:
-          "1d10bb50-6c2b-4e20-8152-a832dc08e4ab.a6ZSYfSRvy8Lwx6937nvKVNP8l7eoqQC9Vl62DzBhJPcPPDosEk8mfC8ep35SyT0Ea7TGVuc2-8uEr_B-W5p5w",
-        name: user.name,
-        userId: user.id,
-      });
-    } else {
-      console.error("BOTSDK is not defined");
-    }
-  }, [user]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
-    <div className="min-h-screen">
-      <Layout className="h-screen flex flex-row overflow-x-hidden">
-        <Sidebar />
-        {path.includes("content") && <SecondarySidebar menuItems={contentMenuItems} />}
-        {path.includes("settings") && <SecondarySidebar menuItems={settingMenuItems} heading="Settings" />}
+    <div className="h-screen overflow-hidden">
+      <Layout className="h-full flex flex-row">
+        {/* <Sidebar /> */}
+        <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+        <Layout className="flex-1">
+          {header && (
+            <Flex className="w-full border-b border-Gray400" style={{ height: "60px", flexShrink: 0 }}>
+              {header}
+            </Flex>
+          )}
 
-        <Layout className="px-0 py-0 flex-shrink-0 max-w-full flex-1 overflow-hidden">
-          <Flex className="w-full border-b border-Gray400">{header}</Flex>
-          <Content className="flex flex-col p-4 gap-4 relative overflow-y-auto max-[820px]:mb-[120px]">
-            {path.includes("content") && <SecondaryMenusMobile menuItems={contentMenuItems} />}
-            {path.includes("settings") && <SecondaryMenusMobile menuItems={settingMenuItems} />}
-
+          <Content
+            className="bg-white p-4"
+            style={{
+              height: header ? "calc(100vh - 60px - 60px)" : "calc(100vh - 60px)", // Subtract header and footer height
+              overflowY: "auto",
+              overflowX: "hidden",
+            }}
+          >
             {children}
           </Content>
-          {/* Footer */}
+
           <MobileFooter />
         </Layout>
       </Layout>

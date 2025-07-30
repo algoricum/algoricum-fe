@@ -1,12 +1,9 @@
 // src/redux/slices/clinicSlice.ts
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { 
-  getClinicData, 
-  setClinicData, 
-  clearClinicData 
-} from "@/services/auth";
 import { createClient } from '@supabase/supabase-js';
 import { Clinic, CreateClinicProps, UpdateClinicProps } from "@/interfaces/services_type";
+import { setClinicData } from "@/utils/supabase/clinic-helper";
+import { clearClinicData } from "@/helpers/storage-helper";
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -52,7 +49,7 @@ export const fetchUserClinics = createAsyncThunk(
       
       // Get detailed clinic data
       const { data: clinics, error: clinicsError } = await supabase
-        .from('clinics')
+        .from('clinic')
         .select('*')
         .in('id', clinicIds);
         
@@ -73,7 +70,7 @@ export const fetchClinicById = createAsyncThunk(
     try {
       // Get clinic data
       const { data, error } = await supabase
-        .from('clinics')
+        .from('clinic')
         .select('*')
         .eq('id', clinicId)
         .single();
@@ -92,13 +89,36 @@ export const fetchClinicById = createAsyncThunk(
   }
 );
 
+export const getRoleId = async () => {
+    console.log("🔍 Fetching role ID for type: owner");
+
+    const { data, error } = await supabase.from("role").select("id").eq("type", "owner").limit(1); // Get first owner role instead of using .single()
+
+    console.log("📊 Role query result:", { data, error });
+
+    if (error) {
+      console.error("❌ Error fetching role:", error.message);
+      throw new Error(`Failed to fetch role: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      console.error("❌ No owner role found");
+      throw new Error("No owner role found in database");
+    }
+
+    const roleId = data[0].id;
+    console.log("✅ Role ID found:", roleId);
+    return roleId;
+};
+
+
 export const createClinic = createAsyncThunk(
   'clinic/createClinic',
   async (clinicData: CreateClinicProps, { rejectWithValue }) => {
     try {
       // Insert new clinic
       const { data, error } = await supabase
-        .from('clinics')
+        .from('clinic')
         .insert([clinicData])
         .select()
         .single();
@@ -109,12 +129,14 @@ export const createClinic = createAsyncThunk(
       
       // Create user_clinic relationship if userId is provided
       if (clinicData.owner_id) {
+
+        const role_id= await getRoleId()
         const { error: relationError } = await supabase
           .from('user_clinic')
           .insert([{
             user_id: clinicData.owner_id,
             clinic_id: data.id,
-            role: 'owner',
+            role_id,
             is_active: true
           }]);
           
@@ -139,7 +161,7 @@ export const updateClinic = createAsyncThunk(
     try {
       // Update clinic
       const { data, error } = await supabase
-        .from('clinics')
+        .from('clinic')
         .update({
           name: clinicData.name,
           address: clinicData.address,

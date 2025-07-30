@@ -1,6 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { setAccessToken, setUserData, getUserData, clearUserData, clearTokens, logoutUser } from "@/services/auth";
 import { User } from "@/interfaces/services_type";
+import { getUserData, setUserData } from "@/utils/supabase/user-helper";
+import { setAccessToken } from "@/helpers/storage-helper";
+import { signOut } from "@/utils/supabase/auth-helper";
 
 interface UserState {
   user: User | null;
@@ -53,12 +55,12 @@ export const saveUser = (user: any, token?: string) => (dispatch: any) => {
       dispatch(setToken(token));
     }
   } else {
-    dispatch(logoutUser());
+    dispatch(signOut());
   }
 };
 
 export const clearUser = () => (dispatch: any) => {
-  logoutUser()
+  signOut()
   dispatch(clearUserAction());
 };
 

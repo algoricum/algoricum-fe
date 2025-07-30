@@ -4,9 +4,9 @@ const settingMenuItems = [
   {
     key: "widget",
     icon: <AllHelpCenterIcon />,
-    selectedIcon: <AllHelpCenterIcon color="var(--color-primary-1000)" />,
+    selectedicon: <AllHelpCenterIcon color="var(--color-primary-1000)" />,
     label: "Widget Setup",
-    route: "/settings/widget",
+    route: "/settings/lead-capturing-form",
   },
 ];
 export default settingMenuItems;

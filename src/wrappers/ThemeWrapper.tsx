@@ -1,13 +1,10 @@
-import { useClinic } from "@/redux/accessors/clinic.accessors";
-import { selectTheme, updateTheme } from "@/utils/themeUtils";
-import React, { ReactNode, useEffect } from "react";
+import React, { ReactNode } from "react";
 
 interface ThemeWrapperProps {
   children: ReactNode | ReactNode[];
 }
 
 const ThemeWrapper: React.FC<ThemeWrapperProps> = ({ children }) => {
-  const { clinic } = useClinic();
 
   // useEffect(() => {
   //   // Safe check for primaryColor with optional chaining and default to defaultTheme

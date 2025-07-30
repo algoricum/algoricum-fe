@@ -583,7 +583,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .custom-picker .ant-color-picker-color-block {
   width: 16px !important;
   height: 16px !important;
-  border-radius: 50% !important;
+  border: none !important;
   overflow: hidden;
 }
 .custom-picker .ant-color-picker-trigger-text {
@@ -671,4 +671,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .layout-onboarding{
   background: linear-gradient(208.77deg, #A87FFF 0.61%, #6620FF 99.29%);
+}
+
+.custom-alert-icon .anticon {
+  color: #A068F1 !important;
 }

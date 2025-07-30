@@ -1,22 +1,9 @@
 // src/redux/slices/userSlice.ts
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { 
-  getUserData, 
-  setUserData, 
-  getAccessToken, 
-  setAccessToken, 
-  clearUserData, 
-  clearTokens, 
-  clearAll,
-  loginUser as loginUserService,
-  signupUser as signupUserService,
-  verifyOtp as verifyOtpService,
-  forgotPassword as forgotPasswordService,
-  resetPassword as resetPasswordService,
-  logoutUser as logoutUserService,
-  resendOtp as resendOtpService
-} from "@/services/auth";
 import { User } from "@/interfaces/services_type";
+import { resetPasswordRequest, signInWithPassword,resendOtp as resendOtpService,verifyOtp as verifyOtpService,signUp as signupUserService } from "@/utils/supabase/auth-helper";
+import { getAccessToken } from "@/helpers/storage-helper";
+import { getUserData } from "@/utils/supabase/user-helper";
 
 interface UserState {
   user: User | null;
@@ -64,7 +51,7 @@ export const loginUser = createAsyncThunk(
   'user/loginUser',
   async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
-      const result = await loginUserService(credentials.email, credentials.password);
+      const result = await signInWithPassword(credentials.email, credentials.password);
       return result;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Login failed');
@@ -108,23 +95,12 @@ export const resendOtp = createAsyncThunk(
   }
 );
 
-export const forgotPassword = createAsyncThunk(
-  'user/forgotPassword',
-  async (email: string, { rejectWithValue }) => {
-    try {
-      await forgotPasswordService(email);
-      return { email };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Forgot password request failed');
-    }
-  }
-);
 
 export const resetPassword = createAsyncThunk(
   'user/resetPassword',
   async (password: string, { rejectWithValue }) => {
     try {
-      await resetPasswordService(password);
+      await resetPasswordRequest(password);
       return { success: true };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Password reset failed');
@@ -132,17 +108,7 @@ export const resetPassword = createAsyncThunk(
   }
 );
 
-export const logoutUser = createAsyncThunk(
-  'user/logoutUser',
-  async (_, { rejectWithValue }) => {
-    try {
-      await logoutUserService();
-      return { success: true };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Logout failed');
-    }
-  }
-);
+
 
 const userSlice = createSlice({
   name: "user",
@@ -202,89 +168,6 @@ const userSlice = createSlice({
       state.error = null;
     });
     builder.addCase(loginUser.rejected, (state, action) => {
-      state.isLoading = false;
-      state.error = action.payload as string;
-    });
-    
-    // Handle signupUser
-    builder.addCase(signupUser.pending, (state) => {
-      state.isLoading = true;
-      state.error = null;
-    });
-    builder.addCase(signupUser.fulfilled, (state) => {
-      state.isLoading = false;
-      // User is not logged in after signup until OTP is verified
-    });
-    builder.addCase(signupUser.rejected, (state, action) => {
-      state.isLoading = false;
-      state.error = action.payload as string;
-    });
-    
-    // Handle OTP verification
-    builder.addCase(verifyOtp.pending, (state) => {
-      state.isLoading = true;
-      state.error = null;
-    });
-    builder.addCase(verifyOtp.fulfilled, (state) => {
-      state.isLoading = false;
-      // Verification successful, but user still needs to log in
-    });
-    builder.addCase(verifyOtp.rejected, (state, action) => {
-      state.isLoading = false;
-      state.error = action.payload as string;
-    });
-    
-    // Handle resendOtp
-    builder.addCase(resendOtp.pending, (state) => {
-      state.isLoading = true;
-      state.error = null;
-    });
-    builder.addCase(resendOtp.fulfilled, (state) => {
-      state.isLoading = false;
-    });
-    builder.addCase(resendOtp.rejected, (state, action) => {
-      state.isLoading = false;
-      state.error = action.payload as string;
-    });
-    
-    // Handle forgotPassword
-    builder.addCase(forgotPassword.pending, (state) => {
-      state.isLoading = true;
-      state.error = null;
-    });
-    builder.addCase(forgotPassword.fulfilled, (state) => {
-      state.isLoading = false;
-    });
-    builder.addCase(forgotPassword.rejected, (state, action) => {
-      state.isLoading = false;
-      state.error = action.payload as string;
-    });
-    
-    // Handle resetPassword
-    builder.addCase(resetPassword.pending, (state) => {
-      state.isLoading = true;
-      state.error = null;
-    });
-    builder.addCase(resetPassword.fulfilled, (state) => {
-      state.isLoading = false;
-    });
-    builder.addCase(resetPassword.rejected, (state, action) => {
-      state.isLoading = false;
-      state.error = action.payload as string;
-    });
-    
-    // Handle logoutUser
-    builder.addCase(logoutUser.pending, (state) => {
-      state.isLoading = true;
-    });
-    builder.addCase(logoutUser.fulfilled, (state) => {
-      state.isLoading = false;
-      state.user = null;
-      state.token = null;
-      state.isAuthenticated = false;
-      state.error = null;
-    });
-    builder.addCase(logoutUser.rejected, (state, action) => {
       state.isLoading = false;
       state.error = action.payload as string;
     });

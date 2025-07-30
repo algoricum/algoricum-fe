@@ -41,6 +41,9 @@ import StandardPlanIcon from "./StandardPlanIcon";
 import TicketIcon from "./TicketIcon";
 import TwitterIcon from "./TwitterIcon";
 import UploadIcon from "./UploadIcon";
+import StaffManagementIcon from "./StaffManagmentIcons";
+import BillingIcon from "./BillingIcon";
+
 export {
   AllHelpCenterIcon,
   ArticleIcon,
@@ -84,4 +87,6 @@ export {
   TicketIcon,
   TwitterIcon,
   UploadIcon,
+  StaffManagementIcon,
+  BillingIcon,
 };

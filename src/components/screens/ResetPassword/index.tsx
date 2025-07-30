@@ -4,12 +4,12 @@ import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { PasswordIcon } from "@/icons";
 import { ResetPasswordProps } from "@/interfaces/services_type";
-import authService from "@/services/auth";
 import { Flex, Form, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useMutation } from "react-query";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/config/client";
+import { resendOtp } from "@/utils/supabase/auth-helper";
 
 const { Title, Text } = Typography;
 
@@ -22,7 +22,7 @@ const ResetPasswordPage = () => {
   useEffect(() => {
     const checkResetSession = async () => {
       const { data, error } = await supabase.auth.getSession();
-      
+
       if (error || !data.session) {
         ErrorToast("Invalid or expired password reset link");
         push("/login");
@@ -30,9 +30,10 @@ const ResetPasswordPage = () => {
     };
 
     checkResetSession();
-  }, [push]);
+  }, [push, supabase.auth]);
 
-  const { mutate, isLoading } = useMutation((data: ResetPasswordProps) => authService.resetPassword(data), {
+  // eslint-disable-next-line no-unused-vars
+  const { mutate, isLoading } = useMutation((data: ResetPasswordProps) => resendOtp("email"), {
     onSuccess: () => {
       SuccessToast("Password reset successfully");
       push("/login");

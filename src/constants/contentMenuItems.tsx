@@ -4,14 +4,14 @@ const contentMenuItems = [
   {
     key: "articles",
     icon: <AllHelpCenterIcon />,
-    selectedIcon: <AllHelpCenterIcon color="var(--color-primary-1000)" />,
+    selectedicon: <AllHelpCenterIcon color="var(--color-primary-1000)" />,
     label: "Articles",
     route: "/content/articles",
   },
   {
     key: "sections",
     icon: <AllHelpCenterIcon />,
-    selectedIcon: <AllHelpCenterIcon color="var(--color-primary-1000)" />,
+    selectedicon: <AllHelpCenterIcon color="var(--color-primary-1000)" />,
     label: "Sections",
     route: "/content/sections",
   },

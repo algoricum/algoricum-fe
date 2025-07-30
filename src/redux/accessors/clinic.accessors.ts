@@ -1,7 +1,10 @@
 import { createSlice, Dispatch, PayloadAction } from "@reduxjs/toolkit";
-import { createClient } from "@/utils/supabase/client";
+import { createClient } from "@/utils/supabase/config/client";
 import { Clinic, UpdateClinicProps } from "@/interfaces/services_type";
-import { getClinicData, setClinicData } from "@/services/auth";
+import { getClinicData, setClinicData } from "@/utils/supabase/clinic-helper";
+
+
+const supabase=createClient()
 
 interface ClinicState {
     clinic: Clinic | null;
@@ -51,7 +54,7 @@ export const saveClinic = (clinic: Clinic | null) => {
 export const updateClinicData = async (updateData: UpdateClinicProps, dispatch: Dispatch) => {
     try {
       dispatch(setLoading(true));
-      const supabase = createClient();
+      
       
       const { data, error } = await supabase
         .from('clinic')
@@ -78,12 +81,11 @@ export const updateClinicData = async (updateData: UpdateClinicProps, dispatch: 
 export const uploadLogo = async (userId: string, file: File, dispatch: Dispatch) => {
     try {
       dispatch(setLoading(true));
-      const supabase = createClient();
       const fileExt = file.name.split('.').pop();
       const fileName = `${userId}-${Date.now()}.${fileExt}`;
       const filePath = `clinic-logos/${fileName}`;
       
-      const { data, error } = await supabase.storage
+      const {error } = await supabase.storage
         .from('public')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -123,17 +125,16 @@ export const useClinic = () => {
 export const fetchUserClinic = (userId: string) => async (dispatch: any) => {
     try {
         dispatch(setLoading(true));
-        const supabase = createClient();
-
+      
         // Get the clinic this user is part of
         const { data, error } = await supabase
             .from('user_clinic')
             .select(`
-        clinic_id,
-        role,
-        position,
-        clinic (*)
-      `)
+                clinic_id,
+                role_id,
+                position,
+                clinic (*)
+              `)
             .eq('user_id', userId)
             .eq('is_active', true)
             .single();

@@ -4,15 +4,16 @@ import PasswordInput from "@/components/elements/PasswordInput"
 import { ErrorToast } from "@/helpers/toast"
 import { MailIcon, PasswordIcon } from "@/icons"
 import type { LoginProps } from "@/interfaces/services_type"
-import { saveUser } from "@/redux/accessors/user.accessors"
-import { loginUser, setClinicData } from "@/services/auth"
 import { Flex, Form, Typography } from "antd"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useMutation } from "react-query"
-import { createClient } from "@/utils/supabase/client"
+import { createClient } from "@/utils/supabase/config/client"
 import { AuthSeparator, SocialButton } from "@/components/common"
-import { useClinicCheck } from "@/services/clinic"
+import { signInWithPassword } from "@/utils/supabase/auth-helper"
+import { useClinicCheck } from "@/hooks/useClinicCheck"
+import { setClinicData } from "@/utils/supabase/clinic-helper"
+import { setUserData } from "@/utils/supabase/user-helper"
 
 const { Text } = Typography
 
@@ -22,9 +23,9 @@ const LoginPage = () => {
   const redirectUrl = searchParams.get("redirectUrl") || "/dashboard"
   const [form] = Form.useForm()
   const { checkAndRedirectIfNoClinic } = useClinicCheck();
-  const { mutate, isLoading } = useMutation((data: LoginProps) => loginUser(data.email, data.password), {
+  const { mutate, isLoading } = useMutation((data: LoginProps) => signInWithPassword(data.email, data.password), {
     onSuccess: (data: any) => {
-      saveUser(data?.user)
+      setUserData(data?.user)
 
       // Check if email is verified
       if (!data?.user?.is_email_verified) {
@@ -56,7 +57,7 @@ const LoginPage = () => {
     try {
       const supabase = createClient()
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: `${window.location.origin}/auth/callback?redirectUrl=${redirectUrl}`,
@@ -131,7 +132,7 @@ const LoginPage = () => {
         </Flex>
       </Form>
       <AuthSeparator />
-      <Flex gap={12} className="flex-col justify-center sm:flex-row w-full">
+      <Flex gap={12} className="flex-col justify-center items-center sm:flex-row w-full">
         <SocialButton
         isGoogle={true}
         label="Continue With Google"
@@ -142,7 +143,7 @@ const LoginPage = () => {
 
       <div className="text-center mt-2">
         <Text className="text-sm text-gray-600">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/signup" className="!text-brand-primary font-medium hover:underline">
             Sign Up
           </Link>
