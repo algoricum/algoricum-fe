@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { Tabs, Button, Skeleton, Alert, Table } from "antd";
+import { Tabs, Button, Skeleton, Alert} from "antd";
 import { CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { createClient } from "@/utils/supabase/config/client";
 import { getClinicData } from "@/utils/supabase/clinic-helper";

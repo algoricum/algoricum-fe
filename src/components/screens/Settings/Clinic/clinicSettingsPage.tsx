@@ -1,11 +1,11 @@
 import { ColorConfigurator } from "@/components/common";
 import { Button, Input, PasswordInput } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import {  PencilIcon, UploadIcon } from "@/icons";
+import { PencilIcon, UploadIcon } from "@/icons";
 import { Clinic, UpdateClinicProps, User } from "@/interfaces/services_type";
 import { createClient } from "@/utils/supabase/config/client";
 import { Flex, Form, Upload, UploadFile } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import SettingsCard from "../SettingsCard";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
@@ -27,7 +27,26 @@ const ClinicSettingsPage = () => {
     fontColor: "#000000",
   });
 
+  // Ref to keep track of created object URLs for cleanup
+  const logoObjectUrlRef = useRef<string | null>(null);
+
   const supabase = createClient();
+
+  // Cleanup function to revoke object URLs
+  const cleanupObjectUrl = () => {
+    if (logoObjectUrlRef.current) {
+      URL.revokeObjectURL(logoObjectUrlRef.current);
+      logoObjectUrlRef.current = null;
+    }
+  };
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      cleanupObjectUrl();
+    };
+  }, []);
+
   useEffect(() => {
     const fetchClinic = async () => {
       const data = await getClinicData();
@@ -44,6 +63,7 @@ const ClinicSettingsPage = () => {
     fetchClinic();
     fetchUser();
   }, []);
+
   // Check if current user is the owner of the clinic
   useEffect(() => {
     const checkOwnership = async () => {
@@ -93,6 +113,9 @@ const ClinicSettingsPage = () => {
       return false;
     }
 
+    // Cleanup previous object URL before creating a new one
+    cleanupObjectUrl();
+
     setIsLogoChanged(true);
     setLogoFile(file);
     return false; // Prevent automatic upload
@@ -111,6 +134,8 @@ const ClinicSettingsPage = () => {
       // Handle logo upload if changed
       if (isLogoChanged && logoFile && user?.id) {
         await uploadClinicLogo(user.id, logoFile);
+        // Cleanup object URL after successful upload
+        cleanupObjectUrl();
       }
 
       // Prepare dashboard theme data
@@ -151,6 +176,14 @@ const ClinicSettingsPage = () => {
       });
     }
   }, [clinic, form]);
+
+  // Create object URL for logo file and store reference for cleanup
+  const getLogoObjectUrl = (file: File): string => {
+    cleanupObjectUrl(); // Clean up any existing URL
+    const objectUrl = URL.createObjectURL(file);
+    logoObjectUrlRef.current = objectUrl;
+    return objectUrl;
+  };
 
   return (
     <Flex vertical gap={18} className="bg-white max-w-[535px] w-full rounded-xl p-3">
@@ -222,7 +255,7 @@ const ClinicSettingsPage = () => {
                         uid: "-1",
                         name: logoFile.name,
                         status: "done",
-                        url: URL.createObjectURL(logoFile),
+                        url: getLogoObjectUrl(logoFile),
                       } as UploadFile,
                     ]
                   : clinic?.logo
@@ -237,6 +270,7 @@ const ClinicSettingsPage = () => {
                     : []
               }
               onRemove={() => {
+                cleanupObjectUrl(); // Clean up object URL when removing
                 setLogoFile(null);
                 setIsLogoChanged(true);
               }}

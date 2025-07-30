@@ -131,6 +131,7 @@ const LeadCapturingForm = () => {
     };
 
     fetchFormFields();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicData?.id]);
 
   const handleSave = async () => {
