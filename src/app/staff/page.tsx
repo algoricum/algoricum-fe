@@ -1,23 +1,13 @@
-// "use client";
-// import { Header } from "@/components/common";
-// import StaffManagementWithModal from "@/components/staff-managment/staff-management-with-modal";
-// import StaffManagmentLayout from "@/layouts/StaffManagmentLayout";
-
-// const Page = () => {
-//   return (
-//     <StaffManagmentLayout header={<Header title="Staff Management" description="Manage your clinic staff from here." />}>
-//       <StaffManagementWithModal />
-//     </StaffManagmentLayout>
-//   );
-// };
-
-// export default Page;
 "use client";
 import type React from "react";
 import { useState } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { Users, UserPlus, Calendar, Search, Plus, X } from "lucide-react";
-import {Header} from "@/components/common"
+import { Header } from "@/components/common";
+import { createClient } from "@/utils/supabase/config/client";
+import { createStaffUser } from "@/utils/supabase/config/staff";
+import { getCurrentUserClinic} from "@/utils/supabase/leads-helper"
+
 interface Staff {
   id: string;
   name: string;
@@ -29,6 +19,7 @@ interface Staff {
 }
 
 export default function StaffPage() {
+  const supabase = createClient();
   const [staffData, setStaffData] = useState<Staff[]>([
     {
       id: "1",
@@ -61,39 +52,56 @@ export default function StaffPage() {
 
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [newStaff, setNewStaff] = useState({
-    name: "",
     email: "",
-    role: "Nurse",
-    createdBy: "Admin",
-    avatar: "",
   });
 
-  const handleAddStaff = (e: React.FormEvent) => {
+  const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    const staff: Staff = {
-      id: (staffData.length + 1).toString(),
-      ...newStaff,
-      password: "••••••••",
-      avatar: newStaff.name
-        .split(" ")
-        .map(n => n[0])
-        .join(""),
-    };
-    setStaffData([...staffData, staff]);
-    setNewStaff({
-      name: "",
-      email: "",
-      role: "Nurse",
-      createdBy: "Admin",
-      avatar: "",
+
+    const clinin_id=await getCurrentUserClinic()
+
+    if (!newStaff.email) {
+      alert("Please enter staff email");
+      return;
+    }
+    
+    const { data, error1 } = await createStaffUser({
+      email: newStaff.email,
+      password: "Temp1234", // you can generate random password
+      name: "Receptionist 1",
+      clinicId: clinin_id,
+      roleId: "074a8cb5-03ea-422c-8786-da5ef8fd5d00",
     });
-    setShowAddStaffModal(false);
+
+    if (error1) {
+      console.error(error1.message);
+    } else {
+      console.log("Staff created:", data);
+    }
+
+    // 1️⃣ Send Magic Link to staff
+    const { error } = await supabase.auth.signInWithOtp({
+      email: newStaff.email,
+      options: {
+        shouldCreateUser: true, // Creates user if not exists
+        emailRedirectTo: `http://localhost:3001/reset-password`, // Redirect to unified password setup page
+      },
+    });
+
+    if (error) {
+      alert("❌ Failed to send invite: " + error.message);
+    } else {
+      alert(`✅ Invitation sent to ${newStaff.email}`);
+
+      // Reset form
+      setNewStaff({ email: "" });
+      setShowAddStaffModal(false);
+    }
   };
 
   return (
     <DashboardLayout header={<Header title="Staff Management" description="Manage your healthcare team and staff information." />}>
       <div>
-
         {/* Staff Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="card">
@@ -236,16 +244,6 @@ export default function StaffPage() {
               </div>
               <form onSubmit={handleAddStaff} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={newStaff.name}
-                    onChange={e => setNewStaff({ ...newStaff, name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <input
                     type="email"
@@ -253,27 +251,16 @@ export default function StaffPage() {
                     value={newStaff.email}
                     onChange={e => setNewStaff({ ...newStaff, email: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter email address"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                  <select
-                    required
-                    value={newStaff.role}
-                    onChange={e => setNewStaff({ ...newStaff, role: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="Doctor">Doctor</option>
-                    <option value="Nurse">Nurse</option>
-                    <option value="Receptionist">Receptionist</option>
-                  </select>
-                </div>
+
                 <div className="flex space-x-3 pt-4">
                   <button type="button" onClick={() => setShowAddStaffModal(false)} className="flex-1 btn btn-secondary">
                     Cancel
                   </button>
                   <button type="submit" className="flex-1 btn btn-primary">
-                    Add Staff Member
+                    Invite Staff
                   </button>
                 </div>
               </form>
