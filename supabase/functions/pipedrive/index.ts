@@ -341,8 +341,35 @@ async function handleOAuthCallback(req: Request) {
       apiDomain: tokenData.api_domain,
       companyId: tokenData.company_id,
       userId: tokenData.user_id,
-      expiresIn: tokenData.expires_in
+      expiresIn: tokenData.expires_in,
+      fullTokenData: tokenData // Log full response to see what Pipedrive is actually returning
     })
+
+    // Handle missing company_id and user_id gracefully
+    if (!tokenData.company_id || !tokenData.user_id) {
+      console.log('⚠️ Missing company_id or user_id, attempting to fetch from API...')
+      
+      // Try to get user info from Pipedrive API
+      try {
+        const userResponse = await fetch(`https://${tokenData.api_domain}/api/v1/users/me`, {
+          headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+        })
+        
+        if (userResponse.ok) {
+          const userData = await userResponse.json()
+          console.log('📊 User data from API:', userData.data)
+          
+          if (!tokenData.company_id && userData.data?.company_id) {
+            tokenData.company_id = userData.data.company_id
+          }
+          if (!tokenData.user_id && userData.data?.id) {
+            tokenData.user_id = userData.data.id
+          }
+        }
+      } catch (apiError) {
+        console.log('⚠️ Could not fetch user data from API:', apiError.message)
+      }
+    }
 
     // If we don't have clinicId from state, try to find it using the pending integration
     if (!clinicId) {
@@ -389,8 +416,8 @@ async function handleOAuthCallback(req: Request) {
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
       api_domain: tokenData.api_domain,
-      company_id: tokenData.company_id.toString(),
-      user_id: tokenData.user_id.toString(),
+      company_id: tokenData.company_id ? tokenData.company_id.toString() : 'unknown',
+      user_id: tokenData.user_id ? tokenData.user_id.toString() : 'unknown',
       expires_at: expiresAt?.toISOString(),
       is_active: true,
       updated_at: new Date().toISOString(),
@@ -536,7 +563,6 @@ async function handleSyncLeads(req: Request) {
       .from('lead_source')
       .select('id')
       .eq('name', 'Pipedrive')
-      .eq('clinic_id', clinic_id)
       .single()
 
     let sourceId = leadSource?.id
@@ -546,8 +572,6 @@ async function handleSyncLeads(req: Request) {
         .from('lead_source')
         .insert({
           name: 'Pipedrive',
-          clinic_id: clinic_id,
-          is_active: true
         })
         .select('id')
         .single()
