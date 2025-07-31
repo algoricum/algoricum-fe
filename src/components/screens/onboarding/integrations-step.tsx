@@ -305,6 +305,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
 
+        // Auto-sync leads from Pipedrive
+        setTimeout(() => {
+          syncPipedriveLeads();
+        }, 1000);
+
         // Continue to next question if needed
         if (currentQuestionIndex < filteredQuestions.length - 1) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -442,9 +447,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
+          name: "Functions",
           userId: await getCurrentUserId(),
           clinic_id: clinicId,
           redirectUrl: window.location.href, // Current page URL
@@ -473,6 +478,39 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
+  const syncPipedriveLeads = async () => {
+    const clinicId = await getClinicId();
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive/sync-leads`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          clinic_id: clinicId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sync leads");
+      }
+
+      const result = await response.json();
+      console.log("✅ Leads synced:", result);
+
+      if (result.synced_count > 0) {
+        SuccessToast(`Successfully synced ${result.synced_count} leads from Pipedrive!`);
+      } else {
+        InfoToast("No new leads to sync from Pipedrive");
+      }
+    } catch (error) {
+      console.error("Lead sync failed:", error);
+      WarningToast("Failed to sync leads from Pipedrive");
+    }
+  };
+
   // Keep the message listener for popup communication
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -498,6 +536,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setPipedriveAccountInfo(event.data.accountInfo);
 
         clearOAuthState();
+
+        // Auto-sync leads from Pipedrive
+        setTimeout(() => {
+          syncPipedriveLeads();
+        }, 1000);
 
         // Continue to next question if needed
         if (currentQuestionIndex < filteredQuestions.length - 1) {
@@ -947,17 +990,27 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                       {pipedriveAccountInfo.contactCount} contacts • {pipedriveAccountInfo.dealCount} deals
                     </Text>
                   </div>
-                  <Button
-                    type="link"
-                    danger
-                    onClick={() => {
-                      setPipedriveStatus("disconnected");
-                      setPipedriveAccountInfo(null);
-                    }}
-                    className="text-red-500"
-                  >
-                    Disconnect
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button
+                      type="primary"
+                      size="small"
+                      onClick={syncPipedriveLeads}
+                      className="bg-green-600 border-green-600 hover:bg-green-700"
+                    >
+                      Sync Leads
+                    </Button>
+                    <Button
+                      type="link"
+                      danger
+                      onClick={() => {
+                        setPipedriveStatus("disconnected");
+                        setPipedriveAccountInfo(null);
+                      }}
+                      className="text-red-500"
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div className="mt-4 text-center">
