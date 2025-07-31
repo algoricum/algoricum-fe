@@ -2,11 +2,11 @@
 import type React from "react";
 import { useState } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { Users, UserPlus, Calendar, Search, Plus, X } from "lucide-react";
+import { Users, UserPlus, Calendar, Search, Plus, X, Loader2 } from "lucide-react";
 import { Header } from "@/components/common";
 import { createClient } from "@/utils/supabase/config/client";
 import { createStaffUser } from "@/utils/supabase/config/staff";
-import { getCurrentUserClinic} from "@/utils/supabase/leads-helper"
+import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
 
 interface Staff {
   id: string;
@@ -51,57 +51,92 @@ export default function StaffPage() {
   ]);
 
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [newStaff, setNewStaff] = useState({
     email: "",
+    name: "",
   });
 
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const clinin_id=await getCurrentUserClinic()
-
-    if (!newStaff.email) {
-      alert("Please enter staff email");
+    if (!newStaff.email.trim()) {
+      setMessage({ type: "error", text: "Please enter staff email" });
       return;
     }
-    
-    const { data, error1 } = await createStaffUser({
-      email: newStaff.email,
-      password: "Temp1234", // you can generate random password
-      name: "Receptionist 1",
-      clinicId: clinin_id,
-      roleId: "074a8cb5-03ea-422c-8786-da5ef8fd5d00",
-    });
 
-    if (error1) {
-      console.error(error1.message);
-    } else {
-      console.log("Staff created:", data);
+    if (!newStaff.name.trim()) {
+      setMessage({ type: "error", text: "Please enter staff name" });
+      return;
     }
 
-    // 1️⃣ Send Magic Link to staff
-    const { error } = await supabase.auth.signInWithOtp({
-      email: newStaff.email,
-      options: {
-        shouldCreateUser: true, // Creates user if not exists
-        emailRedirectTo: `http://localhost:3001/reset-password`, // Redirect to unified password setup page
-      },
-    });
+    setIsSubmitting(true);
+    setMessage(null);
 
-    if (error) {
-      alert("❌ Failed to send invite: " + error.message);
-    } else {
-      alert(`✅ Invitation sent to ${newStaff.email}`);
+    try {
+      const clinic_id = await getCurrentUserClinic();
 
-      // Reset form
-      setNewStaff({ email: "" });
-      setShowAddStaffModal(false);
+      if (!clinic_id) {
+        setMessage({ type: "error", text: "No clinic found. Please make sure you have a clinic set up." });
+        return;
+      }
+
+      // Create staff user via API route
+      const { data, error1 } = await createStaffUser({
+        email: newStaff.email,
+        name: newStaff.name,
+        clinicId: clinic_id,
+        roleId: "074a8cb5-03ea-422c-8786-da5ef8fd5d00", // Make this dynamic later
+      });
+
+      if (error1) {
+        setMessage({ type: "error", text: error1.message || "Failed to create staff member" });
+        console.error("Staff creation error:", error1);
+        return;
+      }
+
+      if (data) {
+        setMessage({
+          type: "success",
+          text: `✅ Staff member created successfully! ${data.emailSent ? "Login credentials have been sent to " + newStaff.email : "Please share the credentials manually: " + data.tempPassword}`,
+        });
+
+        // Reset form
+        setNewStaff({ email: "", name: "" });
+        setShowAddStaffModal(false);
+
+        console.log("Staff created:", data);
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      setMessage({ type: "error", text: "An unexpected error occurred. Please try again." });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <DashboardLayout header={<Header title="Staff Management" description="Manage your healthcare team and staff information." />}>
       <div>
+        {/* Success/Error Messages */}
+        {message && (
+          <div
+            className={`mb-6 p-4 rounded-lg ${
+              message.type === "success"
+                ? "bg-green-50 text-green-800 border border-green-200"
+                : "bg-red-50 text-red-800 border border-red-200"
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <span>{message.text}</span>
+              <button onClick={() => setMessage(null)} className="text-current opacity-50 hover:opacity-75">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Staff Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="card">
@@ -238,11 +273,35 @@ export default function StaffPage() {
             <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Add New Staff Member</h3>
-                <button onClick={() => setShowAddStaffModal(false)} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => setShowAddStaffModal(false)} className="text-gray-400 hover:text-gray-600" disabled={isSubmitting}>
                   <X className="w-6 h-6" />
                 </button>
               </div>
+
+              {message && (
+                <div
+                  className={`mb-4 p-3 rounded-lg text-sm ${
+                    message.type === "success" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
+                  }`}
+                >
+                  {message.text}
+                </div>
+              )}
+
               <form onSubmit={handleAddStaff} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={newStaff.name}
+                    onChange={e => setNewStaff({ ...newStaff, name: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter full name"
+                    disabled={isSubmitting}
+                  />
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <input
@@ -252,15 +311,29 @@ export default function StaffPage() {
                     onChange={e => setNewStaff({ ...newStaff, email: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder="Enter email address"
+                    disabled={isSubmitting}
                   />
+                  <p className="text-xs text-gray-500 mt-1">A secure temporary password will be auto-generated and sent to this email.</p>
                 </div>
 
                 <div className="flex space-x-3 pt-4">
-                  <button type="button" onClick={() => setShowAddStaffModal(false)} className="flex-1 btn btn-secondary">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStaffModal(false)}
+                    className="flex-1 btn btn-secondary"
+                    disabled={isSubmitting}
+                  >
                     Cancel
                   </button>
-                  <button type="submit" className="flex-1 btn btn-primary">
-                    Invite Staff
+                  <button type="submit" className="flex-1 btn btn-primary flex items-center justify-center" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Staff"
+                    )}
                   </button>
                 </div>
               </form>

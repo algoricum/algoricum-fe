@@ -1,49 +1,77 @@
-import { createClient } from "./client";
+// utils/supabase/config/staff.ts
 
-export const createStaffUser = async ({
-  email,
-  password,
-  name,
-  clinicId,
-  roleId,
-}: {
+// Define interfaces for better type safety
+interface CreateStaffUserParams {
   email: string;
-  password: string;
   name: string;
-  clinicId: string;
-  roleId: string;
-}) => {
-  const supabase = createClient();
+  clinicId: string | number; // Adjust based on your actual ID type
+  roleId: string | number; // Adjust based on your actual ID type
+}
 
-  // 1️⃣ Sign up the user in Auth
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { name }, // Save name in metadata
-    },
-  });
+interface StaffUser {
+  id: string;
+  email: string;
+  name: string;
+  clinicId: string | number;
+  roleId: string | number;
+  createdAt?: string;
+  // Add other properties that your API returns
+}
 
-  if (authError) return { error: authError };
+interface ApiResponse<T> {
+  data?: T;
+  error?: string;
+}
 
-  // 2️⃣ Insert in `user` table
-  const { error: userError } = await supabase.from("user").insert({
-    id: authData.user?.id,
-    email,
-    name,
-    user_id: authData.user?.id,
-  });
+interface CreateStaffResult {
+  data?: StaffUser;
+  error?: {
+    message: string;
+  };
+}
 
-  if (userError) return { error1: userError };
+export const createStaffUser = async ({ email, name, clinicId, roleId }: CreateStaffUserParams): Promise<CreateStaffResult> => {
+  try {
+    const response = await fetch("/api/create-staff", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email.trim(),
+        name: name.trim(),
+        clinicId,
+        roleId,
+      }),
+    });
 
-  // 3️⃣ Insert in `user_clinic`
-  const { error: ucError } = await supabase.from("user_clinic").insert({
-    user_id: authData.user?.id,
-    clinic_id: clinicId,
-    role_id: roleId,
-  });
+    const result: ApiResponse<StaffUser> = await response.json();
 
-  if (ucError) return { error1: ucError };
+    if (!response.ok) {
+      return {
+        error: {
+          message: result.error || "Failed to create staff user",
+        },
+      };
+    }
 
-  return { data: authData.user };
+    return { data: result.data };
+  } catch (error) {
+    console.error("Error calling create staff API:", error);
+    return {
+      error: {
+        message: "Failed to communicate with server. Please try again.",
+      },
+    };
+  }
 };
+
+// Optional: Create a more specific type for clinic and role IDs if they're UUIDs
+// type UUID = string;
+//
+// interface CreateStaffUserParams {
+//   email: string;
+//   name: string;
+//   clinicId: UUID;
+//   roleId: UUID;
+// }
