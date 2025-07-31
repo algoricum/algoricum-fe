@@ -437,7 +437,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     const clinicId = await getClinicId();
 
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive-integration`, {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
