@@ -81,6 +81,12 @@ async function handleOAuthInit(req: Request) {
   try {
     // Get JWT token from request
     const authHeader = req.headers.get('authorization')
+    console.log('🔍 Auth header check:', {
+      hasAuthHeader: !!authHeader,
+      authHeaderLength: authHeader ? authHeader.length : 0,
+      startsWithBearer: authHeader ? authHeader.startsWith('Bearer ') : false
+    })
+    
     if (!authHeader) {
       console.error('❌ No authorization header found')
       throw new Error('No authorization header')
@@ -89,6 +95,7 @@ async function handleOAuthInit(req: Request) {
 
     const token = authHeader.replace('Bearer ', '')
     console.log(`🎫 Token extracted (length: ${token.length})`)
+    console.log(`🎫 Token preview: ${token.substring(0, 20)}...`)
     
     // Check environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -113,70 +120,129 @@ async function handleOAuthInit(req: Request) {
     })
     console.log('🗄️ Supabase client initialized')
 
-    // Get user from token
+    // Get user from token with detailed error logging
     console.log('👤 Verifying user token...')
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
-    if (userError || !user) {
-      console.error('❌ User token verification failed:', userError?.message)
-      throw new Error('Invalid user token')
-    }
-    console.log(`✅ User verified: ${user.id}`)
-
-    // Get clinic_id from request body
-    console.log('📦 Parsing request body...')
-    const requestBody = await req.json()
-    console.log('📦 Request body:', requestBody)
-    
-    const { clinic_id } = requestBody
-    if (!clinic_id) {
-      console.error('❌ Missing clinic_id in request body')
-      throw new Error('Missing clinic_id')
-    }
-    console.log(`🏥 Clinic ID: ${clinic_id}`)
-
-    // Verify user owns the clinic
-    console.log('🔍 Verifying clinic ownership...')
-    const { data: clinic, error: clinicError } = await supabase
-      .from('clinic')
-      .select('id')
-      .eq('id', clinic_id)
-      .eq('owner_id', user.id)
-      .single()
-
-    if (clinicError) {
-      console.error('❌ Clinic query error:', clinicError)
-      throw new Error('Clinic not found or unauthorized')
-    }
-    
-    if (!clinic) {
-      console.error('❌ Clinic not found or user not authorized')
-      throw new Error('Clinic not found or unauthorized')
-    }
-    console.log('✅ Clinic ownership verified')
-
-    // Build OAuth URL
-    console.log('🔗 Building OAuth URL...')
-    const oauthUrl = new URL('https://oauth.pipedrive.com/oauth/authorize')
-    oauthUrl.searchParams.set('client_id', clientId)
-    oauthUrl.searchParams.set('redirect_uri', redirectUri)
-    oauthUrl.searchParams.set('response_type', 'code')
-    oauthUrl.searchParams.set('state', clinic_id)
-    oauthUrl.searchParams.set('scope', 'deals:read leads:read persons:read')
-
-    console.log('✅ OAuth URL built:', oauthUrl.toString())
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        authUrl: oauthUrl.toString() 
-      }),
-      {
-        headers: { 
-          'Content-Type': 'application/json',
-          ...corsHeaders 
-        },
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+      
+      console.log('👤 User verification result:', {
+        hasUser: !!user,
+        userId: user?.id,
+        userEmail: user?.email,
+        errorMessage: userError?.message,
+        errorCode: userError?.code
+      })
+      
+      if (userError) {
+        console.error('❌ User token verification failed:', {
+          message: userError.message,
+          code: userError.code,
+          details: userError
+        })
+        throw new Error(`Invalid user token: ${userError.message}`)
       }
-    )
+      
+      if (!user) {
+        console.error('❌ No user returned from token verification')
+        throw new Error('Invalid user token: No user found')
+      }
+      
+      console.log(`✅ User verified: ${user.id}`)
+
+      // Get clinic_id from request body
+      console.log('📦 Parsing request body...')
+      const requestBody = await req.json()
+      console.log('📦 Request body:', requestBody)
+      
+      const { clinic_id } = requestBody
+      if (!clinic_id) {
+        console.error('❌ Missing clinic_id in request body')
+        throw new Error('Missing clinic_id')
+      }
+      console.log(`🏥 Clinic ID: ${clinic_id}`)
+
+      // Verify user owns the clinic
+      console.log('🔍 Verifying clinic ownership...')
+      const { data: clinic, error: clinicError } = await supabase
+        .from('clinic')
+        .select('id, owner_id')
+        .eq('id', clinic_id)
+        .eq('owner_id', user.id)
+        .single()
+
+      console.log('🔍 Clinic verification result:', {
+        hasClinic: !!clinic,
+        clinicId: clinic?.id,
+        ownerId: clinic?.owner_id,
+        errorMessage: clinicError?.message
+      })
+
+      if (clinicError) {
+        console.error('❌ Clinic query error:', clinicError)
+        throw new Error(`Clinic verification failed: ${clinicError.message}`)
+      }
+      
+      if (!clinic) {
+        console.error('❌ Clinic not found or user not authorized')
+        throw new Error('Clinic not found or unauthorized')
+      }
+      console.log('✅ Clinic ownership verified')
+
+      // Build OAuth URL with user_id in state to help identify the clinic later
+      console.log('🔗 Building OAuth URL...')
+      const stateData = `${clinic_id}:${user.id}` // Include both clinic_id and user_id
+      const oauthUrl = new URL('https://oauth.pipedrive.com/oauth/authorize')
+      oauthUrl.searchParams.set('client_id', clientId)
+      oauthUrl.searchParams.set('redirect_uri', redirectUri)
+      oauthUrl.searchParams.set('response_type', 'code')
+      oauthUrl.searchParams.set('state', stateData)
+      oauthUrl.searchParams.set('scope', 'deals:read leads:read persons:read')
+
+      console.log('✅ OAuth URL built:', oauthUrl.toString())
+
+      // Also store the pending integration in a temporary table or cache
+      // This is a backup method in case state parameter gets lost
+      const { error: tempError } = await supabase
+        .from('pipedrive_integration')
+        .upsert({
+          clinic_id: clinic_id,
+          access_token: 'PENDING',
+          api_domain: 'pending',
+          company_id: 'pending',
+          user_id: user.id,
+          is_active: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'clinic_id'
+        })
+
+      if (tempError) {
+        console.log('⚠️ Could not store pending integration:', tempError.message)
+      } else {
+        console.log('✅ Stored pending integration for fallback')
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          authUrl: oauthUrl.toString() 
+        }),
+        {
+          headers: { 
+            'Content-Type': 'application/json',
+            ...corsHeaders 
+          },
+        }
+      )
+    } catch (authError) {
+      console.error('💥 Authentication error details:', {
+        message: authError.message,
+        stack: authError.stack,
+        tokenPreview: token ? token.substring(0, 20) + '...' : 'No token'
+      })
+      throw authError
+    }
   } catch (error) {
     console.error('💥 OAuth init error:', {
       message: error.message,
@@ -193,7 +259,7 @@ async function handleOAuthCallback(req: Request) {
   try {
     const url = new URL(req.url)
     const code = url.searchParams.get('code')
-    const state = url.searchParams.get('state') // Contains clinic_id
+    const state = url.searchParams.get('state') // Contains clinic_id:user_id or may be missing
     
     console.log('📥 Callback parameters:', {
       code: code ? `${code.substring(0, 10)}...` : 'Missing',
@@ -201,9 +267,22 @@ async function handleOAuthCallback(req: Request) {
       fullUrl: req.url
     })
     
-    if (!code || !state) {
-      console.error('❌ Missing required callback parameters')
-      throw new Error('Missing authorization code or state')
+    if (!code) {
+      console.error('❌ Missing authorization code')
+      throw new Error('Missing authorization code')
+    }
+
+    // Parse state if available
+    let clinicId = null
+    let userId = null
+    
+    if (state && state.includes(':')) {
+      const [parsedClinicId, parsedUserId] = state.split(':')
+      clinicId = parsedClinicId
+      userId = parsedUserId
+      console.log('✅ Parsed state:', { clinicId, userId })
+    } else {
+      console.log('⚠️ State parameter missing or malformed, will use fallback method')
     }
 
     // Check environment variables
@@ -264,6 +343,37 @@ async function handleOAuthCallback(req: Request) {
       userId: tokenData.user_id,
       expiresIn: tokenData.expires_in
     })
+
+    // If we don't have clinicId from state, try to find it using the pending integration
+    if (!clinicId) {
+      console.log('🔍 Looking for pending integration using company_id...')
+      
+      const { data: pendingIntegrations, error: pendingError } = await supabase
+        .from('pipedrive_integration')
+        .select('clinic_id, user_id')
+        .eq('access_token', 'PENDING')
+        .eq('is_active', false)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (pendingError) {
+        console.error('❌ Error finding pending integrations:', pendingError)
+      } else if (pendingIntegrations && pendingIntegrations.length > 0) {
+        console.log('🔍 Found pending integrations:', pendingIntegrations.length)
+        
+        // Use the most recent pending integration
+        const pendingIntegration = pendingIntegrations[0]
+        clinicId = pendingIntegration.clinic_id
+        userId = pendingIntegration.user_id
+        
+        console.log('✅ Using pending integration:', { clinicId, userId })
+      }
+    }
+
+    if (!clinicId) {
+      console.error('❌ Could not determine clinic_id from state or pending integrations')
+      throw new Error('Could not determine clinic for this integration')
+    }
     
     // Calculate expiry time
     const expiresAt = tokenData.expires_in 
@@ -275,7 +385,7 @@ async function handleOAuthCallback(req: Request) {
     // Save integration to database
     console.log('💾 Saving integration to database...')
     const integrationData = {
-      clinic_id: state,
+      clinic_id: clinicId,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
       api_domain: tokenData.api_domain,

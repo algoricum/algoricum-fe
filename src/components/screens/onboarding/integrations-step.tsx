@@ -442,11 +442,30 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     const clinicId = await getClinicId();
 
     try {
+      // Get the user's session token
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      console.log("Session debug:", {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        sessionError: sessionError,
+        tokenLength: session?.access_token ? session.access_token.length : 0,
+      });
+
+      if (!session?.access_token) {
+        throw new Error("No valid session found. Please log in again.");
+      }
+
+      console.log("Making request with token:", session.access_token.substring(0, 20) + "...");
+
       const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           name: "Functions",
@@ -456,13 +475,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         }),
       });
 
+      console.log("Response status:", response.status);
+      const responseText = await response.text();
+      console.log("Response body:", responseText);
+
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Response error:", response.status, errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`);
       }
 
-      const data = await response.json();
+      const data = JSON.parse(responseText);
       if (data.error) {
         throw new Error(data.error);
       }
@@ -482,11 +503,19 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     const clinicId = await getClinicId();
 
     try {
+      // Get the user's session token
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No valid session found. Please log in again.");
+      }
+
       const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive/sync-leads`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           clinic_id: clinicId,
