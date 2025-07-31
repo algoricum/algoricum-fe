@@ -1,0 +1,301 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Button, Input, Select, Switch, Typography, Upload } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
+import { updateClinic, getClinicData } from "@/utils/supabase/clinic-helper";
+import { SuccessToast, ErrorToast } from "@/helpers/toast";
+import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
+import { createClient } from "@/utils/supabase/config/client";
+import Image from "next/image";
+
+const { Title } = Typography;
+const { Option } = Select;
+
+const TIME_OPTIONS = [
+  "6:00 AM",
+  "6:30 AM",
+  "7:00 AM",
+  "7:30 AM",
+  "8:00 AM",
+  "8:30 AM",
+  "9:00 AM",
+  "9:30 AM",
+  "10:00 AM",
+  "10:30 AM",
+  "11:00 AM",
+  "11:30 AM",
+  "12:00 PM",
+  "12:30 PM",
+  "1:00 PM",
+  "1:30 PM",
+  "2:00 PM",
+  "2:30 PM",
+  "3:00 PM",
+  "3:30 PM",
+  "4:00 PM",
+  "4:30 PM",
+  "5:00 PM",
+  "5:30 PM",
+  "6:00 PM",
+  "6:30 PM",
+  "7:00 PM",
+  "7:30 PM",
+  "8:00 PM",
+  "8:30 PM",
+  "9:00 PM",
+  "9:30 PM",
+  "10:00 PM",
+];
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const CLINIC_FIELDS = [
+  ["Legal Business Name", "legal_business_name"],
+  ["DBA Name", "dba_name"],
+  ["Email", "email"],
+  ["Phone", "phone"],
+  ["Address", "address"],
+  ["Booking Link", "calendly_link"],
+  ["Clinic Type", "clinic_type"],
+];
+
+const supabase = createClient();
+
+const ClinicSetting = () => {
+  const [loading, setLoading] = useState(true);
+  const [clinic, setClinic] = useState<any>(null);
+  const [fileList, setFileList] = useState<any[]>([]);
+  const [formData, setFormData] = useState<any>({
+    legal_business_name: "",
+    dba_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    domain: "",
+    calendly_link: "",
+    clinic_type: "",
+    logo: null,
+    business_hours: {},
+  });
+
+  useEffect(() => {
+    const fetchClinic = async () => {
+      const data = await getClinicData();
+      if (data) {
+        let logoUrl = null;
+        if (data.logo?.startsWith("http")) {
+          logoUrl = data.logo;
+        } else if (data.logo) {
+          const { data: publicUrlData } = supabase.storage.from("clinic-logos").getPublicUrl(data.logo);
+          logoUrl = publicUrlData?.publicUrl || null;
+        }
+
+        const normalizedHours = Object.fromEntries(
+          DAYS.map(day => {
+            const entry = data.business_hours?.[day];
+            return [
+              day,
+              entry
+                ? { enabled: entry.isOpen, start: entry.openTime, end: entry.closeTime }
+                : { enabled: day !== "Sunday", start: "9:00 AM", end: "5:00 PM" },
+            ];
+          }),
+        );
+
+        setClinic(data);
+        setFormData({
+          legal_business_name: data.legal_business_name || "",
+          dba_name: data.dba_name || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          address: data.address || "",
+          domain: data.domain || "",
+          calendly_link: data.calendly_link || "",
+          clinic_type: data.clinic_type || "",
+          logo: logoUrl,
+          business_hours: normalizedHours,
+        });
+
+        if (data.logo) {
+          setFileList([{ uid: "-1", name: "Clinic Logo", status: "done", url: logoUrl }]);
+        }
+      }
+      setLoading(false);
+    };
+
+    fetchClinic();
+  }, []);
+
+  const handleChange = (field: string, value: any) => {
+    setFormData((prev: typeof formData) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogoUpload = (info: any) => {
+    const newFileList = info.fileList.slice(-1);
+    setFileList(newFileList);
+    const file = newFileList[0]?.originFileObj;
+    if (file instanceof File) {
+      const previewUrl = URL.createObjectURL(file);
+      setFormData((prev: typeof formData) => ({ ...prev, logo: previewUrl }));
+    }
+  };
+
+  const handleDayToggle = (day: string, enabled: boolean) => {
+    setFormData((prev: typeof formData) => ({
+      ...prev,
+      business_hours: {
+        ...prev.business_hours,
+        [day]: { ...prev.business_hours?.[day], enabled },
+      },
+    }));
+  };
+
+  const handleTimeChange = (day: string, field: "start" | "end", value: string) => {
+    setFormData((prev: typeof formData) => ({
+      ...prev,
+      business_hours: {
+        ...prev.business_hours,
+        [day]: { ...prev.business_hours?.[day], [field]: value },
+      },
+    }));
+  };
+
+  const handleSubmit = async () => {
+    if (!clinic?.id) return;
+
+    let logoUrl = formData.logo;
+    const file = fileList[0]?.originFileObj;
+    if (file instanceof File) {
+      try {
+        logoUrl = await uploadClinicLogo(clinic.created_by || clinic.id, file);
+      } catch (error) {
+        console.error("Upload failed", error);
+        return ErrorToast("Logo upload failed");
+      }
+    }
+
+    const updatedHours = Object.fromEntries(
+      DAYS.map(day => {
+        const entry = formData.business_hours?.[day];
+        return [day, { isOpen: entry?.enabled, openTime: entry?.start, closeTime: entry?.end }];
+      }),
+    );
+
+    const result = await updateClinic({
+      id: clinic.id,
+      ...formData,
+      logo: logoUrl,
+      business_hours: updatedHours,
+    });
+
+    if (result) {
+      SuccessToast("Clinic profile updated successfully");
+    } else {
+      ErrorToast("Update failed. Please try again.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading clinic settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      {/* Clinic Profile & Logo */}
+      <div className="flex flex-col lg:flex-row gap-6 flex-wrap border border-gray-200 p-6 bg-Gray100">
+        <div className="flex-1 min-w-[280px] rounded-[20px]">
+          <Title level={3}>Clinic Profile</Title>
+          {CLINIC_FIELDS.map(([label, key]) => (
+            <div key={key}>
+              <label className="font-medium">{label}</label>
+              <Input value={formData[key] ?? ""} onChange={e => handleChange(key, e.target.value)} placeholder={label} className="mb-4" />
+            </div>
+          ))}
+        </div>
+
+        <div className="w-full sm:w-full lg:w-2/5 flex flex-col items-center justify-center border border-gray-200 rounded-[20px] p-6 bg-white">
+          <Upload
+            accept="image/*"
+            showUploadList={false}
+            beforeUpload={() => false}
+            onChange={handleLogoUpload}
+            maxCount={1}
+            fileList={fileList}
+          >
+            <Button icon={<UploadOutlined />}>Upload Logo</Button>
+          </Upload>
+
+          {formData.logo && (
+            <div className="relative w-full max-w-xs h-[300px] mt-4">
+              <Image src={formData.logo} alt="Clinic Logo" fill className="object-contain border border-gray-200 rounded" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Business Hours */}
+      <div className="rounded-[20px] border border-gray-200 p-6 bg-Gray100">
+        <Title level={4}>Business Hours</Title>
+        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white mb-8">
+          <div className="grid grid-cols-[1fr_120px_300px] bg-gray-50 p-4 border-b border-gray-200 font-medium text-gray-700">
+            <div>Day</div>
+            <div>Status</div>
+            <div>Hours</div>
+          </div>
+
+          {DAYS.map(day => {
+            const dayData = formData.business_hours?.[day] || {};
+            return (
+              <div key={day} className="grid grid-cols-[1fr_120px_300px] p-4 items-center border-b border-gray-100">
+                <div className="text-gray-700 font-medium">{day}</div>
+                <div>
+                  <Switch
+                    checked={dayData.enabled}
+                    onChange={checked => handleDayToggle(day, checked)}
+                    className={dayData.enabled ? "bg-purple-500" : "bg-gray-300"}
+                  />
+                </div>
+                <div>
+                  {dayData.enabled ? (
+                    <div className="flex items-center gap-2">
+                      <Select value={dayData.start ?? ""} onChange={val => handleTimeChange(day, "start", val)} className="w-28">
+                        {TIME_OPTIONS.map(t => (
+                          <Option key={t} value={t}>
+                            {t}
+                          </Option>
+                        ))}
+                      </Select>
+                      <span className="text-gray-500">to</span>
+                      <Select value={dayData.end ?? ""} onChange={val => handleTimeChange(day, "end", val)} className="w-28">
+                        {TIME_OPTIONS.map(t => (
+                          <Option key={t} value={t}>
+                            {t}
+                          </Option>
+                        ))}
+                      </Select>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">Closed</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <Button type="primary" onClick={handleSubmit} className="bg-brand-primary hover:!bg-brand-secondary text-white mt-4">
+          Save Changes
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default ClinicSetting;
