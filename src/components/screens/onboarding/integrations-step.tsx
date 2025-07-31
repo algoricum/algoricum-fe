@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Button, Radio, Card, Space, Typography, Modal, Alert, Spin, Form } from "antd";
+import { Button, Radio, Select, Card, Space, Typography, Modal, Alert, Spin, Form } from "antd";
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
 import { getUserData } from "@/utils/supabase/user-helper";
 import { createClient } from "@/utils/supabase/config/client";
@@ -34,35 +34,23 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [showCustomCrmModal, setShowCustomCrmModal] = useState(false);
 
   const [formData, setFormData] = useState({
-    usesHubspot: initialData.usesHubspot || "",
-    usesPipedrive: initialData.usesPipedrive || "",
-    uploadLeads: initialData.uploadLeads || "", // New field for file upload
+    selectedCrm: initialData.selectedCrm || "",
+    uploadLeads: initialData.uploadLeads || "",
   });
   const supabase = createClient();
   const [showCompletionButtons, setShowCompletionButtons] = useState(false);
 
   const getClinicId = async () => {
     const clinic = await getClinicData();
-
-    if (!clinic || !clinic?.id) {
-      return null;
-    } else {
-      return clinic.id;
-    }
+    return clinic?.id || null;
   };
 
   const questions = [
     {
-      id: "usesHubspot",
-      type: "radio",
-      question: "Do you use HubSpot as your CRM?",
-      options: ["Yes", "No"],
-    },
-    {
-      id: "usesPipedrive",
-      type: "radio",
-      question: "Do you use Pipedrive as your CRM?",
-      options: ["Yes", "No"],
+      id: "selectedCrm",
+      type: "select",
+      question: "Which CRM do you use?",
+      options: ["HubSpot", "Pipedrive", "None"],
     },
     {
       id: "uploadLeads",
@@ -72,11 +60,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     },
   ];
 
-  // All questions are shown regardless of previous answers
   const filteredQuestions = questions;
-
   const currentQuestion = filteredQuestions[currentQuestionIndex];
-
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
   const handleCsvUpload = async (leadsData: any) => {
@@ -85,17 +70,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         WarningToast("No CSV file selected");
       }
 
-      // Get current user
       const user = await getUserData();
       if (!user) {
         throw new Error("User not found. Please log in again.");
       }
 
-      // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const fileName = `leads-${user.id}-${timestamp}.csv`;
-
-      // Create file path: user_id/filename.csv
       const filePath = `${user.id}/${fileName}`;
 
       let csvData;
@@ -104,7 +85,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       } else {
         csvData = leadsData;
       }
-      // Upload file directly to Supabase Storage
+
       const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvData, {
         cacheControl: "3600",
         upsert: false,
@@ -131,12 +112,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
         setShowHubspotModal(false);
+        setShowPipedriveModal(false);
       } else {
         const finalData = {
           ...formData,
-          usesHubspot: "Yes",
-          hubspotConnected: true,
+          hubspotConnected: hubspotStatus === "connected",
+          pipedriveConnected: pipedriveStatus === "connected",
           hubspotAccountInfo,
+          pipedriveAccountInfo,
         };
         onNext(finalData);
       }
@@ -146,16 +129,15 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     autoProgressing,
     currentQuestionIndex,
     questions.length,
-    setCurrentQuestionIndex,
-    setShowHubspotModal,
     formData,
+    hubspotStatus,
+    pipedriveStatus,
     hubspotAccountInfo,
+    pipedriveAccountInfo,
     onNext,
   ]);
 
-  // Restore state from localStorage on component mount
   useEffect(() => {
-    // Restore OAuth state if it exists
     const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
     const savedPipedriveStatus = localStorage.getItem("pipedrive_oauth_status");
     const savedQuestionIndex = localStorage.getItem("oauth_question_index");
@@ -198,7 +180,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   }, []);
 
-  // Listen for OAuth callback messages
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) {
@@ -208,17 +189,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       if (event.data.type === "hubspot_success") {
         setHubspotStatus("connected");
         setHubspotAccountInfo(event.data.accountInfo);
-
-        // Update form data
-        setFormData(prevFormData => ({
-          ...prevFormData,
-          usesHubspot: "Yes",
+        setFormData(prev => ({
+          ...prev,
+          selectedCrm: "HubSpot",
         }));
-
-        // Clear saved OAuth state
         clearOAuthState();
-
-        // Auto-progress to next question
         autoProgressToNext();
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
@@ -227,11 +202,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       } else if (event.data.type === "pipedrive_success") {
         setPipedriveStatus("connected");
         setPipedriveAccountInfo(event.data.accountInfo);
-
-        // Clear saved OAuth state
         clearOAuthState();
-
-        // Continue to next question if needed
+        setTimeout(() => syncPipedriveLeads(), 1000);
         if (currentQuestionIndex < filteredQuestions.length - 1) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
         }
@@ -244,9 +216,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing, autoProgressToNext, filteredQuestions.length]);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, pipedriveAccountInfo, autoProgressToNext, filteredQuestions.length]);
 
-  // Handle OAuth callback if code parameter is present
   useEffect(() => {
     const handleOAuthRedirect = () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -259,68 +230,44 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
       if (hubspotStatus === "success") {
         console.log("✅ HubSpot OAuth success detected from URL");
-
         const accountInfo = {
           accountName: accountName || "Connected Account",
           contactCount: parseInt(contactCount || "0"),
           dealCount: 0,
         };
-
         setHubspotStatus("connected");
         setHubspotAccountInfo(accountInfo);
-        setFormData(prevFormData => ({
-          ...prevFormData,
-          usesHubspot: "Yes",
+        setFormData(prev => ({
+          ...prev,
+          selectedCrm: "HubSpot",
         }));
-
         clearOAuthState();
-
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
-
-        // Auto-progress to next question
         autoProgressToNext();
       } else if (hubspotStatus === "error") {
         console.log("❌ HubSpot OAuth error detected from URL:", errorMessage);
-
         setHubspotStatus("disconnected");
         clearOAuthState();
-
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
       } else if (pipedriveStatus === "success") {
         console.log("✅ Pipedrive OAuth success detected from URL");
-
         const accountInfo = {
           accountName: accountName || "Connected Account",
           contactCount: parseInt(contactCount || "0"),
           dealCount: parseInt(dealCount || "0"),
         };
-
         setPipedriveStatus("connected");
         setPipedriveAccountInfo(accountInfo);
-
         clearOAuthState();
-
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
-
-        // Auto-sync leads from Pipedrive
-        setTimeout(() => {
-          syncPipedriveLeads();
-        }, 1000);
-
-        // Continue to next question if needed
+        setTimeout(() => syncPipedriveLeads(), 1000);
         if (currentQuestionIndex < filteredQuestions.length - 1) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
         }
       } else if (pipedriveStatus === "error") {
         console.log("❌ Pipedrive OAuth error detected from URL:", errorMessage);
-
         setPipedriveStatus("disconnected");
         clearOAuthState();
-
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     };
@@ -359,38 +306,25 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       [currentQuestion.id]: value,
     }));
 
-    if (currentQuestion.id === "usesHubspot") {
-      if (value === "Yes") {
+    if (currentQuestion.id === "selectedCrm") {
+      if (value === "HubSpot") {
         setShowHubspotModal(true);
         setShowCompletionButtons(true);
-      } else if (value === "No") {
-        setShowCompletionButtons(false);
-      }
-    }
-
-    if (currentQuestion.id === "usesPipedrive") {
-      if (value === "Yes") {
+      } else if (value === "Pipedrive") {
         setShowPipedriveModal(true);
         setShowCompletionButtons(true);
-      } else if (value === "No") {
-        setShowCompletionButtons(false);
-      }
-    }
-
-    // Handle file upload question
-    if (currentQuestion.id === "uploadLeads") {
-      if (value === "Yes") {
-        setTimeout(() => {
-          setShowManualLeadsModal(true);
-        }, 500); // Small delay for better UX
-      }
-    }
-
-    //show onboarding completion buttons
-    if (currentQuestion.id === "uploadLeads" || currentQuestion.id === "usesPipedrive") {
-      if (value === "Yes" || value === "No") {
+      } else if (value === "None") {
+        setShowCustomCrmModal(true);
         setShowCompletionButtons(true);
       }
+    }
+
+    if (currentQuestion.id === "uploadLeads" && value === "Yes") {
+      setTimeout(() => setShowManualLeadsModal(true), 500);
+    }
+
+    if (currentQuestion.id === "uploadLeads" && (value === "Yes" || value === "No")) {
+      setShowCompletionButtons(true);
     }
   };
 
@@ -410,7 +344,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         body: JSON.stringify({
           userId: await getCurrentUserId(),
           clinic_id: clinicId,
-          redirectUrl: window.location.href, // Current page URL
+          redirectUrl: window.location.href,
         }),
       });
 
@@ -426,8 +360,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       }
 
       console.log("🚀 Redirecting to HubSpot OAuth:", data.authUrl);
-
-      // Simple redirect - no popup!
       window.location.href = data.authUrl;
     } catch (error) {
       console.error("Connection failed:", error);
@@ -442,12 +374,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     const clinicId = await getClinicId();
 
     try {
-      // Get the user's session token
       const {
         data: { session },
         error: sessionError,
       } = await supabase.auth.getSession();
-
       console.log("Session debug:", {
         hasSession: !!session,
         hasAccessToken: !!session?.access_token,
@@ -471,7 +401,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           name: "Functions",
           userId: await getCurrentUserId(),
           clinic_id: clinicId,
-          redirectUrl: window.location.href, // Current page URL
+          redirectUrl: window.location.href,
         }),
       });
 
@@ -489,8 +419,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       }
 
       console.log("🚀 Redirecting to Pipedrive OAuth:", data.authUrl);
-
-      // Simple redirect - no popup!
       window.location.href = data.authUrl;
     } catch (error) {
       console.error("Connection failed:", error);
@@ -503,7 +431,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     const clinicId = await getClinicId();
 
     try {
-      // Get the user's session token
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -540,51 +467,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
-  // Keep the message listener for popup communication
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      console.log("Received message:", event.data); // Debug log
-
-      if (event.data.type === "hubspot_success") {
-        setHubspotStatus("connected");
-        setHubspotAccountInfo(event.data.accountInfo);
-
-        setFormData(prevFormData => ({
-          ...prevFormData,
-          usesHubspot: "Yes",
-        }));
-
-        clearOAuthState();
-
-        autoProgressToNext();
-      } else if (event.data.type === "hubspot_error") {
-        setHubspotStatus("disconnected");
-        clearOAuthState();
-      } else if (event.data.type === "pipedrive_success") {
-        setPipedriveStatus("connected");
-        setPipedriveAccountInfo(event.data.accountInfo);
-
-        clearOAuthState();
-
-        // Auto-sync leads from Pipedrive
-        setTimeout(() => {
-          syncPipedriveLeads();
-        }, 1000);
-
-        // Continue to next question if needed
-        if (currentQuestionIndex < filteredQuestions.length - 1) {
-          setCurrentQuestionIndex(currentQuestionIndex + 1);
-        }
-      } else if (event.data.type === "pipedrive_error") {
-        setPipedriveStatus("disconnected");
-        clearOAuthState();
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing, autoProgressToNext, filteredQuestions.length]);
-
   const handleHubspotModalOk = () => {
     setShowHubspotModal(false);
   };
@@ -594,7 +476,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     setShowCompletionButtons(false);
     setFormData(prev => ({
       ...prev,
-      usesHubspot: "",
+      selectedCrm: "",
     }));
   };
 
@@ -605,7 +487,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       }
     } else {
-      // Skip for now
       setShowPipedriveModal(false);
       if (currentQuestionIndex < filteredQuestions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -618,40 +499,30 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     pipedriveForm.resetFields();
     setFormData(prev => ({
       ...prev,
-      usesPipedrive: "",
+      selectedCrm: "",
     }));
   };
 
   const handleNext = () => {
-    // Handle HubSpot modal
-    if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
+    if (currentQuestion.id === "selectedCrm" && currentValue === "HubSpot" && hubspotStatus !== "connected") {
       setShowHubspotModal(true);
       return;
     }
-
-    // Handle Pipedrive modal
-    if (currentQuestion.id === "usesPipedrive" && currentValue === "Yes" && pipedriveStatus !== "connected") {
+    if (currentQuestion.id === "selectedCrm" && currentValue === "Pipedrive" && pipedriveStatus !== "connected") {
       setShowPipedriveModal(true);
       return;
     }
 
-    // Continue to next question or complete
     if (currentQuestionIndex < filteredQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       const finalData = {
         ...formData,
-        ...(formData.usesHubspot === "Yes" && {
-          hubspotConnected: hubspotStatus === "connected",
-          hubspotAccountInfo,
-        }),
-        ...(formData.usesPipedrive === "Yes" && {
-          pipedriveConnected: pipedriveStatus === "connected",
-          pipedriveAccountInfo,
-        }),
-        ...(formData.uploadLeads === "Yes" && {
-          csvUploaded: localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) !== null,
-        }),
+        hubspotConnected: hubspotStatus === "connected",
+        pipedriveConnected: pipedriveStatus === "connected",
+        hubspotAccountInfo,
+        pipedriveAccountInfo,
+        csvUploaded: localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) !== null,
       };
       onNext(finalData);
     }
@@ -659,7 +530,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const handlePrevious = () => {
     setShowCompletionButtons(false);
-
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     } else if (onPrev) {
@@ -676,7 +546,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">{q.question}</Text>
           <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
             <Text className="text-gray-700 text-lg">{value || "Not specified"}</Text>
-            {q.id === "usesHubspot" && value === "Yes" && hubspotStatus === "connected" && (
+            {q.id === "selectedCrm" && value === "HubSpot" && hubspotStatus === "connected" && (
               <div className="mt-2 p-2 bg-green-100 rounded-lg">
                 <Text className="text-green-700 text-sm">
                   <CheckCircleOutlined className="mr-1" />
@@ -684,7 +554,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 </Text>
               </div>
             )}
-            {q.id === "usesPipedrive" && value === "Yes" && pipedriveStatus === "connected" && (
+            {q.id === "selectedCrm" && value === "Pipedrive" && pipedriveStatus === "connected" && (
               <div className="mt-2 p-2 bg-blue-100 rounded-lg">
                 <Text className="text-blue-700 text-sm">
                   <CheckCircleOutlined className="mr-1" />
@@ -707,7 +577,54 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const renderCurrentInput = () => {
-    if (currentQuestion?.type === "radio") {
+    if (currentQuestion?.type === "select") {
+      return (
+        <div className="mb-6">
+          <Select
+            value={currentValue || undefined}
+            onChange={handleInputChange}
+            placeholder="Select a CRM"
+            className="w-full"
+            size="large"
+            disabled={isSubmitting}
+          >
+            {currentQuestion.options?.map(option => (
+              <Select.Option key={option} value={option}>
+                {option}
+              </Select.Option>
+            ))}
+          </Select>
+          {currentQuestion.id === "selectedCrm" && currentValue === "Pipedrive" && (
+            <Card className="rounded-xl bg-green-50 border-2 border-green-500 mt-6" styles={{ body: { padding: "20px" } }}>
+              <div className="flex items-center mb-3">
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                  <ThunderboltOutlined className="text-white text-base" />
+                </div>
+                <Text className="text-lg font-semibold text-green-900">Connect your Pipedrive CRM!</Text>
+              </div>
+              <Text className="text-green-900 text-base leading-6">
+                Great! We can connect your Pipedrive CRM directly to automatically sync your leads, contacts, and deals with our platform
+                for seamless workflows.
+              </Text>
+            </Card>
+          )}
+          {currentQuestion.id === "selectedCrm" && currentValue === "HubSpot" && (
+            <Card className="rounded-xl bg-orange-50 border-2 border-orange-500 mt-6" styles={{ body: { padding: "20px" } }}>
+              <div className="flex items-center mb-3">
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
+                  <Text className="text-white font-bold text-sm">H</Text>
+                </div>
+                <Text className="text-lg font-semibold text-orange-900">Connect your HubSpot CRM!</Text>
+              </div>
+              <Text className="text-orange-900 text-base leading-6">
+                Great! We can connect your HubSpot CRM directly to automatically sync your leads, contacts, and deals with our platform for
+                seamless workflows.
+              </Text>
+            </Card>
+          )}
+        </div>
+      );
+    } else if (currentQuestion?.type === "radio") {
       return (
         <div className="mb-6">
           <Radio.Group value={currentValue} onChange={e => handleInputChange(e.target.value)} className="w-full">
@@ -729,22 +646,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               ))}
             </Space>
           </Radio.Group>
-          {/* Special info card for pipedrive question */}
-          {currentQuestion.id === "usesPipedrive" && currentValue === "Yes" && (
-            <Card className="rounded-xl bg-green-50 border-2 border-green-500 mt-6" styles={{ body: { padding: "20px" } }}>
-              <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
-                  <ThunderboltOutlined className="text-white text-base" />
-                </div>
-                <Text className="text-lg font-semibold text-green-900">Connect your Pipedrive CRM!</Text>
-              </div>
-              <Text className="text-green-900 text-base leading-6">
-                Great! We can connect your Pipedrive CRM directly to automatically sync your leads, contacts, and deals with our platform
-                for seamless workflows.
-              </Text>
-            </Card>
-          )}
-          {/* Special info card for upload leads question */}
           {currentQuestion.id === "uploadLeads" && currentValue === "Yes" && (
             <Card className="rounded-xl bg-purple-50 border-2 border-purple-500 mt-6" styles={{ body: { padding: "20px" } }}>
               <div className="flex items-center mb-3">
@@ -762,11 +663,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         </div>
       );
     }
-
     return null;
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
@@ -796,10 +695,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             >
               Previous
             </Button>
-
             <Button
               type="primary"
-              onClick={handleNext} // or your onboarding completion logic
+              onClick={handleNext}
               className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
               loading={isSubmitting}
             >
@@ -820,7 +718,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             <Button
               type="primary"
               onClick={handleNext}
-              disabled={(currentQuestion.type === "radio" ? !currentValue : false) || isSubmitting}
+              disabled={(currentQuestion.type === "radio" || currentQuestion.type === "select" ? !currentValue : false) || isSubmitting}
               loading={isSubmitting && currentQuestionIndex === filteredQuestions?.length - 1}
               className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
             >
@@ -834,7 +732,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         )}
       </div>
 
-      {/* HubSpot Connection Modal */}
       <Modal
         title={
           <div className="flex items-center">
@@ -887,7 +784,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </>
           )}
-
           {hubspotStatus === "connecting" && (
             <div className="text-center py-8">
               <Spin size="large" />
@@ -898,7 +794,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </div>
           )}
-
           {hubspotStatus === "connected" && hubspotAccountInfo && (
             <>
               <Alert
@@ -913,7 +808,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         </div>
       </Modal>
 
-      {/* Pipedrive Modal */}
       <Modal
         title={
           <div className="flex items-center">
@@ -987,7 +881,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </>
           )}
-
           {pipedriveStatus === "connecting" && (
             <div className="text-center py-8">
               <Spin size="large" />
@@ -998,7 +891,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </div>
           )}
-
           {pipedriveStatus === "connected" && pipedriveAccountInfo && (
             <>
               <Alert
@@ -1060,7 +952,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         </div>
       </Modal>
 
-      {/* Manual Leads Modal */}
       <CsvUploadModal
         open={showManualLeadsModal}
         onOk={leads => {
