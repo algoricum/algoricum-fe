@@ -701,7 +701,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
               loading={isSubmitting}
             >
-              Complete Onboarding
+              {/* More explicit logic to ensure correct button text */}
+              {currentQuestionIndex < filteredQuestions.length - 1 ? "Continue" : "Complete Onboarding"}
             </Button>
           </div>
         )}
@@ -979,12 +980,19 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         }
         open={showCustomCrmModal}
         onOk={() => setShowCustomCrmModal(false)}
-        onCancel={() => setShowCustomCrmModal(false)}
+        onCancel={() => {
+          setShowCustomCrmModal(false);
+          setShowCompletionButtons(false);
+          setFormData(prev => ({
+            ...prev,
+            selectedCrm: "",
+          }));
+        }}
         okText="Close"
         cancelText="Cancel"
         width={500}
         centered
-        footer={null}
+        // Remove footer={null} to show the buttons
       >
         <div className="py-6 text-center">
           <Alert
