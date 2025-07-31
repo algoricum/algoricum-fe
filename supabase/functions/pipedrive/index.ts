@@ -7,6 +7,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to construct proper Pipedrive API URLs
+function buildPipedriveUrl(apiDomain: string, endpoint: string): string {
+  const baseUrl = apiDomain.startsWith('http') ? apiDomain : `https://${apiDomain}`
+  return `${baseUrl}/api/v1/${endpoint.startsWith('/') ? endpoint.slice(1) : endpoint}`
+}
+
 serve(async (req) => {
   console.log(`🚀 Function called: ${req.method} ${req.url}`)
   
@@ -351,7 +357,7 @@ async function handleOAuthCallback(req: Request) {
       
       // Try to get user info from Pipedrive API
       try {
-        const userResponse = await fetch(`https://${tokenData.api_domain}/api/v1/users/me`, {
+        const userResponse = await fetch(buildPipedriveUrl(tokenData.api_domain, 'users/me'), {
           headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
         })
         
@@ -473,7 +479,7 @@ async function getAccountInfo(accessToken: string, apiDomain: string) {
     console.log('📊 Fetching account information...')
     
     // Get persons (contacts) count
-    const personsResponse = await fetch(`https://${apiDomain}/api/v1/persons?limit=1`, {
+    const personsResponse = await fetch(buildPipedriveUrl(apiDomain, 'persons?limit=1'), {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     })
     
@@ -484,7 +490,7 @@ async function getAccountInfo(accessToken: string, apiDomain: string) {
     }
     
     // Get deals count
-    const dealsResponse = await fetch(`https://${apiDomain}/api/v1/deals?limit=1`, {
+    const dealsResponse = await fetch(buildPipedriveUrl(apiDomain, 'deals?limit=1'), {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     })
     
@@ -563,6 +569,7 @@ async function handleSyncLeads(req: Request) {
       .from('lead_source')
       .select('id')
       .eq('name', 'Pipedrive')
+      .eq('clinic_id', clinic_id)
       .single()
 
     let sourceId = leadSource?.id
@@ -583,7 +590,9 @@ async function handleSyncLeads(req: Request) {
     }
 
     // Fetch leads from Pipedrive
-    const leadsUrl = `https://${integration.api_domain}/api/v1/leads?limit=500`
+    const leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=500')
+    console.log('🔗 Leads URL:', leadsUrl)
+    
     const leadsResponse = await fetch(leadsUrl, {
       headers: { 'Authorization': `Bearer ${integration.access_token}` }
     })
@@ -598,7 +607,7 @@ async function handleSyncLeads(req: Request) {
     console.log(`📊 Found ${pipedriveLeads.length} leads in Pipedrive`)
 
     // Also fetch persons for additional contact info
-    const personsUrl = `https://${integration.api_domain}/api/v1/persons?limit=500`
+    const personsUrl = buildPipedriveUrl(integration.api_domain, 'persons?limit=500')
     const personsResponse = await fetch(personsUrl, {
       headers: { 'Authorization': `Bearer ${integration.access_token}` }
     })
@@ -782,7 +791,7 @@ async function handleGetLeads(req: Request) {
     }
 
     // Fetch leads from Pipedrive
-    const leadsUrl = `https://${integration.api_domain}/api/v1/leads?limit=100`
+    const leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=100')
     const leadsResponse = await fetch(leadsUrl, {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     })
@@ -794,7 +803,7 @@ async function handleGetLeads(req: Request) {
     const leadsData = await leadsResponse.json()
 
     // Also fetch deals
-    const dealsUrl = `https://${integration.api_domain}/api/v1/deals?limit=100&status=open`
+    const dealsUrl = buildPipedriveUrl(integration.api_domain, 'deals?limit=100&status=open')
     const dealsResponse = await fetch(dealsUrl, {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     })
