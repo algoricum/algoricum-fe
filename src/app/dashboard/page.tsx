@@ -1,29 +1,93 @@
 "use client";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 // import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
-import { UserPlus, Calendar, TrendingUp, Users, Plus, X, CheckCircle, Upload } from "lucide-react";
+import { Calendar, Plus, X, CheckCircle, Upload } from "lucide-react";
 import ConversionFunnel from "@/components/common/charts/conversion-funnel";
 import LeadSourcesLineChart from "@/components/common/charts/lead-sources-line-chart";
 import { Header } from "@/components/common";
+import StatsGrid from "./StatsGrid";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
 
 export default function DashboardPage() {
   const [appointmentFilter, setAppointmentFilter] = useState("month");
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [csvUploaded, setCsvUploaded] = useState(false);
-  const [zapierActive, setZapierActive] = useState(true);
-  const [showZapierBanner, setShowZapierBanner] = useState(true);
+  // const [zapierActive, setZapierActive] = useState(true);
+  // const [showZapierBanner, setShowZapierBanner] = useState(true);
   const [showHubspotBanner, setShowHubspotBanner] = useState(true);
   const [showCsvBanner, setShowCsvBanner] = useState(true);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [leadsData, setLeadsData] = useState<any[]>([]);
+  const [clinicId, setClinicId] = useState<string>("");
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function fetchClinicId() {
+      const data = await getClinicData();
+      if (data?.id) {
+        setClinicId(data.id);
+      }
+      // setLoading(false);
+    }
+
+    fetchClinicId();
+  }, []);
+
+  useEffect(() => {
+    async function fetchLeads() {
+      if (!clinicId) return; // 🛡️ Prevent running if clinicId is not ready
+
+      const { data, error } = await supabase
+        .from("lead")
+        .select(
+          `
+        id,
+        first_name,
+        last_name,
+        email,
+        phone,
+        status,
+        created_at,
+        source_id:source_id(id),
+        source:source_id(name)
+      `,
+        )
+        .eq("clinic_id", clinicId);
+
+
+      if (error) {
+        // setLoading(false);
+        return;
+      }
+
+      const formatted = data.map((lead: any) => ({
+        id: lead.id,
+        name: `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim(),
+        email: lead.email,
+        phone: lead.phone,
+        status: lead.status,
+        date: lead.created_at,
+        source_id: lead.source_id ?? "Unknown",
+        sourceName: lead.source ?? "Unknown",
+      }));
+
+      setLeadsData(formatted);
+      // setLoading(false);
+    }
+
+    fetchLeads();
+  }, [clinicId]);
 
   const [newTask, setNewTask] = useState({
     task: "",
     priority: "medium",
     time: "",
   });
+  // const [loading, setLoading] = useState(true);
 
   const [tasks, setTasks] = useState([
     {
@@ -57,41 +121,6 @@ export default function DashboardPage() {
   ]);
 
   // Sample data
-  const leadsData = [
-    {
-      id: "1",
-      name: "John Smith",
-      email: "john.smith@email.com",
-      phone: "+1 (555) 123-4567",
-      source: "HubSpot",
-      specialty: "Cardiology",
-      score: 85,
-      status: "booked",
-      date: "2024-01-15",
-    },
-    {
-      id: "2",
-      name: "Sarah Johnson",
-      email: "sarah.j@email.com",
-      phone: "+1 (555) 234-5678",
-      source: "Zapier",
-      specialty: "Dermatology",
-      score: 72,
-      status: "attempted",
-      date: "2024-01-14",
-    },
-    {
-      id: "3",
-      name: "Mike Wilson",
-      email: "mike.w@email.com",
-      phone: "+1 (555) 345-6789",
-      source: "Email",
-      specialty: "Orthopedics",
-      score: 95,
-      status: "booked",
-      date: "2024-01-13",
-    },
-  ];
 
   const appointmentsData = [
     {
@@ -160,62 +189,47 @@ export default function DashboardPage() {
     return <span className={`badge ${config.class}`}>{config.label}</span>;
   };
 
-  const getConversionRate = () => {
-    if (leadsData.length === 0) return 0;
-    const bookedLeads = leadsData.filter((lead: any) => lead.status === "booked").length;
-    return Math.round((bookedLeads / leadsData.length) * 100);
-  };
-
   return (
     <DashboardLayout
       header={<Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." />}
     >
-      <div>
+      <div className="p-6 space-y-8">
         {/* Integration Banners */}
-        {showHubspotBanner && (
-          <div className={`mb-4 p-4 rounded-lg border ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`w-2 h-2 rounded-full mr-3 ${hubspotConnected ? "bg-green-400" : "bg-blue-400"}`}></div>
-                <div>
-                  <div className="font-semibold flex items-center">
-                    HubSpot Integration
-                    {hubspotConnected && <CheckCircle className="w-4 h-4 ml-2 text-green-500" />}
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {hubspotConnected
-                      ? "HubSpot is connected and syncing data successfully."
-                      : "Connect your HubSpot account to sync leads and contacts automatically."}
-                  </div>
+        <div className="grid gap-4 md:grid-cols-2 ">
+          {showHubspotBanner && (
+            <div className={`p-4 rounded-lg border ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center font-semibold">
+                  <div className={`w-2 h-2 rounded-full mr-2 ${hubspotConnected ? "bg-green-400" : "bg-blue-400"}`} />
+                  <span>HubSpot Integration</span>
+                  {hubspotConnected && <CheckCircle className="w-4 h-4 ml-2 text-green-500" />}
+                </div>
+                <div className="flex items-center space-x-2">
+                  {!hubspotConnected && (
+                    <button onClick={() => setHubspotConnected(true)} className="btn btn-primary btn-sm">
+                      Connect HubSpot
+                    </button>
+                  )}
+                  <button onClick={() => setShowHubspotBanner(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                {!hubspotConnected && (
-                  <button onClick={() => setHubspotConnected(true)} className="btn btn-primary btn-sm">
-                    Connect HubSpot
-                  </button>
-                )}
-                <button onClick={() => setShowHubspotBanner(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-4 h-4" />
-                </button>
+              <div className="text-sm text-gray-600">
+                {hubspotConnected
+                  ? "HubSpot is connected and syncing data successfully."
+                  : "Connect your HubSpot account to sync leads and contacts automatically."}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {showZapierBanner && (
-          <div className="mb-4 p-4 rounded-lg border bg-green-50 border-green-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`w-2 h-2 rounded-full mr-3 ${zapierActive ? "bg-green-400" : "bg-yellow-400"}`}></div>
-                <div>
-                  <div className="font-semibold">Zapier Integration</div>
-                  <div className="text-sm text-gray-600">
-                    {zapierActive ? "Zapier integration is active and working properly." : "Zapier integration is currently inactive."}
-                  </div>
+          {/* {showZapierBanner && (
+            <div className="p-4 rounded-lg border bg-green-50 border-green-200">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center font-semibold">
+                  <div className={`w-2 h-2 rounded-full mr-2 ${zapierActive ? "bg-green-400" : "bg-yellow-400"}`} />
+                  <span>Zapier Integration</span>
                 </div>
-              </div>
-              <div className="flex items-center space-x-2">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600">{zapierActive ? "Active" : "Inactive"}</span>
                   <button
@@ -230,113 +244,43 @@ export default function DashboardPage() {
                       }`}
                     />
                   </button>
+                  <button onClick={() => setShowZapierBanner(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <button onClick={() => setShowZapierBanner(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-4 h-4" />
-                </button>
+              </div>
+              <div className="text-sm text-gray-600">
+                {zapierActive ? "Zapier integration is active and working properly." : "Zapier integration is currently inactive."}
               </div>
             </div>
-          </div>
-        )}
+          )} */}
 
-        {showCsvBanner && (
-          <div className={`mb-6 p-4 rounded-lg border ${csvUploaded ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Upload className={`w-5 h-5 mr-3 ${csvUploaded ? "text-green-500" : "text-blue-500"}`} />
-                <div>
-                  <div className="font-semibold flex items-center">
-                    CSV Upload
-                    {csvUploaded && <CheckCircle className="w-4 h-4 ml-2 text-green-500" />}
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {csvUploaded ? "CSV file uploaded successfully. Data has been processed." : "Upload your lead data to get started"}
-                  </div>
+          {showCsvBanner && (
+            <div className={`p-4 rounded-lg border ${csvUploaded ? "bg-green-50 border-green-200" : "bg-purple-50 purple-blue-200"}`}>
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center font-semibold">
+                  <Upload className={`w-5 h-5 mr-2 ${csvUploaded ? "text-green-500" : "text-purple-500"}`} />
+                  <span>CSV Upload</span>
+                  {csvUploaded && <CheckCircle className="w-4 h-4 ml-2 text-green-500" />}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button className="btn btn-secondary btn-sm">View Guide</button>
+                  <label className="btn btn-primary btn-sm cursor-pointer">
+                    {csvUploaded ? "Upload New CSV" : "Upload CSV"}
+                    <input type="file" accept=".csv" onChange={handleCsvUpload} className="hidden" />
+                  </label>
                 </div>
               </div>
-              <div className="flex space-x-2">
-                <button className="btn btn-secondary btn-sm">View Guide</button>
-                <label className="btn btn-primary btn-sm cursor-pointer">
-                  {csvUploaded ? "Upload New CSV" : "Upload CSV"}
-                  <input type="file" accept=".csv" onChange={handleCsvUpload} className="hidden" />
-                </label>
+              <div className="text-sm text-gray-600">
+                {csvUploaded ? "CSV file uploaded successfully. Data has been processed." : "Upload your lead data to get started"}
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="card">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-purple-100">
-                <UserPlus className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Leads</p>
-                <div className="flex items-center">
-                  <p className="text-2xl font-semibold text-gray-900">{leadsData.length}</p>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  this month <span className="text-green-600">+12%</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <div className="card">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-blue-100">
-                <Calendar className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Appointments</p>
-                <div className="flex items-center">
-                  <p className="text-2xl font-semibold text-gray-900">{appointmentsData.length}</p>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  this month <span className="text-green-600">+8%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-green-100">
-                <TrendingUp className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Conversion Rate</p>
-                <div className="flex items-center">
-                  <p className="text-2xl font-semibold text-gray-900">{getConversionRate()}%</p>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  leads to appointments <span className="text-green-600">+5%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-purple-100">
-                <Users className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Active Patients</p>
-                <div className="flex items-center">
-                  <p className="text-2xl font-semibold text-gray-900">
-                    {[...new Set(appointmentsData.map((apt: any) => apt.patient))].length}
-                  </p>
-                </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  unique patients <span className="text-green-600">+2%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <StatsGrid clinicId={clinicId} />
 
         {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -396,7 +340,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <div className="card">
             <h3 className="text-lg font-semibold mb-6">Conversion Funnel</h3>
-            <ConversionFunnel leadsData={leadsData} appointmentsData={appointmentsData} />
+            <ConversionFunnel leadsData={leadsData} />
           </div>
           <div className="card">
             <h3 className="text-lg font-semibold mb-6">Lead Sources Trends</h3>

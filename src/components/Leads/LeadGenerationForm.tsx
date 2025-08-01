@@ -235,9 +235,9 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="">
       <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-lg">
-        <h1 className="text-3xl font-bold mb-6 text-center">Get In Touch</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center">Add a new lead</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
           {fields.map(f => (
             <div key={f.field_id}>
