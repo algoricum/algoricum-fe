@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Flex, Form, Input, Select, Upload } from "antd";
+import { Flex, Form, Input, Select, Tooltip, Upload } from "antd";
 import { Button } from "@/components/elements";
 import { FileTextOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons";
 import { SuccessToast, ErrorToast } from "@/helpers/toast";
@@ -238,13 +238,15 @@ const ChatbotSettings = () => {
         <Form form={form} layout="vertical" onFinish={handleSave} name="themeForm">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold">Chatbot Settings</h2>
-            <Button
-              type="primary"
-              onClick={() => setIsConnectModalOpen(true)}
-              className="bg-brand-primary hover:!bg-brand-secondary !hover:text-white text-white py-2 rounded-md"
-            >
-              Generate Script
-            </Button>
+            <Tooltip title="This will let you connect the chatbot to your website">
+              <Button
+                type="primary"
+                onClick={() => setIsConnectModalOpen(true)}
+                className="bg-brand-primary hover:!bg-brand-secondary !hover:text-white text-white py-2 rounded-md"
+              >
+                Add Chatbot to Website
+              </Button>
+            </Tooltip>
           </div>
           <Form.Item label="Chatbot Name" name="chatbotName" rules={[{ required: true, message: "Please enter a chatbot name" }]}>
             <Input
