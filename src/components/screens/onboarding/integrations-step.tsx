@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Button, Radio, Card, Space, Select, Typography, Modal, Alert, Spin, Form } from "antd";
+import { Button, Radio, Select, Card, Space, Typography, Modal, Alert, Spin, Form } from "antd";
 import { CheckCircleOutlined, LinkOutlined, ThunderboltOutlined, CalendarOutlined } from "@ant-design/icons";
 import { getUserData } from "@/utils/supabase/user-helper";
 import { createClient } from "@/utils/supabase/config/client";
@@ -9,8 +9,7 @@ import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toa
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
-import Papa from 'papaparse'
-const { Option } = Select;
+import Papa from "papaparse";
 const { Title, Text } = Typography;
 
 interface IntegrationsStepProps {
@@ -24,100 +23,34 @@ interface IntegrationsStepProps {
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
-  const [showZapierModal, setShowZapierModal] = useState(false);
+  const [showPipedriveModal, setShowPipedriveModal] = useState(false);
   const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
   const [hubspotStatus, setHubspotStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [zapierStatus, setZapierStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+  const [pipedriveStatus, setPipedriveStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null);
-  const [zapierAccountInfo, setZapierAccountInfo] = useState<any>(null);
-  const [zapierForm] = Form.useForm();
+  const [pipedriveAccountInfo, setPipedriveAccountInfo] = useState<any>(null);
+  const [pipedriveForm] = Form.useForm();
   const [autoProgressing, setAutoProgressing] = useState(false);
-  // const [hubspotPrompted, setHubspotPrompted] = useState(false);
   const [showCustomCrmModal, setShowCustomCrmModal] = useState(false);
-  // const [csvValidationError, setCsvValidationError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    usesHubspot: initialData.usesHubspot || "",
-    otherTools: initialData.otherTools || "",
-    uploadLeads: initialData.uploadLeads || "", // New field for file upload
+    selectedCrm: initialData.selectedCrm || "",
+    uploadLeads: initialData.uploadLeads || "",
   });
   const supabase = createClient();
   const [showCompletionButtons, setShowCompletionButtons] = useState(false);
 
   const getClinicId = async () => {
     const clinic = await getClinicData();
-
-    if (!clinic || !clinic?.id) {
-      return null;
-    } else {
-      return clinic.id;
-    }
+    return clinic?.id || null;
   };
 
   const questions = [
     {
-      id: "usesHubspot",
-      type: "radio",
-      question: "Do you use HubSpot as your CRM?",
-      options: ["Yes", "No"],
-    },
-    {
-      id: "otherTools",
-      type: "multiselect",
-      question: "Do you use other CRM or form tools?",
-      options: [
-        "Jotform",
-        "Typeform",
-        "Gravity Forms",
-        "Google Forms",
-        "Squarespace Forms",
-        "WPForms",
-        "Tally",
-        "Formstack",
-        "Wufoo",
-        "Formidable forms",
-        "SurveyMonkey",
-        "Microsoft Forms",
-        "Paperform",
-        "Cognito Forms",
-        "Zoho forms",
-        "123 formbuilder",
-        "Airtable forms",
-        "Formsite",
-        "Ninja forms",
-        "Quform",
-        "HubSpot",
-        "Pipedrive",
-        "Zoho CRM",
-        "Salesforce sales cloud",
-        "Agile CRM",
-        "Keap (Infusionsoft)",
-        "Nimble",
-        "Monday CRM",
-        "Close",
-        "Copper (formerly ProsperWorks)",
-        "Nutshell",
-        "Ontraport",
-        "Bigin by Zoho",
-        "EngageBay",
-        "Vcita",
-        "Drip",
-        "ActiveCampaign",
-        "Bitrix24",
-        "Salesflare",
-        "Capsule CRM",
-        "Squarespace",
-        "Wix",
-        "Webflow",
-        "Weebly",
-        "Shopify",
-        "Unbounce",
-        "Leadpages",
-        "ClickFunnels",
-        "Elementor Forms",
-        "Instapage",
-        "Unable to find my CRM",
-      ],
+      id: "selectedCrm",
+      type: "select",
+      question: "Which CRM do you use?",
+      options: ["HubSpot", "Pipedrive", "None"],
     },
     {
       id: "uploadLeads",
@@ -127,44 +60,32 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     },
   ];
 
-  // Filter questions based on HubSpot answer
-  const filteredQuestions = questions.filter(q => {
-    if ((q.id === "otherTools" || q.id === "uploadLeads") && formData.usesHubspot === "Yes") {
-      return false; // Skip "otherTools" if HubSpot is Yes
-    }
-    return true;
-  });
-
+  const filteredQuestions = questions;
   const currentQuestion = filteredQuestions[currentQuestionIndex];
-
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
-  const handleCsvUpload = async (leadsData:any) => {
+  const handleCsvUpload = async (leadsData: any) => {
     try {
       if (!leadsData) {
         WarningToast("No CSV file selected");
       }
 
-      // Get current user
       const user = await getUserData();
       if (!user) {
         throw new Error("User not found. Please log in again.");
       }
 
-      // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const fileName = `leads-${user.id}-${timestamp}.csv`;
-
-      // Create file path: user_id/filename.csv
       const filePath = `${user.id}/${fileName}`;
-      
+
       let csvData;
-      if(Array.isArray(leadsData)){
-        csvData=Papa.unparse(leadsData)   
-      }else{
-        csvData=leadsData
+      if (Array.isArray(leadsData)) {
+        csvData = Papa.unparse(leadsData);
+      } else {
+        csvData = leadsData;
       }
-      // Upload file directly to Supabase Storage
+
       const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvData, {
         cacheControl: "3600",
         upsert: false,
@@ -191,12 +112,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
         setShowHubspotModal(false);
+        setShowPipedriveModal(false);
       } else {
         const finalData = {
           ...formData,
-          usesHubspot: "Yes",
-          hubspotConnected: true,
+          hubspotConnected: hubspotStatus === "connected",
+          pipedriveConnected: pipedriveStatus === "connected",
           hubspotAccountInfo,
+          pipedriveAccountInfo,
         };
         onNext(finalData);
       }
@@ -206,27 +129,27 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     autoProgressing,
     currentQuestionIndex,
     questions.length,
-    setCurrentQuestionIndex,
-    setShowHubspotModal,
     formData,
+    hubspotStatus,
+    pipedriveStatus,
     hubspotAccountInfo,
+    pipedriveAccountInfo,
     onNext,
   ]);
 
-  // Restore state from localStorage on component mount
   useEffect(() => {
-    // if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(6)) {
-    // setCurrentQuestionIndex(filteredQuestions.length - 1);
-    // }
-
-    // Restore OAuth state if it exists
     const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
-    const savedQuestionIndex = localStorage.getItem("hubspot_oauth_question_index");
-    const savedFormData = localStorage.getItem("hubspot_oauth_form_data");
-    const savedAccountInfo = localStorage.getItem("hubspot_oauth_account_info");
+    const savedPipedriveStatus = localStorage.getItem("pipedrive_oauth_status");
+    const savedQuestionIndex = localStorage.getItem("oauth_question_index");
+    const savedFormData = localStorage.getItem("oauth_form_data");
+    const savedHubspotAccountInfo = localStorage.getItem("hubspot_oauth_account_info");
+    const savedPipedriveAccountInfo = localStorage.getItem("pipedrive_oauth_account_info");
 
     if (savedHubspotStatus) {
       setHubspotStatus(savedHubspotStatus as "disconnected" | "connecting" | "connected");
+    }
+    if (savedPipedriveStatus) {
+      setPipedriveStatus(savedPipedriveStatus as "disconnected" | "connecting" | "connected");
     }
     if (savedQuestionIndex && !isNaN(Number.parseInt(savedQuestionIndex))) {
       setCurrentQuestionIndex(Number.parseInt(savedQuestionIndex));
@@ -239,17 +162,24 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         console.error("Error parsing saved form data:", error);
       }
     }
-    if (savedAccountInfo) {
+    if (savedHubspotAccountInfo) {
       try {
-        const parsedAccountInfo = JSON.parse(savedAccountInfo);
+        const parsedAccountInfo = JSON.parse(savedHubspotAccountInfo);
         setHubspotAccountInfo(parsedAccountInfo);
       } catch (error) {
-        console.error("Error parsing saved account info:", error);
+        console.error("Error parsing saved hubspot account info:", error);
+      }
+    }
+    if (savedPipedriveAccountInfo) {
+      try {
+        const parsedAccountInfo = JSON.parse(savedPipedriveAccountInfo);
+        setPipedriveAccountInfo(parsedAccountInfo);
+      } catch (error) {
+        console.error("Error parsing saved pipedrive account info:", error);
       }
     }
   }, []);
 
-  // Listen for OAuth callback messages
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) {
@@ -259,77 +189,91 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       if (event.data.type === "hubspot_success") {
         setHubspotStatus("connected");
         setHubspotAccountInfo(event.data.accountInfo);
-
-        // Update form data
-        setFormData(prevFormData => ({
-          ...prevFormData,
-          usesHubspot: "Yes",
+        setFormData(prev => ({
+          ...prev,
+          selectedCrm: "HubSpot",
         }));
-
-        // Clear saved OAuth state
         clearOAuthState();
-
-        // Auto-progress to next question
         autoProgressToNext();
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
-        ErrorToast(`
- message: "Connection Failed",
- description: ${event.data.error} || "Unable to connect to HubSpot. Please try again.",
- `);
+        ErrorToast(`Connection Failed: ${event.data.error || "Unable to connect to HubSpot. Please try again."}`);
+        clearOAuthState();
+      } else if (event.data.type === "pipedrive_success") {
+        setPipedriveStatus("connected");
+        setPipedriveAccountInfo(event.data.accountInfo);
+        clearOAuthState();
+        setTimeout(() => syncPipedriveLeads(), 1000);
+        if (currentQuestionIndex < filteredQuestions.length - 1) {
+          setCurrentQuestionIndex(currentQuestionIndex + 1);
+        }
+      } else if (event.data.type === "pipedrive_error") {
+        setPipedriveStatus("disconnected");
+        ErrorToast(`Connection Failed: ${event.data.error || "Unable to connect to Pipedrive. Please try again."}`);
         clearOAuthState();
       }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing, autoProgressToNext]);
+  }, [currentQuestionIndex, formData, hubspotAccountInfo, pipedriveAccountInfo, autoProgressToNext, filteredQuestions.length]);
 
-  // Handle OAuth callback if code parameter is present
   useEffect(() => {
     const handleOAuthRedirect = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const hubspotStatus = urlParams.get("hubspot_status");
+      const pipedriveStatus = urlParams.get("pipedrive_status");
       const errorMessage = urlParams.get("error_message");
       const accountName = urlParams.get("account_name");
       const contactCount = urlParams.get("contact_count");
+      const dealCount = urlParams.get("deal_count");
 
       if (hubspotStatus === "success") {
         console.log("✅ HubSpot OAuth success detected from URL");
-
         const accountInfo = {
           accountName: accountName || "Connected Account",
           contactCount: parseInt(contactCount || "0"),
           dealCount: 0,
         };
-
         setHubspotStatus("connected");
         setHubspotAccountInfo(accountInfo);
-        setFormData(prevFormData => ({
-          ...prevFormData,
-          usesHubspot: "Yes",
+        setFormData(prev => ({
+          ...prev,
+          selectedCrm: "HubSpot",
         }));
-
         clearOAuthState();
-
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
-
-        // Auto-progress to next question
         autoProgressToNext();
       } else if (hubspotStatus === "error") {
         console.log("❌ HubSpot OAuth error detected from URL:", errorMessage);
-
         setHubspotStatus("disconnected");
         clearOAuthState();
-
-        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (pipedriveStatus === "success") {
+        console.log("✅ Pipedrive OAuth success detected from URL");
+        const accountInfo = {
+          accountName: accountName || "Connected Account",
+          contactCount: parseInt(contactCount || "0"),
+          dealCount: parseInt(dealCount || "0"),
+        };
+        setPipedriveStatus("connected");
+        setPipedriveAccountInfo(accountInfo);
+        clearOAuthState();
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setTimeout(() => syncPipedriveLeads(), 1000);
+        if (currentQuestionIndex < filteredQuestions.length - 1) {
+          setCurrentQuestionIndex(currentQuestionIndex + 1);
+        }
+      } else if (pipedriveStatus === "error") {
+        console.log("❌ Pipedrive OAuth error detected from URL:", errorMessage);
+        setPipedriveStatus("disconnected");
+        clearOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     };
 
     handleOAuthRedirect();
-  }, [autoProgressToNext]);
+  }, [autoProgressToNext, currentQuestionIndex, filteredQuestions.length]);
 
   const getCurrentUserId = async () => {
     const user = await getUserData();
@@ -338,17 +282,21 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const clearOAuthState = () => {
     localStorage.removeItem("hubspot_oauth_status");
-    localStorage.removeItem("hubspot_oauth_question_index");
-    localStorage.removeItem("hubspot_oauth_form_data");
+    localStorage.removeItem("pipedrive_oauth_status");
+    localStorage.removeItem("oauth_question_index");
+    localStorage.removeItem("oauth_form_data");
     localStorage.removeItem("hubspot_oauth_account_info");
+    localStorage.removeItem("pipedrive_oauth_account_info");
   };
 
-  const saveOAuthState = () => {
-    localStorage.setItem("hubspot_oauth_status", "connecting");
-    localStorage.setItem("hubspot_oauth_question_index", currentQuestionIndex.toString());
-    localStorage.setItem("hubspot_oauth_form_data", JSON.stringify(formData));
-    if (hubspotAccountInfo) {
+  const saveOAuthState = (type: "hubspot" | "pipedrive") => {
+    localStorage.setItem(`${type}_oauth_status`, "connecting");
+    localStorage.setItem("oauth_question_index", currentQuestionIndex.toString());
+    localStorage.setItem("oauth_form_data", JSON.stringify(formData));
+    if (type === "hubspot" && hubspotAccountInfo) {
       localStorage.setItem("hubspot_oauth_account_info", JSON.stringify(hubspotAccountInfo));
+    } else if (type === "pipedrive" && pipedriveAccountInfo) {
+      localStorage.setItem("pipedrive_oauth_account_info", JSON.stringify(pipedriveAccountInfo));
     }
   };
 
@@ -358,50 +306,31 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       [currentQuestion.id]: value,
     }));
 
-    if (currentQuestion.id === "usesHubspot") {
-      if (value === "Yes") {
+    if (currentQuestion.id === "selectedCrm") {
+      if (value === "HubSpot") {
         setShowHubspotModal(true);
         setShowCompletionButtons(true);
-      } else if (value === "No") {
-        setShowCompletionButtons(false);
-      }
-    }
-
-    if (currentQuestion.id === "otherTools" && value && value.length > 0) {
-      const selectedTools = value.split(",").filter((s: string) => s);
-      if (selectedTools.includes("Unable to find my CRM")) {
-        setTimeout(() => {
-          setShowCustomCrmModal(true);
-        }, 500);
-      }
-      // Only show Zapier modal if 'Unable to find my CRM' is NOT selected
-      else if (selectedTools.length > 0) {
-        setTimeout(() => {
-          setShowZapierModal(true);
-        }, 2500); // Delay for UX
-      }
-    }
-
-    // Handle file upload question
-    if (currentQuestion.id === "uploadLeads") {
-      if (value === "Yes") {
-        setTimeout(() => {
-          setShowManualLeadsModal(true);
-        }, 500); // Small delay for better UX
-      }
-    }
-
-    //show onboarding completion buttons
-    if (currentQuestion.id === "uploadLeads") {
-      if (value === "Yes" || value === "No") {
+      } else if (value === "Pipedrive") {
+        setShowPipedriveModal(true);
+        setShowCompletionButtons(true);
+      } else if (value === "None") {
+        setShowCustomCrmModal(true);
         setShowCompletionButtons(true);
       }
+    }
+
+    if (currentQuestion.id === "uploadLeads" && value === "Yes") {
+      setTimeout(() => setShowManualLeadsModal(true), 500);
+    }
+
+    if (currentQuestion.id === "uploadLeads" && (value === "Yes" || value === "No")) {
+      setShowCompletionButtons(true);
     }
   };
 
   const connectToHubSpot = async () => {
     setHubspotStatus("connecting");
-    saveOAuthState();
+    saveOAuthState("hubspot");
     const clinicId = await getClinicId();
 
     try {
@@ -415,7 +344,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         body: JSON.stringify({
           userId: await getCurrentUserId(),
           clinic_id: clinicId,
-          redirectUrl: window.location.href, // Current page URL
+          redirectUrl: window.location.href,
         }),
       });
 
@@ -431,48 +360,112 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       }
 
       console.log("🚀 Redirecting to HubSpot OAuth:", data.authUrl);
-
-      // Simple redirect - no popup!
       window.location.href = data.authUrl;
     } catch (error) {
       console.error("Connection failed:", error);
       setHubspotStatus("disconnected");
-      ErrorToast(`
- message: "Connection Failed",
- description: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"},
- `);
+      ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"}`);
     }
   };
 
-  // Keep the message listener for popup communication
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // For security, you can check the origin if needed:
-      // if (!event.origin.includes('supabase.co')) return;
+  const connectToPipedrive = async () => {
+    setPipedriveStatus("connecting");
+    saveOAuthState("pipedrive");
+    const clinicId = await getClinicId();
 
-      console.log("Received message:", event.data); // Debug log
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+      console.log("Session debug:", {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        sessionError: sessionError,
+        tokenLength: session?.access_token ? session.access_token.length : 0,
+      });
 
-      if (event.data.type === "hubspot_success") {
-        setHubspotStatus("connected");
-        setHubspotAccountInfo(event.data.accountInfo);
-
-        setFormData(prevFormData => ({
-          ...prevFormData,
-          usesHubspot: "Yes",
-        }));
-
-        clearOAuthState();
-
-        autoProgressToNext();
-      } else if (event.data.type === "hubspot_error") {
-        setHubspotStatus("disconnected");
-        clearOAuthState();
+      if (!session?.access_token) {
+        throw new Error("No valid session found. Please log in again.");
       }
-    };
 
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [currentQuestionIndex, formData, hubspotAccountInfo, onNext, autoProgressing, autoProgressToNext]);
+      console.log("Making request with token:", session.access_token.substring(0, 20) + "...");
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          name: "Functions",
+          userId: await getCurrentUserId(),
+          clinic_id: clinicId,
+          redirectUrl: window.location.href,
+        }),
+      });
+
+      console.log("Response status:", response.status);
+      const responseText = await response.text();
+      console.log("Response body:", responseText);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`);
+      }
+
+      const data = JSON.parse(responseText);
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      console.log("🚀 Redirecting to Pipedrive OAuth:", data.authUrl);
+      window.location.href = data.authUrl;
+    } catch (error) {
+      console.error("Connection failed:", error);
+      setPipedriveStatus("disconnected");
+      ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Pipedrive. Please try again"}`);
+    }
+  };
+
+  const syncPipedriveLeads = async () => {
+    const clinicId = await getClinicId();
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No valid session found. Please log in again.");
+      }
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive/sync-leads`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          clinic_id: clinicId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sync leads");
+      }
+
+      const result = await response.json();
+      console.log("✅ Leads synced:", result);
+
+      if (result.synced_count > 0) {
+        SuccessToast(`Successfully synced ${result.synced_count} leads from Pipedrive!`);
+      } else {
+        InfoToast("No new leads to sync from Pipedrive");
+      }
+    } catch (error) {
+      console.error("Lead sync failed:", error);
+      WarningToast("Failed to sync leads from Pipedrive");
+    }
+  };
 
   const handleHubspotModalOk = () => {
     setShowHubspotModal(false);
@@ -483,87 +476,53 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     setShowCompletionButtons(false);
     setFormData(prev => ({
       ...prev,
-      usesHubspot: "",
+      selectedCrm: "",
     }));
   };
 
-  const validateZapierForm = async (): Promise<boolean> => {
-    try {
-      const formValues = await zapierForm.validateFields();
-      if (!formValues.zapierApiKey || formValues.zapierApiKey.length < 32) {
-        ErrorToast(`
- message: "Invalid API Key",
- description: "Please enter a valid Zapier API key (32+ characters)",
- `);
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error("Form validation error:", error);
-      return false;
-    }
-  };
-
-  const handleZapierModalOk = async () => {
-    if (zapierStatus === "connected") {
-      setShowZapierModal(false);
+  const handlePipedriveModalOk = () => {
+    if (pipedriveStatus === "connected") {
+      setShowPipedriveModal(false);
       if (currentQuestionIndex < filteredQuestions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       }
     } else {
-      const isValid = await validateZapierForm();
-      if (isValid) {
-        // await connectToZapier();
+      setShowPipedriveModal(false);
+      if (currentQuestionIndex < filteredQuestions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
       }
     }
   };
 
-  const handleZapierModalCancel = () => {
-    setShowZapierModal(false);
-    zapierForm.resetFields();
+  const handlePipedriveModalCancel = () => {
+    setShowPipedriveModal(false);
+    pipedriveForm.resetFields();
     setFormData(prev => ({
       ...prev,
-      otherTools: "",
+      selectedCrm: "",
     }));
   };
 
   const handleNext = () => {
-    // Handle HubSpot modal
-    if (currentQuestion.id === "usesHubspot" && currentValue === "Yes" && hubspotStatus !== "connected") {
+    if (currentQuestion.id === "selectedCrm" && currentValue === "HubSpot" && hubspotStatus !== "connected") {
       setShowHubspotModal(true);
       return;
     }
-
-    // Handle Zapier modal
-    if (
-      currentQuestion.id === "otherTools" &&
-      currentValue &&
-      currentValue.length > 0 &&
-      zapierStatus !== "connected" &&
-      !currentValue.split(",").includes("Unable to find my CRM")
-    ) {
-      setShowZapierModal(true);
+    if (currentQuestion.id === "selectedCrm" && currentValue === "Pipedrive" && pipedriveStatus !== "connected") {
+      setShowPipedriveModal(true);
       return;
     }
 
-    // Continue to next question or complete
     if (currentQuestionIndex < filteredQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       const finalData = {
         ...formData,
-        ...(formData.usesHubspot === "Yes" && {
-          hubspotConnected: hubspotStatus === "connected",
-          hubspotAccountInfo,
-        }),
-        ...(formData.otherTools &&
-          formData.otherTools.length > 0 && {
-            zapierConnected: zapierStatus === "connected",
-            zapierAccountInfo,
-          }),
-        ...(formData.uploadLeads === "Yes" && {
-          csvUploaded: localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) !== null,
-        }),
+        hubspotConnected: hubspotStatus === "connected",
+        pipedriveConnected: pipedriveStatus === "connected",
+        hubspotAccountInfo,
+        pipedriveAccountInfo,
+        csvUploaded: localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) !== null,
       };
       onNext(finalData);
     }
@@ -571,14 +530,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   const handlePrevious = () => {
     setShowCompletionButtons(false);
-
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
-      // Reset HubSpot prompted flag when going back
-      if (currentQuestionIndex - 1 === 0) {
-        // Going back to HubSpot question
-        // setHubspotPrompted(false);
-      }
     } else if (onPrev) {
       onPrev();
     }
@@ -592,15 +545,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         <div key={q.id} className="mb-8">
           <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">{q.question}</Text>
           <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
-            <Text className="text-gray-700 text-lg">
-              {q.type === "multiselect" && value
-                ? value
-                    .split(",")
-                    .filter((s: string) => s)
-                    .join(", ")
-                : value || "Not specified"}
-            </Text>
-            {q.id === "usesHubspot" && value === "Yes" && hubspotStatus === "connected" && (
+            <Text className="text-gray-700 text-lg">{value || "Not specified"}</Text>
+            {q.id === "selectedCrm" && value === "HubSpot" && hubspotStatus === "connected" && (
               <div className="mt-2 p-2 bg-green-100 rounded-lg">
                 <Text className="text-green-700 text-sm">
                   <CheckCircleOutlined className="mr-1" />
@@ -608,11 +554,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 </Text>
               </div>
             )}
-            {q.id === "otherTools" && value && value.length > 0 && zapierStatus === "connected" && (
+            {q.id === "selectedCrm" && value === "Pipedrive" && pipedriveStatus === "connected" && (
               <div className="mt-2 p-2 bg-blue-100 rounded-lg">
                 <Text className="text-blue-700 text-sm">
                   <CheckCircleOutlined className="mr-1" />
-                  Connected to Zapier for automated workflows
+                  Connected to {pipedriveAccountInfo?.accountName || "Pipedrive"}
                 </Text>
               </div>
             )}
@@ -631,7 +577,54 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const renderCurrentInput = () => {
-    if (currentQuestion?.type === "radio") {
+    if (currentQuestion?.type === "select") {
+      return (
+        <div className="mb-6">
+          <Select
+            value={currentValue || undefined}
+            onChange={handleInputChange}
+            placeholder="Select a CRM"
+            className="w-full"
+            size="large"
+            disabled={isSubmitting}
+          >
+            {currentQuestion.options?.map(option => (
+              <Select.Option key={option} value={option}>
+                {option}
+              </Select.Option>
+            ))}
+          </Select>
+          {currentQuestion.id === "selectedCrm" && currentValue === "Pipedrive" && (
+            <Card className="rounded-xl bg-green-50 border-2 border-green-500 mt-6" styles={{ body: { padding: "20px" } }}>
+              <div className="flex items-center mb-3">
+                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
+                  <ThunderboltOutlined className="text-white text-base" />
+                </div>
+                <Text className="text-lg font-semibold text-green-900">Connect your Pipedrive CRM!</Text>
+              </div>
+              <Text className="text-green-900 text-base leading-6">
+                Great! We can connect your Pipedrive CRM directly to automatically sync your leads, contacts, and deals with our platform
+                for seamless workflows.
+              </Text>
+            </Card>
+          )}
+          {currentQuestion.id === "selectedCrm" && currentValue === "HubSpot" && (
+            <Card className="rounded-xl bg-orange-50 border-2 border-orange-500 mt-6" styles={{ body: { padding: "20px" } }}>
+              <div className="flex items-center mb-3">
+                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
+                  <Text className="text-white font-bold text-sm">H</Text>
+                </div>
+                <Text className="text-lg font-semibold text-orange-900">Connect your HubSpot CRM!</Text>
+              </div>
+              <Text className="text-orange-900 text-base leading-6">
+                Great! We can connect your HubSpot CRM directly to automatically sync your leads, contacts, and deals with our platform for
+                seamless workflows.
+              </Text>
+            </Card>
+          )}
+        </div>
+      );
+    } else if (currentQuestion?.type === "radio") {
       return (
         <div className="mb-6">
           <Radio.Group value={currentValue} onChange={e => handleInputChange(e.target.value)} className="w-full">
@@ -653,7 +646,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               ))}
             </Space>
           </Radio.Group>
-          {/* Special info card for upload leads question */}
           {currentQuestion.id === "uploadLeads" && currentValue === "Yes" && (
             <Card className="rounded-xl bg-purple-50 border-2 border-purple-500 mt-6" styles={{ body: { padding: "20px" } }}>
               <div className="flex items-center mb-3">
@@ -671,52 +663,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         </div>
       );
     }
-
-    if (currentQuestion?.type === "multiselect") {
-      const selectedTools = currentValue ? currentValue.split(",").filter((s: string) => s) : [];
-      return (
-        <div className="mb-6">
-          <Select
-            mode="multiple"
-            placeholder="Select tools you use"
-            value={selectedTools}
-            onChange={values => handleInputChange(values.join(","))}
-            size="large"
-            className="w-full text-lg"
-            disabled={isSubmitting}
-          >
-            {currentQuestion.options?.map(option => (
-              <Option key={option} value={option}>
-                {option}
-              </Option>
-            ))}
-          </Select>
-          {currentValue && currentValue.length > 0 && !selectedTools.includes("Unable to find my CRM") && (
-            <Card className="rounded-xl bg-orange-50 border-2 border-orange-500 mt-6" styles={{ body: { padding: "20px" } }}>
-              <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
-                  <ThunderboltOutlined className="text-white text-base" />
-                </div>
-                <Text className="text-lg font-semibold text-orange-900">Automate your workflows!</Text>
-              </div>
-              <Text className="text-orange-900 text-base leading-6">
-                Great! We can connect your tools through Zapier to automatically sync data and create seamless workflows between your
-                existing tools and our platform.
-              </Text>
-            </Card>
-          )}
-        </div>
-      );
-    }
-
     return null;
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      const savedStatus = localStorage.getItem("hubspot_oauth_status");
-      if (savedStatus !== "connecting") {
+      const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
+      const savedPipedriveStatus = localStorage.getItem("pipedrive_oauth_status");
+      if (savedHubspotStatus !== "connecting" && savedPipedriveStatus !== "connecting") {
         clearOAuthState();
       }
     };
@@ -741,14 +695,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             >
               Previous
             </Button>
-
             <Button
               type="primary"
-              onClick={handleNext} // or your onboarding completion logic
+              onClick={handleNext}
               className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
               loading={isSubmitting}
             >
-              Complete Onboarding
+              {/* More explicit logic to ensure correct button text */}
+              {currentQuestionIndex < filteredQuestions.length - 1 ? "Continue" : "Complete Onboarding"}
             </Button>
           </div>
         )}
@@ -765,7 +719,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             <Button
               type="primary"
               onClick={handleNext}
-              disabled={(currentQuestion.type === "radio" ? !currentValue : false) || isSubmitting}
+              disabled={(currentQuestion.type === "radio" || currentQuestion.type === "select" ? !currentValue : false) || isSubmitting}
               loading={isSubmitting && currentQuestionIndex === filteredQuestions?.length - 1}
               className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
             >
@@ -779,7 +733,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         )}
       </div>
 
-      {/* HubSpot Connection Modal */}
       <Modal
         title={
           <div className="flex items-center">
@@ -832,7 +785,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </>
           )}
-
           {hubspotStatus === "connecting" && (
             <div className="text-center py-8">
               <Spin size="large" />
@@ -843,7 +795,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               </div>
             </div>
           )}
-
           {hubspotStatus === "connected" && hubspotAccountInfo && (
             <>
               <Alert
@@ -857,67 +808,71 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           )}
         </div>
       </Modal>
-      {/* Zapier Modal - keeping existing implementation */}
+
       <Modal
         title={
           <div className="flex items-center">
-            <div className="w-8 h-8 bg-orange-400 rounded-lg flex items-center justify-center mr-3">
-              <ThunderboltOutlined className="text-white text-base" />
+            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
+              <Text className="text-white font-bold text-sm">P</Text>
             </div>
-            <span className="text-xl font-semibold">Setup Zapier Integration</span>
+            <span className="text-xl font-semibold">Connect to Pipedrive</span>
           </div>
         }
-        open={showZapierModal}
-        onOk={handleZapierModalOk}
-        onCancel={handleZapierModalCancel}
-        okText={zapierStatus === "connected" ? "Continue" : zapierStatus === "connecting" ? "Connecting..." : "Connect with Zapier"}
-        cancelText="Skip for Now"
+        open={showPipedriveModal}
+        onOk={handlePipedriveModalOk}
+        onCancel={handlePipedriveModalCancel}
+        okText={pipedriveStatus === "connected" ? "Continue" : pipedriveStatus === "connecting" ? "Connecting..." : "Skip for Now"}
+        cancelText="Cancel"
         okButtonProps={{
           className: "bg-purple-500 border-purple-500",
-          loading: zapierStatus === "connecting",
+          loading: pipedriveStatus === "connecting",
         }}
         width={600}
         centered
       >
         <div className="py-6">
-          {zapierStatus === "disconnected" && (
+          {pipedriveStatus === "disconnected" && (
             <>
               <Alert
-                message="Connect Zapier for Automation"
-                description={`Click the button below to connect ${
-                  formData.otherTools
-                    ? formData.otherTools
-                        .split(",")
-                        .filter((s: string) => s)
-                        .slice(0, 3)
-                        .join(", ") + (formData.otherTools.split(",").filter((s: string) => s).length > 3 ? " and more" : "")
-                    : "your tools"
-                } with Zapier for seamless automation.`}
+                message="Connect Pipedrive for CRM Integration"
+                description="Connect your Pipedrive CRM to automatically sync your leads, contacts, and deals with our platform."
                 type="info"
                 showIcon
                 className="mb-6"
               />
-              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="text-center">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<LinkOutlined />}
+                  onClick={connectToPipedrive}
+                  className="bg-green-600 border-green-600 hover:bg-green-700 h-12 px-8 text-lg font-medium"
+                >
+                  Connect to Pipedrive
+                </Button>
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <Text className="text-sm text-gray-600">
+                    <strong>What happens next:</strong>
+                    <br />• You&apos;ll be redirected to Pipedrive to sign in
+                    <br />• Grant permission to access your CRM data
+                    <br />• We&apos;ll automatically sync your leads and deals
+                    <br />• Takes less than 30 seconds!
+                  </Text>
+                </div>
+              </div>
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 mt-6">
                 <div className="flex items-start">
                   <CalendarOutlined className="text-blue-500 mt-1 mr-3" />
                   <div className="flex-1">
-                    <Text className="text-blue-800 text-sm font-medium block mb-2">How to Set Up Zapier</Text>
+                    <Text className="text-blue-800 text-sm font-medium block mb-2">Need Help?</Text>
                     <Text className="text-blue-700 text-sm mb-3">
-                      1. Click &quot;Connect with Zapier&quot; to open Zapier in a new tab.
-                      <br />
-                      2. Sign in to your Zapier account or create one (it&apos;s free!).
-                      <br />
-                      3. Follow Zapier’s prompts to connect your tools.
-                      <br />
-                      4. Return here and click &quot;Continue&quot; when done.
-                      <br />
-                      Need help? Book a meeting with our team!
+                      Our team can help you set up the integration and configure your workflows.
                     </Text>
                     <Button
                       type="primary"
                       size="small"
                       icon={<CalendarOutlined />}
-                      onClick={() => window.open("https://calendly.com/your-team/zapier-setup", "_blank")}
+                      onClick={() => window.open("https://calendly.com/your-team/pipedrive-setup", "_blank")}
                       className="bg-purple-600 border-purple-600 hover:bg-purple-700"
                     >
                       Book a Support Meeting
@@ -925,36 +880,23 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                   </div>
                 </div>
               </div>
-              {formData.otherTools && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <Text className="text-sm text-gray-700">
-                    <strong>Selected tools to integrate:</strong>{" "}
-                    {formData.otherTools
-                      .split(",")
-                      .filter((s: string) => s)
-                      .join(", ")}
-                  </Text>
-                </div>
-              )}
             </>
           )}
-
-          {zapierStatus === "connecting" && (
+          {pipedriveStatus === "connecting" && (
             <div className="text-center py-8">
               <Spin size="large" />
               <div className="mt-4">
-                <Text className="text-lg">Setting up Zapier integration...</Text>
+                <Text className="text-lg">Connecting to Pipedrive...</Text>
                 <br />
-                <Text className="text-gray-500">Please complete the setup in Zapier and return here.</Text>
+                <Text className="text-gray-500">Please complete the authorization process</Text>
               </div>
             </div>
           )}
-
-          {zapierStatus === "connected" && zapierAccountInfo && (
+          {pipedriveStatus === "connected" && pipedriveAccountInfo && (
             <>
               <Alert
                 message="Successfully Connected!"
-                description="Your Zapier integration is set up. Your tools are now ready for automated workflows."
+                description={`Connected to ${pipedriveAccountInfo.accountName}. Your CRM integration is ready!`}
                 type="success"
                 showIcon
                 className="mb-4"
@@ -963,32 +905,44 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 <div className="flex justify-between items-center">
                   <div>
                     <Text strong className="text-green-800">
-                      Zapier Integration Active
+                      Pipedrive Integration Active
                     </Text>
                     <br />
-                    <Text className="text-green-600 text-sm">Ready for automation workflows</Text>
+                    <Text className="text-green-600 text-sm">
+                      {pipedriveAccountInfo.contactCount} contacts • {pipedriveAccountInfo.dealCount} deals
+                    </Text>
                   </div>
-                  <Button
-                    type="link"
-                    danger
-                    onClick={() => {
-                      setZapierStatus("disconnected");
-                      setZapierAccountInfo(null);
-                    }}
-                    className="text-red-500"
-                  >
-                    Disconnect
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button
+                      type="primary"
+                      size="small"
+                      onClick={syncPipedriveLeads}
+                      className="bg-green-600 border-green-600 hover:bg-green-700"
+                    >
+                      Sync Leads
+                    </Button>
+                    <Button
+                      type="link"
+                      danger
+                      onClick={() => {
+                        setPipedriveStatus("disconnected");
+                        setPipedriveAccountInfo(null);
+                      }}
+                      className="text-red-500"
+                    >
+                      Disconnect
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div className="mt-4 text-center">
-                <Text className="text-gray-600">⚡ Your automation is ready! Need further help? Book a support meeting.</Text>
+                <Text className="text-gray-600">⚡ Your CRM integration is ready! Need further help? Book a support meeting.</Text>
                 <br />
                 <Button
                   type="primary"
                   size="small"
                   icon={<CalendarOutlined />}
-                  onClick={() => window.open("https://calendly.com/your-team/zapier-setup", "_blank")}
+                  onClick={() => window.open("https://calendly.com/your-team/pipedrive-setup", "_blank")}
                   className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
                 >
                   Book a Support Meeting
@@ -999,13 +953,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         </div>
       </Modal>
 
-      {/* Manual Leads Modal */}
       <CsvUploadModal
         open={showManualLeadsModal}
         onOk={leads => {
           setShowManualLeadsModal(false);
           handleCsvUpload(leads);
-          if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) &&  (leads)) {
+          if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
             SuccessToast("Leads saved successfully");
           }
           setShowCompletionButtons(true);
@@ -1015,6 +968,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         }}
         onCancel={() => setShowManualLeadsModal(false)}
       />
+
       <Modal
         title={
           <div className="flex items-center">
@@ -1026,12 +980,19 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         }
         open={showCustomCrmModal}
         onOk={() => setShowCustomCrmModal(false)}
-        onCancel={() => setShowCustomCrmModal(false)}
+        onCancel={() => {
+          setShowCustomCrmModal(false);
+          setShowCompletionButtons(false);
+          setFormData(prev => ({
+            ...prev,
+            selectedCrm: "",
+          }));
+        }}
         okText="Close"
         cancelText="Cancel"
         width={500}
         centered
-        footer={null}
+        // Remove footer={null} to show the buttons
       >
         <div className="py-6 text-center">
           <Alert
