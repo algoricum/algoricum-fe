@@ -1,3 +1,4 @@
+
 "use client";
 import { Button } from "@/components/elements";
 import PasswordInput from "@/components/elements/PasswordInput";
@@ -21,31 +22,12 @@ const PasswordSetupPage = () => {
   // Check for recovery token or code in hash or query parameters
   useEffect(() => {
     // Check URL hash
-    const hash = window.location.hash.substring(1);
-    const hashParams = new URLSearchParams(hash);
-    const accessTokenFromHash = hashParams.get("access_token");
-    const typeFromHash = hashParams.get("type");
-    // Check query parameters
-    const tokenFromQuery = searchParams.get("token");
-    const typeFromQuery = searchParams.get("type");
-    const codeFromQuery = searchParams.get("code");
-    // Log parameters for debugging
-    console.log("Hash:", { accessToken: accessTokenFromHash, type: typeFromHash });
-    console.log("Query:", { token: tokenFromQuery, type: typeFromQuery, code: codeFromQuery });
-
-    if (
-      (typeFromHash === "recovery" && accessTokenFromHash) ||
-      (typeFromQuery === "recovery" && tokenFromQuery) ||
-      codeFromQuery // Handle code parameter from redirect
-    ) {
-      // Verify session if code is present
-      if (codeFromQuery) {
         const verifySession = async () => {
           try {
             const { data, error } = await supabase.auth.getSession();
             if (error) throw error;
             if (data.session) {
-              setLoadingSession(false)
+              setLoadingSession(false);
             } else {
               console.error({
                 message: "Error",
@@ -60,11 +42,8 @@ const PasswordSetupPage = () => {
           }
         };
         verifySession();
-      } else {
-        setLoadingSession(false);
-      }
-    }
-  }, [searchParams]);
+      } 
+  , [searchParams]);
 
   const { mutate, isLoading } = useMutation(
     async (password: string) => {

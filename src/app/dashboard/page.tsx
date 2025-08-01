@@ -1,6 +1,6 @@
 "use client";
 import type React from "react";
-import { useState } from "react";
+import { useState,useEffect } from "react";
 // import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
@@ -8,8 +8,12 @@ import { UserPlus, Calendar, TrendingUp, Users, Plus, X, CheckCircle, Upload } f
 import ConversionFunnel from "@/components/common/charts/conversion-funnel";
 import LeadSourcesLineChart from "@/components/common/charts/lead-sources-line-chart";
 import { Header } from "@/components/common";
+import {createClient} from "@/utils/supabase/config/client"
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const supabase=createClient()
   const [appointmentFilter, setAppointmentFilter] = useState("month");
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [csvUploaded, setCsvUploaded] = useState(false);
@@ -119,6 +123,30 @@ export default function DashboardPage() {
       status: "completed",
     },
   ];
+
+    useEffect(() => {
+      const checkUser = async () => {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+
+        if (error || !user) {
+          console.error("User fetch error:", error);
+          return;
+        }
+         
+        const loggedFirst = user.user_metadata?.logged_first;
+        const isStaff = user.user_metadata?.is_staff;
+        console.log("I am running ....")
+
+        if (loggedFirst === true && isStaff) {
+          router.push("/reset-password");
+        }
+      };
+
+      checkUser();
+    }, [router, supabase.auth]);
 
   const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

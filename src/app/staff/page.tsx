@@ -7,6 +7,7 @@ import { Header } from "@/components/common";
 import { createClient } from "@/utils/supabase/config/client";
 import { createStaffUser } from "@/utils/supabase/config/staff";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
+import { resetPasswordRequest} from "@/utils/supabase/auth-helper"
 
 interface Staff {
   id: string;
@@ -101,6 +102,8 @@ export default function StaffPage() {
           type: "success",
           text: `✅ Staff member created successfully! ${data.emailSent ? "Login credentials have been sent to " + newStaff.email : "Please share the credentials manually: " + data.tempPassword}`,
         });
+         
+       await resetPasswordRequest(newStaff.email)
 
         // Reset form
         setNewStaff({ email: "", name: "" });
