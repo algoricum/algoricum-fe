@@ -140,7 +140,7 @@ export const verifyOtp = async (email: string, otp: string): Promise<void> => {
 export const resetPasswordRequest = async (email: string): Promise<void> => {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "http://localhost:3001/reset-password",
+      redirectTo: "http://localhost:3001/forgot-password",
     });
     if (error) throw error;
   } catch (error: any) {

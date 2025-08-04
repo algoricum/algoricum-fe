@@ -1,4 +1,5 @@
 // types/staff.ts
+
 export interface CreateStaffRequest {
   email: string;
   name: string;
@@ -48,7 +49,9 @@ export interface EmailResult {
 // app/api/create-staff/route.ts
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
-// import type { CreateStaffRequest, CreateStaffResponse, ApiErrorResponse, EmailResult } from "@/types/staff";
+import FormData from "form-data";
+import Mailgun, { MailgunMessageData } from "mailgun.js";
+import { emailTemplate } from "@/utils/emailTemplate";
 
 // Server-side admin client
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -86,70 +89,60 @@ function generateRandomPassword(length: number = 12): string {
 }
 
 /**
- * Send welcome email using Supabase
+ * Send welcome email with credentials using Mailgun
  */
-async function sendWelcomeEmail(email: string, tempPassword: string, name: string, clinicName: string): Promise<EmailResult> {
+async function sendWelcomeEmail(email: string, name: string, password: string, clinicName: string): Promise<EmailResult> {
   try {
-    const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login`;
-
-    // Try invite email first
-    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-      type: "invite",
-      email: email,
-      options: {
-        data: {
-          name: name,
-          temp_password: tempPassword,
-          clinic_name: clinicName,
-          welcome_email: true,
-        },
-        redirectTo: loginUrl,
-      },
+    // Initialize Mailgun client
+    const mailgun = new Mailgun(FormData);
+    const mg = mailgun.client({
+      username: "api",
+      key: process.env.MAILGUN_API_KEY || "",
     });
 
-    if (error) {
-      console.error("Invite email error:", error);
+    const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/login`;
 
-      // Fallback: Try invite user by email
-      const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        data: {
-          name: name,
-          temp_password: tempPassword,
-          clinic_name: clinicName,
-        },
-        redirectTo: loginUrl,
-      });
+    // Generate beautiful email template
+    const { html: emailHtml, text: textContent } = emailTemplate({
+      name,
+      email,
+      password,
+      clinicName,
+      loginUrl,
+    });
 
-      if (inviteError) {
-        console.error("Invite user error:", inviteError);
-        throw new Error(`Failed to send welcome email: ${inviteError.message}`);
-      }
+    // Send email using Mailgun
+    const mailData: MailgunMessageData = {
+      from: `${clinicName} <${process.env.MAILGUN_FROM_EMAIL || "noreply@yourdomain.com"}>`,
+      to: [email],
+      subject: `Welcome to ${clinicName} - Your Account Details`,
+      text: textContent,
+      html: emailHtml,
+    };
 
-      console.log(`✅ Welcome email sent via invite to: ${email}`);
-      return { success: true, method: "invite" };
-    }
+    const data = await mg.messages.create(process.env.MAILGUN_DOMAIN || "", mailData);
 
-    console.log(`✅ Welcome email sent to: ${email}`);
-    console.log(`🔐 Temporary Password: ${tempPassword}`);
-
-    return { success: true, method: "generate_link" };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error sending welcome email:", error);
-
-    // Log credentials for manual sharing
-    console.log(`
-    ❌ EMAIL FAILED - Manual credentials for ${email}:
-    📧 Email: ${email}
-    🔐 Password: ${tempPassword}
-    👤 Name: ${name}
-    🏥 Clinic: ${clinicName}
-        `);
+    console.log("Email sent successfully:", data);
 
     return {
+      success: true,
+      method: "mailgun",
+      credentials: {
+        email,
+        password,
+        name,
+      },
+    };
+  } catch (error) {
+    console.error("Mailgun email sending failed:", error);
+    return {
       success: false,
-      error: errorMessage,
-      credentials: { email, password: tempPassword, name },
+      error: error instanceof Error ? error.message : "Unknown email error",
+      credentials: {
+        email,
+        password,
+        name,
+      },
     };
   }
 }
@@ -182,6 +175,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateSta
 
     // Get clinic name for email
     const { data: clinic } = await supabaseAdmin.from("clinic").select("name").eq("id", clinicId).single();
+    const clinicName = clinic?.name || "Healthcare System";
 
     // Create user in Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -192,7 +186,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateSta
         name,
         is_staff: true,
         clinic_id: clinicId,
-        logged_first:true
+        logged_first: true,
       },
     });
 
@@ -239,7 +233,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateSta
     }
 
     // Send welcome email
-    const emailResult = await sendWelcomeEmail(email, userPassword, name, clinic?.name || "Our Clinic");
+    const emailResult = await sendWelcomeEmail(email, name, userPassword, clinicName);
 
     return NextResponse.json({
       success: true,
@@ -248,14 +242,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateSta
           id: authData.user.id,
           email: authData.user.email || email,
         },
-        tempPassword: userPassword, // Only for development - remove in production
+        tempPassword: process.env.NODE_ENV === "development" ? userPassword : undefined, // Only for development
         emailSent: emailResult.success,
       },
-      message: "Staff member created successfully",
+      message: emailResult.success
+        ? "Staff member created successfully and welcome email sent"
+        : "Staff member created successfully but email sending failed",
     });
   } catch (error) {
     console.error("Error creating staff:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+
     return NextResponse.json({ error: "An unexpected error occurred while creating staff member" }, { status: 500 });
   }
 }

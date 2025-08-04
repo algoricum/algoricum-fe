@@ -1,9 +1,10 @@
 "use client";
 import type React from "react";
-import { useState } from "react";
+import { useState ,useEffect} from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { Calendar, CheckCircle, Clock, X, Search, Plus } from "lucide-react";
 import { Header } from "@/components/common";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 
 interface Appointment {
   id: string;
@@ -16,40 +17,11 @@ interface Appointment {
   status: string;
 }
 
-export default function AppointmentsPage() {
-  const [appointmentsData, setAppointmentsData] = useState<Appointment[]>([
-    {
-      id: "1",
-      patient: "John Doe",
-      doctor: "Dr. Sarah Johnson",
-      date: "2023-10-27",
-      time: "10:00",
-      type: "Consultation",
-      phone: "123-456-7890",
-      status: "completed",
-    },
-    {
-      id: "2",
-      patient: "Jane Smith",
-      doctor: "Dr. Michael Wilson",
-      date: "2023-10-28",
-      time: "11:00",
-      type: "Follow-up",
-      phone: "987-654-3210",
-      status: "pending",
-    },
-    {
-      id: "3",
-      patient: "Peter Brown",
-      doctor: "Dr. Robert Chen",
-      date: "2023-10-29",
-      time: "14:00",
-      type: "Treatment",
-      phone: "112-358-4697",
-      status: "cancelled",
-    },
-  ]);
 
+export default function AppointmentsPage() {
+  const [appointmentsData, setAppointmentsData] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddAppointmentModal, setShowAddAppointmentModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -63,23 +35,104 @@ export default function AppointmentsPage() {
     status: "pending",
   });
 
-  const handleAddAppointment = (e: React.FormEvent) => {
-    e.preventDefault();
-    const appointment = {
-      id: (appointmentsData.length + 1).toString(),
-      ...newAppointment,
+  // Simulate loading appointments data
+  useEffect(() => {
+    const loadAppointments = async () => {
+      setIsLoading(true);
+
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Mock data
+      const mockAppointments: Appointment[] = [
+        {
+          id: "1",
+          patient: "John Doe",
+          doctor: "Dr. Sarah Johnson",
+          date: "2023-10-27",
+          time: "10:00",
+          type: "Consultation",
+          phone: "123-456-7890",
+          status: "completed",
+        },
+        {
+          id: "2",
+          patient: "Jane Smith",
+          doctor: "Dr. Michael Wilson",
+          date: "2023-10-28",
+          time: "11:00",
+          type: "Follow-up",
+          phone: "987-654-3210",
+          status: "pending",
+        },
+        {
+          id: "3",
+          patient: "Peter Brown",
+          doctor: "Dr. Robert Chen",
+          date: "2023-10-29",
+          time: "14:00",
+          type: "Treatment",
+          phone: "112-358-4697",
+          status: "cancelled",
+        },
+        {
+          id: "4",
+          patient: "Alice Johnson",
+          doctor: "Dr. Lisa Anderson",
+          date: "2023-10-30",
+          time: "09:00",
+          type: "Check-up",
+          phone: "555-123-4567",
+          status: "confirmed",
+        },
+        {
+          id: "5",
+          patient: "Bob Wilson",
+          doctor: "Dr. Sarah Johnson",
+          date: "2023-10-31",
+          time: "15:30",
+          type: "Consultation",
+          phone: "444-987-6543",
+          status: "pending",
+        },
+      ];
+
+      setAppointmentsData(mockAppointments);
+      setIsLoading(false);
     };
-    setAppointmentsData([...appointmentsData, appointment]);
-    setNewAppointment({
-      patient: "",
-      doctor: "",
-      date: "",
-      time: "",
-      type: "Consultation",
-      phone: "",
-      status: "pending",
-    });
-    setShowAddAppointmentModal(false);
+
+    loadAppointments();
+  }, []);
+
+  const handleAddAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      const appointment = {
+        id: (appointmentsData.length + 1).toString(),
+        ...newAppointment,
+      };
+
+      setAppointmentsData([...appointmentsData, appointment]);
+      setNewAppointment({
+        patient: "",
+        doctor: "",
+        date: "",
+        time: "",
+        type: "Consultation",
+        phone: "",
+        status: "pending",
+      });
+      setShowAddAppointmentModal(false);
+    } catch (error) {
+      console.error("Error adding appointment:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Filter appointments based on search and status
@@ -94,6 +147,17 @@ export default function AppointmentsPage() {
 
     return matchesSearch && matchesStatus;
   });
+
+  // Show loading spinner while data is being fetched
+  if (isLoading) {
+    return (
+      <DashboardLayout header={<Header title="Appointments" description="Manage patient appointments and scheduling." />}>
+        <div className="flex justify-center items-center min-h-[400px]">
+          <LoadingSpinner message="Loading appointments..." size="lg" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout header={<Header title="Appointments" description="Manage patient appointments and scheduling." />}>
@@ -160,8 +224,16 @@ export default function AppointmentsPage() {
                   placeholder="Search appointments..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent w-64"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
               <select
                 value={statusFilter}
@@ -174,10 +246,29 @@ export default function AppointmentsPage() {
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
+
+              {/* Filter Status Indicator */}
+              {(searchQuery || statusFilter !== "all") && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">
+                    {filteredAppointments.length} of {appointmentsData.length} appointments
+                  </span>
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setStatusFilter("all");
+                    }}
+                    className="text-xs text-purple-600 hover:text-purple-800 underline"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
             </div>
+
             <button
               onClick={() => setShowAddAppointmentModal(true)}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center"
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center transition-colors duration-200"
             >
               <Plus className="w-4 h-4 mr-2" />
               New Appointment
@@ -200,7 +291,27 @@ export default function AppointmentsPage() {
                 {filteredAppointments.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 px-4 text-center text-gray-500">
-                      {appointmentsData.length === 0 ? "No appointments found" : "No appointments match your filters"}
+                      {appointmentsData.length === 0 ? (
+                        <div className="flex flex-col items-center">
+                          <Calendar className="w-12 h-12 text-gray-300 mb-4" />
+                          <p className="text-lg font-medium text-gray-600 mb-2">No appointments yet</p>
+                          <p className="text-sm text-gray-500">Create your first appointment to get started</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <Search className="w-12 h-12 text-gray-300 mb-4" />
+                          <p className="text-lg font-medium text-gray-600 mb-2">No appointments match your filters</p>
+                          <button
+                            onClick={() => {
+                              setSearchQuery("");
+                              setStatusFilter("all");
+                            }}
+                            className="text-purple-600 hover:text-purple-800 underline text-sm"
+                          >
+                            Clear filters to see all appointments
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -264,10 +375,21 @@ export default function AppointmentsPage() {
             <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Add New Appointment</h3>
-                <button onClick={() => setShowAddAppointmentModal(false)} className="text-gray-400 hover:text-gray-600">
+                <button
+                  onClick={() => setShowAddAppointmentModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                  disabled={isSubmitting}
+                >
                   <X className="w-6 h-6" />
                 </button>
               </div>
+
+              {/* Show loading spinner in modal when submitting */}
+              {isSubmitting && (
+                <div className="mb-4">
+                  <LoadingSpinner message="Creating appointment..." size="sm" />
+                </div>
+              )}
 
               <form onSubmit={handleAddAppointment} className="space-y-4">
                 <div>
@@ -278,6 +400,7 @@ export default function AppointmentsPage() {
                     value={newAppointment.patient}
                     onChange={e => setNewAppointment({ ...newAppointment, patient: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -288,6 +411,7 @@ export default function AppointmentsPage() {
                     value={newAppointment.doctor}
                     onChange={e => setNewAppointment({ ...newAppointment, doctor: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    disabled={isSubmitting}
                   >
                     <option value="">Select Doctor</option>
                     <option value="Dr. Sarah Johnson">Dr. Sarah Johnson</option>
@@ -306,6 +430,7 @@ export default function AppointmentsPage() {
                       value={newAppointment.date}
                       onChange={e => setNewAppointment({ ...newAppointment, date: e.target.value })}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      disabled={isSubmitting}
                     />
                   </div>
                   <div>
@@ -316,6 +441,7 @@ export default function AppointmentsPage() {
                       value={newAppointment.time}
                       onChange={e => setNewAppointment({ ...newAppointment, time: e.target.value })}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      disabled={isSubmitting}
                     />
                   </div>
                 </div>
@@ -328,6 +454,7 @@ export default function AppointmentsPage() {
                     value={newAppointment.phone}
                     onChange={e => setNewAppointment({ ...newAppointment, phone: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -338,6 +465,7 @@ export default function AppointmentsPage() {
                     value={newAppointment.type}
                     onChange={e => setNewAppointment({ ...newAppointment, type: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    disabled={isSubmitting}
                   >
                     <option value="Consultation">Consultation</option>
                     <option value="Follow-up">Follow-up</option>
@@ -350,12 +478,17 @@ export default function AppointmentsPage() {
                   <button
                     type="button"
                     onClick={() => setShowAddAppointmentModal(false)}
-                    className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+                    className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors duration-200"
+                    disabled={isSubmitting}
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-                    Add Appointment
+                  <button
+                    type="submit"
+                    className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Creating..." : "Add Appointment"}
                   </button>
                 </div>
               </form>

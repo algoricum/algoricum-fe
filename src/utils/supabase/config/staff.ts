@@ -66,12 +66,3 @@ export const createStaffUser = async ({ email, name, clinicId, roleId }: CreateS
   }
 };
 
-// Optional: Create a more specific type for clinic and role IDs if they're UUIDs
-// type UUID = string;
-//
-// interface CreateStaffUserParams {
-//   email: string;
-//   name: string;
-//   clinicId: UUID;
-//   roleId: UUID;
-// }
