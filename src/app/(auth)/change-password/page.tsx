@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMutation } from "react-query";
 import { createClient } from "@/utils/supabase/config/client";
-
+import {updateLoggedStatus} from "@/utils/supabase/auth-helper";
 const { Title, Text } = Typography;
 
 const PasswordSetupPage = () => {
@@ -52,9 +52,11 @@ const PasswordSetupPage = () => {
       return true;
     },
     {
-      onSuccess: () => {
+      onSuccess: async () => {
         SuccessToast("Password updated successfully");
-        push("/login");
+        form.resetFields();
+        await updateLoggedStatus(form.getFieldValue("password"));
+        push("/dashboard");
       },
       onError: (error: any) => {
         ErrorToast(error?.message || "Failed to update password");
