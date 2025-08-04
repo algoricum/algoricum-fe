@@ -4,13 +4,14 @@ import type React from "react";
 import { useState, useEffect, useMemo } from "react";
 import { Button, Dropdown } from "antd";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { Users, Search, Plus, X, MoreVertical } from "lucide-react";
+import { Users, Search, Plus, X, MoreVertical, AlertTriangle } from "lucide-react";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { createStaffUser } from "@/utils/supabase/config/staff";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import { getClinicStaff, type TransformedStaffMember } from "@/utils/supabase/clinic-staff-helper";
-import type { JSX } from "react/jsx-runtime"; // Import JSX to fix the undeclared variable error
+import type { JSX } from "react/jsx-runtime";
+// Fixed import path
+import { getClinicStaff, updateStaffMember, deleteStaffMember, type TransformedStaffMember } from "@/utils/supabase/clinic-staff-helper";
 
 interface Staff {
   id: string;
@@ -21,11 +22,18 @@ interface Staff {
   password: string;
   avatar: string;
   joinedDate: string;
+  status?: string;
 }
 
 interface NewStaff {
   email: string;
   name: string;
+}
+
+interface EditStaff {
+  id: string;
+  name: string;
+  status: string;
 }
 
 interface Message {
@@ -44,20 +52,44 @@ interface CreateStaffResponse {
 }
 
 export default function StaffPage(): JSX.Element {
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [staffData, setStaffData] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showAddStaffModal, setShowAddStaffModal] = useState<boolean>(false);
+  const [showEditStaffModal, setShowEditStaffModal] = useState<boolean>(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [message, setMessage] = useState<Message | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
+  const [selectedStaffForEdit, setSelectedStaffForEdit] = useState<Staff | null>(null);
+  const [selectedStaffForDelete, setSelectedStaffForDelete] = useState<Staff | null>(null);
   const [newStaff, setNewStaff] = useState<NewStaff>({
     email: "",
     name: "",
+  });
+  const [editStaff, setEditStaff] = useState<EditStaff>({
+    id: "",
+    name: "",
+    status: "active",
   });
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("all");
+
+  // Helper function to convert database status to frontend status
+  const mapDatabaseStatusToFrontend = (dbStatus: string): string => {
+    if (dbStatus === "Active" || dbStatus === "TRUE" || dbStatus === true) {
+      return "active";
+    }
+    return "inactive";
+  };
+
+  // Helper function to convert frontend status to database boolean
+  const mapFrontendStatusToDatabase = (frontendStatus: string): boolean => {
+    return frontendStatus === "active";
+  };
 
   // Load staff data from Supabase
   useEffect(() => {
@@ -91,6 +123,7 @@ export default function StaffPage(): JSX.Element {
             password: "••••••••", // Always masked
             avatar: getInitials(member.staff_member),
             joinedDate: member.joined_date,
+            status: mapDatabaseStatusToFrontend(member.status), // Convert database status
           })) || [];
 
         setStaffData(transformedStaff);
@@ -125,9 +158,15 @@ export default function StaffPage(): JSX.Element {
 
       const matchesRole = selectedRole === "all" || staff.role.toLowerCase() === selectedRole.toLowerCase();
 
-      return matchesSearch && matchesRole;
+      // Add status filtering
+      const matchesStatus =
+        selectedStatus === "all" ||
+        (selectedStatus === "active" && staff.status === "active") ||
+        (selectedStatus === "inactive" && staff.status === "inactive");
+
+      return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [staffData, searchTerm, selectedRole]);
+  }, [staffData, searchTerm, selectedRole, selectedStatus]);
 
   // Get unique roles for dropdown
   const availableRoles = useMemo(() => {
@@ -148,9 +187,145 @@ export default function StaffPage(): JSX.Element {
     setSelectedRole(e.target.value);
   };
 
+  // Add handler for status filter change
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
+    setSelectedStatus(e.target.value);
+  };
+
   // Clear search
   const clearSearch = (): void => {
     setSearchTerm("");
+  };
+
+  // Handle edit staff
+  const handleEditStaff = (staff: Staff): void => {
+    console.log("Edit staff clicked:", staff);
+    setSelectedStaffForEdit(staff);
+    setEditStaff({
+      id: staff.id,
+      name: staff.name,
+      status: staff.status || "active",
+    });
+    setShowEditStaffModal(true);
+  };
+
+  // Fixed handleEditSubmit function
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    if (!editStaff.name.trim()) {
+      setMessage({ type: "error", text: "Please fill in all required fields." });
+      return;
+    }
+
+    if (!clinicId) {
+      setMessage({ type: "error", text: "No clinic found. Please try again." });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage(null); // Clear previous messages
+
+    try {
+      console.log("Updating staff with data:", {
+        userId: editStaff.id,
+        clinicId,
+        name: editStaff.name,
+        is_active: mapFrontendStatusToDatabase(editStaff.status),
+      });
+
+      // Update staff member in Supabase
+      const result = await updateStaffMember(editStaff.id, clinicId, {
+        name: editStaff.name,
+        is_active: mapFrontendStatusToDatabase(editStaff.status),
+      });
+
+      if (result.error) {
+        setMessage({ type: "error", text: result.error });
+        return;
+      }
+
+      // Update local state only if Supabase update was successful
+      setStaffData(prev =>
+        prev.map(staff =>
+          staff.id === editStaff.id
+            ? {
+                ...staff,
+                name: editStaff.name,
+                status: editStaff.status,
+                avatar: getInitials(editStaff.name),
+              }
+            : staff,
+        ),
+      );
+
+      setMessage({
+        type: "success",
+        text: `✅ Staff member "${editStaff.name}" has been updated successfully.`,
+      });
+
+      setShowEditStaffModal(false);
+      setSelectedStaffForEdit(null);
+
+      // Refresh the data from server to ensure consistency
+      await refreshStaffData();
+    } catch (error: any) {
+      console.error("Error updating staff:", error);
+      setMessage({ type: "error", text: "Failed to update staff member. Please try again." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle delete staff
+  const handleDeleteStaff = (staff: Staff): void => {
+    console.log("Delete staff clicked:", staff);
+    setSelectedStaffForDelete(staff);
+    setShowDeleteConfirmModal(true);
+  };
+
+  // Fixed confirmDeleteStaff function
+  const confirmDeleteStaff = async (): Promise<void> => {
+    if (!selectedStaffForDelete || !clinicId) {
+      setMessage({ type: "error", text: "Missing required information. Please try again." });
+      return;
+    }
+
+    setIsDeleting(true);
+    setMessage(null); // Clear previous messages
+
+    try {
+      console.log("Deleting staff with data:", {
+        userId: selectedStaffForDelete.id,
+        clinicId,
+      });
+
+      // Delete staff member from Supabase
+      const result = await deleteStaffMember(selectedStaffForDelete.id, clinicId);
+
+      if (result.error) {
+        setMessage({ type: "error", text: result.error });
+        return;
+      }
+
+      // Remove staff from local state only if Supabase deletion was successful
+      setStaffData(prev => prev.filter(staff => staff.id !== selectedStaffForDelete.id));
+
+      setMessage({
+        type: "success",
+        text: `✅ Staff member "${selectedStaffForDelete.name}" has been removed successfully.`,
+      });
+
+      setShowDeleteConfirmModal(false);
+      setSelectedStaffForDelete(null);
+
+      // Refresh the data from server to ensure consistency
+      await refreshStaffData();
+    } catch (error: any) {
+      console.error("Error deleting staff:", error);
+      setMessage({ type: "error", text: "Failed to remove staff member. Please try again." });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Refresh staff data after adding new staff
@@ -174,6 +349,7 @@ export default function StaffPage(): JSX.Element {
           password: "••••••••",
           avatar: getInitials(member.staff_member),
           joinedDate: member.joined_date,
+          status: mapDatabaseStatusToFrontend(member.status), // Convert database status
         })) || [];
 
       setStaffData(transformedStaff);
@@ -256,6 +432,11 @@ export default function StaffPage(): JSX.Element {
   // Handle input changes
   const handleInputChange = (field: keyof NewStaff, value: string): void => {
     setNewStaff(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Handle edit input changes
+  const handleEditInputChange = (field: keyof EditStaff, value: string): void => {
+    setEditStaff(prev => ({ ...prev, [field]: value }));
   };
 
   // Show loading spinner while data is being fetched
@@ -343,9 +524,19 @@ export default function StaffPage(): JSX.Element {
                   </option>
                 ))}
               </select>
+              {/* Status Filter */}
+              <select
+                value={selectedStatus}
+                onChange={handleStatusChange}
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent min-w-[120px]"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
 
               {/* Filter Status Indicator */}
-              {(searchTerm || selectedRole !== "all") && (
+              {(searchTerm || selectedRole !== "all" || selectedStatus !== "all") && (
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-500">
                     {filteredStaffData.length} of {staffData.length} staff
@@ -354,6 +545,7 @@ export default function StaffPage(): JSX.Element {
                     onClick={() => {
                       setSearchTerm("");
                       setSelectedRole("all");
+                      setSelectedStatus("all");
                     }}
                     className="text-xs text-purple-600 hover:text-purple-800 underline"
                   >
@@ -404,15 +596,16 @@ export default function StaffPage(): JSX.Element {
                 {filteredStaffData.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-8 px-4 text-center text-gray-500">
-                      {searchTerm || selectedRole !== "all"
+                      {searchTerm || selectedRole !== "all" || selectedStatus !== "all"
                         ? `No staff members found matching your search criteria.`
                         : "No staff members found. Add your first staff member to get started."}
-                      {(searchTerm || selectedRole !== "all") && (
+                      {(searchTerm || selectedRole !== "all" || selectedStatus !== "all") && (
                         <div className="mt-2">
                           <button
                             onClick={() => {
                               setSearchTerm("");
                               setSelectedRole("all");
+                              setSelectedStatus("all");
                             }}
                             className="text-purple-600 hover:text-purple-800 underline text-sm"
                           >
@@ -449,7 +642,9 @@ export default function StaffPage(): JSX.Element {
                       <td className="py-3 px-4 text-gray-900">{formatDate(staff.joinedDate)}</td>
                       <td className="py-3 px-4 text-gray-900">{staff.createdBy}</td>
                       <td className="py-3 px-4">
-                        <span className="badge badge-success">Active</span>
+                        <span className={`badge ${staff.status === "active" ? "badge-success" : "badge-warning"}`}>
+                          {staff.status === "active" ? "Active" : "Inactive"}
+                        </span>
                       </td>
                       <td className="py-3 px-4">
                         <Dropdown
@@ -457,21 +652,23 @@ export default function StaffPage(): JSX.Element {
                             items: [
                               {
                                 key: "edit",
-                                label: <span className="flex items-center text-blue-600 hover:text-blue-800">Edit</span>,
-                                onClick: () => {
-                                  // Handle edit action
-                                  console.log("Edit staff:", staff.id);
-                                },
+                                label: "Edit",
+                                icon: null,
                               },
                               {
                                 key: "delete",
-                                label: <span className="flex items-center text-red-600 hover:text-red-800">Delete</span>,
-                                onClick: () => {
-                                  // Handle delete action
-                                  console.log("Delete staff:", staff.id);
-                                },
+                                label: "Delete",
+                                icon: null,
+                                danger: true,
                               },
                             ],
+                            onClick: ({ key }) => {
+                              if (key === "edit") {
+                                handleEditStaff(staff);
+                              } else if (key === "delete") {
+                                handleDeleteStaff(staff);
+                              }
+                            },
                           }}
                           trigger={["click"]}
                           placement="bottomRight"
@@ -502,13 +699,9 @@ export default function StaffPage(): JSX.Element {
                 </button>
               </div>
 
-              {message && (
-                <div
-                  className={`mb-4 p-3 rounded-lg text-sm ${
-                    message.type === "success" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
-                  }`}
-                >
-                  {message.text}
+              {isSubmitting && (
+                <div className="mb-4">
+                  <LoadingSpinner message="Creating staff member..." size="sm" />
                 </div>
               )}
 
@@ -549,7 +742,6 @@ export default function StaffPage(): JSX.Element {
                   >
                     Cancel
                   </button>
-                  {/* Beautiful Ant Design Submit Button */}
                   <Button
                     type="primary"
                     htmlType="submit"
@@ -569,6 +761,151 @@ export default function StaffPage(): JSX.Element {
                   </Button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Staff Modal */}
+        {showEditStaffModal && selectedStaffForEdit && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Edit Staff Member</h3>
+                <button
+                  onClick={() => {
+                    setShowEditStaffModal(false);
+                    setSelectedStaffForEdit(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                  disabled={isSubmitting}
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {isSubmitting && (
+                <div className="mb-4">
+                  <LoadingSpinner message="Updating staff member..." size="sm" />
+                </div>
+              )}
+
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editStaff.name}
+                    onChange={e => handleEditInputChange("name", e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter full name"
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={editStaff.status}
+                    onChange={e => handleEditInputChange("status", e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    disabled={isSubmitting}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditStaffModal(false);
+                      setSelectedStaffForEdit(null);
+                    }}
+                    className="flex-1 btn btn-secondary"
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={isSubmitting}
+                    disabled={isSubmitting}
+                    style={{
+                      backgroundColor: "#9564e9",
+                      borderColor: "#9564e9",
+                      borderRadius: "6px",
+                      height: "40px",
+                      fontWeight: "600",
+                      flex: 1,
+                    }}
+                    className="hover:!bg-[#8554d6] hover:!border-[#8554d6] transition-all duration-200"
+                  >
+                    {isSubmitting ? "Updating..." : "Update Staff"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirmModal && selectedStaffForDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <div className="flex items-center mb-4">
+                <div className="p-3 rounded-full bg-red-100 mr-4">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Delete Staff Member</h3>
+                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                </div>
+              </div>
+
+              {isDeleting && (
+                <div className="mb-4">
+                  <LoadingSpinner message="Deleting staff member..." size="sm" />
+                </div>
+              )}
+
+              <div className="mb-6">
+                <p className="text-gray-700">
+                  Are you sure you want to delete <span className="font-semibold">{selectedStaffForDelete.name}</span>? This will
+                  permanently remove their access and all associated data.
+                </p>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirmModal(false);
+                    setSelectedStaffForDelete(null);
+                  }}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors duration-200"
+                  disabled={isDeleting}
+                >
+                  No, Cancel
+                </button>
+                <Button
+                  onClick={confirmDeleteStaff}
+                  loading={isDeleting}
+                  disabled={isDeleting}
+                  style={{
+                    backgroundColor: "#dc2626",
+                    borderColor: "#dc2626",
+                    borderRadius: "6px",
+                    height: "40px",
+                    fontWeight: "600",
+                    flex: 1,
+                  }}
+                  className="hover:!bg-[#b91c1c] hover:!border-[#b91c1c] transition-all duration-200"
+                >
+                  {isDeleting ? "Deleting..." : "Yes, Delete"}
+                </Button>
+              </div>
             </div>
           </div>
         )}

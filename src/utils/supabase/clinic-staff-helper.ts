@@ -3,6 +3,21 @@ import { createClient } from "@/utils/supabase/config/client";
 
 const supabase = createClient();
 
+export interface UpdateStaffData {
+  name?: string;
+  is_active?: boolean;
+}
+
+export interface StaffUpdateResponse {
+  data?: any;
+  error?: string;
+}
+
+export interface StaffDeleteResponse {
+  data?: any;
+  error?: string;
+}
+
 // Type definitions
 export interface User {
   id: string;
@@ -76,7 +91,6 @@ export async function getClinicStaff(clinicId: string): Promise<StaffResponse> {
       `,
      )
      .eq("clinic_id", clinicId)
-     .eq("is_active", true)
      .neq("role.type", "owner")
      .order("created_at", { ascending: false });
 
@@ -169,29 +183,7 @@ export async function updateStaffStatus(userId: string, clinicId: string, isActi
   }
 }
 
-// Delete staff member (soft delete by setting is_active to false)
-export async function deleteStaffMember(userId: string, clinicId: string): Promise<UpdateResponse> {
-  try {
-    const { data, error } = await supabase
-      .from("user_clinic")
-      .update({
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId)
-      .eq("clinic_id", clinicId)
-      .select();
 
-    if (error) {
-      console.error("Error deleting staff member:", error);
-      throw error;
-    }
-
-    return { data, error: null };
-  } catch (error: any) {
-    return { data: null, error: error.message || "An unexpected error occurred" };
-  }
-}
 
 // Additional helper function to get staff count
 export async function getStaffCount(clinicId: string): Promise<{ count: number; error: string | null }> {
@@ -213,3 +205,105 @@ export async function getStaffCount(clinicId: string): Promise<{ count: number; 
     return { count: 0, error: error.message || "An unexpected error occurred" };
   }
 }
+
+
+// Add these functions to your clinic-staff-helper.ts file
+
+
+
+
+export async function updateStaffMember(
+  userId: string,
+  clinicId: string,
+  updateData: UpdateStaffData
+): Promise<StaffUpdateResponse> {
+  try {
+    if (!userId || !clinicId) {
+      throw new Error("User ID and Clinic ID are required");
+    }
+
+    // Start a transaction-like approach
+    const updates: Promise<any>[] = [];
+
+    // Update user table if name is provided
+    if (updateData.name) {
+      const userUpdate = supabase
+        .from("user")
+        .update({ 
+          name: updateData.name,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", userId);
+      
+      updates.push(userUpdate);
+    }
+
+    // Update user_clinic table if is_active is provided
+    if (updateData.is_active !== undefined) {
+      const userClinicUpdate = supabase
+        .from("user_clinic")
+        .update({ 
+          is_active: updateData.is_active,
+          updated_at: new Date().toISOString()
+        })
+        .eq("user_id", userId)
+        .eq("clinic_id", clinicId);
+      
+      updates.push(userClinicUpdate);
+    }
+
+    // Execute all updates
+    const results = await Promise.all(updates);
+
+    // Check for errors in any of the updates
+    for (const result of results) {
+      if (result.error) {
+        console.error("Update error:", result.error);
+        throw new Error(`Database update failed: ${result.error.message}`);
+      }
+    }
+
+    return { data: "Staff member updated successfully", error: undefined };
+  } catch (error: any) {
+    console.error("Error updating staff member:", error);
+    return { 
+      data: undefined, 
+      error: error.message || "An unexpected error occurred while updating staff member" 
+    };
+  }
+}
+
+/**
+ * Delete (deactivate) staff member
+ * @param userId - The user ID of the staff member
+ * @param clinicId - The clinic ID
+ * @returns Promise<StaffDeleteResponse>
+ */
+export async function deleteStaffMember(userId: string, clinicId: string): Promise<StaffDeleteResponse> {
+  try {
+    if (!userId || !clinicId) {
+      throw new Error("User ID and Clinic ID are required");
+    }
+
+    // Hard delete from user_clinic table
+    const { data, error } = await supabase.from("user_clinic").delete().eq("user_id", userId).eq("clinic_id", clinicId).select();
+
+    if (error) {
+      console.error("Error deleting staff member:", error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error("Staff member not found or already removed");
+    }
+
+    return { data: "Staff member deleted successfully", error: undefined };
+  } catch (error: any) {
+    console.error("Error deleting staff member:", error);
+    return {
+      data: undefined,
+      error: error.message || "An unexpected error occurred while deleting staff member",
+    };
+  }
+}
+

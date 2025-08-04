@@ -93,7 +93,8 @@ function generateRandomPassword(length: number = 12): string {
  */
 async function sendWelcomeEmail(email: string, name: string, password: string, clinicName: string): Promise<EmailResult> {
   try {
-    // Initialize Mailgun client
+    // Initialize Mailgun clientLet's make sure your preferences are up-to-date. Where are you located?
+
     const mailgun = new Mailgun(FormData);
     const mg = mailgun.client({
       username: "api",
