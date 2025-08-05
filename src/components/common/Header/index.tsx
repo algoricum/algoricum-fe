@@ -59,7 +59,7 @@ const Header = ({ title = "", description = "" }: HeaderProps) => {
     <Flex className="w-full bg-white px-4 py-3" justify="space-between" align="center">
       <Flex vertical>
         <Text className="text-xl sm:text-header font-helvetica-700 text-Gray900 mt-1">{title}</Text>
-        <Text className="text-xs sm:text-sm font-helvetica text-Gray600 ">{description}</Text>
+        <Text className="text-xs sm:text-sm font-helvetica text-Gray600 mb-1">{description}</Text>
       </Flex>
       {/* <Dropdown menu={{ items: dropdownItems, onClick: ({ key }) => menuHandler(key) }} placement="bottomRight" arrow>
         <Avatar className="cursor-pointer" size="large" icon={<UserOutlined />} />

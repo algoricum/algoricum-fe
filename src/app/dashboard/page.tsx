@@ -11,6 +11,7 @@ import { Header } from "@/components/common";
 import StatsGrid from "./StatsGrid";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
+import { Button } from "antd";
 
 export default function DashboardPage() {
   const [appointmentFilter, setAppointmentFilter] = useState("month");
@@ -18,7 +19,7 @@ export default function DashboardPage() {
   const [csvUploaded, setCsvUploaded] = useState(false);
   // const [zapierActive, setZapierActive] = useState(true);
   // const [showZapierBanner, setShowZapierBanner] = useState(true);
-  const [showHubspotBanner, setShowHubspotBanner] = useState(true);
+  const [showHubspotBanner, setShowHubspotBanner] = useState(false);
   const [showCsvBanner, setShowCsvBanner] = useState(true);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [leadsData, setLeadsData] = useState<any[]>([]);
@@ -30,6 +31,9 @@ export default function DashboardPage() {
       const data = await getClinicData();
       if (data?.id) {
         setClinicId(data.id);
+      }
+      if (data?.uses_hubspot) {
+        setShowHubspotBanner(true);
       }
       // setLoading(false);
     }
@@ -57,7 +61,6 @@ export default function DashboardPage() {
       `,
         )
         .eq("clinic_id", clinicId);
-
 
       if (error) {
         // setLoading(false);
@@ -195,9 +198,11 @@ export default function DashboardPage() {
     >
       <div className="p-6 space-y-8">
         {/* Integration Banners */}
-        <div className="grid gap-4 md:grid-cols-2 ">
+        <div className="flex flex-wrap gap-4">
           {showHubspotBanner && (
-            <div className={`p-4 rounded-lg border ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
+            <div
+              className={`flex-1 min-w-[300px] p-4 rounded-lg border ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}
+            >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center font-semibold">
                   <div className={`w-2 h-2 rounded-full mr-2 ${hubspotConnected ? "bg-green-400" : "bg-blue-400"}`} />
@@ -256,7 +261,9 @@ export default function DashboardPage() {
           )} */}
 
           {showCsvBanner && (
-            <div className={`p-4 rounded-lg border ${csvUploaded ? "bg-green-50 border-green-200" : "bg-purple-50 purple-blue-200"}`}>
+            <div
+              className={`flex-1 min-w-[300px] p-4 rounded-lg border ${csvUploaded ? "bg-green-50 border-green-200" : "bg-purple-50 border-purple-200"}`}
+            >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center font-semibold">
                   <Upload className={`w-5 h-5 mr-2 ${csvUploaded ? "text-green-500" : "text-purple-500"}`} />
