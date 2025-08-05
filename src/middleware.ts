@@ -167,7 +167,7 @@ async function checkIfUserHasClinic(
 // Configure which routes use this middleware
 export const config = {
   matcher: [
-    // Match all routes except for these:
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)',
+    // Exclude any route starting with `/api`, and other static files
+    '/((?!^api|^_next/static|^_next/image|^favicon.ico|.*\\.(svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)',
   ],
 };
