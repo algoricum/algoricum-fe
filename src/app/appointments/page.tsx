@@ -220,9 +220,9 @@ export default function AppointmentsPage() {
       const meetingData: CreateMeetingRequest = {
         username: newMeeting.username,
         email: newMeeting.email,
-        preferred_meeting_time: fullDateTime,
-        meeting_notes: newMeeting.meeting_notes || null,
-        meeting_link: newMeeting.meeting_link || null,
+        preferred_meeting_time: fullDateTime || undefined,
+        meeting_notes: newMeeting.meeting_notes || undefined,
+        meeting_link: newMeeting.meeting_link || undefined,
         clinic_id: clinicId,
         status: "pending",
       };

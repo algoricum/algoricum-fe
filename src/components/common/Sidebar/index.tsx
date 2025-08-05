@@ -8,7 +8,7 @@ import { signOut } from "@/utils/supabase/auth-helper";
 import menuItems from "@/constants/menuItems";
 import { createClient } from "@/utils/supabase/config/client";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"; // Import your LoadingSpinner
-
+import { User } from "@supabase/supabase-js";
 interface SidebarProps {
   sidebarOpen: boolean;
   // eslint-disable-next-line no-unused-vars
@@ -20,7 +20,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const { push } = useRouter();
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(true); // Add loading state
 
   useEffect(() => {

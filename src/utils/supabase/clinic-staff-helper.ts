@@ -124,40 +124,40 @@ export async function getClinicStaff(clinicId: string): Promise<StaffResponse> {
 }
 
 // Get staff member by ID
-export async function getStaffMember(userId: string, clinicId: string): Promise<SingleStaffResponse> {
-  try {
-    const { data, error } = await supabase
-      .from("user_clinic")
-      .select(
-        `
-        id,
-        created_at,
-        is_active,
-        user:user_id (
-          id,
-          name,
-          email
-        ),
-        role:role_id (
-          id,
-          type
-        )
-      `,
-      )
-      .eq("user_id", userId)
-      .eq("clinic_id", clinicId)
-      .single();
+// export async function getStaffMember(userId: string, clinicId: string): Promise<SingleStaffResponse> {
+//   try {
+//     const { data, error } = await supabase
+//       .from("user_clinic")
+//       .select(
+//         `
+//         id,
+//         created_at,
+//         is_active,
+//         user:user_id (
+//           id,
+//           name,
+//           email
+//         ),
+//         role:role_id (
+//           id,
+//           type
+//         )
+//       `,
+//       )
+//       .eq("user_id", userId)
+//       .eq("clinic_id", clinicId)
+//       .single();
 
-    if (error) {
-      console.error("Error fetching staff member:", error);
-      throw error;
-    }
+//     if (error) {
+//       console.error("Error fetching staff member:", error);
+//       throw error;
+//     }
 
-    return { data: data as UserClinic, error: null };
-  } catch (error: any) {
-    return { data: null, error: error.message || "An unexpected error occurred" };
-  }
-}
+//     return { data: data as UserClinic, error: null };
+//   } catch (error: any) {
+//     return { data: null, error: error.message || "An unexpected error occurred" };
+//   }
+// }
 
 // Update staff member status
 export async function updateStaffStatus(userId: string, clinicId: string, isActive: boolean): Promise<UpdateResponse> {
@@ -208,54 +208,44 @@ export async function getStaffCount(clinicId: string): Promise<{ count: number; 
 
 
 // Add these functions to your clinic-staff-helper.ts file
-
-
-
-
-export async function updateStaffMember(
-  userId: string,
-  clinicId: string,
-  updateData: UpdateStaffData
-): Promise<StaffUpdateResponse> {
+export async function updateStaffMember(userId: string, clinicId: string, updateData: UpdateStaffData): Promise<StaffUpdateResponse> {
   try {
     if (!userId || !clinicId) {
       throw new Error("User ID and Clinic ID are required");
     }
 
-    // Start a transaction-like approach
-    const updates: Promise<any>[] = [];
+    const results: any[] = [];
 
     // Update user table if name is provided
     if (updateData.name) {
-      const userUpdate = supabase
+      const result = await supabase
         .from("user")
-        .update({ 
+        .update({
           name: updateData.name,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", userId);
-      
-      updates.push(userUpdate);
+        .eq("id", userId)
+        .select();
+
+      results.push(result);
     }
 
     // Update user_clinic table if is_active is provided
     if (updateData.is_active !== undefined) {
-      const userClinicUpdate = supabase
+      const result = await supabase
         .from("user_clinic")
-        .update({ 
+        .update({
           is_active: updateData.is_active,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq("user_id", userId)
-        .eq("clinic_id", clinicId);
-      
-      updates.push(userClinicUpdate);
+        .eq("clinic_id", clinicId)
+        .select();
+
+      results.push(result);
     }
 
-    // Execute all updates
-    const results = await Promise.all(updates);
-
-    // Check for errors in any of the updates
+    // Check for errors
     for (const result of results) {
       if (result.error) {
         console.error("Update error:", result.error);
@@ -266,12 +256,15 @@ export async function updateStaffMember(
     return { data: "Staff member updated successfully", error: undefined };
   } catch (error: any) {
     console.error("Error updating staff member:", error);
-    return { 
-      data: undefined, 
-      error: error.message || "An unexpected error occurred while updating staff member" 
+    return {
+      data: undefined,
+      error: error.message || "An unexpected error occurred while updating staff member",
     };
   }
 }
+
+
+
 
 /**
  * Delete (deactivate) staff member
