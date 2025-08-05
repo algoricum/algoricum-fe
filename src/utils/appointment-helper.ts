@@ -1,4 +1,15 @@
-"use client";
+// src/utils/appointment-helper.ts
+
+import { createClient } from "@/utils/supabase/config/client";
+
+export type MeetingStatus = "confirmed" | "pending";
+
+export interface MeetingSchedule {
+  id: string;
+  username: string;
+  email: string;
+  created_at: string;
+  preferred_meeting_time: string | null;"use client";
 import type React from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -69,7 +80,6 @@ export default function AppointmentsPage() {
     meeting_notes: "",
     meeting_link: "",
   });
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Load appointments data from Supabase
   useEffect(() => {
@@ -164,48 +174,11 @@ export default function AppointmentsPage() {
   const handleSubmitMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Clear previous validation errors
-    setValidationErrors([]);
-
     if (!clinicId) {
-      setValidationErrors(["No clinic found. Please make sure you have a clinic set up."]);
-      return;
-    }
-
-    // Client-side validation
-    const errors: string[] = [];
-
-    if (!newMeeting.username.trim()) {
-      errors.push("Name is required");
-    }
-
-    if (!newMeeting.email.trim()) {
-      errors.push("Email is required");
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newMeeting.email)) {
-      errors.push("Please enter a valid email address");
-    }
-
-    if (!newMeeting.preferred_meeting_date) {
-      errors.push("Meeting date is required");
-    }
-
-    if (!newMeeting.preferred_meeting_time) {
-      errors.push("Meeting time is required");
-    }
-
-    if (newMeeting.preferred_meeting_date && newMeeting.preferred_meeting_time) {
-      const meetingDateTime = new Date(`${newMeeting.preferred_meeting_date} ${newMeeting.preferred_meeting_time}`);
-      if (meetingDateTime < new Date()) {
-        errors.push("Meeting time cannot be in the past");
-      }
-    }
-
-    if (newMeeting.meeting_link && !/^https?:\/\/.+/.test(newMeeting.meeting_link)) {
-      errors.push("Please enter a valid meeting link URL");
-    }
-
-    if (errors.length > 0) {
-      setValidationErrors(errors);
+      setMessage({
+        type: "error",
+        text: "No clinic found. Please make sure you have a clinic set up.",
+      });
       return;
     }
 
@@ -232,7 +205,10 @@ export default function AppointmentsPage() {
       // Check if email already exists
       const emailExists = await appointmentHelper.checkEmailExists(newMeeting.email, clinicId);
       if (emailExists) {
-        setValidationErrors(["This email is already registered for a meeting in this clinic"]);
+        setMessage({
+          type: "error",
+          text: "This email is already registered for a meeting in this clinic",
+        });
         return;
       }
 
@@ -251,11 +227,13 @@ export default function AppointmentsPage() {
         meeting_notes: "",
         meeting_link: "",
       });
-      setValidationErrors([]);
       setShowAddAppointmentModal(false);
     } catch (error: any) {
       console.error("Error saving meeting schedule:", error);
-      setValidationErrors([error.message || "Failed to schedule meeting"]);
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to schedule meeting",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -498,162 +476,168 @@ export default function AppointmentsPage() {
             </button>
           </div>
 
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Patient</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Date & Time</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Meeting Link</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Meeting Notes</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAppointments.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 px-4 text-center text-gray-500">
-                    {appointmentsData.length === 0 ? (
-                      <div className="flex flex-col items-center">
-                        <Calendar className="w-12 h-12 text-gray-300 mb-4" />
-                        <p className="text-lg font-medium text-gray-600 mb-2">No appointments yet</p>
-                        <p className="text-sm text-gray-500">Create your first appointment to get started</p>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center">
-                        <Search className="w-12 h-12 text-gray-300 mb-4" />
-                        <p className="text-lg font-medium text-gray-600 mb-2">No appointments match your filters</p>
-                        <button
-                          onClick={() => {
-                            setSearchQuery("");
-                            setStatusFilter("all");
-                          }}
-                          className="text-purple-600 hover:text-purple-800 underline text-sm"
-                        >
-                          Clear filters to see all appointments
-                        </button>
-                      </div>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Patient</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Date & Time</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Meeting Link</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Meeting Notes</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
                 </tr>
-              ) : (
-                filteredAppointments.map(appointment => {
-                  const { date, time } = formatAppointmentDateTime(appointment.preferred_meeting_time);
-                  return (
-                    <tr key={appointment.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold">
-                            {appointment.username
-                              .split(" ")
-                              .map(n => n[0])
-                              .join("")
-                              .toUpperCase()}
-                          </div>
-                          <div className="ml-3">
-                            <p className="font-medium text-gray-900">{appointment.username}</p>
-                          </div>
+              </thead>
+              <tbody>
+                {filteredAppointments.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 px-4 text-center text-gray-500">
+                      {appointmentsData.length === 0 ? (
+                        <div className="flex flex-col items-center">
+                          <Calendar className="w-12 h-12 text-gray-300 mb-4" />
+                          <p className="text-lg font-medium text-gray-600 mb-2">No appointments yet</p>
+                          <p className="text-sm text-gray-500">Create your first appointment to get started</p>
                         </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center">
-                          <Mail className="w-4 h-4 text-gray-400 mr-2" />
-                          <span className="text-gray-900">{appointment.email}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div>
-                          <p className="text-gray-900">{date}</p>
-                          <p className="text-sm text-gray-500">{time}</p>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        {appointment.meeting_link ? (
-                          <div className="flex items-center space-x-2">
-                            <a
-                              href={appointment.meeting_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center text-blue-600 hover:text-blue-800 transition-colors"
-                            >
-                              <Link className="w-4 h-4 mr-1" />
-                              <span className="text-sm">Join Meeting</span>
-                              <ExternalLink className="w-3 h-3 ml-1" />
-                            </a>
-                            <button
-                              onClick={() => copyToClipboard(appointment.meeting_link!, appointment.id)}
-                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                              title="Copy link"
-                            >
-                              {copiedLink === appointment.id ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">No link</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="max-w-xs">
-                          <p className="text-sm text-gray-900 truncate" title={appointment.meeting_notes || ""}>
-                            {appointment.meeting_notes || "No notes"}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                            appointment.status === "confirmed" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {appointment.status === "confirmed" ? "CONFIRMED" : "PENDING"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="relative dropdown-container">
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <Search className="w-12 h-12 text-gray-300 mb-4" />
+                          <p className="text-lg font-medium text-gray-600 mb-2">No appointments match your filters</p>
                           <button
-                            onClick={e => toggleDropdown(e, appointment.id)}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
-                            type="button"
+                            onClick={() => {
+                              setSearchQuery("");
+                              setStatusFilter("all");
+                            }}
+                            className="text-purple-600 hover:text-purple-800 underline text-sm"
                           >
-                            <MoreVertical className="w-4 h-4 text-gray-600" />
+                            Clear filters to see all appointments
                           </button>
-
-                          {/* Dropdown Menu */}
-                          {activeDropdown === appointment.id && (
-                            <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[140px]">
-                              <button
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  openEditModal(appointment);
-                                }}
-                                className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 rounded-t-lg"
-                                type="button"
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAppointments.map(appointment => {
+                    const { date, time } = formatAppointmentDateTime(appointment.preferred_meeting_time);
+                    return (
+                      <tr key={appointment.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold">
+                              {appointment.username
+                                .split(" ")
+                                .map(n => n[0])
+                                .join("")
+                                .toUpperCase()}
+                            </div>
+                            <div className="ml-3">
+                              <p className="font-medium text-gray-900">{appointment.username}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center">
+                            <Mail className="w-4 h-4 text-gray-400 mr-2" />
+                            <span className="text-gray-900">{appointment.email}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div>
+                            <p className="text-gray-900">{date}</p>
+                            <p className="text-sm text-gray-500">{time}</p>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {appointment.meeting_link ? (
+                            <div className="flex items-center space-x-2">
+                              <a
+                                href={appointment.meeting_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center text-blue-600 hover:text-blue-800 transition-colors"
                               >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Status
-                              </button>
+                                <Link className="w-4 h-4 mr-1" />
+                                <span className="text-sm">Join Meeting</span>
+                                <ExternalLink className="w-3 h-3 ml-1" />
+                              </a>
                               <button
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  openDeleteConfirmation(appointment);
-                                }}
-                                className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 rounded-b-lg"
-                                type="button"
+                                onClick={() => copyToClipboard(appointment.meeting_link!, appointment.id)}
+                                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                                title="Copy link"
                               >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
+                                {copiedLink === appointment.id ? (
+                                  <Check className="w-4 h-4 text-green-500" />
+                                ) : (
+                                  <Copy className="w-4 h-4" />
+                                )}
                               </button>
                             </div>
+                          ) : (
+                            <span className="text-gray-400 text-sm">No link</span>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="max-w-xs">
+                            <p className="text-sm text-gray-900 truncate" title={appointment.meeting_notes || ""}>
+                              {appointment.meeting_notes || "No notes"}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                              appointment.status === "confirmed" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                            }`}
+                          >
+                            {appointment.status === "confirmed" ? "CONFIRMED" : "PENDING"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="relative dropdown-container">
+                            <button
+                              onClick={e => toggleDropdown(e, appointment.id)}
+                              className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                              type="button"
+                            >
+                              <MoreVertical className="w-4 h-4 text-gray-600" />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {activeDropdown === appointment.id && (
+                              <div className="absolute right-0 top-10 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[140px]">
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    openEditModal(appointment);
+                                  }}
+                                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 rounded-t-lg"
+                                  type="button"
+                                >
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit Status
+                                </button>
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    openDeleteConfirmation(appointment);
+                                  }}
+                                  className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 rounded-b-lg"
+                                  type="button"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Add Appointment Modal - Schedule Meeting Form */}
@@ -676,7 +660,6 @@ export default function AppointmentsPage() {
                       meeting_notes: "",
                       meeting_link: "",
                     });
-                    setValidationErrors([]);
                   }}
                   className="text-gray-400 hover:text-gray-600"
                   disabled={isSubmitting}
@@ -686,26 +669,6 @@ export default function AppointmentsPage() {
               </div>
 
               <p className="text-gray-600 mb-6">Fill out the form below to schedule your meeting with us</p>
-
-              {/* Validation Errors */}
-              {validationErrors.length > 0 && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-start">
-                    <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 mr-2 flex-shrink-0" />
-                    <div>
-                      <h4 className="text-sm font-medium text-red-800 mb-1">Please fix the following errors:</h4>
-                      <ul className="text-sm text-red-700 space-y-1">
-                        {validationErrors.map((error, index) => (
-                          <li key={index} className="flex items-start">
-                            <span className="w-1 h-1 bg-red-600 rounded-full mt-2 mr-2 flex-shrink-0"></span>
-                            {error}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {isSubmitting && (
                 <div className="mb-4">
@@ -828,7 +791,6 @@ export default function AppointmentsPage() {
                         meeting_notes: "",
                         meeting_link: "",
                       });
-                      setValidationErrors([]);
                     }}
                     className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors duration-200"
                     disabled={isSubmitting}
@@ -985,3 +947,458 @@ export default function AppointmentsPage() {
     </DashboardLayout>
   );
 }
+
+  meeting_link: string | null;
+  calendly_link: string | null;
+  meeting_notes: string | null;
+  clinic_id: string | null;
+  status: MeetingStatus;
+}
+
+export interface CreateMeetingRequest {
+  username: string;
+  email: string;
+  preferred_meeting_time?: string;
+  meeting_link?: string;
+  calendly_link?: string;
+  meeting_notes?: string;
+  clinic_id: string;
+  status?: MeetingStatus;
+}
+
+export interface UpdateMeetingRequest {
+  username?: string;
+  email?: string;
+  preferred_meeting_time?: string;
+  meeting_link?: string;
+  calendly_link?: string;
+  meeting_notes?: string;
+  status?: MeetingStatus;
+}
+
+export class AppointmentHelper {
+  private supabase = createClient();
+
+  /**
+   * Get all meetings for a specific clinic
+   */
+  async getMeetingsByClinic(clinicId: string): Promise<MeetingSchedule[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from("meeting_schedule")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw new Error(`Failed to fetch meetings: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching meetings by clinic:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific meeting by ID
+   */
+  async getMeetingById(meetingId: string): Promise<MeetingSchedule | null> {
+    try {
+      const { data, error } = await this.supabase.from("meeting_schedule").select("*").eq("id", meetingId).single();
+
+      if (error) {
+        if (error.code === "PGRST116") {
+          return null; // No rows returned
+        }
+        throw new Error(`Failed to fetch meeting: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error fetching meeting by ID:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new meeting
+   */
+  async createMeeting(meetingData: CreateMeetingRequest): Promise<MeetingSchedule> {
+    try {
+      // Validate data before creating
+      const errors = validateMeetingData(meetingData);
+      if (errors.length > 0) {
+        throw new Error(`Validation errors: ${errors.join(", ")}`);
+      }
+
+      const { data, error } = await this.supabase
+        .from("meeting_schedule")
+        .insert([
+          {
+            ...meetingData,
+            status: meetingData.status || "pending",
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to create meeting: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error creating meeting:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update an existing meeting
+   */
+  async updateMeeting(meetingId: string, updateData: UpdateMeetingRequest): Promise<MeetingSchedule> {
+    try {
+      const { data, error } = await this.supabase.from("meeting_schedule").update(updateData).eq("id", meetingId).select().single();
+
+      if (error) {
+        throw new Error(`Failed to update meeting: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error updating meeting:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a meeting
+   */
+  async deleteMeeting(meetingId: string): Promise<boolean> {
+    try {
+      const { error } = await this.supabase.from("meeting_schedule").delete().eq("id", meetingId);
+
+      if (error) {
+        throw new Error(`Failed to delete meeting: ${error.message}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting meeting:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update meeting status only
+   */
+  async updateMeetingStatus(meetingId: string, status: MeetingStatus): Promise<MeetingSchedule> {
+    return this.updateMeeting(meetingId, { status });
+  }
+
+  /**
+   * Get meetings by status for a clinic
+   */
+  async getMeetingsByStatus(clinicId: string, status: MeetingStatus): Promise<MeetingSchedule[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from("meeting_schedule")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .eq("status", status)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw new Error(`Failed to fetch meetings by status: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching meetings by status:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get meeting by email (since email is unique)
+   */
+  async getMeetingByEmail(email: string): Promise<MeetingSchedule | null> {
+    try {
+      const { data, error } = await this.supabase.from("meeting_schedule").select("*").eq("email", email).single();
+
+      if (error) {
+        if (error.code === "PGRST116") {
+          return null; // No rows returned
+        }
+        throw new Error(`Failed to fetch meeting by email: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Error fetching meeting by email:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get meetings within a date range for a clinic
+   */
+  async getMeetingsByDateRange(clinicId: string, startDate: string, endDate: string): Promise<MeetingSchedule[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from("meeting_schedule")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .gte("preferred_meeting_time", startDate)
+        .lte("preferred_meeting_time", endDate)
+        .order("preferred_meeting_time", { ascending: true });
+
+      if (error) {
+        throw new Error(`Failed to fetch meetings by date range: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching meetings by date range:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk update meeting statuses
+   */
+  async bulkUpdateStatus(meetingIds: string[], status: MeetingStatus): Promise<boolean> {
+    try {
+      const { error } = await this.supabase.from("meeting_schedule").update({ status }).in("id", meetingIds);
+
+      if (error) {
+        throw new Error(`Failed to bulk update meeting statuses: ${error.message}`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error bulk updating meeting statuses:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get meeting statistics for a clinic
+   */
+  async getMeetingStats(clinicId: string): Promise<{
+    total: number;
+    confirmed: number;
+    pending: number;
+    thisWeek: number;
+    thisMonth: number;
+  }> {
+    try {
+      // Get all meetings for the clinic
+      const { data: allMeetings, error: allError } = await this.supabase
+        .from("meeting_schedule")
+        .select("status, preferred_meeting_time, created_at")
+        .eq("clinic_id", clinicId);
+
+      if (allError) {
+        throw new Error(`Failed to fetch meeting stats: ${allError.message}`);
+      }
+
+      const meetings = allMeetings || [];
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const stats = {
+        total: meetings.length,
+        confirmed: meetings.filter(m => m.status === "confirmed").length,
+        pending: meetings.filter(m => m.status === "pending").length,
+        thisWeek: meetings.filter(m => new Date(m.created_at) >= weekAgo).length,
+        thisMonth: meetings.filter(m => new Date(m.created_at) >= monthAgo).length,
+      };
+
+      return stats;
+    } catch (error) {
+      console.error("Error fetching meeting stats:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get upcoming meetings for a clinic (next 7 days)
+   */
+  async getUpcomingMeetings(clinicId: string, days: number = 7): Promise<MeetingSchedule[]> {
+    try {
+      const now = new Date();
+      const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+      const { data, error } = await this.supabase
+        .from("meeting_schedule")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .gte("preferred_meeting_time", now.toISOString())
+        .lte("preferred_meeting_time", futureDate.toISOString())
+        .order("preferred_meeting_time", { ascending: true });
+
+      if (error) {
+        throw new Error(`Failed to fetch upcoming meetings: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching upcoming meetings:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search meetings by username or email for a clinic
+   */
+  async searchMeetings(clinicId: string, searchTerm: string): Promise<MeetingSchedule[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from("meeting_schedule")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .or(`username.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw new Error(`Failed to search meetings: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error("Error searching meetings:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if email already exists for a clinic
+   */
+  async checkEmailExists(email: string, clinicId?: string): Promise<boolean> {
+    try {
+      let query = this.supabase.from("meeting_schedule").select("id").eq("email", email);
+
+      if (clinicId) {
+        query = query.eq("clinic_id", clinicId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw new Error(`Failed to check email existence: ${error.message}`);
+      }
+
+      return data && data.length > 0;
+    } catch (error) {
+      console.error("Error checking email existence:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get meetings by date for a clinic (specific day)
+   */
+  async getMeetingsByDate(clinicId: string, date: string): Promise<MeetingSchedule[]> {
+    try {
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const { data, error } = await this.supabase
+        .from("meeting_schedule")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .gte("preferred_meeting_time", startOfDay.toISOString())
+        .lte("preferred_meeting_time", endOfDay.toISOString())
+        .order("preferred_meeting_time", { ascending: true });
+
+      if (error) {
+        throw new Error(`Failed to fetch meetings by date: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error("Error fetching meetings by date:", error);
+      throw error;
+    }
+  }
+}
+
+// Export a default instance
+export const appointmentHelper = new AppointmentHelper();
+
+// Utility functions for date formatting
+export const formatMeetingDate = (dateString: string | null): string => {
+  if (!dateString) return "Not scheduled";
+
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+export const formatMeetingTime = (dateString: string | null): string => {
+  if (!dateString) return "Not scheduled";
+
+  const date = new Date(dateString);
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+export const getStatusColor = (status: MeetingStatus): string => {
+  switch (status) {
+    case "confirmed":
+      return "text-green-600 bg-green-100";
+    case "pending":
+      return "text-yellow-600 bg-yellow-100";
+    default:
+      return "text-gray-600 bg-gray-100";
+  }
+};
+
+// Validation utilities
+export const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+export const validateMeetingData = (data: CreateMeetingRequest): string[] => {
+  const errors: string[] = [];
+
+  if (!data.username?.trim()) {
+    errors.push("Username is required");
+  }
+
+  if (!data.email?.trim()) {
+    errors.push("Email is required");
+  } else if (!validateEmail(data.email)) {
+    errors.push("Please enter a valid email address");
+  }
+
+  if (!data.clinic_id?.trim()) {
+    errors.push("Clinic ID is required");
+  }
+
+  if (data.preferred_meeting_time) {
+    const meetingDate = new Date(data.preferred_meeting_time);
+    if (isNaN(meetingDate.getTime())) {
+      errors.push("Please enter a valid meeting date and time");
+    } else if (meetingDate < new Date()) {
+      errors.push("Meeting time cannot be in the past");
+    }
+  }
+
+  return errors;
+};
