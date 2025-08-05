@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Utility function to validate clinic slug
+// Improved utility function to validate clinic slug
 function validateClinicSlug(slug: string, logger: Logger): { valid: boolean; error?: string } {
   logger.debug('Validating clinic slug', { slug })
 
@@ -15,15 +15,15 @@ function validateClinicSlug(slug: string, logger: Logger): { valid: boolean; err
     return { valid: false, error: 'Clinic slug cannot be empty' }
   }
 
-  // Check length (domain labels can be max 63 chars)
-  if (slug.length > 63) {
-    return { valid: false, error: 'Clinic slug cannot exceed 63 characters' }
+  // Check length (domain labels can be max 63 chars, but let's be more conservative)
+  if (slug.length > 50) {
+    return { valid: false, error: 'Clinic slug cannot exceed 50 characters' }
   }
 
-  // Check for valid characters (alphanumeric and hyphens only)
-  const validSlugRegex = /^[a-zA-Z0-9-]+$/
+  // Check for valid characters (alphanumeric and hyphens only, more restrictive)
+  const validSlugRegex = /^[a-z0-9-]+$/
   if (!validSlugRegex.test(slug)) {
-    return { valid: false, error: 'Clinic slug can only contain letters, numbers, and hyphens' }
+    return { valid: false, error: 'Clinic slug can only contain lowercase letters, numbers, and hyphens' }
   }
 
   // Cannot start or end with hyphen
@@ -36,33 +36,44 @@ function validateClinicSlug(slug: string, logger: Logger): { valid: boolean; err
     return { valid: false, error: 'Clinic slug cannot contain consecutive hyphens' }
   }
 
+  // Additional validation for problematic patterns
+  if (slug.includes('api') || slug.includes('www') || slug.includes('mail')) {
+    return { valid: false, error: 'Clinic slug cannot contain reserved words (api, www, mail)' }
+  }
+
   logger.success('Clinic slug validation passed', { slug })
   return { valid: true }
 }
 
-// Utility function to generate a slug from clinic name
+// Improved utility function to generate a slug from clinic name
 function generateSlug(clinicName: string): string {
   let slug = clinicName
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '') // Remove special characters
+    .trim()
+    // Remove possessive apostrophes and other special characters
+    .replace(/[''`]/g, '')
+    .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
     .replace(/\s+/g, '-')     // Replace spaces with hyphens
     .replace(/-+/g, '-')      // Replace multiple hyphens with single
-    .trim();
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 
   // Ensure slug meets validation criteria
-  if (slug.length > 63) {
-    slug = slug.substring(0, 63);
+  if (slug.length > 50) {
+    slug = slug.substring(0, 50).replace(/-+$/, ''); // Remove trailing hyphens after truncation
   }
-  if (slug.startsWith('-')) {
-    slug = slug.substring(1);
+  
+  // If slug is empty after processing, generate a fallback
+  if (!slug) {
+    slug = 'clinic-' + Date.now().toString().slice(-6);
   }
-  if (slug.endsWith('-')) {
-    slug = slug.substring(0, slug.length - 1);
-  }
-  return slug || 'default-clinic'; // Fallback if slug is empty after processing
+
+  // Final cleanup
+  slug = slug.replace(/^-+|-+$/g, ''); // Remove any remaining leading/trailing hyphens
+
+  return slug || 'default-clinic';
 }
 
-// Enhanced logging utility
+// Enhanced logging utility (same as before)
 class Logger {
   private context: string
   private startTime: number
@@ -118,15 +129,15 @@ class Logger {
   }
 }
 
-// Namecheap API integration with enhanced logging
+// Simplified and more reliable Namecheap DNS function
 async function createNamecheapDNSRecords(domain: string, subdomain: string, logger: Logger) {
-  const stepLogger = new Logger('NamecheapDNS')
-  const stepStart = Date.now()
+  const stepLogger = new Logger('NamecheapDNS');
+  const stepStart = Date.now();
 
-  const NAMECHEAP_API_USER = Deno.env.get('NAMECHEAP_API_USER')
-  const NAMECHEAP_API_KEY = Deno.env.get('NAMECHEAP_API_KEY')
-  const NAMECHEAP_USERNAME = Deno.env.get('NAMECHEAP_USERNAME')
-  const NAMECHEAP_CLIENT_IP = Deno.env.get('NAMECHEAP_CLIENT_IP')
+  const NAMECHEAP_API_USER = Deno.env.get('NAMECHEAP_API_USER');
+  const NAMECHEAP_API_KEY = Deno.env.get('NAMECHEAP_API_KEY');
+  const NAMECHEAP_USERNAME = Deno.env.get('NAMECHEAP_USERNAME');
+  let NAMECHEAP_CLIENT_IP = Deno.env.get('NAMECHEAP_CLIENT_IP');
 
   stepLogger.info('Starting DNS setup', {
     domain,
@@ -134,8 +145,19 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, logg
     hasApiUser: !!NAMECHEAP_API_USER,
     hasApiKey: !!NAMECHEAP_API_KEY,
     hasUsername: !!NAMECHEAP_USERNAME,
-    hasClientIp: !!NAMECHEAP_CLIENT_IP
-  })
+    hasClientIp: !!NAMECHEAP_CLIENT_IP,
+  });
+
+  // Try to get dynamic IP if not configured
+  if (!NAMECHEAP_CLIENT_IP) {
+    try {
+      const ipResponse = await fetch('https://ifconfig.me', { signal: AbortSignal.timeout(10000) });
+      NAMECHEAP_CLIENT_IP = await ipResponse.text();
+      stepLogger.info('Dynamically fetched outbound IP', { clientIp: NAMECHEAP_CLIENT_IP });
+    } catch (ipError) {
+      stepLogger.error('Failed to fetch outbound IP', ipError);
+    }
+  }
 
   if (!NAMECHEAP_API_USER || !NAMECHEAP_API_KEY || !NAMECHEAP_USERNAME || !NAMECHEAP_CLIENT_IP) {
     stepLogger.warn('Namecheap API credentials incomplete, DNS setup will be manual', {
@@ -150,188 +172,65 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, logg
   }
 
   try {
-    stepLogger.step('Fetching existing DNS records')
-    
     // Parse domain parts
     const domainParts = domain.split('.')
+    if (domainParts.length !== 2) {
+      throw new Error(`Invalid domain format: ${domain}. Expected format: domain.com`)
+    }
+    
     const sld = domainParts[0]
     const tld = domainParts[1]
-    
-    stepLogger.debug('Parsed domain', { domain, sld, tld, subdomain })
-
-    // Get current DNS records
-    const getRecordsUrl = new URL('https://api.namecheap.com/xml.response')
-    const getRecordsParams = {
-      ApiUser: NAMECHEAP_API_USER,
-      ApiKey: NAMECHEAP_API_KEY,
-      UserName: NAMECHEAP_USERNAME,
-      ClientIp: NAMECHEAP_CLIENT_IP,
-      Command: 'namecheap.domains.dns.getHosts',
-      SLD: sld,
-      TLD: tld
-    }
-
-    Object.entries(getRecordsParams).forEach(([key, value]) => {
-      getRecordsUrl.searchParams.set(key, value)
-    })
-
-    stepLogger.debug('Fetching DNS records', { 
-      url: getRecordsUrl.toString().replace(NAMECHEAP_API_KEY!, '[REDACTED]'),
-      params: { ...getRecordsParams, ApiKey: '[REDACTED]' }
-    })
-
-    const getRecordsStart = Date.now()
-    const getResponse = await fetch(getRecordsUrl.toString(), {
-      signal: AbortSignal.timeout(30000) // 30 second timeout
-    })
-    stepLogger.performance('DNS records fetch', Date.now() - getRecordsStart, {
-      status: getResponse.status,
-      statusText: getResponse.statusText
-    })
-
-    if (!getResponse.ok) {
-      throw new Error(`Failed to fetch DNS records: ${getResponse.status} ${getResponse.statusText}`)
-    }
-
-    const getResponseText = await getResponse.text()
-    stepLogger.debug('DNS records response received', { 
-      responseLength: getResponseText.length,
-      containsError: getResponseText.includes('<Errors>'),
-      responsePreview: getResponseText.substring(0, 200) + '...'
-    })
-
-    // Parse XML response to check for errors
-    if (getResponseText.includes('<Errors>')) {
-      const errorMatch = getResponseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
-      const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
-      const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
-      throw new Error(`Namecheap API Error ${errorNumber}: ${errorText}`)
-    }
-
-    stepLogger.success('Current DNS records fetched successfully')
-
-    // Prepare new DNS records
     const subdomainHost = subdomain.replace(`.${domain}`, '')
-    stepLogger.info('Preparing to add MX records', {
-      subdomainHost,
-      mxRecords: [
-        { host: subdomainHost, type: 'MX', address: 'mxa.mailgun.org', priority: 10 },
-        { host: subdomainHost, type: 'MX', address: 'mxb.mailgun.org', priority: 10 }
-      ]
-    })
-
-    // Parse existing DNS records to preserve them
-    const existingRecords: any[] = []
-    let recordCounter = 1
     
-    // Extract existing records from XML response
-    const hostRegex = /<host[^>]*HostId="(\d+)"[^>]*Name="([^"]*)"[^>]*Type="([^"]*)"[^>]*Address="([^"]*)"[^>]*MXPref="([^"]*)"[^>]*TTL="([^"]*)"[^>]*\/>/g
-    let match
+    stepLogger.debug('Parsed domain components', { domain, sld, tld, subdomain, subdomainHost })
+
+    // Step 1: Get existing DNS records
+    stepLogger.step('Fetching existing DNS records')
+    const existingRecords = await getNamecheapDNSRecords(sld, tld, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP, stepLogger)
     
-    while ((match = hostRegex.exec(getResponseText)) !== null) {
-      const [, hostId, name, type, address, mxPref, ttl] = match
-      // Skip records we're about to replace
-      if (name !== subdomainHost || type !== 'MX') {
-        existingRecords.push({
-          name: name,
-          type: type,
-          address: address,
-          mxPref: mxPref || '',
-          ttl: ttl || '1800'
-        })
+    // Step 2: Filter out existing MX records for this subdomain
+    const preservedRecords = existingRecords.filter(record => 
+      !(record.name === subdomainHost && record.type === 'MX')
+    )
+
+    stepLogger.info('DNS records analysis', {
+      totalExisting: existingRecords.length,
+      toPreserve: preservedRecords.length,
+      toReplace: existingRecords.length - preservedRecords.length
+    })
+
+    // Step 3: Add new MX and TXT records
+    const newRecords = [
+      ...preservedRecords,
+      {
+        name: subdomainHost,
+        type: 'MX',
+        address: 'mxa.mailgun.org',
+        mxPref: '10',
+        ttl: '300'
+      },
+      {
+        name: subdomainHost,
+        type: 'MX', 
+        address: 'mxb.mailgun.org',
+        mxPref: '10',
+        ttl: '300'
+      },
+      {
+        name: subdomainHost,
+        type: 'TXT',
+        address: 'v=spf1 include:mailgun.org ~all',
+        mxPref: '',
+        ttl: '300'
       }
-    }
+    ]
 
-    stepLogger.debug('Existing DNS records to preserve', { 
-      count: existingRecords.length,
-      records: existingRecords.slice(0, 5) // Log first 5 for brevity
-    })
-
-    // Set new DNS records (existing + new MX + SPF)
-    const setRecordsUrl = new URL('https://api.namecheap.com/xml.response')
-    const setRecordsParams: any = {
-      ApiUser: NAMECHEAP_API_USER,
-      ApiKey: NAMECHEAP_API_KEY,
-      UserName: NAMECHEAP_USERNAME,
-      ClientIp: NAMECHEAP_CLIENT_IP,
-      Command: 'namecheap.domains.dns.setHosts',
-      SLD: sld,
-      TLD: tld
-    }
-
-    // Add existing records
-    existingRecords.forEach(record => {
-      setRecordsParams[`HostName${recordCounter}`] = record.name
-      setRecordsParams[`RecordType${recordCounter}`] = record.type
-      setRecordsParams[`Address${recordCounter}`] = record.address
-      if (record.type === 'MX' && record.mxPref) {
-        setRecordsParams[`MXPref${recordCounter}`] = record.mxPref
-      }
-      setRecordsParams[`TTL${recordCounter}`] = record.ttl
-      recordCounter++
-    })
-
-    // Add new MX records
-    setRecordsParams[`HostName${recordCounter}`] = subdomainHost
-    setRecordsParams[`RecordType${recordCounter}`] = 'MX'
-    setRecordsParams[`Address${recordCounter}`] = 'mxa.mailgun.org'
-    setRecordsParams[`MXPref${recordCounter}`] = '10'
-    setRecordsParams[`TTL${recordCounter}`] = '300'
-    recordCounter++
-
-    setRecordsParams[`HostName${recordCounter}`] = subdomainHost
-    setRecordsParams[`RecordType${recordCounter}`] = 'MX'
-    setRecordsParams[`Address${recordCounter}`] = 'mxb.mailgun.org'
-    setRecordsParams[`MXPref${recordCounter}`] = '10'
-    setRecordsParams[`TTL${recordCounter}`] = '300'
-    recordCounter++
-
-    // Add SPF TXT record
-    setRecordsParams[`HostName${recordCounter}`] = subdomainHost
-    setRecordsParams[`RecordType${recordCounter}`] = 'TXT'
-    setRecordsParams[`Address${recordCounter}`] = 'v=spf1 include:mailgun.org ~all'
-    setRecordsParams[`TTL${recordCounter}`] = '300'
-
-    Object.entries(setRecordsParams).forEach(([key, value]) => {
-      setRecordsUrl.searchParams.set(key, value)
-    })
-
-    stepLogger.step('Setting DNS records')
-    stepLogger.debug('DNS update request', {
-      url: setRecordsUrl.toString().replace(NAMECHEAP_API_KEY!, '[REDACTED]'),
-      params: { ...setRecordsParams, ApiKey: '[REDACTED]' }
-    })
-
-    const setRecordsStart = Date.now()
-    const setResponse = await fetch(setRecordsUrl.toString(), {
-      signal: AbortSignal.timeout(30000) // 30 second timeout
-    })
-    stepLogger.performance('DNS records update', Date.now() - setRecordsStart, {
-      status: setResponse.status,
-      statusText: setResponse.statusText
-    })
-
-    if (!setResponse.ok) {
-      throw new Error(`Failed to set DNS records: ${setResponse.status} ${setResponse.statusText}`)
-    }
-
-    const setResponseText = await setResponse.text()
-    stepLogger.debug('DNS update response received', {
-      responseLength: setResponseText.length,
-      containsError: setResponseText.includes('<Errors>'),
-      responsePreview: setResponseText.substring(0, 200) + '...'
-    })
-
-    // Check for errors in set response
-    if (setResponseText.includes('<Errors>')) {
-      const errorMatch = setResponseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
-      const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
-      const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
-      throw new Error(`Namecheap DNS Update Error ${errorNumber}: ${errorText}`)
-    }
+    // Step 4: Update DNS records
+    stepLogger.step('Updating DNS records')
+    const updateResult = await setNamecheapDNSRecords(sld, tld, newRecords, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP, stepLogger)
 
     stepLogger.performance('Complete DNS setup', Date.now() - stepStart)
-    stepLogger.success('DNS records created successfully on Namecheap', {
+    stepLogger.success('DNS records updated successfully', {
       domain,
       subdomain,
       recordsSet: 3, // 2 MX + 1 TXT
@@ -340,13 +239,13 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, logg
 
     return { 
       automated: true, 
-      records: setResponseText,
+      records: updateResult,
       recordsCreated: [
         { host: subdomainHost, type: 'MX', address: 'mxa.mailgun.org', priority: 10 },
         { host: subdomainHost, type: 'MX', address: 'mxb.mailgun.org', priority: 10 },
         { host: subdomainHost, type: 'TXT', address: 'v=spf1 include:mailgun.org ~all' }
       ],
-      existingRecordsPreserved: existingRecords.length
+      existingRecordsPreserved: preservedRecords.length
     }
 
   } catch (error) {
@@ -359,6 +258,117 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, logg
     })
     return { automated: false, error: error.message, details: error.stack }
   }
+}
+
+// Helper function to get existing DNS records
+async function getNamecheapDNSRecords(sld: string, tld: string, apiUser: string, apiKey: string, username: string, clientIp: string, logger: Logger) {
+  const url = new URL('https://api.namecheap.com/xml.response')
+  const params = {
+    ApiUser: apiUser,
+    ApiKey: apiKey,
+    UserName: username,
+    ClientIp: clientIp,
+    Command: 'namecheap.domains.dns.getHosts',
+    SLD: sld,
+    TLD: tld
+  }
+
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value)
+  })
+
+  logger.debug('Fetching DNS records', { sld, tld })
+
+  const response = await fetch(url.toString(), {
+    signal: AbortSignal.timeout(30000)
+  })
+
+  if (!response.ok) {
+    throw new Error(`Namecheap API error: ${response.status} ${response.statusText}`)
+  }
+
+  const responseText = await response.text()
+  logger.debug('DNS records response received', { responseLength: responseText.length })
+
+  // Check for API errors
+  if (responseText.includes('<Errors>')) {
+    const errorMatch = responseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
+    const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
+    const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
+    throw new Error(`Namecheap API Error ${errorNumber}: ${errorText}`)
+  }
+
+  // Parse records using a more robust approach
+  const records: any[] = []
+  const hostRegex = /<host[^>]*HostId="(\d+)"[^>]*Name="([^"]*)"[^>]*Type="([^"]*)"[^>]*Address="([^"]*)"[^>]*MXPref="([^"]*)"[^>]*TTL="([^"]*)"[^>]*\/>/g
+  let match
+
+  while ((match = hostRegex.exec(responseText)) !== null) {
+    const [, hostId, name, type, address, mxPref, ttl] = match
+    records.push({
+      hostId,
+      name: name || '@',
+      type,
+      address,
+      mxPref: mxPref || '',
+      ttl: ttl || '1800'
+    })
+  }
+
+  logger.info('Parsed existing DNS records', { count: records.length })
+  return records
+}
+
+// Helper function to set DNS records
+async function setNamecheapDNSRecords(sld: string, tld: string, records: any[], apiUser: string, apiKey: string, username: string, clientIp: string, logger: Logger) {
+  const url = new URL('https://api.namecheap.com/xml.response')
+  const params: any = {
+    ApiUser: apiUser,
+    ApiKey: apiKey,
+    UserName: username,
+    ClientIp: clientIp,
+    Command: 'namecheap.domains.dns.setHosts',
+    SLD: sld,
+    TLD: tld
+  }
+
+  // Add each record as parameters
+  records.forEach((record, index) => {
+    const recordNum = index + 1
+    params[`HostName${recordNum}`] = record.name
+    params[`RecordType${recordNum}`] = record.type
+    params[`Address${recordNum}`] = record.address
+    if (record.type === 'MX' && record.mxPref) {
+      params[`MXPref${recordNum}`] = record.mxPref
+    }
+    params[`TTL${recordNum}`] = record.ttl
+  })
+
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value)
+  })
+
+  logger.debug('Setting DNS records', { recordCount: records.length })
+
+  const response = await fetch(url.toString(), {
+    signal: AbortSignal.timeout(30000)
+  })
+
+  if (!response.ok) {
+    throw new Error(`Namecheap API error: ${response.status} ${response.statusText}`)
+  }
+
+  const responseText = await response.text()
+
+  // Check for API errors
+  if (responseText.includes('<Errors>')) {
+    const errorMatch = responseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
+    const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
+    const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
+    throw new Error(`Namecheap DNS Update Error ${errorNumber}: ${errorText}`)
+  }
+
+  return responseText
 }
 
 // Get DNS records needed for manual setup
@@ -378,7 +388,7 @@ function getRequiredDNSRecords(subdomain: string, logger: Logger) {
   return records
 }
 
-// Check domain verification status with enhanced logging
+// Improved domain verification function
 async function checkDomainVerification(domain: string, apiKey: string, logger: Logger) {
   const stepLogger = new Logger('DomainVerification')
   const stepStart = Date.now()
@@ -386,28 +396,33 @@ async function checkDomainVerification(domain: string, apiKey: string, logger: L
   stepLogger.step('Checking domain verification status', { domain })
 
   try {
-    const verifyStart = Date.now()
     const response = await fetch(`https://api.mailgun.net/v3/domains/${domain}`, {
       method: 'GET',
       headers: {
         'Authorization': `Basic ${btoa(`api:${apiKey}`)}`,
       },
-      signal: AbortSignal.timeout(30000) // 30 second timeout
+      signal: AbortSignal.timeout(30000)
     })
 
-    stepLogger.performance('Mailgun API call', Date.now() - verifyStart, {
+    stepLogger.performance('Mailgun API call', Date.now() - stepStart, {
       status: response.status,
       statusText: response.statusText,
       domain
     })
 
     if (!response.ok) {
+      if (response.status === 404) {
+        stepLogger.warn('Domain not found in Mailgun', { domain })
+        return { verified: false, error: 'Domain not found in Mailgun', exists: false }
+      }
+      const errorText = await response.text()
       stepLogger.warn('Domain verification check failed', {
         status: response.status,
         statusText: response.statusText,
+        error: errorText,
         domain
       })
-      return { verified: false, error: `HTTP ${response.status}: ${response.statusText}` }
+      return { verified: false, error: `HTTP ${response.status}: ${response.statusText}`, exists: false }
     }
 
     const data = await response.json()
@@ -416,13 +431,12 @@ async function checkDomainVerification(domain: string, apiKey: string, logger: L
       state: data.domain?.state,
       hasReceivingRecords: !!data.receiving_dns_records,
       hasSendingRecords: !!data.sending_dns_records,
-      receivingRecordsCount: data.receiving_dns_records?.length || 0,
-      sendingRecordsCount: data.sending_dns_records?.length || 0
     })
 
     const result = {
       verified: data.domain?.state === 'active',
       state: data.domain?.state,
+      exists: true,
       receiving_records: data.receiving_dns_records,
       sending_records: data.sending_dns_records,
       domain_info: {
@@ -447,8 +461,130 @@ async function checkDomainVerification(domain: string, apiKey: string, logger: L
   } catch (error) {
     stepLogger.performance('Failed domain verification check', Date.now() - stepStart)
     stepLogger.error('Domain verification check error', error, { domain })
-    return { verified: false, error: error.message, details: error.stack }
+    return { verified: false, error: error.message, details: error.stack, exists: false }
   }
+}
+
+// Improved Mailgun domain creation with better error handling
+async function createMailgunDomain(subdomain: string, apiKey: string, logger: Logger) {
+  const stepLogger = new Logger('MailgunDomainCreation')
+  const stepStart = Date.now()
+
+  // Validate domain format before sending to Mailgun
+  if (!subdomain || subdomain.length < 4 || subdomain.length > 253) {
+    throw new Error(`Invalid domain format: ${subdomain}`)
+  }
+
+  // Check if domain name contains valid characters
+  const domainRegex = /^[a-z0-9.-]+\.[a-z]{2,}$/
+  if (!domainRegex.test(subdomain)) {
+    throw new Error(`Invalid domain format: ${subdomain}. Domain must contain only lowercase letters, numbers, dots, and hyphens`)
+  }
+
+  const mailgunPayload = {
+    name: subdomain,
+    smtp_password: crypto.randomUUID().substring(0, 32), // Limit password length
+    spam_action: 'disabled',
+    wildcard: 'false',
+    force_dkim_authority: 'true'
+  }
+
+  stepLogger.info('Creating Mailgun domain', {
+    domain: subdomain,
+    payload: { ...mailgunPayload, smtp_password: '[REDACTED]' }
+  })
+
+  // First, check if domain already exists
+  const existingDomain = await checkDomainVerification(subdomain, apiKey, stepLogger)
+  if (existingDomain.exists) {
+    stepLogger.info('Domain already exists in Mailgun', { domain: subdomain, verified: existingDomain.verified })
+    return existingDomain
+  }
+
+  let attempts = 0
+  const maxAttempts = 3
+
+  while (attempts < maxAttempts) {
+    attempts++
+    stepLogger.debug(`Mailgun creation attempt ${attempts}/${maxAttempts}`)
+
+    try {
+      const response = await fetch('https://api.mailgun.net/v3/domains', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${btoa(`api:${apiKey}`)}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams(mailgunPayload),
+        signal: AbortSignal.timeout(30000)
+      })
+
+      stepLogger.performance(`Mailgun API call attempt ${attempts}`, Date.now() - stepStart, {
+        status: response.status,
+        statusText: response.statusText,
+        subdomain
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        stepLogger.success('Mailgun domain created successfully', {
+          domain: data.domain?.name,
+          state: data.domain?.state,
+          attempt: attempts
+        })
+        return data
+      }
+
+      const responseText = await response.text()
+      
+      // Handle specific error cases
+      if (response.status === 401) {
+        throw new Error(`Mailgun authentication failed. Please check your MAILGUN_API_KEY`)
+      }
+      
+      if (response.status === 402) {
+        throw new Error(`Mailgun payment required. Please verify your account and add payment method`)
+      }
+      
+      if (response.status === 409 || responseText.includes('already exists')) {
+        stepLogger.info('Domain already exists, fetching existing domain info')
+        return await checkDomainVerification(subdomain, apiKey, stepLogger)
+      }
+      
+      if (response.status === 429) {
+        if (attempts < maxAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, attempts), 10000) // Exponential backoff, max 10s
+          stepLogger.warn(`Rate limited, retrying in ${delay}ms`, { attempt: attempts })
+          await new Promise(resolve => setTimeout(resolve, delay))
+          continue
+        }
+        throw new Error(`Mailgun rate limit exceeded after ${maxAttempts} attempts`)
+      }
+      
+      if (response.status >= 500 && attempts < maxAttempts) {
+        const delay = Math.min(2000 * attempts, 10000) // Linear backoff for server errors
+        stepLogger.warn(`Server error (${response.status}), retrying in ${delay}ms`, { 
+          attempt: attempts, 
+          error: responseText.substring(0, 200)
+        })
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+      
+      // If we've exhausted retries or hit a non-retryable error
+      throw new Error(`Mailgun domain creation failed (${response.status}): ${responseText}`)
+
+    } catch (error) {
+      if (attempts >= maxAttempts) {
+        throw error
+      }
+      
+      stepLogger.warn(`Attempt ${attempts} failed, retrying`, { error: error.message })
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempts))
+    }
+  }
+
+  throw new Error(`Failed to create Mailgun domain after ${maxAttempts} attempts`)
 }
 
 serve(async (req) => {
@@ -530,36 +666,6 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     logger.success('Supabase client initialized')
 
-    // Validate database tables exist
-    logger.step('Validating database schema')
-    try {
-      // Test if clinic table exists and has required columns
-      const { error: clinicTestError } = await supabase
-        .from('clinic')
-        .select('id, slug, name')
-        .limit(1)
-
-      if (clinicTestError) {
-        throw new Error(`Clinic table validation failed: ${clinicTestError.message}`)
-      }
-
-      // Test if mailgun_settings table exists (or can be created)
-      const { error: settingsTestError } = await supabase
-        .from('mailgun_settings')
-        .select('id')
-        .limit(1)
-
-      // If table doesn't exist, log warning but continue (upsert will handle it)
-      if (settingsTestError && !settingsTestError.message.includes('does not exist')) {
-        logger.warn('Mailgun settings table validation warning', { error: settingsTestError.message })
-      }
-
-      logger.success('Database schema validation passed')
-    } catch (schemaError) {
-      logger.error('Database schema validation failed', schemaError)
-      throw new Error(`Database schema validation failed: ${schemaError.message}`)
-    }
-
     // Get clinic data
     logger.step('Fetching clinic data from database')
     const clinicFetchStart = Date.now()
@@ -629,7 +735,7 @@ serve(async (req) => {
   }
 })
 
-// Setup action handler
+// Improved setup action handler
 async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey: string, webhookBaseUrl: string, supabase: any, logger: Logger, requestStart: number, clinicName?: string) {
   const setupLogger = new Logger('SetupAction')
   setupLogger.info('⚙️ Starting domain setup process', { clinicId: clinic.id, clinicName: clinic.name })
@@ -653,10 +759,33 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
     setupLogger.success('Clinic slug updated in database', { clinicId: clinic.id, slug: clinicSlug })
   }
 
+  if (!clinicSlug) {
+    throw new Error('No clinic slug available and no clinic name provided to generate one')
+  }
+
   // Validate clinic slug format
   const slugValidation = validateClinicSlug(clinicSlug, setupLogger)
   if (!slugValidation.valid) {
-    throw new Error(`Invalid clinic slug "${clinicSlug}": ${slugValidation.error}`)
+    // Try to fix the slug
+    const fixedSlug = generateSlug(clinicSlug)
+    const fixedValidation = validateClinicSlug(fixedSlug, setupLogger)
+    
+    if (fixedValidation.valid) {
+      setupLogger.warn('Original slug invalid, using fixed version', { 
+        original: clinicSlug, 
+        fixed: fixedSlug, 
+        originalError: slugValidation.error 
+      })
+      clinicSlug = fixedSlug
+      
+      // Update database with fixed slug
+      await supabase
+        .from('clinic')
+        .update({ slug: clinicSlug, updated_at: new Date().toISOString() })
+        .eq('id', clinic.id)
+    } else {
+      throw new Error(`Cannot create valid slug from "${clinicSlug}": ${slugValidation.error}`)
+    }
   }
   
   // Generate domain and email
@@ -675,77 +804,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
 
   // Step 1: Create/verify domain in Mailgun
   setupLogger.step('Creating domain in Mailgun')
-  const mailgunStart = Date.now()
-  
-  const mailgunPayload = {
-    name: subdomain,
-    smtp_password: crypto.randomUUID(),
-    spam_action: 'disabled',
-    wildcard: 'false',
-    force_dkim_authority: 'true'
-  }
-
-  setupLogger.debug('Mailgun API request details', {
-    endpoint: 'https://api.mailgun.net/v3/domains',
-    method: 'POST',
-    payload: { ...mailgunPayload, smtp_password: '[REDACTED]' }
-  })
-
-  const mailgunResponse = await fetch('https://api.mailgun.net/v3/domains', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${btoa(`api:${mailgunApiKey}`)}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams(mailgunPayload),
-    signal: AbortSignal.timeout(30000) // 30 second timeout
-  })
-
-  setupLogger.performance('Mailgun domain creation API call', Date.now() - mailgunStart, {
-    status: mailgunResponse.status,
-    statusText: mailgunResponse.statusText,
-    subdomain
-  })
-
-  let mailgunData = null
-  const responseText = await mailgunResponse.text()
-
-  if (!mailgunResponse.ok) {
-    setupLogger.warn('Mailgun domain creation failed', {
-      status: mailgunResponse.status,
-      statusText: mailgunResponse.statusText,
-      responsePreview: responseText.substring(0, 300),
-      subdomain
-    })
-    
-    // Check if domain already exists
-    if (responseText.includes('already exists') || responseText.includes('Domain already exists') || mailgunResponse.status === 409) {
-      setupLogger.info('♻️ Domain already exists in Mailgun, proceeding with existing domain')
-    } else if (mailgunResponse.status === 401) {
-      throw new Error(`Mailgun authentication failed. Please check your MAILGUN_API_KEY: ${responseText}`)
-    } else if (mailgunResponse.status === 402) {
-      throw new Error(`Mailgun payment required. Please verify your account and add payment method: ${responseText}`)
-    } else if (mailgunResponse.status === 429) {
-      throw new Error(`Mailgun rate limit exceeded. Please try again later: ${responseText}`)
-    } else {
-      throw new Error(`Mailgun domain creation failed (${mailgunResponse.status}): ${responseText}`)
-    }
-  } else {
-    try {
-      mailgunData = JSON.parse(responseText)
-      setupLogger.success('Mailgun domain created successfully', {
-        domain: mailgunData.domain?.name,
-        state: mailgunData.domain?.state,
-        receivingRecords: mailgunData.receiving_dns_records?.length || 0,
-        sendingRecords: mailgunData.sending_dns_records?.length || 0
-      })
-    } catch (parseError) {
-      setupLogger.warn('Could not parse Mailgun response as JSON', {
-        responsePreview: responseText.substring(0, 200),
-        parseError: parseError.message
-      })
-    }
-  }
+  const mailgunData = await createMailgunDomain(subdomain, mailgunApiKey, setupLogger)
 
   // Step 2: Get domain verification status
   setupLogger.step('Checking domain verification status')
@@ -766,20 +825,12 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
   if (webhookBaseUrl) {
     setupLogger.step('Setting up email routing webhook')
     
-    // Validate webhook URL format
     try {
       const webhookUrl = new URL(`${webhookBaseUrl}/webhooks/mailgun/${clinic.id}`)
       if (!webhookUrl.protocol.startsWith('https')) {
         setupLogger.warn('Webhook URL is not HTTPS, Mailgun may reject it', { webhookUrl: webhookUrl.toString() })
       }
-    } catch (urlError) {
-      setupLogger.error('Invalid webhook URL format', urlError, { webhookBaseUrl })
-      throw new Error(`Invalid WEBHOOK_BASE_URL format: ${webhookBaseUrl}`)
-    }
 
-    const routeStart = Date.now()
-    
-    try {
       const routePayload = {
         priority: '1',
         description: `Route for ${subdomain} - ${clinic.name}`,
@@ -788,7 +839,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
       }
 
       setupLogger.debug('Creating email route', {
-        webhookUrl: `${webhookBaseUrl}/webhooks/mailgun/${clinic.id}`,
+        webhookUrl: webhookUrl.toString(),
         expression: routePayload.expression,
         description: routePayload.description
       })
@@ -800,12 +851,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams(routePayload),
-        signal: AbortSignal.timeout(30000) // 30 second timeout
-      })
-
-      setupLogger.performance('Email route creation', Date.now() - routeStart, {
-        status: routeResponse.status,
-        statusText: routeResponse.statusText
+        signal: AbortSignal.timeout(30000)
       })
 
       if (routeResponse.ok) {
@@ -843,13 +889,9 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
   const clinicUpdateData = {
     domain: subdomain,
     email: clinicEmail,
+    slug: clinicSlug, // Ensure slug is saved
     updated_at: new Date().toISOString()
   }
-
-  setupLogger.debug('Updating clinic record', {
-    clinicId: clinic.id,
-    updateData: clinicUpdateData
-  })
 
   const { error: clinicUpdateError } = await supabase
     .from('clinic')
@@ -878,8 +920,6 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }
-
-  setupLogger.debug('Upserting mailgun_settings', { settingsData })
 
   const { error: settingsError } = await supabase
     .from('mailgun_settings')
@@ -947,7 +987,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
   })
 }
 
-// Verify action handler
+// Verify action handler (same as before but using improved checkDomainVerification)
 async function handleVerifyAction(clinic: any, mailgunApiKey: string, supabase: any, logger: Logger, requestStart: number) {
   const verifyLogger = new Logger('VerifyAction')
   verifyLogger.info('🔍 Starting domain verification check', { clinicId: clinic.id })
@@ -984,6 +1024,7 @@ async function handleVerifyAction(clinic: any, mailgunApiKey: string, supabase: 
       domain: clinic.domain,
       verified: verificationStatus.verified,
       status: verificationStatus.state,
+      exists: verificationStatus.exists,
       details: verificationStatus,
       executionTime: Date.now() - requestStart
     }
@@ -997,7 +1038,7 @@ async function handleVerifyAction(clinic: any, mailgunApiKey: string, supabase: 
   })
 }
 
-// Delete action handler
+// Delete action handler (same as before)
 async function handleDeleteAction(clinic: any, mailgunApiKey: string, supabase: any, logger: Logger, requestStart: number) {
   const deleteLogger = new Logger('DeleteAction')
   deleteLogger.info('🗑️ Starting cleanup process', { clinicId: clinic.id, domain: clinic.domain })
@@ -1018,7 +1059,7 @@ async function handleDeleteAction(clinic: any, mailgunApiKey: string, supabase: 
           headers: {
             'Authorization': `Basic ${btoa(`api:${mailgunApiKey}`)}`,
           },
-          signal: AbortSignal.timeout(30000) // 30 second timeout
+          signal: AbortSignal.timeout(30000)
         }
       )
 
