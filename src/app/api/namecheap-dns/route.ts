@@ -98,7 +98,7 @@ async function setNamecheapDNSRecords(sld: string, tld: string, records: any[], 
   })
 
   Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, value)
+    url.searchParams.set(key, String(value))
   })
 
   console.log('Setting DNS records via proxy', { recordCount: records.length })
@@ -112,7 +112,12 @@ async function setNamecheapDNSRecords(sld: string, tld: string, records: any[], 
   const proxyUrl = process.env.FIXIE_PROXY_URL
   if (proxyUrl) {
     console.log('Using Fixie proxy for Namecheap API')
+
     const agent = new HttpsProxyAgent(proxyUrl)
+
+    console.log('Using Fixie proxy for Namecheap API', agent)
+
+
     fetchOptions.agent = agent
   }
 
