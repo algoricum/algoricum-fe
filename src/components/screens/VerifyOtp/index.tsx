@@ -162,8 +162,8 @@ const VerifyOTPPage = () => {
           value={otp}
           onChange={setOtp}
           numInputs={6}
-          renderSeparator={<span className="w-4"></span>}
-          renderInput={props => <input {...props} className="w-12 h-12 border border-gray-300 rounded-md text-center text-xl" />}
+          renderSeparator={<span className=""></span>}
+          renderInput={props => <input {...props} className="h-16 w-12 border border-gray-300 rounded-md text-center text-5xl p-2" />}
           inputStyle="inputStyle"
           containerStyle="flex justify-between w-full"
         />

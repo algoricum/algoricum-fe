@@ -9,7 +9,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useMutation } from "react-query"
 import { createClient } from "@/utils/supabase/config/client"
-import { AuthSeparator, SocialButton } from "@/components/common"
+import { AuthSeparator } from "@/components/common"
 import { signInWithPassword } from "@/utils/supabase/auth-helper"
 import { useClinicCheck } from "@/hooks/useClinicCheck"
 import { setClinicData } from "@/utils/supabase/clinic-helper"
@@ -53,22 +53,22 @@ const LoginPage = () => {
     mutate(values)
   }
 
-  const handleSocialLogin = async (provider: "google" | "apple") => {
-    try {
-      const supabase = createClient()
+  // const handleSocialLogin = async (provider: "google" | "apple") => {
+  //   try {
+  //     const supabase = createClient()
 
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirectUrl=${redirectUrl}`,
-        },
-      })
+  //     const { error } = await supabase.auth.signInWithOAuth({
+  //       provider,
+  //       options: {
+  //         redirectTo: `${window.location.origin}/auth/callback?redirectUrl=${redirectUrl}`,
+  //       },
+  //     })
 
-      if (error) throw error
-    } catch (error: any) {
-      ErrorToast(error?.message || `Failed to sign in with ${provider}`)
-    }
-  }
+  //     if (error) throw error
+  //   } catch (error: any) {
+  //     ErrorToast(error?.message || `Failed to sign in with ${provider}`)
+  //   }
+  // }
 
   return (
     <Flex vertical gap={24} className="w-full justify-center">
@@ -132,13 +132,13 @@ const LoginPage = () => {
         </Flex>
       </Form>
       <AuthSeparator />
-      <Flex gap={12} className="flex-col justify-center items-center sm:flex-row w-full">
+      {/* <Flex gap={12} className="flex-col justify-center items-center sm:flex-row w-full">
         <SocialButton
         isGoogle={true}
         label="Continue With Google"
         onClick={() => handleSocialLogin("google")}
         />
-      </Flex>
+      </Flex> */}
 
 
       <div className="text-center mt-2">
@@ -149,6 +149,7 @@ const LoginPage = () => {
           </Link>
         </Text>
       </div>
+      
     </Flex>
   )
 }

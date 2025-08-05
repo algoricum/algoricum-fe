@@ -17,11 +17,11 @@ dayjs.extend(relativeTime);
 const supabase = createClient();
 
 const BillingPage = () => {
-  const [billingCycle, setBillingCycle] = useState("monthly");
+  // const [billingCycle, setBillingCycle] = useState("monthly");
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [subscriptionEvents, setSubscriptionEvents] = useState<any[]>([]);
   const [trialEnd, setTrialEnd] = useState<string | null>(null);
-  const [plans, setPlans] = useState<any[]>([]);
+  // const [plans, setPlans] = useState<any[]>([]);
   const [clinicId, setClinicId] = useState<string | null>(null);
 
   const hasActiveSubscription = subscriptionStatus === "active" || subscriptionStatus === "trialing";
@@ -53,7 +53,7 @@ const BillingPage = () => {
 
         const { data: planData } = await supabase.from("plans").select("*").eq("active", true).order("amount", { ascending: true });
 
-        setPlans(planData || []);
+        // setPlans(planData || []);
 
         if (subscription) {
           setSubscriptionStatus(subscription.status);
@@ -260,7 +260,7 @@ const BillingPage = () => {
 
           {loading && <Skeleton active paragraph={{ rows: 6 }} className="mt-6" />}
 
-          {!hasActiveSubscription && !loading && (
+          {/* {!hasActiveSubscription && !loading && (
             <div className="mt-6">
               <Tabs
                 activeKey={billingCycle}
@@ -301,7 +301,7 @@ const BillingPage = () => {
                   ))}
               </div>
             </div>
-          )}
+          )} */}
 
           {subscriptionEvents.length > 0 && (
             <div className="grid grid-cols-1 gap-6 mb-8">

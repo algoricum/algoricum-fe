@@ -52,14 +52,15 @@ export default function StatsGrid({ clinicId }: { clinicId: string }) {
       const bookedThis = leadsThis.filter(l => l.status === "Booked").length;
       const bookedLast = leadsLast.filter(l => l.status === "Booked").length;
       const bookedChange = getChangePercent(bookedThis, bookedLast);
-
-      const convThis = totalThis === 0 ? 0 : Math.round((bookedThis / totalThis) * 100);
-      const convLast = totalLast === 0 ? 0 : Math.round((bookedLast / totalLast) * 100);
-      const convChange = getChangePercent(convThis, convLast);
-
+      
       const convertedThis = new Set(leadsThis.filter(l => l.status === "Converted").map(l => l.email)).size;
       const convertedLast = new Set(leadsLast.filter(l => l.status === "Converted").map(l => l.email)).size;
       const activeChange = getChangePercent(convertedThis, convertedLast);
+
+      const convThis = totalThis === 0 ? 0 : Math.round((convertedThis / totalThis) * 100);
+      const convLast = totalLast === 0 ? 0 : Math.round((convertedLast / totalLast) * 100);
+      const convChange = getChangePercent(convThis, convLast);
+
 
       setStats({
         totalLeads: { thisMonth: totalThis, lastMonth: totalLast, change: totalChange },
@@ -163,8 +164,8 @@ function StatCard({
             <p className="text-2xl font-semibold text-gray-900">{value}</p>
           </div>
           <div className="text-sm text-gray-500 mt-1">
-            this month{" "}
-            <span className="text-green-600">
+            This month{" "}
+            <span className={`text-${change >= 0 ? "green" : "red"}-600`}>
               {change >= 0 ? "+" : ""}
               {change}%
             </span>
