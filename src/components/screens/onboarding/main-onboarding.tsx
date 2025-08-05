@@ -356,16 +356,16 @@ export default function MainOnboarding() {
 
       // router.push("/dashboard?onboarding=success");
       SuccessToast("You're all set!");
-await fetch("/api/sendConfiramtionMail", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    name: clinicData.dba_name || clinicData.legal_business_name,
-    email: clinicData.email || user.email || "",
-  }),
-});
+      await fetch("/api/sendConfiramtionMail", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: clinicData.dba_name || clinicData.legal_business_name,
+          email: clinicData.email || user.email || "",
+        }),
+      });
       setIsOnboardingComplete(true); // new state you'll add below
     } catch (error: any) {
       ErrorToast(error.message || "Failed to update clinic");
