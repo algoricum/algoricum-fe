@@ -44,7 +44,7 @@ const PasswordSetupPage = () => {
         };
         verifySession();
       } 
-  , [searchParams]);
+  , [searchParams, supabase.auth]);
 
   const { mutate, isLoading } = useMutation(
     async (password: string) => {

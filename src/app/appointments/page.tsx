@@ -1,7 +1,6 @@
 "use client";
 import type React from "react";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   Calendar,
@@ -47,7 +46,6 @@ interface NewMeetingForm {
 }
 
 export default function AppointmentsPage() {
-  const router = useRouter();
   const [appointmentsData, setAppointmentsData] = useState<MeetingSchedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -38,7 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     };
 
     fetchUser();
-  }, []);
+  }, [supabase.auth]);
 
   const menuHandler = async (key: string) => {
     switch (key) {
