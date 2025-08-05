@@ -73,7 +73,7 @@ function generateSlug(clinicName: string): string {
   return slug || 'default-clinic';
 }
 
-// Enhanced logging utility (same as before)
+// Enhanced logging utility
 class Logger {
   private context: string
   private startTime: number
@@ -129,246 +129,100 @@ class Logger {
   }
 }
 
-// Simplified and more reliable Namecheap DNS function
+// DNS function that calls Next.js API route with proxy support
 async function createNamecheapDNSRecords(domain: string, subdomain: string, logger: Logger) {
   const stepLogger = new Logger('NamecheapDNS');
   const stepStart = Date.now();
 
-  const NAMECHEAP_API_USER = Deno.env.get('NAMECHEAP_API_USER');
-  const NAMECHEAP_API_KEY = Deno.env.get('NAMECHEAP_API_KEY');
-  const NAMECHEAP_USERNAME = Deno.env.get('NAMECHEAP_USERNAME');
-  let NAMECHEAP_CLIENT_IP = Deno.env.get('NAMECHEAP_CLIENT_IP');
+  // Get the Next.js API URL from environment
+  const NEXTJS_API_URL = Deno.env.get('NEXTJS_API_URL') || Deno.env.get('VERCEL_URL')
+  
+  if (!NEXTJS_API_URL) {
+    stepLogger.warn('NEXTJS_API_URL not configured, DNS setup will be manual')
+    return { 
+      automated: false, 
+      error: 'NEXTJS_API_URL not configured for proxy support', 
+      reason: 'No proxy available' 
+    }
+  }
 
-  stepLogger.info('Starting DNS setup', {
+  const nextjsApiUrl = NEXTJS_API_URL.startsWith('http') ? NEXTJS_API_URL : `https://${NEXTJS_API_URL}`
+  const dnsApiEndpoint = `${nextjsApiUrl}/api/namecheap-dns`
+
+  stepLogger.info('Starting DNS setup via Next.js proxy', {
     domain,
     subdomain,
-    hasApiUser: !!NAMECHEAP_API_USER,
-    hasApiKey: !!NAMECHEAP_API_KEY,
-    hasUsername: !!NAMECHEAP_USERNAME,
-    hasClientIp: !!NAMECHEAP_CLIENT_IP,
+    apiEndpoint: dnsApiEndpoint
   });
 
-  // Try to get dynamic IP if not configured
-  if (!NAMECHEAP_CLIENT_IP) {
-    try {
-      const ipResponse = await fetch('https://ifconfig.me', { signal: AbortSignal.timeout(10000) });
-      NAMECHEAP_CLIENT_IP = await ipResponse.text();
-      stepLogger.info('Dynamically fetched outbound IP', { clientIp: NAMECHEAP_CLIENT_IP });
-    } catch (ipError) {
-      stepLogger.error('Failed to fetch outbound IP', ipError);
-    }
-  }
-
-  if (!NAMECHEAP_API_USER || !NAMECHEAP_API_KEY || !NAMECHEAP_USERNAME || !NAMECHEAP_CLIENT_IP) {
-    stepLogger.warn('Namecheap API credentials incomplete, DNS setup will be manual', {
-      missing: {
-        apiUser: !NAMECHEAP_API_USER,
-        apiKey: !NAMECHEAP_API_KEY,
-        username: !NAMECHEAP_USERNAME,
-        clientIp: !NAMECHEAP_CLIENT_IP
-      }
-    })
-    return { automated: false, records: null, reason: 'Missing credentials' }
-  }
-
   try {
-    // Parse domain parts
-    const domainParts = domain.split('.')
-    if (domainParts.length !== 2) {
-      throw new Error(`Invalid domain format: ${domain}. Expected format: domain.com`)
-    }
-    
-    const sld = domainParts[0]
-    const tld = domainParts[1]
-    const subdomainHost = subdomain.replace(`.${domain}`, '')
-    
-    stepLogger.debug('Parsed domain components', { domain, sld, tld, subdomain, subdomainHost })
-
-    // Step 1: Get existing DNS records
-    stepLogger.step('Fetching existing DNS records')
-    const existingRecords = await getNamecheapDNSRecords(sld, tld, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP, stepLogger)
-    
-    // Step 2: Filter out existing MX records for this subdomain
-    const preservedRecords = existingRecords.filter(record => 
-      !(record.name === subdomainHost && record.type === 'MX')
-    )
-
-    stepLogger.info('DNS records analysis', {
-      totalExisting: existingRecords.length,
-      toPreserve: preservedRecords.length,
-      toReplace: existingRecords.length - preservedRecords.length
-    })
-
-    // Step 3: Add new MX and TXT records
-    const newRecords = [
-      ...preservedRecords,
-      {
-        name: subdomainHost,
-        type: 'MX',
-        address: 'mxa.mailgun.org',
-        mxPref: '10',
-        ttl: '300'
-      },
-      {
-        name: subdomainHost,
-        type: 'MX', 
-        address: 'mxb.mailgun.org',
-        mxPref: '10',
-        ttl: '300'
-      },
-      {
-        name: subdomainHost,
-        type: 'TXT',
-        address: 'v=spf1 include:mailgun.org ~all',
-        mxPref: '',
-        ttl: '300'
-      }
-    ]
-
-    // Step 4: Update DNS records
-    stepLogger.step('Updating DNS records')
-    const updateResult = await setNamecheapDNSRecords(sld, tld, newRecords, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP, stepLogger)
-
-    stepLogger.performance('Complete DNS setup', Date.now() - stepStart)
-    stepLogger.success('DNS records updated successfully', {
+    const requestPayload = {
+      action: 'setup-dns',
       domain,
-      subdomain,
-      recordsSet: 3, // 2 MX + 1 TXT
-      totalDuration: Date.now() - stepStart
+      subdomain
+    }
+
+    stepLogger.debug('Calling Next.js DNS API', { payload: requestPayload })
+
+    const response = await fetch(dnsApiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestPayload),
+      signal: AbortSignal.timeout(60000) // Longer timeout for DNS operations
     })
 
-    return { 
-      automated: true, 
-      records: updateResult,
-      recordsCreated: [
-        { host: subdomainHost, type: 'MX', address: 'mxa.mailgun.org', priority: 10 },
-        { host: subdomainHost, type: 'MX', address: 'mxb.mailgun.org', priority: 10 },
-        { host: subdomainHost, type: 'TXT', address: 'v=spf1 include:mailgun.org ~all' }
-      ],
-      existingRecordsPreserved: preservedRecords.length
+    stepLogger.performance('Next.js DNS API call', Date.now() - stepStart, {
+      status: response.status,
+      statusText: response.statusText
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      stepLogger.error('Next.js DNS API failed', { 
+        status: response.status, 
+        error: errorText 
+      })
+      return { 
+        automated: false, 
+        error: `DNS API failed (${response.status}): ${errorText}`,
+        details: errorText
+      }
     }
+
+    const result = await response.json()
+    
+    if (result.automated) {
+      stepLogger.success('DNS records updated successfully via proxy', {
+        domain,
+        subdomain,
+        recordsCreated: result.recordsCreated?.length || 0,
+        totalDuration: Date.now() - stepStart
+      })
+    } else {
+      stepLogger.warn('DNS setup failed via proxy', {
+        error: result.error,
+        details: result.details
+      })
+    }
+
+    return result
 
   } catch (error) {
-    stepLogger.performance('Failed DNS setup', Date.now() - stepStart)
-    stepLogger.error('Namecheap DNS creation failed', error, {
+    stepLogger.performance('Failed DNS setup via proxy', Date.now() - stepStart)
+    stepLogger.error('DNS API call failed', error, {
       domain,
       subdomain,
-      operation: 'DNS setup',
+      apiEndpoint: dnsApiEndpoint,
       duration: Date.now() - stepStart
     })
-    return { automated: false, error: error.message, details: error.stack }
-  }
-}
-
-// Helper function to get existing DNS records
-async function getNamecheapDNSRecords(sld: string, tld: string, apiUser: string, apiKey: string, username: string, clientIp: string, logger: Logger) {
-  const url = new URL('https://api.namecheap.com/xml.response')
-  const params = {
-    ApiUser: apiUser,
-    ApiKey: apiKey,
-    UserName: username,
-    ClientIp: clientIp,
-    Command: 'namecheap.domains.dns.getHosts',
-    SLD: sld,
-    TLD: tld
-  }
-
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, value)
-  })
-
-  logger.debug('Fetching DNS records', { sld, tld })
-
-  const response = await fetch(url.toString(), {
-    signal: AbortSignal.timeout(30000)
-  })
-
-  if (!response.ok) {
-    throw new Error(`Namecheap API error: ${response.status} ${response.statusText}`)
-  }
-
-  const responseText = await response.text()
-  logger.debug('DNS records response received', { responseLength: responseText.length })
-
-  // Check for API errors
-  if (responseText.includes('<Errors>')) {
-    const errorMatch = responseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
-    const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
-    const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
-    throw new Error(`Namecheap API Error ${errorNumber}: ${errorText}`)
-  }
-
-  // Parse records using a more robust approach
-  const records: any[] = []
-  const hostRegex = /<host[^>]*HostId="(\d+)"[^>]*Name="([^"]*)"[^>]*Type="([^"]*)"[^>]*Address="([^"]*)"[^>]*MXPref="([^"]*)"[^>]*TTL="([^"]*)"[^>]*\/>/g
-  let match
-
-  while ((match = hostRegex.exec(responseText)) !== null) {
-    const [, hostId, name, type, address, mxPref, ttl] = match
-    records.push({
-      hostId,
-      name: name || '@',
-      type,
-      address,
-      mxPref: mxPref || '',
-      ttl: ttl || '1800'
-    })
-  }
-
-  logger.info('Parsed existing DNS records', { count: records.length })
-  return records
-}
-
-// Helper function to set DNS records
-async function setNamecheapDNSRecords(sld: string, tld: string, records: any[], apiUser: string, apiKey: string, username: string, clientIp: string, logger: Logger) {
-  const url = new URL('https://api.namecheap.com/xml.response')
-  const params: any = {
-    ApiUser: apiUser,
-    ApiKey: apiKey,
-    UserName: username,
-    ClientIp: clientIp,
-    Command: 'namecheap.domains.dns.setHosts',
-    SLD: sld,
-    TLD: tld
-  }
-
-  // Add each record as parameters
-  records.forEach((record, index) => {
-    const recordNum = index + 1
-    params[`HostName${recordNum}`] = record.name
-    params[`RecordType${recordNum}`] = record.type
-    params[`Address${recordNum}`] = record.address
-    if (record.type === 'MX' && record.mxPref) {
-      params[`MXPref${recordNum}`] = record.mxPref
+    return { 
+      automated: false, 
+      error: `DNS proxy call failed: ${error.message}`, 
+      details: error.stack 
     }
-    params[`TTL${recordNum}`] = record.ttl
-  })
-
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, value)
-  })
-
-  logger.debug('Setting DNS records', { recordCount: records.length })
-
-  const response = await fetch(url.toString(), {
-    signal: AbortSignal.timeout(30000)
-  })
-
-  if (!response.ok) {
-    throw new Error(`Namecheap API error: ${response.status} ${response.statusText}`)
   }
-
-  const responseText = await response.text()
-
-  // Check for API errors
-  if (responseText.includes('<Errors>')) {
-    const errorMatch = responseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
-    const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
-    const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
-    throw new Error(`Namecheap DNS Update Error ${errorNumber}: ${errorText}`)
-  }
-
-  return responseText
 }
 
 // Get DNS records needed for manual setup
@@ -607,6 +461,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     const WEBHOOK_BASE_URL = Deno.env.get('WEBHOOK_BASE_URL')
+    const NEXTJS_API_URL = Deno.env.get('NEXTJS_API_URL')
 
     const environmentCheck = {
       MAILGUN_API_KEY: !!MAILGUN_API_KEY,
@@ -614,10 +469,7 @@ serve(async (req) => {
       SUPABASE_URL: !!SUPABASE_URL,
       SUPABASE_SERVICE_ROLE_KEY: !!SUPABASE_SERVICE_ROLE_KEY,
       WEBHOOK_BASE_URL: !!WEBHOOK_BASE_URL,
-      NAMECHEAP_API_KEY: !!Deno.env.get('NAMECHEAP_API_KEY'),
-      NAMECHEAP_API_USER: !!Deno.env.get('NAMECHEAP_API_USER'),
-      NAMECHEAP_USERNAME: !!Deno.env.get('NAMECHEAP_USERNAME'),
-      NAMECHEAP_CLIENT_IP: !!Deno.env.get('NAMECHEAP_CLIENT_IP')
+      NEXTJS_API_URL: !!NEXTJS_API_URL
     }
 
     logger.info('📋 Environment variables check', {
@@ -814,8 +666,8 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
   setupLogger.step('Generating required DNS records')
   const requiredRecords = getRequiredDNSRecords(subdomain, setupLogger)
 
-  // Step 4: Attempt automated DNS setup
-  setupLogger.step('Attempting automated DNS setup')
+  // Step 4: Attempt automated DNS setup via Next.js proxy
+  setupLogger.step('Attempting automated DNS setup via proxy')
   const dnsResult = await createNamecheapDNSRecords(baseDomain, subdomain, setupLogger)
 
   // Step 5: Set up email routing
@@ -959,7 +811,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
       nextSteps: dnsResult.automated 
         ? [
             'Domain setup complete!',
-            'DNS records have been automatically configured',
+            'DNS records have been automatically configured via proxy',
             'Email should work within 10-15 minutes after DNS propagation',
             `Test by sending email to: ${clinicEmail}`
           ]
@@ -987,7 +839,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
   })
 }
 
-// Verify action handler (same as before but using improved checkDomainVerification)
+// Verify action handler
 async function handleVerifyAction(clinic: any, mailgunApiKey: string, supabase: any, logger: Logger, requestStart: number) {
   const verifyLogger = new Logger('VerifyAction')
   verifyLogger.info('🔍 Starting domain verification check', { clinicId: clinic.id })
@@ -1038,7 +890,7 @@ async function handleVerifyAction(clinic: any, mailgunApiKey: string, supabase: 
   })
 }
 
-// Delete action handler (same as before)
+// Delete action handler
 async function handleDeleteAction(clinic: any, mailgunApiKey: string, supabase: any, logger: Logger, requestStart: number) {
   const deleteLogger = new Logger('DeleteAction')
   deleteLogger.info('🗑️ Starting cleanup process', { clinicId: clinic.id, domain: clinic.domain })
