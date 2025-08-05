@@ -1,4 +1,27 @@
 // utils/supabase/config/staff.ts
+export interface CreateStaffRequest {
+  email: string;
+  name: string;
+  clinicId: string;
+  roleId: string;
+}
+
+export interface CreateStaffResponse {
+  success: boolean;
+  data: {
+    user: {
+      id: string;
+      email: string;
+    };
+    tempPassword?: string; // Only for development
+    emailSent: boolean;
+  };
+  message: string;
+}
+
+export interface ApiErrorResponse {
+  error: string;
+}
 
 // Define interfaces for better type safety
 interface CreateStaffUserParams {
@@ -8,23 +31,15 @@ interface CreateStaffUserParams {
   roleId: string | number; // Adjust based on your actual ID type
 }
 
-interface StaffUser {
-  id: string;
-  email: string;
-  name: string;
-  clinicId: string | number;
-  roleId: string | number;
-  createdAt?: string;
-  // Add other properties that your API returns
-}
-
-interface ApiResponse<T> {
-  data?: T;
-  error?: string;
-}
-
 interface CreateStaffResult {
-  data?: StaffUser;
+  data?: {
+    user: {
+      id: string;
+      email: string;
+    };
+    tempPassword?: string;
+    emailSent: boolean;
+  };
   error?: {
     message: string;
   };
@@ -45,17 +60,25 @@ export const createStaffUser = async ({ email, name, clinicId, roleId }: CreateS
       }),
     });
 
-    const result: ApiResponse<StaffUser> = await response.json();
+    const result: CreateStaffResponse | ApiErrorResponse = await response.json();
 
     if (!response.ok) {
       return {
         error: {
-          message: result.error || "Failed to create staff user",
+          message: "error" in result ? result.error : "Failed to create staff user",
         },
       };
     }
 
-    return { data: result.data };
+    if ("success" in result && result.success) {
+      return { data: result.data };
+    }
+
+    return {
+      error: {
+        message: "Unexpected response format",
+      },
+    };
   } catch (error) {
     console.error("Error calling create staff API:", error);
     return {
@@ -65,4 +88,3 @@ export const createStaffUser = async ({ email, name, clinicId, roleId }: CreateS
     };
   }
 };
-

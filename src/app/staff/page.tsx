@@ -80,7 +80,7 @@ export default function StaffPage(): JSX.Element {
 
   // Helper function to convert database status to frontend status
   const mapDatabaseStatusToFrontend = (dbStatus: string): string => {
-    if (dbStatus === "Active" || dbStatus === "TRUE" || dbStatus === true) {
+    if (dbStatus === "Active" || dbStatus === "TRUE") {
       return "active";
     }
     return "inactive";

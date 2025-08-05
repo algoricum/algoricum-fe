@@ -1,21 +1,16 @@
-// types/staff.ts
+// src/app/api/create-staff/route.ts
+import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import FormData from "form-data";
+import Mailgun from "mailgun.js";
+import { emailTemplate } from "@/utils/emailTemplate";
 
+// Types
 export interface CreateStaffRequest {
   email: string;
   name: string;
   clinicId: string;
   roleId: string;
-}
-
-export interface StaffUser {
-  id: string;
-  email: string;
-  name: string;
-  user_id: string;
-  is_email_verified: boolean;
-  is_onboarding_complete: boolean;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface CreateStaffResponse {
@@ -35,7 +30,7 @@ export interface ApiErrorResponse {
   error: string;
 }
 
-export interface EmailResult {
+interface EmailResult {
   success: boolean;
   method?: string;
   error?: string;
@@ -45,13 +40,6 @@ export interface EmailResult {
     name: string;
   };
 }
-
-// app/api/create-staff/route.ts
-import { createClient } from "@supabase/supabase-js";
-import { NextRequest, NextResponse } from "next/server";
-import FormData from "form-data";
-import Mailgun, { MailgunMessageData } from "mailgun.js";
-import { emailTemplate } from "@/utils/emailTemplate";
 
 // Server-side admin client
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -93,8 +81,7 @@ function generateRandomPassword(length: number = 12): string {
  */
 async function sendWelcomeEmail(email: string, name: string, password: string, clinicName: string): Promise<EmailResult> {
   try {
-    // Initialize Mailgun clientLet's make sure your preferences are up-to-date. Where are you located?
-
+    // Initialize Mailgun client
     const mailgun = new Mailgun(FormData);
     const mg = mailgun.client({
       username: "api",
@@ -113,7 +100,7 @@ async function sendWelcomeEmail(email: string, name: string, password: string, c
     });
 
     // Send email using Mailgun
-    const mailData: MailgunMessageData = {
+    const mailData = {
       from: `${clinicName} <${process.env.MAILGUN_FROM_EMAIL || "noreply@yourdomain.com"}>`,
       to: [email],
       subject: `Welcome to ${clinicName} - Your Account Details`,
@@ -256,62 +243,3 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateSta
     return NextResponse.json({ error: "An unexpected error occurred while creating staff member" }, { status: 500 });
   }
 }
-
-// utils/supabase/config/staff.ts - Updated client-side version
-interface CreateStaffResult {
-  data?: {
-    user: {
-      id: string;
-      email: string;
-    };
-    tempPassword?: string;
-    emailSent: boolean;
-  };
-  error?: {
-    message: string;
-  };
-}
-
-export const createStaffUser = async ({ email, name, clinicId, roleId }: CreateStaffRequest): Promise<CreateStaffResult> => {
-  try {
-    const response = await fetch("/api/create-staff", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: email.trim(),
-        name: name.trim(),
-        clinicId,
-        roleId,
-      }),
-    });
-
-    const result: CreateStaffResponse | ApiErrorResponse = await response.json();
-
-    if (!response.ok) {
-      return {
-        error: {
-          message: "error" in result ? result.error : "Failed to create staff user",
-        },
-      };
-    }
-
-    if ("success" in result && result.success) {
-      return { data: result.data };
-    }
-
-    return {
-      error: {
-        message: "Unexpected response format",
-      },
-    };
-  } catch (error) {
-    console.error("Error calling create staff API:", error);
-    return {
-      error: {
-        message: "Failed to communicate with server. Please try again.",
-      },
-    };
-  }
-};
