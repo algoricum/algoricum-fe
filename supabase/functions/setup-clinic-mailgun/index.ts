@@ -1,5 +1,3 @@
-// supabase/functions/setup-clinic-mailgun/index.ts
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -40,6 +38,28 @@ function validateClinicSlug(slug: string, logger: Logger): { valid: boolean; err
 
   logger.success('Clinic slug validation passed', { slug })
   return { valid: true }
+}
+
+// Utility function to generate a slug from clinic name
+function generateSlug(clinicName: string): string {
+  let slug = clinicName
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-')     // Replace spaces with hyphens
+    .replace(/-+/g, '-')      // Replace multiple hyphens with single
+    .trim();
+
+  // Ensure slug meets validation criteria
+  if (slug.length > 63) {
+    slug = slug.substring(0, 63);
+  }
+  if (slug.startsWith('-')) {
+    slug = slug.substring(1);
+  }
+  if (slug.endsWith('-')) {
+    slug = slug.substring(0, slug.length - 1);
+  }
+  return slug || 'default-clinic'; // Fallback if slug is empty after processing
 }
 
 // Enhanced logging utility
@@ -489,12 +509,13 @@ serve(async (req) => {
     // Parse request body
     logger.step('Parsing request body')
     const requestBody = await req.json()
-    const { clinicId: requestClinicId, action = 'setup' } = requestBody
+    const { clinicId: requestClinicId, action = 'setup', clinicName } = requestBody
     clinicId = requestClinicId
 
     logger.info('📝 Request details', {
       action,
       clinicId,
+      clinicName,
       requestBody,
       method: req.method,
       url: req.url
@@ -573,7 +594,7 @@ serve(async (req) => {
 
     // Route to appropriate action
     if (action === 'setup') {
-      return await handleSetupAction(clinic, BASE_DOMAIN, MAILGUN_API_KEY, WEBHOOK_BASE_URL, supabase, logger, requestStart)
+      return await handleSetupAction(clinic, BASE_DOMAIN, MAILGUN_API_KEY, WEBHOOK_BASE_URL, supabase, logger, requestStart, clinicName)
     } else if (action === 'verify') {
       return await handleVerifyAction(clinic, MAILGUN_API_KEY, supabase, logger, requestStart)
     } else if (action === 'delete') {
@@ -609,23 +630,42 @@ serve(async (req) => {
 })
 
 // Setup action handler
-async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey: string, webhookBaseUrl: string, supabase: any, logger: Logger, requestStart: number) {
+async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey: string, webhookBaseUrl: string, supabase: any, logger: Logger, requestStart: number, clinicName?: string) {
   const setupLogger = new Logger('SetupAction')
   setupLogger.info('⚙️ Starting domain setup process', { clinicId: clinic.id, clinicName: clinic.name })
-  
+
+  // Use existing slug or generate a new one from clinicName
+  let clinicSlug = clinic.slug
+  if (!clinicSlug && clinicName) {
+    setupLogger.info('No slug found in database, generating from clinicName', { clinicName })
+    clinicSlug = generateSlug(clinicName)
+
+    // Update the clinic record with the new slug
+    const { error: slugUpdateError } = await supabase
+      .from('clinic')
+      .update({ slug: clinicSlug, updated_at: new Date().toISOString() })
+      .eq('id', clinic.id)
+
+    if (slugUpdateError) {
+      setupLogger.error('Failed to update clinic slug', slugUpdateError, { clinicId: clinic.id, slug: clinicSlug })
+      throw new Error(`Failed to update clinic slug: ${slugUpdateError.message}`)
+    }
+    setupLogger.success('Clinic slug updated in database', { clinicId: clinic.id, slug: clinicSlug })
+  }
+
   // Validate clinic slug format
-  const slugValidation = validateClinicSlug(clinic.slug, setupLogger)
+  const slugValidation = validateClinicSlug(clinicSlug, setupLogger)
   if (!slugValidation.valid) {
-    throw new Error(`Invalid clinic slug "${clinic.slug}": ${slugValidation.error}`)
+    throw new Error(`Invalid clinic slug "${clinicSlug}": ${slugValidation.error}`)
   }
   
   // Generate domain and email
-  const subdomain = `${clinic.slug}.${baseDomain}`
+  const subdomain = `${clinicSlug}.${baseDomain}`
   const clinicEmail = `contact@${subdomain}`
 
   setupLogger.info('🌐 Generated clinic domain configuration', {
     clinicId: clinic.id,
-    clinicSlug: clinic.slug,
+    clinicSlug: clinicSlug,
     baseDomain,
     subdomain,
     clinicEmail,
@@ -863,7 +903,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
     data: {
       clinicId: clinic.id,
       clinicName: clinic.name,
-      clinicSlug: clinic.slug,
+      clinicSlug: clinicSlug,
       domain: subdomain,
       email: clinicEmail,
       domainVerified: domainInfo.verified,

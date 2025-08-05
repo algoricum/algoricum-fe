@@ -1,10 +1,11 @@
 "use client";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Input, Button, Typography } from "antd";
+import { Input, Button, Typography, notification, Spin } from "antd";
 import PhoneInput, { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
+import { getClinicData } from "@/utils/supabase/clinic-helper"; // Assuming this is your Supabase helper
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -15,6 +16,34 @@ interface ClinicInfoStepProps {
   onPrev?: () => void;
   initialData?: any;
   showAllQuestions?: boolean;
+}
+
+interface MailgunSetupResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    clinic: {
+      id: string;
+      name: string;
+      slug: string;
+      domain: string;
+      email: string;
+    };
+    mailgun: {
+      domainVerified: boolean;
+      domainState: string;
+      dnsAutomated: boolean;
+      routeCreated: boolean;
+      requiredDNSRecords?: any;
+      nextSteps: string[];
+    };
+    timing: {
+      totalDuration: string;
+      mailgunSetupDuration: string;
+    };
+  };
+  error?: string;
+  nextSteps?: string[];
 }
 
 const validateEmail = (email: string) => {
@@ -28,22 +57,18 @@ const validatePhoneNumber = (phoneNumber: string) => {
   }
 
   try {
-    // Check if the phone number is valid according to international standards
     const isValid = isValidPhoneNumber(phoneNumber);
 
     if (!isValid) {
-      // Try to parse the phone number to get more specific error info
       try {
         const parsedPhone = parsePhoneNumber(phoneNumber);
         if (parsedPhone) {
-          // If we can parse it but it's not valid, it's likely incomplete
           return {
             isValid: false,
             error: `Please enter a complete phone number for ${parsedPhone.country || "the selected country"}`,
           };
         }
       } catch (parseError) {
-        // If parsing fails, it's an invalid format
         return {
           isValid: false,
           error: "Please enter a valid phone number format",
@@ -67,6 +92,10 @@ const validatePhoneNumber = (phoneNumber: string) => {
 
 export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showAllQuestions = false }: ClinicInfoStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [clinicData, setClinicData] = useState<any>(null); // State to hold clinic data
+  const [isLoadingClinic, setIsLoadingClinic] = useState(true); // Loading state for clinic data
+
   const [formData, setFormData] = useState({
     clinicName: initialData.clinicName || "",
     clinicType: initialData.clinicType || "",
@@ -113,6 +142,33 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     },
   ];
 
+  // Fetch clinic data on component mount
+  useEffect(() => {
+    const fetchClinic = async () => {
+      try {
+        const data = await getClinicData();
+        setClinicData(data);
+        if (data) {
+          // If a clinic exists, pre-fill form data and move to the last step
+          setFormData({
+            clinicName: data.name || "",
+            clinicType: data.clinic_type || "",
+            primaryContactEmail: data.email || "",
+            clinicPhone: data.phone || "",
+            businessAddress: data.address || "",
+          });
+          setCurrentQuestionIndex(questions.length - 1);
+        }
+      } catch (error) {
+        console.error("Failed to fetch clinic data:", error);
+      } finally {
+        setIsLoadingClinic(false);
+      }
+    };
+
+    fetchClinic();
+  }, []);
+
   useEffect(() => {
     if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(0)) {
       setCurrentQuestionIndex(questions.length - 1);
@@ -157,22 +213,147 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     return null;
   };
 
-  const handleNext = () => {
+  const setupMailgunDomain = async (): Promise<MailgunSetupResponse> => {
+    console.log("🚀 Starting Mailgun domain setup...");
+    if (!clinicData?.id) {
+      throw new Error("Clinic ID not available. Cannot proceed with mailgun setup.");
+    }
+
+    try {
+      const response = await fetch("/api/mailgun-setup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...formData,
+          clinicId: clinicData.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      console.log("✅ Mailgun setup completed:", data);
+      return data;
+    } catch (error) {
+      console.error("❌ Mailgun setup failed:", error);
+      throw error;
+    }
+  };
+
+  const handleNext = async () => {
     const error = getFieldError();
 
     if (error) {
-      alert(error);
+      notification.error({
+        message: "Validation Error",
+        description: error,
+        duration: 4,
+      });
       return;
     }
 
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      onNext(formData);
+      // Final step - setup clinic and mailgun domain
+      setIsSubmitting(true);
+
+      try {
+        notification.info({
+          message: "Setting up your clinic...",
+          description: "Creating your clinic profile and email domain. This may take a moment.",
+          duration: 6,
+        });
+
+        const mailgunResult = await setupMailgunDomain();
+
+        if (mailgunResult.success) {
+          notification.success({
+            message: "Clinic Setup Complete!",
+            description: (
+              <div>
+                <p>
+                  <strong>✅ Clinic Created:</strong> {mailgunResult.data?.clinic.name}
+                </p>
+                <p>
+                  <strong>📧 Email Domain:</strong> {mailgunResult.data?.clinic.email}
+                </p>
+                <p>
+                  <strong>🌐 Domain Status:</strong> {mailgunResult.data?.mailgun.domainVerified ? "Verified" : "Pending verification"}
+                </p>
+                {!mailgunResult.data?.mailgun.dnsAutomated && (
+                  <p>
+                    <strong>⚠️ Action Required:</strong> Manual DNS setup needed
+                  </p>
+                )}
+              </div>
+            ),
+            duration: 10,
+          });
+
+          const completeData = {
+            ...formData,
+            clinic: mailgunResult.data?.clinic,
+            mailgun: mailgunResult.data?.mailgun,
+            setupComplete: true,
+          };
+
+          onNext(completeData);
+        } else {
+          notification.warning({
+            message: "Partial Setup Complete",
+            description: (
+              <div>
+                <p>
+                  <strong>✅ Clinic Created</strong>
+                </p>
+                <p>
+                  <strong>❌ Email Setup Failed:</strong> {mailgunResult.error}
+                </p>
+                <p>You can continue and set up email later.</p>
+              </div>
+            ),
+            duration: 8,
+          });
+
+          const partialData = {
+            ...formData,
+            clinic: mailgunResult.data?.clinic,
+            setupComplete: false,
+            setupError: mailgunResult.error,
+          };
+
+          onNext(partialData);
+        }
+      } catch (error: any) {
+        console.error("Setup failed:", error);
+
+        notification.error({
+          message: "Setup Failed",
+          description: (
+            <div>
+              <p>
+                <strong>Error:</strong> {error.message}
+              </p>
+              <p>Please try again or contact support if the issue persists.</p>
+            </div>
+          ),
+          duration: 8,
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
   const handlePrevious = () => {
+    if (isSubmitting) return;
+
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     } else if (onPrev) {
@@ -257,6 +438,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             rows={4}
             className={`text-xs p-3 rounded-xl border-2 bg-white w-full mb-2 ${hasError ? "border-red-500" : "border-gray-200"}`}
             autoFocus
+            disabled={isSubmitting}
           />
           {hasError && <p className="text-red-500 text-sm mb-4">{error}</p>}
         </>
@@ -273,7 +455,8 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             defaultCountry="US"
             international
             countryCallingCodeEditable={false}
-            className={`phone-input-custom ${hasError ? "phone-input-error" : ""}`}
+            disabled={isSubmitting}
+            className={`phone-input-custom ${hasError ? "phone-input-error" : ""} ${isSubmitting ? "phone-input-disabled" : ""}`}
             style={
               {
                 "--PhoneInput-color--focus": hasError ? "#ef4444" : "#a855f7",
@@ -286,7 +469,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             }
           />
           {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
-          {/* Real-time validation feedback */}
           {currentValue && !hasError && <p className="text-green-600 text-sm mt-2">✓ Valid phone number</p>}
           <style jsx>{`
             :global(.phone-input-custom) {
@@ -300,6 +482,10 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             }
             :global(.phone-input-custom.phone-input-error) {
               border-color: #ef4444;
+            }
+            :global(.phone-input-custom.phone-input-disabled) {
+              background: #f9fafb;
+              opacity: 0.7;
             }
             :global(.phone-input-custom:focus-within) {
               border-color: #a855f7;
@@ -341,6 +527,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
           onChange={e => handleInputChange(e.target.value)}
           className={`text-xs p-3 rounded-xl border-2 bg-white w-full mb-2 ${hasError ? "border-red-500" : "border-gray-200"}`}
           autoFocus
+          disabled={isSubmitting}
         />
         {hasError && <p className="text-red-500 text-sm mb-4">{error}</p>}
       </>
@@ -351,34 +538,75 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     return !getFieldError();
   };
 
+  const renderSubmittingState = () => {
+    if (!isSubmitting) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white p-8 rounded-xl max-w-md mx-4 text-center">
+          <Spin size="large" />
+          <h3 className="text-lg font-semibold mt-4 mb-2">Setting up your clinic...</h3>
+          <p className="text-gray-600">
+            We&apos;re creating your clinic profile and setting up your email domain. This may take up to 2 minutes.
+          </p>
+          <div className="mt-4 text-sm text-gray-500">
+            <div>• Creating clinic profile ✓</div>
+            <div>• Setting up email domain...</div>
+            <div>• Configuring DNS records...</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (isLoadingClinic) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <Spin size="large" tip="Loading clinic data..." />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl">
+      {renderSubmittingState()}
+
       {/* Show all questions/answers if requested */}
       {showAllQuestions && renderAllQuestions()}
+
       {/* Previous Questions */}
       {renderPreviousQuestions()}
+
       {/* Current Question */}
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
           {currentQuestion.question}
           {currentQuestion.required && <span className="text-red-500 ml-1">*</span>}
         </Title>
+
         {renderCurrentInput()}
+
         <div className="flex justify-between">
           <Button
             onClick={handlePrevious}
             className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
-            disabled={currentQuestionIndex === 0 && !onPrev}
+            disabled={(currentQuestionIndex === 0 && !onPrev) || isSubmitting}
           >
             Previous
           </Button>
+
           <Button
             type="primary"
             onClick={handleNext}
-            disabled={!isCurrentFieldValid()}
+            disabled={!isCurrentFieldValid() || isSubmitting}
+            loading={isSubmitting}
             className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
           >
-            {currentQuestionIndex === questions.length - 1 ? "Continue to Next Step" : "Continue"}
+            {isSubmitting
+              ? "Setting up clinic..."
+              : currentQuestionIndex === questions.length - 1
+                ? "Create Clinic & Setup Email"
+                : "Continue"}
           </Button>
         </div>
       </div>
