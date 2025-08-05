@@ -32,6 +32,8 @@ async function getNamecheapDNSRecords(sld: string, tld: string, apiUser: string,
     console.log('Using Fixie proxy for Namecheap API')
     const agent = new HttpsProxyAgent(proxyUrl)
     fetchOptions.agent = agent
+    console.log('Using Fixie proxy for Namecheap API', fetchOptions, "-----", agent, "----", url)
+
   }
 
   const response = await fetch(url.toString(), fetchOptions)
