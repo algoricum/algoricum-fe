@@ -11,7 +11,8 @@ const publicRoutes = [
   '/verify-otp',
   '/auth/callback',
   '/auth/oauth-redirect',
-  '/schedule-meeting'
+  '/schedule-meeting',
+  '/api/namecheap-dns'
 ];
 
 // Paths that should redirect to dashboard if already authenticated
@@ -164,10 +165,6 @@ async function checkIfUserHasClinic(
   }
 }
 
-// Configure which routes use this middleware
 export const config = {
-  matcher: [
-    // Match all routes except for these:
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)',
-  ],
+  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)']
 };
