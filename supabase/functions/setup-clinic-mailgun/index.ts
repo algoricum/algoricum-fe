@@ -179,6 +179,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, logg
     })
 
     if (!response.ok) {
+      console.log("--------------------------,", response)
       const errorText = await response.text()
       stepLogger.error('Next.js DNS API failed', { 
         status: response.status, 
