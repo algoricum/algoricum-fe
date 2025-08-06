@@ -309,15 +309,22 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
     
     console.log('Parsed domain components', { domain, sld, tld, subdomain, subdomainHost })
 
-    // Extract DKIM records from Mailgun DNS records (handling any selector: mx, pic, etc.)
+    // Extract DKIM records from Mailgun DNS records (handling ANY selector: mx, pic, mailo, etc.)
     const dkimRecords = mailgunDnsRecords.sending_dns_records?.filter(
       (record: MailgunDnsRecord) => record.record_type === 'TXT' && record.name.includes('_domainkey')
     ) || []
 
     console.log('Found DKIM records:', dkimRecords.map((r: MailgunDnsRecord) => ({ 
       name: r.name, 
-      selector: r.name.split('._domainkey')[0]
+      selector: r.name.split('._domainkey')[0],
+      value_preview: `${r.value.substring(0, 50)}...`
     })))
+
+    if (dkimRecords.length === 0) {
+      console.warn('No DKIM records found in Mailgun DNS data!')
+    } else {
+      console.log(`Successfully found ${dkimRecords.length} DKIM record(s) - will add them all to DNS`)
+    }
 
     // Step 1: Get existing DNS records
     console.log('Fetching existing DNS records')
@@ -386,9 +393,11 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       }
     ]
 
-    // Add all DKIM TXT Records (handles mx._domainkey, pic._domainkey, etc.)
+    // Add all DKIM TXT Records (handles mx._domainkey, pic._domainkey, mailo._domainkey, etc.)
     dkimRecords.forEach((dkimRecord: MailgunDnsRecord) => {
       const dkimHost = dkimRecord.name.replace(`.${subdomain}`, '')
+      console.log(`Adding DKIM record: ${dkimHost} -> ${dkimRecord.value.substring(0, 50)}...`)
+      
       newRecords.push({
         name: dkimHost,
         type: 'TXT',
@@ -426,12 +435,17 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
     
     const updateResult = await setNamecheapDNSRecords(sld, tld, newRecords, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP)
 
-    const totalMailgunRecords = 3 + dkimRecords.length // 2 MX + 1 SPF + 1 CNAME + N DKIM records
+    const totalMailgunRecords = 4 + dkimRecords.length // 2 MX + 1 SPF + 1 CNAME + N DKIM records
     console.log('DNS records updated successfully', {
       domain,
       subdomain,
       recordsSet: totalMailgunRecords,
-      dkimRecords: dkimRecords.length,
+      breakdown: {
+        mx_records: 2,
+        spf_record: 1, 
+        cname_record: 1,
+        dkim_records: dkimRecords.length
+      },
       totalDuration: Date.now() - startTime
     })
 
