@@ -1,4 +1,3 @@
-// app/api/namecheap-dns/route.ts
 import { NextResponse } from 'next/server'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 
@@ -178,7 +177,7 @@ async function setNamecheapDNSRecords(sld: string, tld: string, records: any[], 
 }
 
 // Main DNS setup function
-async function createNamecheapDNSRecords(domain: string, subdomain: string) {
+async function createNamecheapDNSRecords(domain: string, subdomain: string, dkimRecord: { name: string, value: string }) {
   const startTime = Date.now()
 
   const NAMECHEAP_API_USER = process.env.NAMECHEAP_API_USER
@@ -235,8 +234,8 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
         (record.name === subdomainHost && (record.type === 'MX' || record.type === 'TXT')) ||
         // Remove existing CNAME record for email tracking
         (record.name === `email.${subdomainHost}` && record.type === 'CNAME') ||
-        // Remove existing DKIM TXT record
-        (record.name === `pic._domainkey.${subdomainHost}` && record.type === 'TXT')
+        // Remove existing DKIM TXT record (dynamic name from Mailgun)
+        (record.name === dkimRecord.name.replace(`.${subdomain}`, '') && record.type === 'TXT')
       )
     )
 
@@ -280,11 +279,11 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
         mxPref: '',
         ttl: '300'
       },
-      // DKIM TXT Record for email authentication
+      // DKIM TXT Record for email authentication (dynamic)
       {
-        name: `pic._domainkey.${subdomainHost}`,
+        name: dkimRecord.name.replace(`.${subdomain}`, ''),
         type: 'TXT',
-        address: 'k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDidgr20Tb07ylWT8uHIKczUo5ZH8YPGzSuux7qYmH26YIV+Evhva/zT8KL/K5fmflvWM5Sko9gjNBHZaV9oH5dNBsblmHbvuvZwNgDdNFJ+tXVBIqTITvnleBpgvxr0bO227zB7vvck/gmzHjCiGKMlmWtUpWnYY9FMROKhIOsHwIDAQAB',
+        address: dkimRecord.value,
         mxPref: '',
         ttl: '300'
       }
@@ -310,7 +309,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
         `${subdomainHost} MX mxb.mailgun.org`, 
         `${subdomainHost} TXT SPF`,
         `email.${subdomainHost} CNAME mailgun.org`,
-        `pic._domainkey.${subdomainHost} TXT DKIM`
+        `${dkimRecord.name} TXT DKIM`
       ]
     })
     const updateResult = await setNamecheapDNSRecords(sld, tld, newRecords, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP)
@@ -330,7 +329,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
         { host: subdomainHost, type: 'MX', address: 'mxb.mailgun.org', priority: 10 },
         { host: subdomainHost, type: 'TXT', address: 'v=spf1 include:mailgun.org ~all', note: 'SPF Record' },
         { host: `email.${subdomainHost}`, type: 'CNAME', address: 'mailgun.org', note: 'Tracking Record' },
-        { host: `pic._domainkey.${subdomainHost}`, type: 'TXT', address: 'k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDidgr20Tb07ylWT8uHIKczUo5ZH8YPGzSuux7qYmH26YIV+Evhva/zT8KL/K5fmflvWM5Sko9gjNBHZaV9oH5dNBsblmHbvuvZwNgDdNFJ+tXVBIqTITvnleBpgvxr0bO227zB7vvck/gmzHjCiGKMlmWtUpWnYY9FMROKhIOsHwIDAQAB', note: 'DKIM Record' }
+        { host: dkimRecord.name, type: 'TXT', address: dkimRecord.value, note: 'DKIM Record' }
       ],
       existingRecordsPreserved: preservedRecords.length,
       duration: Date.now() - startTime
@@ -350,12 +349,17 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { action, domain, subdomain } = body
+    const { action, domain, subdomain, dkimRecord } = body
 
-    console.log('Namecheap DNS API called', { action, domain, subdomain })
+    console.log('Namecheap DNS API called', { action, domain, subdomain, dkimRecord })
 
     if (action === 'setup-dns') {
-      const result = await createNamecheapDNSRecords(domain, subdomain)
+      if (!dkimRecord || !dkimRecord.name || !dkimRecord.value) {
+        return NextResponse.json({ 
+          error: 'Missing DKIM record information' 
+        }, { status: 400 })
+      }
+      const result = await createNamecheapDNSRecords(domain, subdomain, dkimRecord)
       return NextResponse.json(result)
     } else {
       return NextResponse.json({ 
