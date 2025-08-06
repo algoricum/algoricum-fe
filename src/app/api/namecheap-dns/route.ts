@@ -395,7 +395,9 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
 
     // Add all DKIM TXT Records (handles mx._domainkey, pic._domainkey, mailo._domainkey, etc.)
     dkimRecords.forEach((dkimRecord: MailgunDnsRecord) => {
-      const dkimHost = dkimRecord.name; // Use the full name as is
+      let dkimHost = dkimRecord.name;
+      // Remove ".msgdesk.co" from the host
+      dkimHost = dkimHost.replace('.msgdesk.co', '');
       console.log(`Adding DKIM record: ${dkimHost} -> ${dkimRecord.value.substring(0, 50)}...`);
       
       newRecords.push({
