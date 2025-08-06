@@ -51,7 +51,8 @@ export interface Clinic {
   logo?: string;
   widget_logo?: string;
   domain?: string;
-  uses_hubspot?: boolean; 
+  uses_hubspot?: boolean;
+  use_pipedrive?: boolean;
   widget_theme?: WidgetTheme;
   dashboard_theme?: DashboardTheme;
   created_at: string;
