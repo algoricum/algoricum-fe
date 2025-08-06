@@ -99,11 +99,9 @@ export default function DashboardPage() {
 
     fetchLeads();
   }, [clinicId, supabase]);
- // Use only booked/converted leads for chart
+  // Use only booked/converted leads for chart
   const filteredLeadsForChart = useMemo(() => {
-    return leadsData.filter(lead =>
-      ["booked", "converted"].includes(lead.status?.toLowerCase())
-    );
+    return leadsData.filter(lead => ["booked", "converted"].includes(lead.status?.toLowerCase()));
   }, [leadsData]);
   const [newTask, setNewTask] = useState({
     task: "",
@@ -143,9 +141,40 @@ export default function DashboardPage() {
     },
   ]);
 
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        setLoading(true);
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
+        if (error || !user) {
+          console.error("User fetch error:", error);
+          return;
+        }
 
- 
+        const loggedFirst = user.user_metadata?.logged_first;
+        const isStaff = user.user_metadata?.is_staff;
+
+        console.log("I am running ....");
+
+        if (loggedFirst === true && isStaff) {
+          router.push("/reset-password");
+        }
+      } catch (error) {
+        console.error("Error checking user:", error);
+      } finally {
+        // Simulate loading time for dashboard data
+        setTimeout(() => {
+          setLoading(false);
+        }, 1500);
+      }
+    };
+
+    checkUser();
+  }, [router, supabase.auth]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -243,6 +272,25 @@ export default function DashboardPage() {
     );
   }
 
+  // const getConversionRate = () => {
+  //   if (leadsData.length === 0) return 0;
+  //   const bookedLeads = leadsData.filter((lead: any) => lead.status === "booked").length;
+  //   return Math.round((bookedLeads / leadsData.length) * 100);
+  // };
+
+  // Show loading spinner while checking user and loading dashboard data
+  if (loading) {
+    return (
+      <DashboardLayout
+        header={<Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." />}
+      >
+        <div className="min-h-[60vh]">
+          <LoadingSpinner message="Loading your dashboard..." size="lg" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout
       header={<Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." />}
@@ -278,7 +326,6 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-         
 
           {showPipedriveBanner && (
             <div className="p-4 rounded-lg flex-1 min-w-[200px] p-4 rounded-lg border border min-w-[300px] bg-green-50 border-green-200">
@@ -297,7 +344,7 @@ export default function DashboardPage() {
                   >
                     <span
                       className={`inline-block h-5 w-5 rounded-full bg-white transition-transform ${
-                        pipedriveActive? "translate-x-6" : "translate-x-1"
+                        pipedriveActive ? "translate-x-6" : "translate-x-1"
                       }`}
                     />
                   </button>
