@@ -2,6 +2,21 @@
 import { NextResponse } from 'next/server'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 
+// Use fetch with proxy support (keeping your existing approach)
+async function fetchWithProxy(url: string, options: any = {}) {
+  const proxyUrl = process.env.FIXIE_PROXY_URL
+  
+  if (proxyUrl) {
+    const agent = new HttpsProxyAgent(proxyUrl)
+    return fetch(url, {
+      ...options,
+      agent
+    })
+  } else {
+    return fetch(url, options)
+  }
+}
+
 // Helper function to get existing DNS records using proxy
 async function getNamecheapDNSRecords(sld: string, tld: string, apiUser: string, apiKey: string, username: string, clientIp: string) {
   const url = new URL('https://api.namecheap.com/xml.response')
@@ -19,59 +34,68 @@ async function getNamecheapDNSRecords(sld: string, tld: string, apiUser: string,
     url.searchParams.set(key, value)
   })
 
-  console.log('Fetching DNS records via proxy', { sld, tld })
+  console.log('Fetching DNS records via proxy', { sld, tld, url: url.toString() })
 
-  const fetchOptions: any = {
-    method: 'GET',
-    timeout: 30000
-  }
-
-  // Use Fixie proxy if available
-  const proxyUrl = process.env.FIXIE_PROXY_URL
-  if (proxyUrl) {
-    console.log('Using Fixie proxy for Namecheap API')
-    const agent = new HttpsProxyAgent(proxyUrl)
-    fetchOptions.agent = agent
-    console.log('Using Fixie proxy for Namecheap API', fetchOptions, "-----", agent, "----", url)
-
-  }
-
-  const response = await fetch(url.toString(), fetchOptions)
-
-  if (!response.ok) {
-    throw new Error(`Namecheap API error: ${response.status} ${response.statusText}`)
-  }
-
-  const responseText = await response.text()
-  console.log('DNS records response received', { responseLength: responseText.length })
-
-  // Check for API errors
-  if (responseText.includes('<Errors>')) {
-    const errorMatch = responseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
-    const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
-    const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
-    throw new Error(`Namecheap API Error ${errorNumber}: ${errorText}`)
-  }
-
-  // Parse records
-  const records: any[] = []
-  const hostRegex = /<host[^>]*HostId="(\d+)"[^>]*Name="([^"]*)"[^>]*Type="([^"]*)"[^>]*Address="([^"]*)"[^>]*MXPref="([^"]*)"[^>]*TTL="([^"]*)"[^>]*\/>/g
-  let match
-
-  while ((match = hostRegex.exec(responseText)) !== null) {
-    const [, hostId, name, type, address, mxPref, ttl] = match
-    records.push({
-      hostId,
-      name: name || '@',
-      type,
-      address,
-      mxPref: mxPref || '',
-      ttl: ttl || '1800'
+  try {
+    const response = await fetchWithProxy(url.toString(), {
+      method: 'GET'
     })
-  }
 
-  console.log('Parsed existing DNS records', { count: records.length })
-  return records
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Namecheap API HTTP Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      })
+      throw new Error(`Namecheap API HTTP error: ${response.status} ${response.statusText}`)
+    }
+
+    const responseText = await response.text()
+    console.log('DNS records response received', { 
+      responseLength: responseText.length,
+      preview: responseText.substring(0, 200)
+    })
+
+    // Check for API errors in XML response
+    if (responseText.includes('<Errors>')) {
+      const errorMatch = responseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
+      const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
+      const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
+      console.error('Namecheap API Error in Response:', { errorNumber, errorText, fullResponse: responseText })
+      throw new Error(`Namecheap API Error ${errorNumber}: ${errorText}`)
+    }
+
+    // Check if response is successful
+    if (!responseText.includes('<ApiResponse Status="OK"')) {
+      console.error('Unexpected API response format:', responseText.substring(0, 500))
+      throw new Error('Namecheap API returned unexpected response format')
+    }
+
+    // Parse records
+    const records: any[] = []
+    const hostRegex = /<host[^>]*HostId="(\d+)"[^>]*Name="([^"]*)"[^>]*Type="([^"]*)"[^>]*Address="([^"]*)"[^>]*MXPref="([^"]*)"[^>]*TTL="([^"]*)"[^>]*\/>/g
+    let match
+
+    while ((match = hostRegex.exec(responseText)) !== null) {
+      const [, hostId, name, type, address, mxPref, ttl] = match
+      records.push({
+        hostId,
+        name: name || '@',
+        type,
+        address,
+        mxPref: mxPref || '',
+        ttl: ttl || '1800'
+      })
+    }
+
+    console.log('Parsed existing DNS records', { count: records.length, records })
+    return records
+
+  } catch (error: any) {
+    console.error('Error fetching DNS records:', error)
+    throw error
+  }
 }
 
 // Helper function to set DNS records using proxy
@@ -103,43 +127,54 @@ async function setNamecheapDNSRecords(sld: string, tld: string, records: any[], 
     url.searchParams.set(key, String(value))
   })
 
-  console.log('Setting DNS records via proxy', { recordCount: records.length })
+  console.log('Setting DNS records via proxy', { 
+    recordCount: records.length, 
+    url: url.toString().replace(apiKey, '***'),  // Hide API key in logs
+    records: records.map(r => ({ name: r.name, type: r.type, address: r.address }))
+  })
 
-  const fetchOptions: any = {
-    method: 'GET',
-    timeout: 30000
+  try {
+    const response = await fetchWithProxy(url.toString(), {
+      method: 'GET'
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Namecheap setHosts HTTP Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      })
+      throw new Error(`Namecheap API HTTP error: ${response.status} ${response.statusText}`)
+    }
+
+    const responseText = await response.text()
+    console.log('DNS records set response:', { 
+      responseLength: responseText.length,
+      preview: responseText.substring(0, 200)
+    })
+
+    // Check for API errors in XML response
+    if (responseText.includes('<Errors>')) {
+      const errorMatch = responseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
+      const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
+      const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
+      console.error('Namecheap setHosts API Error:', { errorNumber, errorText, fullResponse: responseText })
+      throw new Error(`Namecheap DNS Update Error ${errorNumber}: ${errorText}`)
+    }
+
+    // Check if response is successful
+    if (!responseText.includes('<ApiResponse Status="OK"')) {
+      console.error('setHosts unexpected response format:', responseText.substring(0, 500))
+      throw new Error('Namecheap setHosts API returned unexpected response format')
+    }
+
+    return responseText
+
+  } catch (error: any) {
+    console.error('Error setting DNS records:', error)
+    throw error
   }
-
-  // Use Fixie proxy if available
-  const proxyUrl = process.env.FIXIE_PROXY_URL
-  if (proxyUrl) {
-    console.log('Using Fixie proxy for Namecheap API')
-
-    const agent = new HttpsProxyAgent(proxyUrl)
-
-    console.log('Using Fixie proxy for Namecheap API', agent)
-
-
-    fetchOptions.agent = agent
-  }
-
-  const response = await fetch(url.toString(), fetchOptions)
-
-  if (!response.ok) {
-    throw new Error(`Namecheap API error: ${response.status} ${response.statusText}`)
-  }
-
-  const responseText = await response.text()
-
-  // Check for API errors
-  if (responseText.includes('<Errors>')) {
-    const errorMatch = responseText.match(/<Error Number="(\d+)"[^>]*>([^<]+)</)
-    const errorNumber = errorMatch ? errorMatch[1] : 'Unknown'
-    const errorText = errorMatch ? errorMatch[2] : 'Unknown error'
-    throw new Error(`Namecheap DNS Update Error ${errorNumber}: ${errorText}`)
-  }
-
-  return responseText
 }
 
 // Main DNS setup function
@@ -158,7 +193,8 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
     hasApiKey: !!NAMECHEAP_API_KEY,
     hasUsername: !!NAMECHEAP_USERNAME,
     hasClientIp: !!NAMECHEAP_CLIENT_IP,
-    hasProxy: !!process.env.FIXIE_PROXY_URL
+    hasProxy: !!process.env.FIXIE_PROXY_URL,
+    clientIp: NAMECHEAP_CLIENT_IP
   })
 
   if (!NAMECHEAP_API_USER || !NAMECHEAP_API_KEY || !NAMECHEAP_USERNAME || !NAMECHEAP_CLIENT_IP) {
@@ -192,9 +228,16 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
     console.log('Fetching existing DNS records')
     const existingRecords = await getNamecheapDNSRecords(sld, tld, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP)
     
-    // Step 2: Filter out existing MX records for this subdomain
+    // Step 2: Filter out existing records for this subdomain (MX, TXT, CNAME)
     const preservedRecords = existingRecords.filter(record => 
-      !(record.name === subdomainHost && record.type === 'MX')
+      !(
+        // Remove existing MX and TXT records for the subdomain
+        (record.name === subdomainHost && (record.type === 'MX' || record.type === 'TXT')) ||
+        // Remove existing CNAME record for email tracking
+        (record.name === `email.${subdomainHost}` && record.type === 'CNAME') ||
+        // Remove existing DKIM TXT record
+        (record.name === `pic._domainkey.${subdomainHost}` && record.type === 'TXT')
+      )
     )
 
     console.log('DNS records analysis', {
@@ -203,9 +246,10 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
       toReplace: existingRecords.length - preservedRecords.length
     })
 
-    // Step 3: Add new MX and TXT records
+    // Step 3: Add new MX, TXT, and CNAME records for Mailgun
     const newRecords = [
       ...preservedRecords,
+      // MX Records for receiving mail
       {
         name: subdomainHost,
         type: 'MX',
@@ -220,23 +264,61 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
         mxPref: '10',
         ttl: '300'
       },
+      // SPF TXT Record
       {
         name: subdomainHost,
         type: 'TXT',
         address: 'v=spf1 include:mailgun.org ~all',
         mxPref: '',
         ttl: '300'
+      },
+      // CNAME Record for tracking opens/clicks/unsubscribes
+      {
+        name: `email.${subdomainHost}`,
+        type: 'CNAME',
+        address: 'mailgun.org',
+        mxPref: '',
+        ttl: '300'
+      },
+      // DKIM TXT Record for email authentication
+      {
+        name: `pic._domainkey.${subdomainHost}`,
+        type: 'TXT',
+        address: 'k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDidgr20Tb07ylWT8uHIKczUo5ZH8YPGzSuux7qYmH26YIV+Evhva/zT8KL/K5fmflvWM5Sko9gjNBHZaV9oH5dNBsblmHbvuvZwNgDdNFJ+tXVBIqTITvnleBpgvxr0bO227zB7vvck/gmzHjCiGKMlmWtUpWnYY9FMROKhIOsHwIDAQAB',
+        mxPref: '',
+        ttl: '300'
       }
     ]
 
+    // Log record details for debugging
+    console.log('Records to be set:', newRecords.map(r => ({
+      name: r.name,
+      type: r.type,
+      address: r.address.length > 50 ? `${r.address.substring(0, 50)}...` : r.address
+    })))
+
+    // Validate records count (Namecheap has limits)
+    if (newRecords.length > 100) {
+      throw new Error(`Too many DNS records (${newRecords.length}). Namecheap limit is 100 records per domain.`)
+    }
+
     // Step 4: Update DNS records
-    console.log('Updating DNS records')
+    console.log('Updating DNS records', {
+      totalRecords: newRecords.length,
+      newMailgunRecords: [
+        `${subdomainHost} MX mxa.mailgun.org`,
+        `${subdomainHost} MX mxb.mailgun.org`, 
+        `${subdomainHost} TXT SPF`,
+        `email.${subdomainHost} CNAME mailgun.org`,
+        `pic._domainkey.${subdomainHost} TXT DKIM`
+      ]
+    })
     const updateResult = await setNamecheapDNSRecords(sld, tld, newRecords, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP)
 
     console.log('DNS records updated successfully', {
       domain,
       subdomain,
-      recordsSet: 3,
+      recordsSet: 5, // 2 MX + 1 SPF TXT + 1 CNAME + 1 DKIM TXT
       totalDuration: Date.now() - startTime
     })
 
@@ -246,7 +328,9 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string) {
       recordsCreated: [
         { host: subdomainHost, type: 'MX', address: 'mxa.mailgun.org', priority: 10 },
         { host: subdomainHost, type: 'MX', address: 'mxb.mailgun.org', priority: 10 },
-        { host: subdomainHost, type: 'TXT', address: 'v=spf1 include:mailgun.org ~all' }
+        { host: subdomainHost, type: 'TXT', address: 'v=spf1 include:mailgun.org ~all', note: 'SPF Record' },
+        { host: `email.${subdomainHost}`, type: 'CNAME', address: 'mailgun.org', note: 'Tracking Record' },
+        { host: `pic._domainkey.${subdomainHost}`, type: 'TXT', address: 'k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDidgr20Tb07ylWT8uHIKczUo5ZH8YPGzSuux7qYmH26YIV+Evhva/zT8KL/K5fmflvWM5Sko9gjNBHZaV9oH5dNBsblmHbvuvZwNgDdNFJ+tXVBIqTITvnleBpgvxr0bO227zB7vvck/gmzHjCiGKMlmWtUpWnYY9FMROKhIOsHwIDAQAB', note: 'DKIM Record' }
       ],
       existingRecordsPreserved: preservedRecords.length,
       duration: Date.now() - startTime
