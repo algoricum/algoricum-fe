@@ -2,6 +2,21 @@
 import { NextResponse } from 'next/server'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 
+// Type definitions
+interface MailgunDnsRecord {
+  is_active: boolean
+  cached: any[]
+  name: string
+  record_type: string
+  valid: string
+  value: string
+  priority?: string
+}
+
+interface MailgunDnsRecords {
+  sending_dns_records: MailgunDnsRecord[]
+}
+
 // Use fetch with proxy support (Fixed for Vercel/Node.js)
 async function fetchWithProxy(url: string, options: any = {}) {
   const proxyUrl = process.env.FIXIE_PROXY_URL
@@ -248,7 +263,7 @@ async function setNamecheapDNSRecords(sld: string, tld: string, records: any[], 
 }
 
 // Main DNS setup function - handles dynamic DKIM records from Mailgun
-async function createNamecheapDNSRecords(domain: string, subdomain: string, mailgunDnsRecords: any) {
+async function createNamecheapDNSRecords(domain: string, subdomain: string, mailgunDnsRecords: MailgunDnsRecords) {
   const startTime = Date.now()
 
   const NAMECHEAP_API_USER = process.env.NAMECHEAP_API_USER
@@ -296,10 +311,10 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
 
     // Extract DKIM records from Mailgun DNS records (handling any selector: mx, pic, etc.)
     const dkimRecords = mailgunDnsRecords.sending_dns_records?.filter(
-      (record:any) => record.record_type === 'TXT' && record.name.includes('_domainkey')
+      (record: MailgunDnsRecord) => record.record_type === 'TXT' && record.name.includes('_domainkey')
     ) || []
 
-    console.log('Found DKIM records:', dkimRecords.map((r:any) => ({ 
+    console.log('Found DKIM records:', dkimRecords.map((r: MailgunDnsRecord) => ({ 
       name: r.name, 
       selector: r.name.split('._domainkey')[0]
     })))
@@ -372,7 +387,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
     ]
 
     // Add all DKIM TXT Records (handles mx._domainkey, pic._domainkey, etc.)
-    dkimRecords.forEach((dkimRecord:any) => {
+    dkimRecords.forEach((dkimRecord: MailgunDnsRecord) => {
       const dkimHost = dkimRecord.name.replace(`.${subdomain}`, '')
       newRecords.push({
         name: dkimHost,
@@ -401,7 +416,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       `${subdomainHost} MX mxb.mailgun.org`, 
       `${subdomainHost} TXT SPF`,
       `email.${subdomainHost} CNAME mailgun.org`,
-      ...dkimRecords.map((r:any) => `${r.name.replace(`.${subdomain}`, '')} TXT DKIM`)
+      ...dkimRecords.map((r: MailgunDnsRecord) => `${r.name.replace(`.${subdomain}`, '')} TXT DKIM`)
     ]
     
     console.log('Updating DNS records', {
@@ -426,7 +441,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       { host: subdomainHost, type: 'MX', address: 'mxb.mailgun.org', priority: 10 },
       { host: subdomainHost, type: 'TXT', address: 'v=spf1 include:mailgun.org ~all', note: 'SPF Record' },
       { host: `email.${subdomainHost}`, type: 'CNAME', address: 'mailgun.org', note: 'Tracking Record' },
-      ...dkimRecords.map((dkim:any) => ({
+      ...dkimRecords.map((dkim: MailgunDnsRecord) => ({
         host: dkim.name,
         type: 'TXT',
         address: dkim.value,
