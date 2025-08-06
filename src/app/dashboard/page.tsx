@@ -1,4 +1,5 @@
 "use client";
+
 import type React from "react";
 import { useEffect, useState } from "react";
 // import DashboardLayout from "@/components/layout/dashboard-layout";
@@ -8,12 +9,21 @@ import { Calendar, Plus, X, CheckCircle, Upload } from "lucide-react";
 import ConversionFunnel from "@/components/common/charts/conversion-funnel";
 import LeadSourcesLineChart from "@/components/common/charts/lead-sources-line-chart";
 import { Header } from "@/components/common";
+import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import StatsGrid from "./StatsGrid";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
-import { Button } from "antd";
+// import { Button } from "antd";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  // Loading states
+  const [loading, setLoading] = useState(true);
+  const [, setCsvUploading] = useState(false);
+
   const [appointmentFilter, setAppointmentFilter] = useState("month");
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [csvUploaded, setCsvUploaded] = useState(false);
@@ -24,7 +34,6 @@ export default function DashboardPage() {
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [leadsData, setLeadsData] = useState<any[]>([]);
   const [clinicId, setClinicId] = useState<string>("");
-  const supabase = createClient();
 
   useEffect(() => {
     async function fetchClinicId() {
@@ -83,7 +92,7 @@ export default function DashboardPage() {
     }
 
     fetchLeads();
-  }, [clinicId]);
+  }, [clinicId, supabase]);
 
   const [newTask, setNewTask] = useState({
     task: "",
@@ -152,14 +161,51 @@ export default function DashboardPage() {
     },
   ];
 
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        setLoading(true);
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
+
+        if (error || !user) {
+          console.error("User fetch error:", error);
+          return;
+        }
+
+        const loggedFirst = user.user_metadata?.logged_first;
+        const isStaff = user.user_metadata?.is_staff;
+
+        console.log("I am running ....");
+
+        if (loggedFirst === true && isStaff) {
+          router.push("/reset-password");
+        }
+      } catch (error) {
+        console.error("Error checking user:", error);
+      } finally {
+        // Simulate loading time for dashboard data
+        setTimeout(() => {
+          setLoading(false);
+        }, 1500);
+      }
+    };
+
+    checkUser();
+  }, [router, supabase.auth]);
+
   const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setCsvUploading(true);
       setTimeout(() => {
         setCsvUploaded(true);
         setShowCsvBanner(true);
+        setCsvUploading(false);
         console.log("CSV file uploaded:", file.name);
-      }, 1000);
+      }, 2000);
     }
   };
 
@@ -191,6 +237,25 @@ export default function DashboardPage() {
     };
     return <span className={`badge ${config.class}`}>{config.label}</span>;
   };
+
+  // const getConversionRate = () => {
+  //   if (leadsData.length === 0) return 0;
+  //   const bookedLeads = leadsData.filter((lead: any) => lead.status === "booked").length;
+  //   return Math.round((bookedLeads / leadsData.length) * 100);
+  // };
+
+  // Show loading spinner while checking user and loading dashboard data
+  if (loading) {
+    return (
+      <DashboardLayout
+        header={<Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." />}
+      >
+        <div className="min-h-[60vh]">
+          <LoadingSpinner message="Loading your dashboard..." size="lg" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout

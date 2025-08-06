@@ -3,10 +3,12 @@ import footerItems from "@/constants/footerItems";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { signOut } from "@/utils/supabase/auth-helper";
 import menuItems from "@/constants/menuItems";
-
+import { createClient } from "@/utils/supabase/config/client";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"; // Import your LoadingSpinner
+import { User } from "@supabase/supabase-js";
 interface SidebarProps {
   sidebarOpen: boolean;
   // eslint-disable-next-line no-unused-vars
@@ -14,9 +16,29 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
+  const supabase = createClient();
   const { push } = useRouter();
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(true); // Add loading state
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (!error && data?.user) {
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error("Error fetching user:", error);
+      } finally {
+        setIsUserLoading(false); // Set loading to false after fetch completes
+      }
+    };
+
+    fetchUser();
+  }, [supabase.auth]);
 
   const menuHandler = async (key: string) => {
     switch (key) {
@@ -68,6 +90,21 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     [pathname],
   );
 
+  // Filter menu items based on user role
+  const getFilteredMenuItems = () => {
+    return menuItems.filter(item => {
+      if (
+        (item.key === "staff" || item.key === "billing") &&
+        user &&
+        Object.hasOwn(user, "user_metadata") &&
+        (user as any).user_metadata?.is_staff
+      ) {
+        return false; // hide Staff and Billing for staff users
+      }
+      return true;
+    });
+  };
+
   return (
     <div
       className={`${
@@ -92,25 +129,32 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       <nav className="flex-1 px-4 mt-8">
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Main Navigation</div>
 
-        {/* Main Menu Items */}
-        <div className="space-y-2">
-          {menuItems.map(item => {
-            const isActive = pathname.includes(item.key);
-            return (
-              <button
-                key={item.key}
-                onClick={() => menuHandler(item.key)}
-                disabled={item.disabled}
-                className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  isActive ? "bg-purple-600 text-white" : "text-gray-700 hover:bg-gray-100"
-                } ${item.disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                <div className="w-5 h-5 mr-3 flex items-center justify-center">{isActive ? item.selectedicon : item.icon}</div>
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
+        {/* Show loading spinner while fetching user data */}
+        {isUserLoading ? (
+          <div className="flex justify-center items-center py-8">
+            <LoadingSpinner message="Loading menu..." size="sm" />
+          </div>
+        ) : (
+          /* Main Menu Items */
+          <div className="space-y-2">
+            {getFilteredMenuItems().map(item => {
+              const isActive = pathname.includes(item.key);
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => menuHandler(item.key)}
+                  disabled={item.disabled}
+                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive ? "bg-purple-600 text-white" : "text-gray-700 hover:bg-gray-100"
+                  } ${item.disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  <div className="w-5 h-5 mr-3 flex items-center justify-center">{isActive ? item.selectedicon : item.icon}</div>
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Footer Items */}
         <div className="absolute bottom-6 left-4 right-4">
