@@ -21,12 +21,14 @@ import {
   Download,
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/config/client";
+import { Header } from "@/components/common";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+// import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";
-import { Header } from "@/components/common";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+// import { Header } from "@/components/common";
 
 dayjs.extend(utc);
 dayjs.extend(relativeTime);
@@ -57,6 +59,7 @@ const BillingPage = () => {
       try {
         const clinic = await getClinicData();
         if (!clinic) return;
+
         setClinicId(clinic.id);
 
         const { data: subscription } = await supabase
@@ -134,6 +137,7 @@ const BillingPage = () => {
 
   const handleSubscribe = async (priceId: string) => {
     if (!clinicId) return;
+
     setSubscribingPlanId(priceId);
     setErrorMessage(null);
     const session = await getSupabaseSession();
@@ -152,6 +156,7 @@ const BillingPage = () => {
       });
 
       if (!response.ok) throw new Error("Checkout session creation failed");
+
       const { url } = await response.json();
       window.location.href = url;
     } catch (err) {
@@ -285,7 +290,6 @@ const BillingPage = () => {
                 <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                   {subscriptionEvents.map(event => {
                     const { id, type, received_at, summary } = event;
-
                     const icon =
                       type.includes("payment_failed") || type.includes("subscription.deleted") ? (
                         <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">

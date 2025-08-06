@@ -3,83 +3,111 @@ import { Button } from "@/components/elements";
 import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { PasswordIcon } from "@/icons";
-import { ResetPasswordProps } from "@/interfaces/services_type";
 import { Flex, Form, Typography } from "antd";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useMutation } from "react-query";
 import { createClient } from "@/utils/supabase/config/client";
-import { resendOtp } from "@/utils/supabase/auth-helper";
 
 const { Title, Text } = Typography;
 
-const ResetPasswordPage = () => {
+const PasswordSetupPage = () => {
   const { push } = useRouter();
   const [form] = Form.useForm();
   const supabase = createClient();
+  const [loadingSession, setLoadingSession] = useState(true);
+  const searchParams = useSearchParams();
 
-  // Check if user has a valid password reset session
+  // Check for recovery token or code in hash or query parameters
   useEffect(() => {
-    const checkResetSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
+    // Check URL hash
+    const hash = window.location.hash.substring(1);
+    const hashParams = new URLSearchParams(hash);
+    const accessTokenFromHash = hashParams.get("access_token");
+    const typeFromHash = hashParams.get("type");
+    // Check query parameters
+    const tokenFromQuery = searchParams.get("token");
+    const typeFromQuery = searchParams.get("type");
+    const codeFromQuery = searchParams.get("code");
+    // Log parameters for debugging
+    console.log("Hash:", { accessToken: accessTokenFromHash, type: typeFromHash });
+    console.log("Query:", { token: tokenFromQuery, type: typeFromQuery, code: codeFromQuery });
 
-      if (error || !data.session) {
-        ErrorToast("Invalid or expired password reset link");
-        push("/login");
+    if (
+      (typeFromHash === "recovery" && accessTokenFromHash) ||
+      (typeFromQuery === "recovery" && tokenFromQuery) ||
+      codeFromQuery // Handle code parameter from redirect
+    ) {
+      // Verify session if code is present
+      if (codeFromQuery) {
+        const verifySession = async () => {
+          try {
+            const { data, error } = await supabase.auth.getSession();
+            if (error) throw error;
+            if (data.session) {
+              setLoadingSession(false)
+            } else {
+              console.error({
+                message: "Error",
+                description: "No active session found. Please request a new reset link.",
+              });
+            }
+          } catch (error) {
+            console.error({
+              message: "Error",
+              description: "Failed to verify session.",
+            });
+          }
+        };
+        verifySession();
+      } else {
+        setLoadingSession(false);
       }
-    };
+    }
+  }, [searchParams, supabase.auth]);
 
-    checkResetSession();
-  }, [push, supabase.auth]);
-
-  // eslint-disable-next-line no-unused-vars
-  const { mutate, isLoading } = useMutation((data: ResetPasswordProps) => resendOtp("email"), {
-    onSuccess: () => {
-      SuccessToast("Password reset successfully");
-      push("/login");
+  const { mutate, isLoading } = useMutation(
+    async (password: string) => {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      return true;
     },
-    onError: (error: any) => {
-      ErrorToast(error?.message || "Failed to reset password");
+    {
+      onSuccess: () => {
+        SuccessToast("Password updated successfully");
+        push("/login");
+      },
+      onError: (error: any) => {
+        ErrorToast(error?.message || "Failed to update password");
+      },
     },
-  });
+  );
 
   const onFinish = (values: any) => {
-    mutate({ password: values.password });
+    mutate(values.password);
   };
+
+  if (loadingSession) return <p className="text-center mt-10">Loading...</p>;
 
   return (
     <Flex vertical gap={36} className="w-full max-w-md mx-auto">
       <Flex vertical gap={12} align="center">
-        <Title level={2}>Reset Your Password</Title>
-        <Text className="text-Gray600 text-center">
-          Enter your new password below.
-        </Text>
+        <Title level={2}>Set Your Password</Title>
+        <Text className="text-Gray600 text-center">{`Enter your new password below.`}</Text>
       </Flex>
 
-      <Form
-        form={form}
-        name="reset-password"
-        layout="vertical"
-        className="w-full"
-        onFinish={onFinish}
-      >
+      <Form form={form} name="password-setup" layout="vertical" className="w-full" onFinish={onFinish}>
         <Flex vertical gap={18}>
           <Form.Item
             name="password"
             label="New Password"
             rules={[
               { required: true, message: "Please input your new password" },
-              {
-                min: 8,
-                message: "Password must contain at least 8 characters",
-              },
-              {
-                max: 32,
-                message: "Password can be maximum 32 characters long",
-              },
+              { min: 8, message: "Password must contain at least 8 characters" },
+              { max: 32, message: "Password can be maximum 32 characters long" },
             ]}
           >
-            <PasswordInput prefix={<PasswordIcon />} className="w-full" placeholder="New Password" />
+            <PasswordInput prefix={<PasswordIcon />} placeholder="New Password" />
           </Form.Item>
 
           <Form.Item
@@ -90,20 +118,18 @@ const ResetPasswordPage = () => {
               { required: true, message: "Please confirm your password" },
               ({ getFieldValue }) => ({
                 validator(_, value) {
-                  if (!value || getFieldValue("password") === value) {
-                    return Promise.resolve();
-                  }
+                  if (!value || getFieldValue("password") === value) return Promise.resolve();
                   return Promise.reject(new Error("Passwords do not match!"));
                 },
               }),
             ]}
           >
-            <PasswordInput prefix={<PasswordIcon />} className="w-full" placeholder="Confirm Password" />
+            <PasswordInput prefix={<PasswordIcon />} placeholder="Confirm Password" />
           </Form.Item>
 
           <Form.Item>
             <Button loading={isLoading} className="w-full" type="primary" htmlType="submit">
-              Reset Password
+              Save Password
             </Button>
           </Form.Item>
         </Flex>
@@ -112,4 +138,4 @@ const ResetPasswordPage = () => {
   );
 };
 
-export default ResetPasswordPage;
+export default PasswordSetupPage;

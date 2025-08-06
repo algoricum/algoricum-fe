@@ -4,6 +4,7 @@ import { User as SupabaseUser, Session } from "@supabase/supabase-js";
 import type { User } from "@/interfaces/services_type";
 import { clearAll, setAccessToken } from "@/helpers/storage-helper";
 import { setUserData } from "./user-helper";
+import { SuccessToast } from "@/helpers/toast";
 
 const supabase = createClient();
 
@@ -138,7 +139,9 @@ export const verifyOtp = async (email: string, otp: string): Promise<void> => {
  */
 export const resetPasswordRequest = async (email: string): Promise<void> => {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: "http://localhost:3001/forgot-password",
+    });
     if (error) throw error;
   } catch (error: any) {
     console.error("Forgot password error:", error.message);
@@ -158,6 +161,22 @@ export const updatePassword = async (password: string): Promise<void> => {
   } catch (error: any) {
     console.error("Reset password error:", error.message);
     throw error;
+  }
+};
+
+
+export const updateLoggedStatus = async (newPassword: string) => {
+  const { error: updateError } = await supabase.auth.updateUser({
+    password: newPassword,
+    data: {
+      logged_first: false, // ✅ prevent future redirects
+    },
+  });
+
+  if (updateError) {
+    console.error("Error resetting password: " + updateError.message);
+  } else {
+    SuccessToast("Moving to Dashboard"); // redirect after success
   }
 };
 
