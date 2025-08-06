@@ -1,19 +1,25 @@
 "use client";
+
 import type React from "react";
-import { useState,useEffect } from "react";
-// import DashboardLayout from "@/components/layout/dashboard-layout";
+import { useState, useEffect } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
 import { UserPlus, Calendar, TrendingUp, Users, Plus, X, CheckCircle, Upload } from "lucide-react";
 import ConversionFunnel from "@/components/common/charts/conversion-funnel";
 import LeadSourcesLineChart from "@/components/common/charts/lead-sources-line-chart";
 import { Header } from "@/components/common";
-import {createClient} from "@/utils/supabase/config/client"
+import { createClient } from "@/utils/supabase/config/client";
 import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const supabase=createClient()
+  const supabase = createClient();
+
+  // Loading states
+  const [loading, setLoading] = useState(true);
+  const [csvUploading, setCsvUploading] = useState(false);
+
   const [appointmentFilter, setAppointmentFilter] = useState("month");
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [csvUploaded, setCsvUploaded] = useState(false);
@@ -22,7 +28,6 @@ export default function DashboardPage() {
   const [showHubspotBanner, setShowHubspotBanner] = useState(true);
   const [showCsvBanner, setShowCsvBanner] = useState(true);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
-
   const [newTask, setNewTask] = useState({
     task: "",
     priority: "medium",
@@ -124,8 +129,10 @@ export default function DashboardPage() {
     },
   ];
 
-    useEffect(() => {
-      const checkUser = async () => {
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        setLoading(true);
         const {
           data: { user },
           error,
@@ -135,27 +142,38 @@ export default function DashboardPage() {
           console.error("User fetch error:", error);
           return;
         }
-         
+
         const loggedFirst = user.user_metadata?.logged_first;
         const isStaff = user.user_metadata?.is_staff;
-        console.log("I am running ....")
+
+        console.log("I am running ....");
 
         if (loggedFirst === true && isStaff) {
           router.push("/reset-password");
         }
-      };
+      } catch (error) {
+        console.error("Error checking user:", error);
+      } finally {
+        // Simulate loading time for dashboard data
+        setTimeout(() => {
+          setLoading(false);
+        }, 1500);
+      }
+    };
 
-      checkUser();
-    }, [router, supabase.auth]);
+    checkUser();
+  }, [router, supabase.auth]);
 
   const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setCsvUploading(true);
       setTimeout(() => {
         setCsvUploaded(true);
         setShowCsvBanner(true);
+        setCsvUploading(false);
         console.log("CSV file uploaded:", file.name);
-      }, 1000);
+      }, 2000);
     }
   };
 
@@ -193,6 +211,19 @@ export default function DashboardPage() {
     const bookedLeads = leadsData.filter((lead: any) => lead.status === "booked").length;
     return Math.round((bookedLeads / leadsData.length) * 100);
   };
+
+  // Show loading spinner while checking user and loading dashboard data
+  if (loading) {
+    return (
+      <DashboardLayout
+        header={<Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." />}
+      >
+        <div className="min-h-[60vh]">
+          <LoadingSpinner message="Loading your dashboard..." size="lg" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout
@@ -278,16 +309,28 @@ export default function DashboardPage() {
                     {csvUploaded && <CheckCircle className="w-4 h-4 ml-2 text-green-500" />}
                   </div>
                   <div className="text-sm text-gray-600">
-                    {csvUploaded ? "CSV file uploaded successfully. Data has been processed." : "Upload your lead data to get started"}
+                    {csvUploading
+                      ? "Processing your CSV file..."
+                      : csvUploaded
+                        ? "CSV file uploaded successfully. Data has been processed."
+                        : "Upload your lead data to get started"}
                   </div>
                 </div>
               </div>
               <div className="flex space-x-2">
-                <button className="btn btn-secondary btn-sm">View Guide</button>
-                <label className="btn btn-primary btn-sm cursor-pointer">
-                  {csvUploaded ? "Upload New CSV" : "Upload CSV"}
-                  <input type="file" accept=".csv" onChange={handleCsvUpload} className="hidden" />
-                </label>
+                {csvUploading ? (
+                  <div className="flex items-center">
+                    <LoadingSpinner message="" size="sm" />
+                  </div>
+                ) : (
+                  <>
+                    <button className="btn btn-secondary btn-sm">View Guide</button>
+                    <label className="btn btn-primary btn-sm cursor-pointer">
+                      {csvUploaded ? "Upload New CSV" : "Upload CSV"}
+                      <input type="file" accept=".csv" onChange={handleCsvUpload} className="hidden" disabled={csvUploading} />
+                    </label>
+                  </>
+                )}
               </div>
             </div>
           </div>

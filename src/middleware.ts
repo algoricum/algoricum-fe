@@ -7,7 +7,6 @@ const publicRoutes = [
   "/login",
   "/signup",
   "/forgot-password",
-  "/reset-password",
   "/verify-otp",
   "/auth/callback",
   "/auth/oauth-redirect",
@@ -33,7 +32,7 @@ export async function middleware(request: NextRequest) {
     const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
 
     const isOnboardingRoute = pathname === "/onboarding";
-    // const isResetPasswordRoute = pathname === "/reset-password";
+    
     const isChangePasswordRoute = pathname === "/change-password";
 
     // Create Supabase client with proper error handling

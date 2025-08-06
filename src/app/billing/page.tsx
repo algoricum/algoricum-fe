@@ -1,15 +1,18 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { Tabs, Button, Skeleton, Alert} from "antd";
+import { Tabs, Button, Alert } from "antd";
 import { CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { createClient } from "@/utils/supabase/config/client";
+import { Header } from "@/components/common";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";
-dayjs.extend(utc);
 
+dayjs.extend(utc);
 dayjs.extend(relativeTime);
 
 const supabase = createClient();
@@ -32,6 +35,7 @@ const BillingPage = () => {
       try {
         const clinic = await getClinicData();
         if (!clinic) return;
+
         setClinicId(clinic.id);
 
         const { data: subscription } = await supabase
@@ -82,6 +86,7 @@ const BillingPage = () => {
 
   const handleSubscribe = async (priceId: string) => {
     if (!clinicId) return;
+
     setSubscribingPlanId(priceId);
     setErrorMessage(null);
 
@@ -98,6 +103,7 @@ const BillingPage = () => {
       });
 
       if (!response.ok) throw new Error("Checkout session creation failed");
+
       const { url } = await response.json();
       window.location.href = url;
     } catch (err) {
@@ -109,11 +115,10 @@ const BillingPage = () => {
   };
 
   const trialDaysLeft = trialEnd ? Math.ceil((new Date(trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
-
   const billingDate = currentPlan?.current_period_end ? new Date(currentPlan.current_period_end).toLocaleDateString() : null;
 
   return (
-    <DashboardLayout>
+    <DashboardLayout header={<Header title="Lead Management" description="Manage and track your leads through the conversion process." />}>
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Billing</h1>
@@ -132,6 +137,14 @@ const BillingPage = () => {
           />
         )}
 
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-white rounded-lg shadow">
+            <LoadingSpinner message="Loading billing information..." size="lg" />
+          </div>
+        )}
+
+        {/* Active Subscription Display */}
         {!loading && hasActiveSubscription && (
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center mb-4">
@@ -155,7 +168,7 @@ const BillingPage = () => {
             {subscriptionStatus === "trialing" && trialDaysLeft !== null && trialDaysLeft <= 3 && (
               <div className="flex items-center text-yellow-600 text-sm mb-4">
                 <AlertTriangle className="w-4 h-4 mr-2" />
-                Your trial is ending soon. Don’t forget to add payment.
+                Your trial is ending soon. Don&apos;t forget to add payment.
               </div>
             )}
 
@@ -172,20 +185,24 @@ const BillingPage = () => {
               </div>
             )}
 
-            <Button
-              type="primary"
-              className="mt-2 mb-6"
-              loading={subscribingPlanId === currentPriceId}
-              onClick={() => currentPriceId && handleSubscribe(currentPriceId)}
-              disabled={!currentPriceId}
-            >
-              {subscribingPlanId === currentPriceId ? "Redirecting..." : "Manage Subscription"}
-            </Button>
+            {subscribingPlanId === currentPriceId ? (
+              <div className="mt-2 mb-6">
+                <LoadingSpinner message="Redirecting to billing portal..." size="sm" />
+              </div>
+            ) : (
+              <Button
+                type="primary"
+                className="mt-2 mb-6"
+                onClick={() => currentPriceId && handleSubscribe(currentPriceId)}
+                disabled={!currentPriceId}
+              >
+                Manage Subscription
+              </Button>
+            )}
           </div>
         )}
 
-        {loading && <Skeleton active paragraph={{ rows: 6 }} className="mt-6" />}
-
+        {/* Plan Selection for Non-Subscribers */}
         {!hasActiveSubscription && !loading && (
           <div className="mt-6">
             <Tabs
@@ -207,7 +224,6 @@ const BillingPage = () => {
                       <p className="text-gray-600">
                         ${plan.amount} {plan.currency.toUpperCase()} / {plan.interval}
                       </p>
-
                       {plan.features && (
                         <ul className="text-sm text-gray-500 list-disc list-inside mt-2">
                           {plan.features.map((feature: string, i: number) => (
@@ -215,33 +231,33 @@ const BillingPage = () => {
                           ))}
                         </ul>
                       )}
-
-                      <Button
-                        type="primary"
-                        className="mt-4"
-                        loading={subscribingPlanId === plan.price_id}
-                        onClick={() => handleSubscribe(plan.price_id)}
-                      >
-                        {subscribingPlanId === plan.price_id ? "Redirecting..." : "Subscribe"}
-                      </Button>
+                      {subscribingPlanId === plan.price_id ? (
+                        <div className="mt-4">
+                          <LoadingSpinner message="Setting up subscription..." size="sm" />
+                        </div>
+                      ) : (
+                        <Button type="primary" className="mt-4" onClick={() => handleSubscribe(plan.price_id)}>
+                          Subscribe
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
             </div>
           </div>
         )}
+
+        {/* Subscription Events */}
         {subscriptionEvents.length > 0 && (
           <div className="grid grid-cols-1 gap-6 mb-8">
             <div className="card">
               <h3 className="text-lg font-semibold mb-6">Recent Events</h3>
-
               {subscriptionEvents.length === 0 ? (
                 <div className="text-sm text-gray-500">No recent events to show.</div>
               ) : (
                 <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                   {subscriptionEvents.map(event => {
                     const { id, type, received_at, summary } = event;
-
                     const icon =
                       type.includes("payment_failed") || type.includes("subscription.deleted") ? (
                         <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
