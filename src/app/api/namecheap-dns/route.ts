@@ -395,8 +395,8 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
 
     // Add all DKIM TXT Records (handles mx._domainkey, pic._domainkey, mailo._domainkey, etc.)
     dkimRecords.forEach((dkimRecord: MailgunDnsRecord) => {
-      const dkimHost = dkimRecord.name.replace(`.${subdomain}`, '')
-      console.log(`Adding DKIM record: ${dkimHost} -> ${dkimRecord.value.substring(0, 50)}...`)
+      const dkimHost = dkimRecord.name; // Use the full name as is
+      console.log(`Adding DKIM record: ${dkimHost} -> ${dkimRecord.value.substring(0, 50)}...`);
       
       newRecords.push({
         name: dkimHost,
@@ -404,8 +404,8 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
         address: dkimRecord.value,
         mxPref: '',
         ttl: '300'
-      })
-    })
+      });
+    });
 
     // Log record details for debugging
     console.log('Records to be set:', newRecords.map(r => ({
