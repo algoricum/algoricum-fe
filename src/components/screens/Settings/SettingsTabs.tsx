@@ -28,13 +28,13 @@ const SettingsTabs = () => {
 
   return (
     <div className="flex flex-col">
-      <Flex className="border border-[#E8EAEC] rounded-[48px]  p-2 gap-4 w-[500px]">
+      <Flex className="border border-[#E8EAEC] rounded-[48px]  p-2 gap-4 w-[300px]">
         {/* <TabButton isActive={activeTab === "lead"} onClick={() => handleTabChange("lead")} label="Custom Lead Capturing Form" /> */}
         <TabButton isActive={activeTab === "clinic-setting"} onClick={() => handleTabChange("clinic-setting")} label="Clinic setting" />
         <TabButton isActive={activeTab === "chatbot"} onClick={() => handleTabChange("chatbot")} label="Chatbot Settings" />
       </Flex>
 
-      <div className="bg-white rounded-xl p-6">
+      <div className="bg-white rounded-xl py-6">
         {/* {activeTab === "lead" && <LeadCapturingForm />} */}
         {activeTab === "chatbot" && <ChatbotSettings />}
         {activeTab === "clinic-setting" && <ClinicSetting />}

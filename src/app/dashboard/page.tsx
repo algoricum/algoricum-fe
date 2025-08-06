@@ -1,17 +1,17 @@
 "use client";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 // import DashboardLayout from "@/components/layout/dashboard-layout";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
-import { Calendar, Plus, X, CheckCircle, Upload } from "lucide-react";
+import { X, CheckCircle, Upload } from "lucide-react";
 import ConversionFunnel from "@/components/common/charts/conversion-funnel";
 import LeadSourcesLineChart from "@/components/common/charts/lead-sources-line-chart";
 import { Header } from "@/components/common";
 import StatsGrid from "./StatsGrid";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
-import { Button } from "antd";
+import TodayTasks from "./TodayTasks";
 
 export default function DashboardPage() {
   const [appointmentFilter, setAppointmentFilter] = useState("month");
@@ -19,6 +19,8 @@ export default function DashboardPage() {
   const [csvUploaded, setCsvUploaded] = useState(false);
   // const [zapierActive, setZapierActive] = useState(true);
   // const [showZapierBanner, setShowZapierBanner] = useState(true);
+  const [pipedriveActive, setPipedriveActive] = useState(true);
+  const [showPipedriveBanner, setShowPipedriveBanner] = useState(false);
   const [showHubspotBanner, setShowHubspotBanner] = useState(false);
   const [showCsvBanner, setShowCsvBanner] = useState(true);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -34,6 +36,9 @@ export default function DashboardPage() {
       }
       if (data?.uses_hubspot) {
         setShowHubspotBanner(true);
+      }
+      if (data?.use_pipedrive) {
+        setShowPipedriveBanner(true);
       }
       // setLoading(false);
     }
@@ -84,7 +89,12 @@ export default function DashboardPage() {
 
     fetchLeads();
   }, [clinicId]);
-
+ // Use only booked/converted leads for chart
+  const filteredLeadsForChart = useMemo(() => {
+    return leadsData.filter(lead =>
+      ["booked", "converted"].includes(lead.status?.toLowerCase())
+    );
+  }, [leadsData]);
   const [newTask, setNewTask] = useState({
     task: "",
     priority: "medium",
@@ -123,34 +133,9 @@ export default function DashboardPage() {
     },
   ]);
 
-  // Sample data
 
-  const appointmentsData = [
-    {
-      id: "1",
-      patient: "John Smith",
-      doctor: "Dr. Sarah Johnson",
-      date: "2024-01-15",
-      time: "10:00",
-      type: "Consultation",
-      phone: "+1 (555) 123-4567",
-      gender: "Male",
-      age: "45",
-      status: "confirmed",
-    },
-    {
-      id: "2",
-      patient: "Sarah Johnson",
-      doctor: "Dr. Michael Wilson",
-      date: "2024-01-16",
-      time: "14:00",
-      type: "Follow-up",
-      phone: "+1 (555) 234-5678",
-      gender: "Female",
-      age: "32",
-      status: "completed",
-    },
-  ];
+
+ 
 
   const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -175,22 +160,22 @@ export default function DashboardPage() {
     setShowAddTaskModal(false);
   };
 
-  const toggleTask = (taskId: number) => {
-    setTasks(tasks.map(task => (task.id === taskId ? { ...task, completed: !task.completed } : task)));
-  };
+  // const toggleTask = (taskId: number) => {
+  //   setTasks(tasks.map(task => (task.id === taskId ? { ...task, completed: !task.completed } : task)));
+  // };
 
-  const getPriorityBadge = (priority: string) => {
-    const priorityConfig = {
-      high: { class: "badge-error", label: "HIGH" },
-      medium: { class: "badge-warning", label: "MEDIUM" },
-      low: { class: "badge-success", label: "LOW" },
-    };
-    const config = priorityConfig[priority as keyof typeof priorityConfig] || {
-      class: "badge-info",
-      label: priority.toUpperCase(),
-    };
-    return <span className={`badge ${config.class}`}>{config.label}</span>;
-  };
+  // const getPriorityBadge = (priority: string) => {
+  //   const priorityConfig = {
+  //     high: { class: "badge-error", label: "HIGH" },
+  //     medium: { class: "badge-warning", label: "MEDIUM" },
+  //     low: { class: "badge-success", label: "LOW" },
+  //   };
+  //   const config = priorityConfig[priority as keyof typeof priorityConfig] || {
+  //     class: "badge-info",
+  //     label: priority.toUpperCase(),
+  //   };
+  //   return <span className={`badge ${config.class}`}>{config.label}</span>;
+  // };
 
   return (
     <DashboardLayout
@@ -201,7 +186,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap gap-4">
           {showHubspotBanner && (
             <div
-              className={`flex-1 min-w-[300px] p-4 rounded-lg border ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}
+              className={`flex-1 min-w-[200px] p-4 rounded-lg border ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center font-semibold">
@@ -227,7 +212,39 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+         
 
+          {showPipedriveBanner && (
+            <div className="p-4 rounded-lg flex-1 min-w-[200px] p-4 rounded-lg border border min-w-[300px] bg-green-50 border-green-200">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center font-semibold">
+                  <div className={`w-2 h-2 rounded-full mr-2 ${pipedriveActive ? "bg-green-400" : "bg-yellow-400"}`} />
+                  <span>Pipedrive Integration</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">{pipedriveActive ? "Active" : "Inactive"}</span>
+                  <button
+                    onClick={() => setPipedriveActive(!pipedriveActive)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                      pipedriveActive ? "bg-green-500" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 rounded-full bg-white transition-transform ${
+                        pipedriveActive? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                  <button onClick={() => setShowPipedriveBanner(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="text-sm text-gray-600">
+                {pipedriveActive ? "Pipedrive integration is active and working properly." : "Pipedrive integration is currently inactive."}
+              </div>
+            </div>
+          )}
           {/* {showZapierBanner && (
             <div className="p-4 rounded-lg border bg-green-50 border-green-200">
               <div className="flex items-start justify-between mb-2">
@@ -262,7 +279,7 @@ export default function DashboardPage() {
 
           {showCsvBanner && (
             <div
-              className={`flex-1 min-w-[300px] p-4 rounded-lg border ${csvUploaded ? "bg-green-50 border-green-200" : "bg-purple-50 border-purple-200"}`}
+              className={`flex-1 min-w-[200px] p-4 rounded-lg border ${csvUploaded ? "bg-green-50 border-green-200" : "bg-purple-50 border-purple-200"}`}
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center font-semibold">
@@ -306,11 +323,11 @@ export default function DashboardPage() {
                 <option value="year">This Year</option>
               </select>
             </div>
-            <SimpleBarChart appointmentsData={appointmentsData} filter={appointmentFilter} />
+            <SimpleBarChart appointmentsData={filteredLeadsForChart} filter={appointmentFilter} />
           </div>
 
           {/* Today's Tasks */}
-          <div className="card">
+          {/* <div className="card">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold">Today&apos;s Tasks</h3>
               <button onClick={() => setShowAddTaskModal(true)} className="btn btn-primary btn-sm flex items-center">
@@ -340,7 +357,8 @@ export default function DashboardPage() {
                 ))
               )}
             </div>
-          </div>
+          </div> */}
+          <TodayTasks clinicId={clinicId} />
         </div>
 
         {/* Lead Sources and Status Section */}

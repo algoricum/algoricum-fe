@@ -1,6 +1,6 @@
 import { IconProps } from "@/interfaces/iconProps";
 
-const TicketIcon = ({ color = "#191919", width = 12, height = 12 }: IconProps) => {
+const TicketIcon = ({ color = "#718096", width = 12, height = 12 }: IconProps) => {
   return (
     <svg width={width} height={height} viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path

@@ -1,14 +1,31 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { Tabs, Button, Skeleton, Alert, Card, Typography, Row, Col, Tag } from "antd";
-import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Download } from "lucide-react";
+import {
+  Button,
+  Skeleton,
+  Alert,
+  Card,
+  Typography,
+  Row,
+  Col,
+  Tag,
+  Flex,
+} from "antd";
+import {
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  ExternalLink,
+  Download,
+} from "lucide-react";
 import { createClient } from "@/utils/supabase/config/client";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { Header } from "@/components/common";
 
 dayjs.extend(utc);
@@ -17,14 +34,10 @@ dayjs.extend(relativeTime);
 const supabase = createClient();
 
 const BillingPage = () => {
-  // const [billingCycle, setBillingCycle] = useState("monthly");
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [subscriptionEvents, setSubscriptionEvents] = useState<any[]>([]);
   const [trialEnd, setTrialEnd] = useState<string | null>(null);
-  // const [plans, setPlans] = useState<any[]>([]);
   const [clinicId, setClinicId] = useState<string | null>(null);
-
-  const hasActiveSubscription = subscriptionStatus === "active" || subscriptionStatus === "trialing";
   const [loading, setLoading] = useState(true);
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
   const [currentPriceId, setCurrentPriceId] = useState<string | null>(null);
@@ -35,6 +48,9 @@ const BillingPage = () => {
   const [expYear, setExpYear] = useState<number | null>(null);
   const [brand, setBrand] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const hasActiveSubscription = subscriptionStatus === "active" || subscriptionStatus === "trialing";
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,9 +67,11 @@ const BillingPage = () => {
           .limit(1)
           .maybeSingle();
 
-        const { data: planData } = await supabase.from("plans").select("*").eq("active", true).order("amount", { ascending: true });
-
-        // setPlans(planData || []);
+        const { data: planData } = await supabase
+          .from("plans")
+          .select("*")
+          .eq("active", true)
+          .order("amount", { ascending: true });
 
         if (subscription) {
           setSubscriptionStatus(subscription.status);
@@ -238,7 +256,6 @@ const BillingPage = () => {
                     </Col>
                     <Col>
                       <Typography.Text style={{ color: "#fff", fontSize: "0.85rem" }}>
-                        {" "}
                         Exp: {expMonth?.toString().padStart(2, "0")}/{expYear?.toString().slice(-2) || "--"}
                       </Typography.Text>
                     </Col>
@@ -259,49 +276,6 @@ const BillingPage = () => {
           )}
 
           {loading && <Skeleton active paragraph={{ rows: 6 }} className="mt-6" />}
-
-          {/* {!hasActiveSubscription && !loading && (
-            <div className="mt-6">
-              <Tabs
-                activeKey={billingCycle}
-                onChange={setBillingCycle}
-                items={[
-                  { key: "monthly", label: "Monthly" },
-                  { key: "annually", label: "Annually" },
-                ]}
-              />
-
-              <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {plans
-                  .filter(plan => plan.interval === (billingCycle === "monthly" ? "month" : "year"))
-                  .map(plan => (
-                    <div key={plan.id} className="border rounded-md p-4 shadow-sm">
-                      <h2 className="text-lg font-bold text-gray-800">{plan.name}</h2>
-                      <p className="text-gray-600">
-                        ${plan.amount} {plan.currency.toUpperCase()} / {plan.interval}
-                      </p>
-
-                      {plan.features && (
-                        <ul className="text-sm text-gray-500 list-disc list-inside mt-2">
-                          {plan.features.map((feature: string, i: number) => (
-                            <li key={i}>{feature}</li>
-                          ))}
-                        </ul>
-                      )}
-
-                      <Button
-                        type="primary"
-                        className="mt-4"
-                        loading={subscribingPlanId === plan.price_id}
-                        onClick={() => handleSubscribe(plan.price_id)}
-                      >
-                        {subscribingPlanId === plan.price_id ? "Redirecting..." : "Subscribe"}
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )} */}
 
           {subscriptionEvents.length > 0 && (
             <div className="grid grid-cols-1 gap-6 mb-8">
@@ -381,11 +355,26 @@ const BillingPage = () => {
       ),
     },
   ];
-
+const TabButton = ({ isActive, onClick, label }: { isActive: boolean; onClick: () => void; label: string }) => {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 py-2 px-6 text-center transition-all rounded-[48px] ${
+        isActive ? "bg-brand-primary text-white" : "bg-Gray100 text-gray-600 hover:bg-gray-200"
+      }`}
+    >
+      {label}
+    </button>
+  );
+};
   return (
     <DashboardLayout header={<Header title="Billing" description="Manage your subscription and view billing activity." />}>
-      
-        <Tabs defaultActiveKey="overview" items={tabItems} />
+      <Flex className="border border-[#E8EAEC] rounded-[48px] p-2 gap-4 w-fit mb-6">
+        <TabButton isActive={activeTab === "overview"} onClick={() => setActiveTab("overview")} label="Overview" />
+        <TabButton isActive={activeTab === "invoices"} onClick={() => setActiveTab("invoices")} label="Invoices" />
+      </Flex>
+
+      {tabItems.find(tab => tab.key === activeTab)?.children}
     </DashboardLayout>
   );
 };
