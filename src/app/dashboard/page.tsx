@@ -92,7 +92,7 @@ export default function DashboardPage() {
     }
 
     fetchLeads();
-  }, [clinicId]);
+  }, [clinicId, supabase]);
 
   const [newTask, setNewTask] = useState({
     task: "",

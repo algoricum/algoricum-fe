@@ -10,8 +10,8 @@ const publicRoutes = [
   "/verify-otp",
   "/auth/callback",
   "/auth/oauth-redirect",
-  "/schedule-meeting",,
-  '/api/namecheap-dns'
+  "/schedule-meeting",
+  "/api/namecheap-dns",
 ];
 
 // Paths that should redirect to dashboard if already authenticated
@@ -21,6 +21,11 @@ export async function middleware(request: NextRequest) {
   try {
     // Get the pathname from the URL
     const { pathname } = request.nextUrl;
+
+    // Add null check for pathname
+    if (!pathname) {
+      return NextResponse.next();
+    }
 
     // Create helper function for redirects
     const redirect = (path: string) => {
@@ -33,7 +38,7 @@ export async function middleware(request: NextRequest) {
     const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
 
     const isOnboardingRoute = pathname === "/onboarding";
-    
+
     const isChangePasswordRoute = pathname === "/change-password";
 
     // Create Supabase client with proper error handling
@@ -163,5 +168,5 @@ async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>
 }
 
 export const config = {
-  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)']
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)"],
 };
