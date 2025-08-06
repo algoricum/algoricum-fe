@@ -18,9 +18,10 @@
     "@stripe/stripe-js": "^7.6.1",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "2.49.6",
+    "@types/node-fetch": "^2.6.13",
     "@types/twilio": "^3.19.2",
     "antd": "^5.22.2",
-    "axios": "^1.7.7",
+    "axios": "^1.11.0",
     "cookies-next": "^5.1.0",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
@@ -29,6 +30,7 @@
     "lodash": "^4.17.21",
     "lucide-react": "^0.525.0",
     "next": "15.3.2",
+    "node-fetch": "^3.3.2",
     "papaparse": "^5.5.3",
     "react": "^18",
     "react-dom": "^18",
@@ -42,6 +44,7 @@
     "recharts": "^3.1.0",
     "redux-persist": "^6.0.0",
     "twilio": "^5.7.1",
+    "undici": "^7.13.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
