@@ -1,8 +1,9 @@
+// Deno server for Mailgun + Namecheap DNS setup
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': '*', // Consider restricting in production
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
@@ -10,33 +11,27 @@ const corsHeaders = {
 function validateClinicSlug(slug: string, logger: Logger): { valid: boolean; error?: string } {
   logger.debug('Validating clinic slug', { slug })
 
-  // Check for empty or null
   if (!slug || slug.trim().length === 0) {
     return { valid: false, error: 'Clinic slug cannot be empty' }
   }
 
-  // Check length (domain labels can be max 63 chars, but let's be more conservative)
   if (slug.length > 50) {
     return { valid: false, error: 'Clinic slug cannot exceed 50 characters' }
   }
 
-  // Check for valid characters (alphanumeric and hyphens only, more restrictive)
   const validSlugRegex = /^[a-z0-9-]+$/
   if (!validSlugRegex.test(slug)) {
     return { valid: false, error: 'Clinic slug can only contain lowercase letters, numbers, and hyphens' }
   }
 
-  // Cannot start or end with hyphen
   if (slug.startsWith('-') || slug.endsWith('-')) {
     return { valid: false, error: 'Clinic slug cannot start or end with a hyphen' }
   }
 
-  // Cannot contain consecutive hyphens
   if (slug.includes('--')) {
     return { valid: false, error: 'Clinic slug cannot contain consecutive hyphens' }
   }
 
-  // Additional validation for problematic patterns
   if (slug.includes('api') || slug.includes('www') || slug.includes('mail')) {
     return { valid: false, error: 'Clinic slug cannot contain reserved words (api, www, mail)' }
   }
@@ -50,27 +45,22 @@ function generateSlug(clinicName: string): string {
   let slug = clinicName
     .toLowerCase()
     .trim()
-    // Remove possessive apostrophes and other special characters
     .replace(/[''`]/g, '')
-    .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
-    .replace(/\s+/g, '-')     // Replace spaces with hyphens
-    .replace(/-+/g, '-')      // Replace multiple hyphens with single
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
 
-  // Ensure slug meets validation criteria
   if (slug.length > 50) {
-    slug = slug.substring(0, 50).replace(/-+$/, ''); // Remove trailing hyphens after truncation
+    slug = slug.substring(0, 50).replace(/-+$/, '')
   }
-  
-  // If slug is empty after processing, generate a fallback
+
   if (!slug) {
-    slug = 'clinic-' + Date.now().toString().slice(-6);
+    slug = 'clinic-' + Date.now().toString().slice(-6)
   }
 
-  // Final cleanup
-  slug = slug.replace(/^-+|-+$/g, ''); // Remove any remaining leading/trailing hyphens
-
-  return slug || 'default-clinic';
+  slug = slug.replace(/^-+|-+$/g, '')
+  return slug || 'default-clinic'
 }
 
 // Enhanced logging utility
@@ -87,7 +77,7 @@ class Logger {
     const timestamp = new Date().toISOString()
     const elapsed = Date.now() - this.startTime
     const prefix = `[${timestamp}] [${level}] [${this.context}] [+${elapsed}ms]`
-    
+
     if (data) {
       return `${prefix} ${message} | Data: ${JSON.stringify(data, null, 2)}`
     }
@@ -129,20 +119,59 @@ class Logger {
   }
 }
 
-// DNS function that calls Next.js API route with proxy support
-async function createNamecheapDNSRecords(domain: string, subdomain: string, logger: Logger) {
-  const stepLogger = new Logger('NamecheapDNS');
-  const stepStart = Date.now();
+// Fetch Mailgun DNS records for a domain
+async function fetchMailgunDNSRecords(domain: string, apiKey: string, logger: Logger): Promise<any> {
+  const stepLogger = new Logger('MailgunDNSFetch')
+  const stepStart = Date.now()
 
-  // Get the Next.js API URL from environment
+  stepLogger.step('Fetching Mailgun DNS records', { domain })
+
+  try {
+    const response = await fetch(`https://api.mailgun.net/v3/domains/${domain}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${btoa(`api:${apiKey}`)}`,
+      },
+      signal: AbortSignal.timeout(30000)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      stepLogger.error('Failed to fetch Mailgun DNS records', {
+        status: response.status,
+        error: errorText,
+        domain
+      })
+      throw new Error(`Failed to fetch Mailgun DNS records: ${response.status} ${errorText}`)
+    }
+
+    const data = await response.json()
+    stepLogger.performance('Mailgun DNS records fetch', Date.now() - stepStart, {
+      domain,
+      sendingRecords: data.sending_dns_records?.length || 0,
+      receivingRecords: data.receiving_dns_records?.length || 0
+    })
+
+    return data
+  } catch (error) {
+    stepLogger.error('Mailgun DNS records fetch failed', error, { domain })
+    throw error
+  }
+}
+
+// DNS function that calls Next.js API route with proxy support
+async function createNamecheapDNSRecords(domain: string, subdomain: string, mailgunApiKey: string, logger: Logger) {
+  const stepLogger = new Logger('NamecheapDNS')
+  const stepStart = Date.now()
+
   const NEXTJS_API_URL = Deno.env.get('NEXTJS_API_URL') || Deno.env.get('VERCEL_URL')
-  
+
   if (!NEXTJS_API_URL) {
     stepLogger.warn('NEXTJS_API_URL not configured, DNS setup will be manual')
-    return { 
-      automated: false, 
-      error: 'NEXTJS_API_URL not configured for proxy support', 
-      reason: 'No proxy available' 
+    return {
+      automated: false,
+      error: 'NEXTJS_API_URL not configured for proxy support',
+      reason: 'No proxy available'
     }
   }
 
@@ -153,76 +182,128 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, logg
     domain,
     subdomain,
     apiEndpoint: dnsApiEndpoint
-  });
+  })
 
+  // Fetch Mailgun DNS records
+  let mailgunDnsRecords = null
   try {
-    const requestPayload = {
-      action: 'setup-dns',
-      domain,
-      subdomain
+    const mailgunData = await fetchMailgunDNSRecords(subdomain, mailgunApiKey, stepLogger)
+    mailgunDnsRecords = {
+      sending_dns_records: mailgunData.sending_dns_records || []
     }
-
-    stepLogger.debug('Calling Next.js DNS API', { payload: requestPayload })
-
-    const response = await fetch(dnsApiEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestPayload),
-      signal: AbortSignal.timeout(60000) // Longer timeout for DNS operations
+    stepLogger.success('Fetched Mailgun DNS records', {
+      recordCount: mailgunDnsRecords.sending_dns_records.length,
+      records: mailgunDnsRecords.sending_dns_records.map((r: any) => ({
+        name: r.name,
+        type: r.record_type,
+        value: r.value.substring(0, 50) + '...'
+      }))
     })
-
-    stepLogger.performance('Next.js DNS API call', Date.now() - stepStart, {
-      status: response.status,
-      statusText: response.statusText
-    })
-
-    if (!response.ok) {
-      console.log("--------------------------,", response)
-      const errorText = await response.text()
-      stepLogger.error('Next.js DNS API failed', { 
-        status: response.status, 
-        error: errorText 
-      })
-      return { 
-        automated: false, 
-        error: `DNS API failed (${response.status}): ${errorText}`,
-        details: errorText
-      }
+  } catch (error) {
+    stepLogger.error('Failed to fetch Mailgun DNS records', error)
+    return {
+      automated: false,
+      error: `Failed to fetch Mailgun DNS records: ${error.message}`,
+      details: error.stack
     }
+  }
 
-    const result = await response.json()
-    
-    if (result.automated) {
-      stepLogger.success('DNS records updated successfully via proxy', {
+  let attempts = 0
+  const maxAttempts = 3
+
+  while (attempts < maxAttempts) {
+    attempts++
+    stepLogger.debug(`DNS setup attempt ${attempts}/${maxAttempts}`, { subdomain })
+
+    try {
+      const requestPayload = {
+        action: 'setup-dns',
         domain,
         subdomain,
-        recordsCreated: result.recordsCreated?.length || 0,
-        totalDuration: Date.now() - stepStart
-      })
-    } else {
-      stepLogger.warn('DNS setup failed via proxy', {
-        error: result.error,
-        details: result.details
-      })
-    }
+        mailgunDnsRecords
+      }
 
-    return result
+      stepLogger.debug('Calling Next.js DNS API', { payload: { ...requestPayload, mailgunDnsRecords: 'included' } })
 
-  } catch (error) {
-    stepLogger.performance('Failed DNS setup via proxy', Date.now() - stepStart)
-    stepLogger.error('DNS API call failed', error, {
-      domain,
-      subdomain,
-      apiEndpoint: dnsApiEndpoint,
-      duration: Date.now() - stepStart
-    })
-    return { 
-      automated: false, 
-      error: `DNS proxy call failed: ${error.message}`, 
-      details: error.stack 
+      const response = await fetch(dnsApiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload),
+        signal: AbortSignal.timeout(30000) // Reduced timeout for faster retries
+      })
+
+      stepLogger.performance(`Next.js DNS API call attempt ${attempts}`, Date.now() - stepStart, {
+        status: response.status,
+        statusText: response.statusText
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        stepLogger.error('Next.js DNS API failed', {
+          status: response.status,
+          error: errorText
+        })
+        if (response.status >= 500 && attempts < maxAttempts) {
+          const delay = Math.min(1000 * attempts, 5000)
+          stepLogger.warn(`Server error, retrying in ${delay}ms`, { attempt: attempts })
+          await new Promise(resolve => setTimeout(resolve, delay))
+          continue
+        }
+        return {
+          automated: false,
+          error: `DNS API failed (${response.status}): ${errorText}`,
+          details: errorText
+        }
+      }
+
+      const result = await response.json()
+
+      if (result.automated) {
+        stepLogger.success('DNS records updated successfully via proxy', {
+          domain,
+          subdomain,
+          recordsCreated: result.recordsCreated?.length || 0,
+          totalDuration: Date.now() - stepStart
+        })
+      } else {
+        stepLogger.warn('DNS setup failed via proxy', {
+          error: result.error,
+          details: result.details
+        })
+      }
+
+      return result
+
+    } catch (error) {
+      stepLogger.performance(`Failed DNS setup attempt ${attempts}`, Date.now() - stepStart)
+      stepLogger.error('DNS API call failed', error, {
+        domain,
+        subdomain,
+        apiEndpoint: dnsApiEndpoint,
+        attempt: attempts
+      })
+
+      if (attempts < maxAttempts) {
+        const delay = Math.min(1000 * attempts, 5000)
+        stepLogger.warn(`Retrying in ${delay}ms`, { attempt: attempts })
+        await new Promise(resolve => setTimeout(resolve, delay))
+        continue
+      }
+
+      return {
+        automated: false,
+        error: `DNS proxy call failed after ${maxAttempts} attempts: ${error.message}`,
+        details: error.stack
+      }
     }
+  }
+
+  return {
+    automated: false,
+    error: `DNS setup failed after ${maxAttempts} attempts`,
+    details: 'Max retries exceeded'
   }
 }
 
@@ -236,6 +317,9 @@ function getRequiredDNSRecords(subdomain: string, logger: Logger) {
     ],
     txt_records: [
       { type: 'TXT', host: subdomainHost, value: 'v=spf1 include:mailgun.org ~all' }
+    ],
+    cname_records: [
+      { type: 'CNAME', host: `email.${subdomainHost}`, value: 'mailgun.org' }
     ]
   }
 
@@ -277,7 +361,7 @@ async function checkDomainVerification(domain: string, apiKey: string, logger: L
         error: errorText,
         domain
       })
-      return { verified: false, error: `HTTP ${response.status}: ${response.statusText}`, exists: false }
+      return { verified: false, error: `HTTP ${response.status}: ${errorText}`, exists: false }
     }
 
     const data = await response.json()
@@ -304,7 +388,7 @@ async function checkDomainVerification(domain: string, apiKey: string, logger: L
     }
 
     stepLogger.performance('Domain verification check', Date.now() - stepStart, result)
-    
+
     if (result.verified) {
       stepLogger.success('Domain is verified and active', { domain, state: result.state })
     } else {
@@ -312,7 +396,6 @@ async function checkDomainVerification(domain: string, apiKey: string, logger: L
     }
 
     return result
-
   } catch (error) {
     stepLogger.performance('Failed domain verification check', Date.now() - stepStart)
     stepLogger.error('Domain verification check error', error, { domain })
@@ -325,12 +408,10 @@ async function createMailgunDomain(subdomain: string, apiKey: string, logger: Lo
   const stepLogger = new Logger('MailgunDomainCreation')
   const stepStart = Date.now()
 
-  // Validate domain format before sending to Mailgun
   if (!subdomain || subdomain.length < 4 || subdomain.length > 253) {
     throw new Error(`Invalid domain format: ${subdomain}`)
   }
 
-  // Check if domain name contains valid characters
   const domainRegex = /^[a-z0-9.-]+\.[a-z]{2,}$/
   if (!domainRegex.test(subdomain)) {
     throw new Error(`Invalid domain format: ${subdomain}. Domain must contain only lowercase letters, numbers, dots, and hyphens`)
@@ -338,7 +419,7 @@ async function createMailgunDomain(subdomain: string, apiKey: string, logger: Lo
 
   const mailgunPayload = {
     name: subdomain,
-    smtp_password: crypto.randomUUID().substring(0, 32), // Limit password length
+    smtp_password: crypto.randomUUID().substring(0, 32),
     spam_action: 'disabled',
     wildcard: 'false',
     force_dkim_authority: 'true'
@@ -349,7 +430,6 @@ async function createMailgunDomain(subdomain: string, apiKey: string, logger: Lo
     payload: { ...mailgunPayload, smtp_password: '[REDACTED]' }
   })
 
-  // First, check if domain already exists
   const existingDomain = await checkDomainVerification(subdomain, apiKey, stepLogger)
   if (existingDomain.exists) {
     stepLogger.info('Domain already exists in Mailgun', { domain: subdomain, verified: existingDomain.verified })
@@ -391,49 +471,46 @@ async function createMailgunDomain(subdomain: string, apiKey: string, logger: Lo
       }
 
       const responseText = await response.text()
-      
-      // Handle specific error cases
+
       if (response.status === 401) {
         throw new Error(`Mailgun authentication failed. Please check your MAILGUN_API_KEY`)
       }
-      
+
       if (response.status === 402) {
         throw new Error(`Mailgun payment required. Please verify your account and add payment method`)
       }
-      
+
       if (response.status === 409 || responseText.includes('already exists')) {
         stepLogger.info('Domain already exists, fetching existing domain info')
         return await checkDomainVerification(subdomain, apiKey, stepLogger)
       }
-      
+
       if (response.status === 429) {
         if (attempts < maxAttempts) {
-          const delay = Math.min(1000 * Math.pow(2, attempts), 10000) // Exponential backoff, max 10s
+          const delay = Math.min(1000 * Math.pow(2, attempts), 10000)
           stepLogger.warn(`Rate limited, retrying in ${delay}ms`, { attempt: attempts })
           await new Promise(resolve => setTimeout(resolve, delay))
           continue
         }
         throw new Error(`Mailgun rate limit exceeded after ${maxAttempts} attempts`)
       }
-      
+
       if (response.status >= 500 && attempts < maxAttempts) {
-        const delay = Math.min(2000 * attempts, 10000) // Linear backoff for server errors
-        stepLogger.warn(`Server error (${response.status}), retrying in ${delay}ms`, { 
-          attempt: attempts, 
+        const delay = Math.min(2000 * attempts, 10000)
+        stepLogger.warn(`Server error (${response.status}), retrying in ${delay}ms`, {
+          attempt: attempts,
           error: responseText.substring(0, 200)
         })
         await new Promise(resolve => setTimeout(resolve, delay))
         continue
       }
-      
-      // If we've exhausted retries or hit a non-retryable error
-      throw new Error(`Mailgun domain creation failed (${response.status}): ${responseText}`)
 
+      throw new Error(`Mailgun domain creation failed (${response.status}): ${responseText}`)
     } catch (error) {
       if (attempts >= maxAttempts) {
         throw error
       }
-      
+
       stepLogger.warn(`Attempt ${attempts} failed, retrying`, { error: error.message })
       await new Promise(resolve => setTimeout(resolve, 1000 * attempts))
     }
@@ -444,7 +521,7 @@ async function createMailgunDomain(subdomain: string, apiKey: string, logger: Lo
 
 serve(async (req) => {
   const logger = new Logger('ClinicMailgunSetup')
-  
+
   if (req.method === 'OPTIONS') {
     logger.info('CORS preflight request')
     return new Response('ok', { headers: corsHeaders })
@@ -455,10 +532,10 @@ serve(async (req) => {
 
   try {
     logger.info('🚀 Starting Mailgun + Namecheap setup function')
-    
+
     // Environment variables validation
     const MAILGUN_API_KEY = Deno.env.get('MAILGUN_API_KEY')
-    const BASE_DOMAIN = Deno.env.get('BASE_DOMAIN') // Should be 'msgdesk.co'
+    const BASE_DOMAIN = Deno.env.get('BASE_DOMAIN')
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     const WEBHOOK_BASE_URL = Deno.env.get('WEBHOOK_BASE_URL')
@@ -475,11 +552,10 @@ serve(async (req) => {
 
     logger.info('📋 Environment variables check', {
       ...environmentCheck,
-      BASE_DOMAIN: BASE_DOMAIN,
+      BASE_DOMAIN,
       timestamp: new Date().toISOString()
     })
 
-    // Validate required environment variables
     const missingRequired = []
     if (!MAILGUN_API_KEY) missingRequired.push('MAILGUN_API_KEY')
     if (!BASE_DOMAIN) missingRequired.push('BASE_DOMAIN')
@@ -490,12 +566,10 @@ serve(async (req) => {
       throw new Error(`Missing required environment variables: ${missingRequired.join(', ')}`)
     }
 
-    // Validate BASE_DOMAIN format
     if (!BASE_DOMAIN.includes('.') || BASE_DOMAIN.startsWith('.') || BASE_DOMAIN.endsWith('.')) {
       throw new Error(`Invalid BASE_DOMAIN format: ${BASE_DOMAIN}. Expected format: domain.com`)
     }
 
-    // Parse request body
     logger.step('Parsing request body')
     const requestBody = await req.json()
     const { clinicId: requestClinicId, action = 'setup', clinicName } = requestBody
@@ -514,15 +588,13 @@ serve(async (req) => {
       throw new Error('clinicId is required in request body')
     }
 
-    // Initialize Supabase
     logger.step('Initializing Supabase client')
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
     logger.success('Supabase client initialized')
 
-    // Get clinic data
     logger.step('Fetching clinic data from database')
     const clinicFetchStart = Date.now()
-    
+
     const { data: clinic, error: clinicError } = await supabase
       .from('clinic')
       .select('id, slug, name, domain, email, created_at, updated_at')
@@ -551,7 +623,6 @@ serve(async (req) => {
       createdAt: clinic.created_at
     })
 
-    // Route to appropriate action
     if (action === 'setup') {
       return await handleSetupAction(clinic, BASE_DOMAIN, MAILGUN_API_KEY, WEBHOOK_BASE_URL, supabase, logger, requestStart, clinicName)
     } else if (action === 'verify') {
@@ -561,7 +632,6 @@ serve(async (req) => {
     } else {
       throw new Error(`Invalid action: ${action}. Supported actions: setup, verify, delete`)
     }
-
   } catch (error) {
     logger.performance('Function execution failed', Date.now() - requestStart)
     logger.error('💥 Function execution error', error, {
@@ -570,7 +640,7 @@ serve(async (req) => {
       requestMethod: req.method,
       executionTime: Date.now() - requestStart
     })
-    
+
     return new Response(
       JSON.stringify({
         success: false,
@@ -593,13 +663,11 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
   const setupLogger = new Logger('SetupAction')
   setupLogger.info('⚙️ Starting domain setup process', { clinicId: clinic.id, clinicName: clinic.name })
 
-  // Use existing slug or generate a new one from clinicName
   let clinicSlug = clinic.slug
   if (!clinicSlug && clinicName) {
     setupLogger.info('No slug found in database, generating from clinicName', { clinicName })
     clinicSlug = generateSlug(clinicName)
 
-    // Update the clinic record with the new slug
     const { error: slugUpdateError } = await supabase
       .from('clinic')
       .update({ slug: clinicSlug, updated_at: new Date().toISOString() })
@@ -616,22 +684,19 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
     throw new Error('No clinic slug available and no clinic name provided to generate one')
   }
 
-  // Validate clinic slug format
   const slugValidation = validateClinicSlug(clinicSlug, setupLogger)
   if (!slugValidation.valid) {
-    // Try to fix the slug
     const fixedSlug = generateSlug(clinicSlug)
     const fixedValidation = validateClinicSlug(fixedSlug, setupLogger)
-    
+
     if (fixedValidation.valid) {
-      setupLogger.warn('Original slug invalid, using fixed version', { 
-        original: clinicSlug, 
-        fixed: fixedSlug, 
-        originalError: slugValidation.error 
+      setupLogger.warn('Original slug invalid, using fixed version', {
+        original: clinicSlug,
+        fixed: fixedSlug,
+        originalError: slugValidation.error
       })
       clinicSlug = fixedSlug
-      
-      // Update database with fixed slug
+
       await supabase
         .from('clinic')
         .update({ slug: clinicSlug, updated_at: new Date().toISOString() })
@@ -640,14 +705,13 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
       throw new Error(`Cannot create valid slug from "${clinicSlug}": ${slugValidation.error}`)
     }
   }
-  
-  // Generate domain and email
+
   const subdomain = `${clinicSlug}.${baseDomain}`
   const clinicEmail = `contact@${subdomain}`
 
   setupLogger.info('🌐 Generated clinic domain configuration', {
     clinicId: clinic.id,
-    clinicSlug: clinicSlug,
+    clinicSlug,
     baseDomain,
     subdomain,
     clinicEmail,
@@ -655,29 +719,24 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
     previousEmail: clinic.email
   })
 
-  // Step 1: Create/verify domain in Mailgun
   setupLogger.step('Creating domain in Mailgun')
   const mailgunData = await createMailgunDomain(subdomain, mailgunApiKey, setupLogger)
 
-  // Step 2: Get domain verification status
   setupLogger.step('Checking domain verification status')
   const domainInfo = await checkDomainVerification(subdomain, mailgunApiKey, setupLogger)
 
-  // Step 3: Get required DNS records
   setupLogger.step('Generating required DNS records')
   const requiredRecords = getRequiredDNSRecords(subdomain, setupLogger)
 
-  // Step 4: Attempt automated DNS setup via Next.js proxy
   setupLogger.step('Attempting automated DNS setup via proxy')
-  const dnsResult = await createNamecheapDNSRecords(baseDomain, subdomain, setupLogger)
+  const dnsResult = await createNamecheapDNSRecords(baseDomain, subdomain, mailgunApiKey, setupLogger)
 
-  // Step 5: Set up email routing
   let routeCreated = false
   let routeInfo = null
 
   if (webhookBaseUrl) {
     setupLogger.step('Setting up email routing webhook')
-    
+
     try {
       const webhookUrl = new URL(`${webhookBaseUrl}/webhooks/mailgun/${clinic.id}`)
       if (!webhookUrl.protocol.startsWith('https')) {
@@ -734,15 +793,13 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
     setupLogger.warn('WEBHOOK_BASE_URL not configured, skipping email route setup')
   }
 
-  // Step 6: Update database
   setupLogger.step('Updating database records')
   const dbStart = Date.now()
 
-  // Update clinic record
   const clinicUpdateData = {
     domain: subdomain,
     email: clinicEmail,
-    slug: clinicSlug, // Ensure slug is saved
+    slug: clinicSlug,
     updated_at: new Date().toISOString()
   }
 
@@ -761,7 +818,6 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
 
   setupLogger.success('Clinic record updated')
 
-  // Create/update mailgun_settings
   const settingsData = {
     clinic_id: clinic.id,
     mailgun_domain: subdomain,
@@ -789,14 +845,13 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
 
   setupLogger.performance('Database updates', Date.now() - dbStart)
 
-  // Prepare comprehensive response
   const result = {
     success: true,
     message: 'Mailgun domain setup completed successfully',
     data: {
       clinicId: clinic.id,
       clinicName: clinic.name,
-      clinicSlug: clinicSlug,
+      clinicSlug,
       domain: subdomain,
       email: clinicEmail,
       domainVerified: domainInfo.verified,
@@ -809,7 +864,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
       verificationStatus: domainInfo,
       mailgunResponse: mailgunData,
       executionTime: Date.now() - requestStart,
-      nextSteps: dnsResult.automated 
+      nextSteps: dnsResult.automated
         ? [
             'Domain setup complete!',
             'DNS records have been automatically configured via proxy',
@@ -818,7 +873,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
           ]
         : [
             'DNS records need to be set manually in your DNS provider',
-            'Add the MX and TXT records shown in requiredDNSRecords',
+            'Add the MX, TXT, and CNAME records shown in requiredDNSRecords',
             'Domain verification will happen automatically after DNS propagation',
             'Use the verify action to check status after DNS changes'
           ]
@@ -850,13 +905,12 @@ async function handleVerifyAction(clinic: any, mailgunApiKey: string, supabase: 
   }
 
   const verificationStatus = await checkDomainVerification(clinic.domain, mailgunApiKey, verifyLogger)
-  
-  // Update verification status in database if verified
+
   if (verificationStatus.verified) {
     verifyLogger.step('Updating verification status in database')
     const { error: updateError } = await supabase
       .from('mailgun_settings')
-      .update({ 
+      .update({
         domain_verified: true,
         updated_at: new Date().toISOString()
       })
@@ -900,10 +954,9 @@ async function handleDeleteAction(clinic: any, mailgunApiKey: string, supabase: 
   let databaseCleaned = false
 
   if (clinic.domain) {
-    // Delete from Mailgun
     deleteLogger.step('Deleting domain from Mailgun')
     const mailgunStart = Date.now()
-    
+
     try {
       const deleteResponse = await fetch(
         `https://api.mailgun.net/v3/domains/${clinic.domain}`,
@@ -937,12 +990,10 @@ async function handleDeleteAction(clinic: any, mailgunApiKey: string, supabase: 
       deleteLogger.error('Mailgun deletion exception', error, { domain: clinic.domain })
     }
 
-    // Clean up database
     deleteLogger.step('Cleaning up database records')
     const dbStart = Date.now()
 
     try {
-      // Delete mailgun settings
       const { error: settingsDeleteError } = await supabase
         .from('mailgun_settings')
         .delete()
@@ -954,11 +1005,10 @@ async function handleDeleteAction(clinic: any, mailgunApiKey: string, supabase: 
         deleteLogger.success('Mailgun settings deleted')
       }
 
-      // Update clinic record
       const { error: clinicUpdateError } = await supabase
         .from('clinic')
-        .update({ 
-          domain: null, 
+        .update({
+          domain: null,
           email: null,
           updated_at: new Date().toISOString()
         })
@@ -972,7 +1022,6 @@ async function handleDeleteAction(clinic: any, mailgunApiKey: string, supabase: 
       }
 
       deleteLogger.performance('Database cleanup', Date.now() - dbStart)
-
     } catch (error) {
       deleteLogger.error('Database cleanup exception', error, { clinicId: clinic.id })
     }
