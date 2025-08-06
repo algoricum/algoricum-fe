@@ -3,6 +3,9 @@ import React, { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/config/client";
 import { getCountries, getCountryCallingCode } from "react-phone-number-input/input";
 import type { CountryCode } from "libphonenumber-js";
+import getLeadSourceId from "@/utils/lead_source";
+
+
 
 type FormField = {
   id: string;
@@ -16,9 +19,9 @@ type FormField = {
 
 type FormData = { [key: string]: string | number };
 
-type Props = { clinicId: string };
+type Props = { clinicId: string; onSuccess?: () => void };
 
-const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
+const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
   const [fields, setFields] = useState<FormField[]>([]);
   const [formData, setFormData] = useState<FormData>({});
   const [countryCode, setCountryCode] = useState<CountryCode>("US");
@@ -112,14 +115,18 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
     if (!validateForm()) return;
 
     setSubmitting(true);
-    try {
-      const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Phone").single();
 
-      if (sourceError) throw sourceError;
+    const source_id=await getLeadSourceId("Others");
+
+    try {
+      // const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Phone").single();
+
+      // if (sourceError) throw sourceError;
 
       const submissionData = {
         clinic_id: clinicId,
-        source_id: sourceData.id,
+        source_id: source_id,
+        first_name: formData.name || null,
         email: formData.email || null,
         phone: formData.phone || null,
         form_data: { ...formData, country_code: countryCode, phone_number: phoneNumber },
@@ -130,8 +137,8 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
 
       const { error: insertError } = await supabase.from("lead").insert([submissionData]);
       if (insertError) throw insertError;
+      onSuccess?.();
 
-      setSubmitted(true);
     } catch (err) {
       console.error("Submit error:", err);
       alert("Error submitting form. Try again.");
@@ -248,10 +255,11 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId }) => {
               {errors[f.field_id] && <p className="text-red-500 text-sm">{errors[f.field_id]}</p>}
             </div>
           ))}
-
-          <button type="submit" disabled={submitting} className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">
-            {submitting ? "Submitting..." : "Submit"}
-          </button>
+          {onSuccess && (
+            <button type="submit" disabled={submitting} className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">
+              {submitting ? "Submitting..." : "Submit"}
+            </button>
+          )}
         </form>
       </div>
     </div>

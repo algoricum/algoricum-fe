@@ -10,13 +10,14 @@ import { createClient } from "@/utils/supabase/config/client";
 const supabase = createClient();
 
 interface OnboardingSubscriptionStepProps {
+  // eslint-disable-next-line no-unused-vars
   onNext: (data?: any) => void;
 }
 
 export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscriptionStepProps) {
   const [plans, setPlans] = useState<any[]>([]);
   const [clinicId, setClinicId] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
+  const [, setStatus] = useState<string | null>(null);
   const [subscribingId, setSubscribingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -94,6 +95,7 @@ interface PricingSelectorProps {
     features?: string[];
   }[];
   subscribingId: string | null;
+  // eslint-disable-next-line no-unused-vars
   handleSubscribe: (priceId: string) => void;
 }
 
