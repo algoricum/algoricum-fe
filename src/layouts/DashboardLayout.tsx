@@ -19,7 +19,7 @@ const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
         <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         <Layout className="flex-1">
           {header && (
-            <Flex className="w-full border-b border-Gray400" style={{ height: "60px", flexShrink: 0 }}>
+            <Flex className="w-full border-b border-Gray300" style={{ height: "64px", flexShrink: 0 }}>
               {header}
             </Flex>
           )}

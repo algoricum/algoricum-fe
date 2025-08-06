@@ -2,15 +2,17 @@
 
 import React, { useEffect, useState } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { Tabs, Button, Alert } from "antd";
-import { CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { Tabs, Button, Skeleton, Alert, Card, Typography, Row, Col, Tag } from "antd";
+import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Download } from "lucide-react";
 import { createClient } from "@/utils/supabase/config/client";
 import { Header } from "@/components/common";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+// import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+// import { Header } from "@/components/common";
 
 dayjs.extend(utc);
 dayjs.extend(relativeTime);
@@ -18,17 +20,24 @@ dayjs.extend(relativeTime);
 const supabase = createClient();
 
 const BillingPage = () => {
-  const [billingCycle, setBillingCycle] = useState("monthly");
+  // const [billingCycle, setBillingCycle] = useState("monthly");
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [subscriptionEvents, setSubscriptionEvents] = useState<any[]>([]);
   const [trialEnd, setTrialEnd] = useState<string | null>(null);
-  const [plans, setPlans] = useState<any[]>([]);
+  // const [plans, setPlans] = useState<any[]>([]);
   const [clinicId, setClinicId] = useState<string | null>(null);
+
+  const hasActiveSubscription = subscriptionStatus === "active" || subscriptionStatus === "trialing";
   const [loading, setLoading] = useState(true);
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
   const [currentPriceId, setCurrentPriceId] = useState<string | null>(null);
   const [currentPlan, setCurrentPlan] = useState<any | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [last4, setLast4] = useState<string | null>(null);
+  const [expMonth, setExpMonth] = useState<number | null>(null);
+  const [expYear, setExpYear] = useState<number | null>(null);
+  const [brand, setBrand] = useState<string | null>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,7 +49,7 @@ const BillingPage = () => {
 
         const { data: subscription } = await supabase
           .from("stripe_subscriptions")
-          .select("id,status, trial_end, stripe_price_id, current_period_end, stripe_subscription_id")
+          .select("id,status, trial_end, stripe_price_id, current_period_end, stripe_subscription_id, last4, exp_month, exp_year, brand")
           .eq("clinic_id", clinic.id)
           .order("created_at", { ascending: false })
           .limit(1)
@@ -48,12 +57,16 @@ const BillingPage = () => {
 
         const { data: planData } = await supabase.from("plans").select("*").eq("active", true).order("amount", { ascending: true });
 
-        setPlans(planData || []);
+        // setPlans(planData || []);
 
         if (subscription) {
           setSubscriptionStatus(subscription.status);
           setTrialEnd(subscription.trial_end);
           setCurrentPriceId(subscription.stripe_price_id);
+          setLast4(subscription.last4);
+          setExpMonth(subscription.exp_month);
+          setExpYear(subscription.exp_year);
+          setBrand(subscription.brand);
 
           const matchedPlan = planData?.find(plan => plan.price_id === subscription.stripe_price_id);
           setCurrentPlan({
@@ -82,19 +95,42 @@ const BillingPage = () => {
     fetchData();
   }, []);
 
-  const hasActiveSubscription = subscriptionStatus === "active" || subscriptionStatus === "trialing";
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      if (!clinicId) return;
+      const session = await getSupabaseSession();
+
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-invoices`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ clinic_id: clinicId }),
+        });
+        const { invoices } = await response.json();
+        setInvoices(invoices || []);
+      } catch (err) {
+        console.error("Invoice fetch error:", err);
+      }
+    };
+    fetchInvoices();
+  }, [clinicId]);
 
   const handleSubscribe = async (priceId: string) => {
     if (!clinicId) return;
 
     setSubscribingPlanId(priceId);
     setErrorMessage(null);
+    const session = await getSupabaseSession();
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           clinic_id: clinicId,
@@ -117,108 +153,134 @@ const BillingPage = () => {
   const trialDaysLeft = trialEnd ? Math.ceil((new Date(trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
   const billingDate = currentPlan?.current_period_end ? new Date(currentPlan.current_period_end).toLocaleDateString() : null;
 
-  return (
-    <DashboardLayout header={<Header title="Lead Management" description="Manage and track your leads through the conversion process." />}>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Billing</h1>
-          <p className="text-gray-600 mt-2">Manage your subscription and view billing activity.</p>
-        </div>
-
-        {errorMessage && (
-          <Alert
-            message="Subscription Error"
-            description={errorMessage}
-            type="error"
-            showIcon
-            closable
-            onClose={() => setErrorMessage(null)}
-            className="mb-4"
-          />
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="bg-white rounded-lg shadow">
-            <LoadingSpinner message="Loading billing information..." size="lg" />
-          </div>
-        )}
-
-        {/* Active Subscription Display */}
-        {!loading && hasActiveSubscription && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center mb-4">
-              {subscriptionStatus === "active" || subscriptionStatus === "trialing" ? (
-                <CheckCircle className="w-6 h-6 text-green-600 mr-2" />
-              ) : (
-                <XCircle className="w-6 h-6 text-red-600 mr-2" />
-              )}
-              <p className="text-gray-700 font-semibold">
-                Subscription Status: <span className="capitalize">{subscriptionStatus}</span>
-              </p>
-            </div>
-
-            {subscriptionStatus === "trialing" && trialEnd && (
-              <p className="text-sm text-gray-500 mb-2">
-                Trial ends on: {new Date(trialEnd).toLocaleDateString()}
-                {trialDaysLeft !== null && trialDaysLeft >= 0 && ` (${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} left)`}
-              </p>
-            )}
-
-            {subscriptionStatus === "trialing" && trialDaysLeft !== null && trialDaysLeft <= 3 && (
-              <div className="flex items-center text-yellow-600 text-sm mb-4">
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Your trial is ending soon. Don&apos;t forget to add payment.
-              </div>
-            )}
-
-            {subscriptionStatus === "active" && billingDate && (
-              <p className="text-sm text-gray-500 mb-4">Next billing date: {billingDate}</p>
-            )}
-
-            {currentPlan && (
-              <div className="mb-4">
-                <h3 className="text-md font-semibold text-gray-800">Current Plan: {currentPlan.name}</h3>
-                <p className="text-sm text-gray-600">
-                  ${currentPlan.amount} {currentPlan.currency.toUpperCase()} / {currentPlan.interval}
-                </p>
-              </div>
-            )}
-
-            {subscribingPlanId === currentPriceId ? (
-              <div className="mt-2 mb-6">
-                <LoadingSpinner message="Redirecting to billing portal..." size="sm" />
-              </div>
-            ) : (
-              <Button
-                type="primary"
-                className="mt-2 mb-6"
-                onClick={() => currentPriceId && handleSubscribe(currentPriceId)}
-                disabled={!currentPriceId}
-              >
-                Manage Subscription
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Plan Selection for Non-Subscribers */}
-        {!hasActiveSubscription && !loading && (
-          <div className="mt-6">
-            <Tabs
-              activeKey={billingCycle}
-              onChange={setBillingCycle}
-              items={[
-                { key: "monthly", label: "Monthly" },
-                { key: "annually", label: "Annually" },
-              ]}
+  const tabItems = [
+    {
+      key: "overview",
+      label: "Overview",
+      children: (
+        <>
+          {errorMessage && (
+            <Alert
+              message="Subscription Error"
+              description={errorMessage}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setErrorMessage(null)}
+              className="mb-4"
             />
+          )}
 
-            <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {plans
-                .filter(plan => plan.interval === (billingCycle === "monthly" ? "month" : "year"))
-                .map(plan => {
-                  return (
+          {!loading && hasActiveSubscription && (
+            <Row gutter={10} className="justify-between mb-6">
+              <Col xs={18} md={10}>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center mb-4">
+                    {subscriptionStatus === "active" || subscriptionStatus === "trialing" ? (
+                      <CheckCircle className="w-6 h-6 text-green-600 mr-2" />
+                    ) : (
+                      <XCircle className="w-6 h-6 text-red-600 mr-2" />
+                    )}
+                    <p className="text-gray-700 font-semibold">
+                      Subscription Status: <span className="capitalize">{subscriptionStatus}</span>
+                    </p>
+                  </div>
+
+                  {subscriptionStatus === "trialing" && trialEnd && (
+                    <p className="text-sm text-gray-500 mb-2">
+                      Trial ends on: {new Date(trialEnd).toLocaleDateString()}
+                      {trialDaysLeft !== null && trialDaysLeft >= 0 && ` (${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} left)`}
+                    </p>
+                  )}
+
+                  {subscriptionStatus === "trialing" && trialDaysLeft !== null && trialDaysLeft <= 3 && (
+                    <div className="flex items-center text-yellow-600 text-sm mb-4">
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Your trial is ending soon. Don’t forget to add payment.
+                    </div>
+                  )}
+
+                  {subscriptionStatus === "active" && billingDate && (
+                    <p className="text-sm text-gray-500 mb-4">Next billing date: {billingDate}</p>
+                  )}
+
+                  {currentPlan && (
+                    <div className="mb-4">
+                      <h3 className="text-md font-semibold text-gray-800">Current Plan: {currentPlan.name}</h3>
+                      <p className="text-sm text-gray-600">
+                        ${currentPlan.amount} {currentPlan.currency.toUpperCase()} / {currentPlan.interval}
+                      </p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="primary"
+                    className="mt-2 mb-6"
+                    loading={subscribingPlanId === currentPriceId}
+                    onClick={() => currentPriceId && handleSubscribe(currentPriceId)}
+                    disabled={!currentPriceId}
+                  >
+                    {subscribingPlanId === currentPriceId ? "Redirecting..." : "Manage Subscription"}
+                  </Button>
+                </div>
+              </Col>
+
+              <Col xs={24} md={10}>
+                <Card
+                  title="Payment Method"
+                  style={{ background: "#9333ea", color: "#fff", borderRadius: "1rem" }}
+                  headStyle={{ color: "#fff", borderBottom: "none" }}
+                  bodyStyle={{ padding: "1.5rem" }}
+                >
+                  <Typography.Text style={{ color: "#fff", fontSize: "1rem" }}>Cardholder: {"***************"}</Typography.Text>
+                  <div style={{ margin: "0.75rem 0", fontSize: "1.25rem", color: "#fff", letterSpacing: "2px" }}>
+                    •••• •••• •••• {last4}
+                  </div>
+                  <Row justify="space-between" align="middle">
+                    <Col>
+                      <Tag color="gold" style={{ borderRadius: "8px" }}>
+                        {brand?.toUpperCase() || "Unknown"}
+                      </Tag>
+                    </Col>
+                    <Col>
+                      <Typography.Text style={{ color: "#fff", fontSize: "0.85rem" }}>
+                        {" "}
+                        Exp: {expMonth?.toString().padStart(2, "0")}/{expYear?.toString().slice(-2) || "--"}
+                      </Typography.Text>
+                    </Col>
+                  </Row>
+                  <Button
+                    block
+                    className="mt-4"
+                    type="primary"
+                    onClick={() => currentPriceId && handleSubscribe(currentPriceId)}
+                    loading={subscribingPlanId === currentPriceId}
+                    disabled={!currentPriceId}
+                  >
+                    {subscribingPlanId === currentPriceId ? "Redirecting..." : "Update Payment Method"}
+                  </Button>
+                </Card>
+              </Col>
+            </Row>
+          )}
+
+          {loading && <Skeleton active paragraph={{ rows: 6 }} className="mt-6" />}
+
+          {/* {!hasActiveSubscription && !loading && (
+            <div className="mt-6">
+              <Tabs
+                activeKey={billingCycle}
+                onChange={setBillingCycle}
+                items={[
+                  { key: "monthly", label: "Monthly" },
+                  { key: "annually", label: "Annually" },
+                ]}
+              />
+
+              <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {plans
+                  .filter(plan => plan.interval === (billingCycle === "monthly" ? "month" : "year"))
+                  .map(plan => (
                     <div key={plan.id} className="border rounded-md p-4 shadow-sm">
                       <h2 className="text-lg font-bold text-gray-800">{plan.name}</h2>
                       <p className="text-gray-600">
@@ -241,20 +303,16 @@ const BillingPage = () => {
                         </Button>
                       )}
                     </div>
-                  );
-                })}
+                  ))}
+              </div>
             </div>
-          </div>
-        )}
+          )} */}
 
-        {/* Subscription Events */}
-        {subscriptionEvents.length > 0 && (
-          <div className="grid grid-cols-1 gap-6 mb-8">
-            <div className="card">
-              <h3 className="text-lg font-semibold mb-6">Recent Events</h3>
-              {subscriptionEvents.length === 0 ? (
-                <div className="text-sm text-gray-500">No recent events to show.</div>
-              ) : (
+          {subscriptionEvents.length > 0 && (
+            <div className="grid grid-cols-1 gap-6 mb-8">
+              <div className="card">
+                <h3 className="text-lg font-semibold mb-6">Recent Events</h3>
+
                 <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                   {subscriptionEvents.map(event => {
                     const { id, type, received_at, summary } = event;
@@ -288,11 +346,50 @@ const BillingPage = () => {
                     );
                   })}
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </>
+      ),
+    },
+    {
+      key: "invoices",
+      label: "Invoices",
+      children: (
+        <>
+          {invoices.length === 0 ? (
+            <p className="text-gray-500 mt-4">No invoices found.</p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {invoices.map(inv => (
+                <div key={inv.id} className="border rounded-lg p-4 flex justify-between items-center">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">
+                      {inv.status.toUpperCase()} — {inv.currency.toUpperCase()} {inv.amount_paid / 100}
+                    </p>
+                    <p className="text-xs text-gray-500">{dayjs.unix(inv.created).format("YYYY-MM-DD hh:mm A")}</p>
+                  </div>
+                  <div className="space-x-2">
+                    <Button icon={<ExternalLink size={14} />} href={inv.hosted_invoice_url} target="_blank">
+                      View
+                    </Button>
+                    <Button icon={<Download size={14} />} href={inv.invoice_pdf} target="_blank">
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <DashboardLayout header={<Header title="Billing" description="Manage your subscription and view billing activity." />}>
+      
+        <Tabs defaultActiveKey="overview" items={tabItems} />
     </DashboardLayout>
   );
 };

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Typography } from "antd";
+import { Button, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import ClinicInfoStep from "./clinic-info-step";
 import StaffHoursStep from "./staff-hours-step";
-import ToneIdentityStep from "./tone-identity-step";
-import AiAssistantStep from "./ai-assistant-step";
+// import ToneIdentityStep from "./tone-identity-step";
+// import AiAssistantStep from "./ai-assistant-step";
 import BookingSetupStep from "./booking-setup-step";
 import IntegrationsStep from "./integrations-step";
 
@@ -14,14 +14,14 @@ import IntegrationsStep from "./integrations-step";
 import apiKeyService from "@/services/apiKey";
 import { Lead } from "@/interfaces/services_type";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
+// import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { updateClinic, getClinicData, createEmailSettings } from "@/utils/supabase/clinic-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
-import generateClinicInstructions from "@/utils/generateClinicInstructions";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+// import generateClinicInstructions from "@/utils/generateClinicInstructions";
+// import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { useAuth } from "@/hooks/useAuth";
-import ChatbotSetupStep from "./chatbot-setup-step";
-
+// import ChatbotSetupStep from "./chatbot-setup-step";
+// import type { MailgunMessageData } from "mailgun.js";
 import { createClient } from "@/utils/supabase/config/client";
 import getLeadSourceId from "@/utils/lead_source";
 import getNormalizedLead from "@/utils/normalizeLeadData";
@@ -33,17 +33,20 @@ import {
   ONBOARDING_COMPLETED_STEPS_KEY,
   ONBOARDING_LEADS_FILE_NAME,
 } from "@/constants/localStorageKeys";
+// import { log } from "console";
+import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
 
 const { Text } = Typography;
 
 const BASE_STEPS = [
-  { id: "clinic-info", title: "Clinic Info", description: "Basic details", icon: "📋" },
-  { id: "staff-hours", title: "Hours", description: "Schedule", icon: "👥" },
-  { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
-  { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
-  { id: "booking-setup", title: "Booking", description: "Appointments", icon: "⚙️" },
-  { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
-  { id: "integrations", title: "CRM-Integrations", description: "Tools", icon: "⚡" },
+  { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
+  { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
+  // { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
+  // { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
+  // { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
+  { id: "integrations", title: "Lead Capture Setup", description: "Tools", icon: "⚡" },
+  { id: "booking-setup", title: "Booking Link Setup", description: "Appointments", icon: "⚙️" },
+  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
 ];
 
 export default function MainOnboarding() {
@@ -54,6 +57,7 @@ export default function MainOnboarding() {
   const [allData, setAllData] = useState<Record<string, any>>({});
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
 
   // Only use BASE_STEPS for sidebar and navigation
   const STEPS = BASE_STEPS;
@@ -113,7 +117,7 @@ export default function MainOnboarding() {
     const clinicInfo = data["clinic-info"] || {};
     const staffHours = data["staff-hours"] || {};
     const toneIdentity = data["tone-identity"] || {};
-    const aiAssistant = data["ai-assistant"] || {};
+    // const aiAssistant = data["ai-assistant"] || {};
     const bookingSetup = data["booking-setup"] || {};
     const integrations = data["integrations"] || {};
 
@@ -133,7 +137,7 @@ export default function MainOnboarding() {
     return {
       // Step 1 - Clinic Info
       legalBusinessName: clinicInfo.clinicName || "",
-      dbaName: "", // Not collected in new flow
+      dbaName: clinicInfo.primaryContactName || "",
       clinicAddress: clinicInfo.businessAddress || "",
       businessHours: businessHours,
 
@@ -143,12 +147,12 @@ export default function MainOnboarding() {
       phoneNumber: clinicInfo.clinicPhone || "",
       calendlyLink: bookingSetup.hasBookingLink === "Yes, I have a booking link" ? bookingSetup.bookingLinkUrl : "",
 
-      // Step 3 - Brand Config
-      logo: aiAssistant.logoUpload?.[0]?.originFileObj || null,
-      tone_selector: toneIdentity.toneSelector || "",
-      sentence_length: toneIdentity.sentenceLength || "",
-      formality_level: toneIdentity.formalityLevel || "",
-      clinic_document: aiAssistant.clinicDetailsUpload?.[0]?.originFileObj || null,
+      // // Step 3 - Brand Config
+      // logo: aiAssistant.logoUpload?.[0]?.originFileObj || null,
+      tone_selector: toneIdentity.toneSelector || "friendly",
+      // sentence_length: toneIdentity.sentenceLength || "",
+      // formality_level: toneIdentity.formalityLevel || "",
+      // clinic_document: aiAssistant.clinicDetailsUpload?.[0]?.originFileObj || null,
 
       // Additional data from new flow
       clinicType: clinicInfo.clinicType || "",
@@ -209,11 +213,11 @@ export default function MainOnboarding() {
         return;
       }
 
-      // Upload the logo if provided
-      let logoUrl = undefined;
-      if (mappedData.logo) {
-        logoUrl = await uploadClinicLogo(user.id, mappedData.logo);
-      }
+      // // Upload the logo if provided
+      // let logoUrl = undefined;
+      // if (mappedData.logo) {
+      //   logoUrl = await uploadClinicLogo(user.id, mappedData.logo);
+      // }
 
       const clinicData = {
         id: clinic.id, // Include clinic ID for update
@@ -226,11 +230,11 @@ export default function MainOnboarding() {
         email: mappedData.emailAddress || user.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink,
-        logo: logoUrl,
-        tone_selector: mappedData.tone_selector,
-        sentence_length: mappedData.sentence_length,
-        formality_level: mappedData.formality_level,
+        calendly_link: mappedData.calendlyLink || `https://algoricum.hashlogics.com/schedule-meeting?clinic_id=${clinic.id}`,
+        // logo: logoUrl,
+        tone_selector: "friendly",
+        // sentence_length: mappedData.sentence_length,
+        // formality_level: mappedData.formality_level,
         clinic_type: mappedData.clinicType,
         uses_hubspot: mappedData.integrations.usesHubspot === "Yes",
         uses_ads: mappedData.integrations.usesAds === "Yes",
@@ -259,64 +263,64 @@ export default function MainOnboarding() {
       });
 
       // Handle document upload and assistant creation if we have a clinic ID
-      if (updatedClinic.id && mappedData.clinic_document) {
-        const hasDocument = !!mappedData.clinic_document;
+      // if (updatedClinic.id && mappedData.clinic_document) {
+      //   const hasDocument = !!mappedData.clinic_document;
 
-        if (hasDocument) {
-          // Prepare form data for the edge function
-          const formDataToSend = new FormData();
-          formDataToSend.append("clinic_document", mappedData.clinic_document);
-          formDataToSend.append("clinic_id", updatedClinic.id);
-          formDataToSend.append("name", mappedData.legalBusinessName);
-          formDataToSend.append("description", `AI Assistant for ${mappedData.legalBusinessName}`);
+      //   if (hasDocument) {
+      //     // Prepare form data for the edge function
+      //     const formDataToSend = new FormData();
+      //     formDataToSend.append("clinic_document", mappedData.clinic_document);
+      //     formDataToSend.append("clinic_id", updatedClinic.id);
+      //     formDataToSend.append("name", mappedData.legalBusinessName);
+      //     formDataToSend.append("description", `AI Assistant for ${mappedData.legalBusinessName}`);
 
-          // Generate customized instructions based on clinic settings
-          const clinicInstructions = generateClinicInstructions({
-            name: mappedData.legalBusinessName,
-            address: mappedData.clinicAddress,
-            phone: mappedData.phoneNumber,
-            email: mappedData.emailAddress || user.email,
-            business_hours: mappedData.businessHours,
-            calendly_link: mappedData.calendlyLink,
-            tone_selector: mappedData.tone_selector,
-            sentence_length: mappedData.sentence_length,
-            formality_level: mappedData.formality_level,
-            has_uploaded_document: true,
-          });
+      //     // Generate customized instructions based on clinic settings
+      //     const clinicInstructions = generateClinicInstructions({
+      //       name: mappedData.legalBusinessName,
+      //       address: mappedData.clinicAddress,
+      //       phone: mappedData.phoneNumber,
+      //       email: mappedData.emailAddress || user.email,
+      //       business_hours: mappedData.businessHours,
+      //       calendly_link: mappedData.calendlyLink,
+      //       tone_selector: mappedData.tone_selector,
+      //       sentence_length: mappedData.sentence_length,
+      //       formality_level: mappedData.formality_level,
+      //       has_uploaded_document: true,
+      //     });
 
-          formDataToSend.append("instructions", clinicInstructions);
-          formDataToSend.append("model", "gpt-4o");
-          formDataToSend.append("tools", JSON.stringify([{ type: "file_search" }]));
+      //     formDataToSend.append("instructions", clinicInstructions);
+      //     formDataToSend.append("model", "gpt-4o");
+      //     formDataToSend.append("tools", JSON.stringify([{ type: "file_search" }]));
 
-          // Get the token for authorization
-          const session = await getSupabaseSession();
+      //     // Get the token for authorization
+      //     const session = await getSupabaseSession();
 
-          if (!session.access_token) {
-            throw new Error("Not authenticated");
-          }
+      //     if (!session.access_token) {
+      //       throw new Error("Not authenticated");
+      //     }
 
-          try {
-            // Call the combined edge function
-            const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              body: formDataToSend,
-            });
+      //     try {
+      //       // Call the combined edge function
+      //       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
+      //         method: "POST",
+      //         headers: {
+      //           Authorization: `Bearer ${session.access_token}`,
+      //         },
+      //         body: formDataToSend,
+      //       });
 
-            await response.json();
+      //       await response.json();
 
-            if (!response.ok) {
-              ErrorToast("Assistant creation error");
-              // Continue with onboarding even if assistant creation fails
-            }
-          } catch (assistantError) {
-            ErrorToast("Failed to create assistant");
-            // Continue with onboarding even if assistant creation fails
-          }
-        }
-      }
+      //       if (!response.ok) {
+      //         ErrorToast("Assistant creation error");
+      //         // Continue with onboarding even if assistant creation fails
+      //       }
+      //     } catch (assistantError) {
+      //       ErrorToast("Failed to create assistant");
+      //       // Continue with onboarding even if assistant creation fails
+      //     }
+      //   }
+      // }
 
       // try {
       //   const session = await getSupabaseSession();
@@ -350,10 +354,19 @@ export default function MainOnboarding() {
       await handleCsvLeadsUpload(clinic.id);
       clearStoredProgress();
 
+      // router.push("/dashboard?onboarding=success");
       SuccessToast("You're all set!");
-      setTimeout(() => {
-        router.push("/dashboard?onboarding=success");
-      }, 2000);
+      await fetch("/api/sendConfiramtionMail", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: clinicData.dba_name || clinicData.legal_business_name,
+          email: clinicData.email || user.email || "",
+        }),
+      });
+      setIsOnboardingComplete(true); // new state you'll add below
     } catch (error: any) {
       ErrorToast(error.message || "Failed to update clinic");
     } finally {
@@ -437,16 +450,19 @@ export default function MainOnboarding() {
         );
       case "staff-hours":
         return <StaffHoursStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
-      case "tone-identity":
-        return <ToneIdentityStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
-      case "ai-assistant":
-        return <AiAssistantStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+      // case "tone-identity":
+      //   return <ToneIdentityStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+      // case "ai-assistant":
+      //   return <AiAssistantStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "booking-setup":
         return <BookingSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
-      case "chatbot-setup":
-        return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+      // case "chatbot-setup":
+      //   return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "integrations":
         return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+      case "billing":
+        return <OnboardingSubscriptionStep onNext={handleStepComplete} />;
+
       default:
         return <div>Unknown step</div>;
     }
@@ -530,7 +546,23 @@ export default function MainOnboarding() {
           </div>
         )}
 
-        <div className="h-full overflow-y-auto py-11 px-8">{renderCurrentStep()}</div>
+        {/* <div className="h-full overflow-y-auto py-11 px-8">{renderCurrentStep()}</div> */}
+        <div className="h-full overflow-y-auto py-11 px-8">
+          {isOnboardingComplete ? (
+            <div className="max-w-xl mx-auto text-center mt-32">
+              <h1 className="text-2xl font-semibold mb-4">You’re all set! 🎉</h1>
+              <p className="text-lg text-gray-700">Algoricum is now live and following up with your leads.</p>
+              <p className="text-md text-gray-600 mt-4">
+                <strong>Check your inbox</strong> for next steps and tips to get the most out of Algoricum.
+              </p>
+              <Button type="primary" className="mt-6" onClick={() => router.push("/dashboard?onboarding=success")}>
+                Go to Dashboard
+              </Button>
+            </div>
+          ) : (
+            renderCurrentStep()
+          )}
+        </div>
       </div>
     </div>
   );

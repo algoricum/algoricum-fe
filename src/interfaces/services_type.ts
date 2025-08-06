@@ -51,11 +51,12 @@ export interface Clinic {
   logo?: string;
   widget_logo?: string;
   domain?: string;
+  uses_hubspot?: boolean; 
   widget_theme?: WidgetTheme;
   dashboard_theme?: DashboardTheme;
   created_at: string;
   updated_at: string;
-  
+
   // Additional fields from the database
   openai_api_key?: string;
   assistant_prompt?: string;
@@ -64,8 +65,9 @@ export interface Clinic {
   dba_name?: string;
   business_hours?: BusinessHours;
   calendly_link?: string;
-  chatbot_avatar?:string;
-  chatbot_name?:string;
+  chatbot_avatar?: string;
+  chatbot_name?: string;
+  clinic_type: string;
   // New fields for chatbot settings
   tone_selector?: string;
   sentence_length?: string;
@@ -76,7 +78,7 @@ export interface CreateClinicProps {
   name: string;
   language: string;
   owner_id: string;
-  
+
   // Optional fields (nullable in database)
   address?: string;
   phone?: string;
@@ -88,7 +90,7 @@ export interface CreateClinicProps {
   widget_logo?: string;
   business_hours?: BusinessHours;
   calendly_link?: string;
-  
+
   // Chatbot related fields
   openai_api_key?: string;
   assistant_prompt?: string;
@@ -96,17 +98,17 @@ export interface CreateClinicProps {
   tone_selector?: string;
   sentence_length?: string;
   formality_level?: string;
-  
+
   // Theme objects
   widget_theme?: WidgetTheme;
   dashboard_theme?: DashboardTheme;
 }
 export interface BusinessHours {
   [key: string]: {
-    isOpen: boolean
-    openTime: string
-    closeTime: string
-  }
+    isOpen: boolean;
+    openTime: string;
+    closeTime: string;
+  };
 }
 export interface UpdateClinicProps {
   id: string;
@@ -122,7 +124,7 @@ export interface UpdateClinicProps {
   widget_logo?: string;
   business_hours?: BusinessHours;
   calendly_link?: string;
-  
+
   // Chatbot related fields
   openai_api_key?: string;
   assistant_prompt?: string;
@@ -130,12 +132,11 @@ export interface UpdateClinicProps {
   tone_selector?: string;
   sentence_length?: string;
   formality_level?: string;
-  chatbot_name?:string;
-  chatbot_avatar?:string;
+  chatbot_name?: string;
+  chatbot_avatar?: string;
   // Theme objects
   widget_theme?: WidgetTheme;
   dashboard_theme?: DashboardTheme;
-
 }
 
 export interface WidgetTheme {
@@ -147,7 +148,7 @@ export interface WidgetTheme {
 
 export interface DashboardTheme {
   primary_color?: string;
-  layout?: 'sidebar' | 'topbar';
+  layout?: "sidebar" | "topbar";
   [key: string]: any;
 }
 
@@ -209,7 +210,7 @@ export interface Thread {
   user_id?: string;
   lead_id?: string;
   clinic_id: string;
-  status: 'active' | 'closed';
+  status: "active" | "closed";
   created_at: string;
   updated_at: string;
 }

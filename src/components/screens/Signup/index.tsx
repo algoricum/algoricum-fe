@@ -1,5 +1,5 @@
 "use client";
-import { AuthSeparator, SocialButton } from "@/components/common";
+import { AuthSeparator } from "@/components/common";
 import { Button, Input } from "@/components/elements";
 import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
@@ -7,7 +7,7 @@ import { MailIcon, PasswordIcon } from "@/icons";
 import { SignupProps } from "@/interfaces/services_type";
 import { saveUser } from "@/redux/accessors/user.accessors";
 import { signUp } from "@/utils/supabase/auth-helper";
-import { createClient } from "@/utils/supabase/config/client";
+// import { createClient } from "@/utils/supabase/config/client";
 import { setUserData } from "@/utils/supabase/user-helper";
 import { Flex, Form, Typography } from "antd";
 import Link from "next/link";
@@ -41,24 +41,24 @@ const SignupPage = () => {
     mutate(values);
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'apple') => {
-    try {
-      // Implement social login with Supabase
-      const supabase = createClient();
+  // const handleSocialLogin = async (provider: 'google' | 'apple') => {
+  //   try {
+  //     // Implement social login with Supabase
+  //     const supabase = createClient();
 
-      let { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/oauth-redirect`
-        }
-      });
+  //     let { error } = await supabase.auth.signInWithOAuth({
+  //       provider,
+  //       options: {
+  //         redirectTo: `${window.location.origin}/auth/oauth-redirect`
+  //       }
+  //     });
 
-      if (error) throw error;
+  //     if (error) throw error;
 
-    } catch (error: any) {
-      ErrorToast(error?.message || `Failed to sign in with ${provider}`);
-    }
-  };
+  //   } catch (error: any) {
+  //     ErrorToast(error?.message || `Failed to sign in with ${provider}`);
+  //   }
+  // };
 
   return (
     <Flex vertical gap={36} className="w-full">
@@ -141,13 +141,13 @@ const SignupPage = () => {
             </Button>
           </Form.Item>
           <AuthSeparator />
-          <Flex gap={18} className="flex-1 flex-col lg:flex-row justify-center items-center w-full">
+          {/* <Flex gap={18} className="flex-1 flex-col lg:flex-row justify-center items-center w-full">
             <SocialButton
               isGoogle={true}
               label="Continue With Google"
               onClick={() => handleSocialLogin('google')}
             />
-          </Flex>
+          </Flex> */}
           <Text className="text-center text-sm font-helvetica text-Gray600">
             Already have an account?{"   "}
             <Link href="/login" className="font-helvetica-700 !text-brand-primary">

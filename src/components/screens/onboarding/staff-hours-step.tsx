@@ -111,11 +111,17 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
 
   return (
     <div className="max-w-4xl">
-      <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
+        <Title level={1} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
+Clinic Profile
+      </Title>
+      <Title level={5} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
+        Welcome! Let’s set up your clinic so that we can start following up with leads right away.
+      </Title>
+      {/* <Title level={3} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
         Business Hours
       </Title>
 
-      <Text className="text-gray-600 text-lg block mb-8">Set your clinic&apos;s operating hours</Text>
+      <Text className="text-gray-600 text-sm block mb-8">Set your clinic&apos;s operating hours</Text> */}
 
       {/* Quick Presets */}
       <div className="mb-8">

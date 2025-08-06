@@ -10,7 +10,6 @@ const { TextArea } = Input;
 const { Title, Text } = Typography;
 
 interface ClinicInfoStepProps {
-  // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
@@ -28,22 +27,18 @@ const validatePhoneNumber = (phoneNumber: string) => {
   }
 
   try {
-    // Check if the phone number is valid according to international standards
     const isValid = isValidPhoneNumber(phoneNumber);
 
     if (!isValid) {
-      // Try to parse the phone number to get more specific error info
       try {
         const parsedPhone = parsePhoneNumber(phoneNumber);
         if (parsedPhone) {
-          // If we can parse it but it's not valid, it's likely incomplete
           return {
             isValid: false,
             error: `Please enter a complete phone number for ${parsedPhone.country || "the selected country"}`,
           };
         }
-      } catch (parseError) {
-        // If parsing fails, it's an invalid format
+      } catch {
         return {
           isValid: false,
           error: "Please enter a valid phone number format",
@@ -57,7 +52,7 @@ const validatePhoneNumber = (phoneNumber: string) => {
     }
 
     return { isValid: true, error: null };
-  } catch (error) {
+  } catch {
     return {
       isValid: false,
       error: "Please enter a valid phone number",
@@ -70,9 +65,16 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
   const [formData, setFormData] = useState({
     clinicName: initialData.clinicName || "",
     clinicType: initialData.clinicType || "",
+    primaryContactName: initialData.primaryContactName || "",
     primaryContactEmail: initialData.primaryContactEmail || "",
     clinicPhone: initialData.clinicPhone || "",
     businessAddress: initialData.businessAddress || "",
+  });
+
+  // ✅ NEW: Consent checkboxes state
+  const [consentData, setConsentData] = useState({
+    acceptedBAA: initialData.acceptedBAA || false,
+    acceptedLeadConsent: initialData.acceptedLeadConsent || false,
   });
 
   const questions = [
@@ -91,13 +93,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       required: false,
     },
     {
-      id: "primaryContactEmail",
-      type: "email",
-      question: "What's your email address?",
-      placeholder: "Enter your email",
-      required: true,
-    },
-    {
       id: "clinicPhone",
       type: "phone",
       question: "What's your clinic's phone number?",
@@ -109,6 +104,20 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       type: "textarea",
       question: "What's your clinic's business address?",
       placeholder: "Enter your complete business address",
+      required: true,
+    },
+    {
+      id: "primaryContactName",
+      type: "text",
+      question: "What's your primary contact name?",
+      placeholder: "Enter your name",
+      required: true,
+    },
+    {
+      id: "primaryContactEmail",
+      type: "email",
+      question: "What's your email address?",
+      placeholder: "Enter your email",
       required: true,
     },
   ];
@@ -165,10 +174,16 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       return;
     }
 
+    // ✅ NEW: prevent submit if consents not checked
+    if (currentQuestionIndex === questions.length - 1 && (!consentData.acceptedBAA || !consentData.acceptedLeadConsent)) {
+      alert("Please accept both BAA and data handling consent to continue.");
+      return;
+    }
+
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      onNext(formData);
+      onNext({ ...formData, ...consentData }); // ✅ Updated to include consentData
     }
   };
 
@@ -202,7 +217,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             </div>
           ) : (
             <Input
-              type={q.type === "phone" ? "text" : q.type}
+              type={q.type}
               value={value}
               disabled
               className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700"
@@ -213,35 +228,47 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     });
   };
 
-  const renderAllQuestions = () => (
-    <div className="mb-8">
-      <Typography.Title level={4} className="mb-4">
-        All Answers
-      </Typography.Title>
-      {questions.map(q => {
-        const value = formData[q.id as keyof typeof formData];
-        return (
-          <div key={q.id} className="mb-4">
-            <Text className="text-gray-700 font-medium block mb-1">{q.question}</Text>
-            {q.type === "textarea" ? (
-              <TextArea
-                value={value}
-                disabled
-                rows={3}
-                className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700"
-              />
-            ) : q.type === "phone" ? (
-              <div className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700 text-xs">
-                {value || "No phone number entered"}
-              </div>
-            ) : (
-              <Input value={value} disabled className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700" />
-            )}
-          </div>
-        );
-      })}
+  const renderConsentSection = () => (
+    <div className="mt-6 mb-6 space-y-3">
+      <div>
+        <label className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={consentData.acceptedBAA}
+            onChange={e => setConsentData(prev => ({ ...prev, acceptedBAA: e.target.checked }))}
+          />
+          <span className="text-sm text-gray-800">I accept the Business Associate Agreement (BAA).</span>
+        </label>
+      </div>
+      <div>
+        <label className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={consentData.acceptedLeadConsent}
+            onChange={e => setConsentData(prev => ({ ...prev, acceptedLeadConsent: e.target.checked }))}
+          />
+          <span className="text-sm text-gray-800">I consent to Algoricum securely handling lead data.</span>
+        </label>
+      </div>
+      {consentData.acceptedBAA && consentData.acceptedLeadConsent && (
+        <a
+          href="/documents/Algoricum_BAA.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-purple-600 text-sm underline block"
+        >
+          Download the signed agreement (PDF)
+        </a>
+      )}
     </div>
   );
+
+  const isCurrentFieldValid = () => {
+    if (currentQuestionIndex === questions.length - 1) {
+      return !getFieldError() && consentData.acceptedBAA && consentData.acceptedLeadConsent;
+    }
+    return !getFieldError();
+  };
 
   const renderCurrentInput = () => {
     const error = getFieldError();
@@ -274,60 +301,9 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             international
             countryCallingCodeEditable={false}
             className={`phone-input-custom ${hasError ? "phone-input-error" : ""}`}
-            style={
-              {
-                "--PhoneInput-color--focus": hasError ? "#ef4444" : "#a855f7",
-                "--PhoneInputInternationalIconPhone-opacity": "0.8",
-                "--PhoneInputInternationalIconGlobe-opacity": "0.65",
-                "--PhoneInputCountrySelect-marginRight": "0.5em",
-                "--PhoneInputCountrySelectArrow-width": "0.3em",
-                "--PhoneInputCountrySelectArrow-marginLeft": "0.35em",
-              } as React.CSSProperties
-            }
           />
           {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
-          {/* Real-time validation feedback */}
           {currentValue && !hasError && <p className="text-green-600 text-sm mt-2">✓ Valid phone number</p>}
-          <style jsx>{`
-            :global(.phone-input-custom) {
-              display: flex;
-              align-items: center;
-              padding: 12px;
-              border: 2px solid #e5e7eb;
-              border-radius: 12px;
-              background: white;
-              font-size: 12px;
-            }
-            :global(.phone-input-custom.phone-input-error) {
-              border-color: #ef4444;
-            }
-            :global(.phone-input-custom:focus-within) {
-              border-color: #a855f7;
-              outline: none;
-              box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
-            }
-            :global(.phone-input-custom.phone-input-error:focus-within) {
-              border-color: #ef4444;
-              box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-            }
-            :global(.phone-input-custom .PhoneInputInput) {
-              border: none;
-              outline: none;
-              font-size: 12px;
-              background: transparent;
-              flex: 1;
-            }
-            :global(.phone-input-custom .PhoneInputCountrySelect) {
-              border: none;
-              outline: none;
-              background: transparent;
-              margin-right: 8px;
-            }
-            :global(.phone-input-custom .PhoneInputCountryIcon) {
-              width: 20px;
-              height: 15px;
-            }
-          `}</style>
         </div>
       );
     }
@@ -347,24 +323,29 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     );
   };
 
-  const isCurrentFieldValid = () => {
-    return !getFieldError();
-  };
-
   return (
     <div className="max-w-4xl">
-      {/* Show all questions/answers if requested */}
-      {showAllQuestions && renderAllQuestions()}
-      {/* Previous Questions */}
-      {renderPreviousQuestions()}
-      {/* Current Question */}
+      <Title level={1} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
+        Clinic Profile
+      </Title>
+      <Title level={5} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
+        Welcome! Let’s set up your clinic so that we can start following up with leads right away.
+      </Title>
+
+      {showAllQuestions ? null : renderPreviousQuestions()}
+
       <div>
-        <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
+        <Title level={3} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ marginBottom: "21px" }}>
           {currentQuestion.question}
           {currentQuestion.required && <span className="text-red-500 ml-1">*</span>}
         </Title>
+
         {renderCurrentInput()}
-        <div className="flex justify-between">
+
+        {/* ✅ Consent section after last step */}
+        {currentQuestionIndex === questions.length - 1 && renderConsentSection()}
+
+        <div className="flex justify-between mt-6">
           <Button
             onClick={handlePrevious}
             className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"

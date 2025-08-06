@@ -5,6 +5,8 @@ import { Form, Input, Button, Card, TimePicker, DatePicker, message } from "antd
 import { CalendarOutlined, ClockCircleOutlined, UserOutlined, MailOutlined } from "@ant-design/icons";
 import { createClient } from "@supabase/supabase-js";
 import dayjs from "dayjs";
+import { useSearchParams } from "next/navigation";
+
 
 const { TextArea } = Input;
 
@@ -13,6 +15,8 @@ const Page = () => {
   const [loading, setLoading] = useState(false);
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const searchParams = useSearchParams();
+const clinicId = searchParams.get("clinic_id");
 
   const handleSubmit = async (values: any) => {
     try {
@@ -32,6 +36,7 @@ const Page = () => {
           email: values.email,
           preferred_meeting_time: fullDateTime,
           meeting_notes: values.meeting_notes || null,
+          clinic_id: clinicId, 
         },
       ]);
 

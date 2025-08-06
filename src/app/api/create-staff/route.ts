@@ -230,7 +230,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateSta
           id: authData.user.id,
           email: authData.user.email || email,
         },
-        tempPassword: process.env.NODE_ENV === "development" ? userPassword : undefined, // Only for development
+        tempPassword: userPassword,
         emailSent: emailResult.success,
       },
       message: emailResult.success

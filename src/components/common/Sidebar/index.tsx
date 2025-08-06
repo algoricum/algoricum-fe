@@ -53,7 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       case "billing":
         return push("/billing");
       case "profileSettings":
-        return push("/settings/lead-capturing-form");
+        return push("/settings/clinic-setting");
       case "setup":
         return push("/setup");
       case "logout":
