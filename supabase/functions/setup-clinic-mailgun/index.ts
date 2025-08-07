@@ -572,13 +572,15 @@ serve(async (req) => {
 
     logger.step('Parsing request body')
     const requestBody = await req.json()
-    const { clinicId: requestClinicId, action = 'setup', clinicName } = requestBody
+    // UPDATED: Now also read slug from request body
+    const { clinicId: requestClinicId, action = 'setup', clinicName, slug } = requestBody
     clinicId = requestClinicId
 
     logger.info('📝 Request details', {
       action,
       clinicId,
       clinicName,
+      slug, // Log the received slug
       requestBody,
       method: req.method,
       url: req.url
@@ -624,7 +626,7 @@ serve(async (req) => {
     })
 
     if (action === 'setup') {
-      return await handleSetupAction(clinic, BASE_DOMAIN, MAILGUN_API_KEY, WEBHOOK_BASE_URL, supabase, logger, requestStart, clinicName)
+      return await handleSetupAction(clinic, BASE_DOMAIN, MAILGUN_API_KEY, WEBHOOK_BASE_URL, supabase, logger, requestStart, clinicName, slug)
     } else if (action === 'verify') {
       return await handleVerifyAction(clinic, MAILGUN_API_KEY, supabase, logger, requestStart)
     } else if (action === 'delete') {
@@ -658,16 +660,36 @@ serve(async (req) => {
   }
 })
 
-// Improved setup action handler
-async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey: string, webhookBaseUrl: string, supabase: any, logger: Logger, requestStart: number, clinicName?: string) {
+// UPDATED: Improved setup action handler that prioritizes passed slug
+async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey: string, webhookBaseUrl: string, supabase: any, logger: Logger, requestStart: number, clinicName?: string, passedSlug?: string) {
   const setupLogger = new Logger('SetupAction')
-  setupLogger.info('⚙️ Starting domain setup process', { clinicId: clinic.id, clinicName: clinic.name })
+  setupLogger.info('⚙️ Starting domain setup process', { 
+    clinicId: clinic.id, 
+    clinicName: clinic.name,
+    dbSlug: clinic.slug,
+    passedSlug 
+  })
 
-  let clinicSlug = clinic.slug
-  if (!clinicSlug && clinicName) {
-    setupLogger.info('No slug found in database, generating from clinicName', { clinicName })
-    clinicSlug = generateSlug(clinicName)
+  // UPDATED: Prioritize slug sources in this order:
+  // 1. Slug passed from API request (most recent)
+  // 2. Slug from database 
+  // 3. Generate from clinic name
+  // 4. Generate from database clinic name
+  let clinicSlug = passedSlug || clinic.slug
 
+  if (!clinicSlug) {
+    if (clinicName) {
+      setupLogger.info('No slug found, generating from provided clinicName', { clinicName })
+      clinicSlug = generateSlug(clinicName)
+    } else if (clinic.name) {
+      setupLogger.info('No slug found, generating from database clinic name', { clinicName: clinic.name })
+      clinicSlug = generateSlug(clinic.name)
+    } else {
+      throw new Error('No slug available and no clinic name provided to generate one')
+    }
+
+    // Update database with the generated slug
+    setupLogger.step('Updating database with generated slug')
     const { error: slugUpdateError } = await supabase
       .from('clinic')
       .update({ slug: clinicSlug, updated_at: new Date().toISOString() })
@@ -678,10 +700,11 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
       throw new Error(`Failed to update clinic slug: ${slugUpdateError.message}`)
     }
     setupLogger.success('Clinic slug updated in database', { clinicId: clinic.id, slug: clinicSlug })
-  }
-
-  if (!clinicSlug) {
-    throw new Error('No clinic slug available and no clinic name provided to generate one')
+  } else {
+    setupLogger.info('Using existing slug', { 
+      source: passedSlug ? 'API request' : 'database',
+      slug: clinicSlug 
+    })
   }
 
   const slugValidation = validateClinicSlug(clinicSlug, setupLogger)

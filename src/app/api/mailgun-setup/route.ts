@@ -24,8 +24,8 @@ export async function POST(req: Request) {
 
     // Parse request body
     const body = await req.json()
-    // --- CORRECTED: Destructure all required fields from the body ---
-    const { clinicId, clinicName, clinicType, primaryContactEmail, clinicPhone, businessAddress, action = 'setup' } = body
+    // --- UPDATED: Destructure slug instead of clinicName ---
+    const { clinicId, clinicName, clinicType, primaryContactEmail, clinicPhone, businessAddress, slug, action = 'setup' } = body
 
     // Validate required fields
     if (!clinicId) {
@@ -34,10 +34,10 @@ export async function POST(req: Request) {
       }, { status: 400 })
     }
 
-    // --- NEW VALIDATION: Ensure clinicName is provided ---
-    if (!clinicName || clinicName.trim() === '') {
+    // --- UPDATED VALIDATION: Ensure slug is provided ---
+    if (!slug || slug.trim() === '') {
         return NextResponse.json({ 
-          error: 'clinicName is required for slug generation' 
+          error: 'slug is required for domain setup' 
         }, { status: 400 })
     }
 
@@ -51,7 +51,8 @@ export async function POST(req: Request) {
 
     console.log('🚀 Starting clinic mailgun setup request:', { 
       clinicId, 
-      clinicName, // --- LOGGING THE NEWLY ADDED FIELD ---
+      clinicName,
+      slug, // --- LOGGING THE SLUG ---
       action,
       timestamp: new Date().toISOString()
     })
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
     // Prepare request to Supabase Edge Function
     const supabaseEdgeFunctionUrl = `${supabaseUrl}/functions/v1/setup-clinic-mailgun`
     
-    // --- CORRECTED: Add all form data to the payload ---
+    // --- UPDATED: Add slug to the payload ---
     const requestPayload = {
       clinicId,
       action,
@@ -67,7 +68,8 @@ export async function POST(req: Request) {
       clinicType,
       primaryContactEmail,
       clinicPhone,
-      businessAddress
+      businessAddress,
+      slug // --- ADDED SLUG TO PAYLOAD ---
     }
 
     const headers = {
@@ -119,6 +121,7 @@ export async function POST(req: Request) {
     if (supabaseResponse.ok) {
       console.log('✅ Supabase Edge Function succeeded:', {
         clinicId,
+        slug,
         action,
         success: responseData.success,
         duration: `${duration}ms`
@@ -129,6 +132,7 @@ export async function POST(req: Request) {
         error: responseData.error,
         details: responseData.details,
         clinicId,
+        slug,
         action,
         duration: `${duration}ms`
       })
