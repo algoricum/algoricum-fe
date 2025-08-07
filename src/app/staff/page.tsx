@@ -46,7 +46,7 @@ interface CreateStaffResponse {
     emailSent?: boolean;
     tempPassword?: string;
   };
-  error1?: {
+  error?: {
     message?: string;
   };
 }
@@ -90,6 +90,21 @@ export default function StaffPage(): JSX.Element {
   const mapFrontendStatusToDatabase = (frontendStatus: string): boolean => {
     return frontendStatus === "active";
   };
+  
+  // Add this useEffect after your existing state declarations and before the existing useEffects
+  useEffect(() => {
+    if (message) {
+      // Set different timeouts based on message type
+      const timeout = message.type === 'success' ? 5000 : 7000; // 5s for success, 7s for error
+      
+      const timer = setTimeout(() => {
+        setMessage(null);
+      }, timeout);
+
+      // Cleanup function to clear timeout if component unmounts or message changes
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
 
   // Load staff data from Supabase
   useEffect(() => {
@@ -384,12 +399,13 @@ export default function StaffPage(): JSX.Element {
         email: newStaff.email,
         name: newStaff.name,
         clinicId: clinic_id,
-        roleId: "074a8cb5-03ea-422c-8786-da5ef8fd5d00", // Make this dynamic later
+        roleId: "074a8cb5-03ea-422c-8786-da5ef8fd5d00", // Make this dynamic later`
       });
-
-      if (response.error1) {
-        setMessage({ type: "error", text: response.error1.message || "Failed to create staff member" });
-        console.error("Staff creation error:", response.error1);
+        
+      if (response.error) {
+  
+        setMessage({ type: "error", text: response.error.message || "Failed to create staff member" });
+        console.error("Staff creation error:", response.error);
         return;
       }
 
@@ -698,6 +714,23 @@ export default function StaffPage(): JSX.Element {
                   <X className="w-6 h-6" />
                 </button>
               </div>
+              {/* Add message display inside the modal */}
+              {message && (
+                <div
+                  className={`mb-4 p-3 rounded-lg ${
+                    message.type === "success"
+                      ? "bg-green-50 text-green-800 border border-green-200"
+                      : "bg-red-50 text-red-800 border border-red-200"
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">{message.text}</span>
+                    <button onClick={() => setMessage(null)} className="text-current opacity-50 hover:opacity-75">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {isSubmitting && (
                 <div className="mb-4">
