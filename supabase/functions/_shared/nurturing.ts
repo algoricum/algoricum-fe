@@ -1,5 +1,4 @@
 // _shared/nurturing.ts
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 
 interface Lead {
@@ -1069,7 +1068,7 @@ async function sendSMS(
   }
 }
 
-// Enhanced sendEmail function
+// Enhanced sendEmail function using Mailgun
 async function sendEmail(
   toEmail: string,
   subject: string,
@@ -1083,226 +1082,130 @@ async function sendEmail(
   try {
     let settings = emailSettings;
 
-    // Fetch settings from email_settings table if not provided
+    // Fetch settings from clinic table if not provided
     if (!settings) {
       const { data: fetchedSettings, error: settingsError } = await supabase
-        .from('email_settings')
-        .select('smtp_host, smtp_port, smtp_user, smtp_password, smtp_sender_email, smtp_sender_name, smtp_use_tls')
-        .eq('clinic_id', clinicId)
+        .from('clinic')
+        .select('mailgun_domain, mailgun_email')
+        .eq('id', clinicId)
         .single();
 
       if (settingsError) {
-        logError('Error fetching email settings', { clinicId, error: settingsError });
-        return { success: false, error: `Error fetching email settings: ${settingsError.message}` };
+        logError('Error fetching Mailgun settings from clinic table', { clinicId, error: settingsError });
+        return { success: false, error: `Error fetching Mailgun settings: ${settingsError.message}` };
       }
 
       settings = fetchedSettings;
-    
     }
-
-    logInfo('Incomplete email settings for clinic -------------', { 
-        settings, 
-        emailSettings
-      });
 
     // Validate required fields
     const missingFields = [];
-    if (!settings?.smtp_host) missingFields.push('smtp_host');
-    if (!settings?.smtp_port) missingFields.push('smtp_port');
-    if (!settings?.smtp_user) missingFields.push('smtp_user');
-    if (!settings?.smtp_password) missingFields.push('smtp_password');
-    if (!settings?.smtp_sender_email) missingFields.push('smtp_sender_email');
+    if (!settings?.mailgun_domain) missingFields.push('mailgun_domain');
+    if (!settings?.mailgun_email) missingFields.push('mailgun_email');
 
     if (missingFields.length > 0) {
-      logError('Incomplete email settings for clinic', { 
+      logError('Incomplete Mailgun settings for clinic', { 
         clinicId, 
         missingFields
       });
       return { 
         success: false, 
-        error: `Incomplete email settings for clinic. Missing: ${missingFields.join(', ')}` 
+        error: `Incomplete Mailgun settings for clinic. Missing: ${missingFields.join(', ')}` 
       };
     }
 
-    // Gmail SMTP configuration
-    const smtpConfig = {
-      connection: {
-        hostname: settings.smtp_host || 'smtp.gmail.com',
-        port: settings.smtp_port || 587,
-        tls: settings.smtp_use_tls !== false, // Default to true for Gmail
-        auth: {
-          username: settings.smtp_user,
-          password: settings.smtp_password
-        }
-      }
-    };
+    // Get Mailgun API key from environment
+    const MAILGUN_API_KEY = Deno.env.get('MAILGUN_API_KEY');
+    if (!MAILGUN_API_KEY) {
+      logError('MAILGUN_API_KEY environment variable not set');
+      return { 
+        success: false, 
+        error: 'Mailgun API key not configured' 
+      };
+    }
 
-    // Prepare email data
-    const emailData = {
-      from: settings.smtp_sender_name 
-        ? `${settings.smtp_sender_name} <${settings.smtp_sender_email}>`
-        : settings.smtp_sender_email,
+    const { mailgun_domain, mailgun_email } = settings;
+
+    logInfo('Sending email via Mailgun', {
+      domain: mailgun_domain,
+      from: mailgun_email,
       to: toEmail,
       subject: subject,
-      html: body.replace(/\n/g, '<br>'), // Convert line breaks to HTML
-      text: body // Include plain text version
-    };
-
-    logInfo('Attempting to send email with data', {
-      from: emailData.from,
-      to: emailData.to,
-      subject: emailData.subject,
       contentLength: body.length,
       contentPreview: body.substring(0, 150)
     });
 
-    // Try multiple configurations (similar to sendReplySimple)
-    const configurations = [
-      // Configuration 1: Standard TLS as specified
-      smtpConfig,
-      // Configuration 2: STARTTLS explicit
-      {
-        connection: {
-          hostname: settings.smtp_host || 'smtp.gmail.com',
-          port: settings.smtp_port || 587,
-          tls: false,
-          auth: {
-            username: settings.smtp_user,
-            password: settings.smtp_password
-          }
-        }
+    // Prepare form data for Mailgun API
+    const formData = new FormData();
+    formData.append('from', mailgun_email);
+    formData.append('to', toEmail);
+    formData.append('subject', subject);
+    formData.append('text', body);
+    formData.append('html', body.replace(/\n/g, '<br>')); // Convert line breaks to HTML
+
+    // Send via Mailgun API
+    const response = await fetch(`https://api.mailgun.net/v3/${mailgun_domain}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(`api:${MAILGUN_API_KEY}`)}`,
       },
-      // Configuration 3: SSL on port 465
-      {
-        connection: {
-          hostname: settings.smtp_host || 'smtp.gmail.com',
-          port: 465,
-          tls: true,
-          auth: {
-            username: settings.smtp_user,
-            password: settings.smtp_password
-          }
-        }
-      }
-    ];
+      body: formData
+    });
 
-    // Try each configuration
-    for (let i = 0; i < configurations.length; i++) {
-      const config = configurations[i];
-      logInfo(`Trying SMTP configuration ${i + 1}`, {
-        hostname: config.connection.hostname,
-        port: config.connection.port,
-        tls: config.connection.tls
+    if (response.ok) {
+      const responseData = await response.json();
+      logInfo('Email sent successfully via Mailgun', { 
+        messageId: responseData.id,
+        message: responseData.message 
       });
-
-      try {
-        const smtpClient = new SMTPClient(config);
-
-        // Try different content field variations (matching sendReplySimple)
-        const emailVariations = [
-          { ...emailData, content: body },
-          { ...emailData, text: body },
-          { ...emailData, html: body.replace(/\n/g, '<br>') },
-          { ...emailData, body: body }
-        ];
-
-        for (const emailVariation of emailVariations) {
-          try {
-            logInfo('Trying email variation with fields', Object.keys(emailVariation));
-            await smtpClient.send(emailVariation);
-            await smtpClient.close();
-            logInfo('Email sent successfully');
-            return { success: true };
-          } catch (sendError) {
-            logInfo(`Email variation failed: ${sendError.message}`);
-            continue;
-          }
-        }
-
-        await smtpClient.close();
-
-      } catch (configError) {
-        logInfo(`Configuration ${i + 1} failed: ${configError.message}`);
-        continue;
-      }
-    }
-
-    // Fallback: Try minimal configuration
-    logInfo('Attempting fallback with minimal configuration');
-    try {
-      const fallbackClient = new SMTPClient({
-        connection: {
-          hostname: settings.smtp_host || 'smtp.gmail.com',
-          port: 587,
-          tls: false, // Start without TLS
-          auth: {
-            username: settings.smtp_user,
-            password: settings.smtp_password
-          }
-        }
-      });
-
-      const simpleEmailData = {
-        from: settings.smtp_sender_email,
-        to: toEmail,
-        subject: subject,
-        text: body // Use only text field
-      };
-
-      await fallbackClient.send(simpleEmailData);
-      await fallbackClient.close();
-
-      logInfo('Fallback method succeeded');
       return { success: true };
-
-    } catch (fallbackError) {
-      logError('Fallback also failed', fallbackError);
-      return {
-        success: false,
-        error: `All email sending attempts failed: ${fallbackError.message}`,
-        troubleshooting: {
-          issues: [
-            {
-              issue: 'SMTP connection failure',
-              solutions: [
-                'Ensure smtp_user is a valid Gmail address',
-                'Verify smtp_password is a valid app-specific password',
-                'Check Gmail security settings for 2FA or less secure apps',
-                'Confirm network connectivity to smtp.gmail.com'
-              ]
-            }
-          ],
-          tips: [
-            'Use an app-specific password if 2FA is enabled (myaccount.google.com/security)',
-            'Check Gmail sending limits (typically 2,000 emails/day)',
-            'Verify port 587 or 465 is open',
-            'Ensure correct SMTP settings in email_settings table'
-          ]
+    } else {
+      const errorText = await response.text();
+      logError('Mailgun API call failed', { 
+        status: response.status, 
+        statusText: response.statusText,
+        error: errorText 
+      });
+      
+      let errorMessage = `Mailgun API error (${response.status}): ${response.statusText}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.message) {
+          errorMessage = `Mailgun error: ${errorJson.message}`;
         }
+      } catch (e) {
+        // If response is not JSON, use the text
+        errorMessage = `Mailgun error: ${errorText}`;
+      }
+
+      return { 
+        success: false, 
+        error: errorMessage 
       };
     }
 
   } catch (error: any) {
-    logError('Error sending email', error);
+    logError('Error sending email via Mailgun', error);
     return {
       success: false,
       error: error.message,
       troubleshooting: {
         issues: [
           {
-            issue: 'General email sending failure',
+            issue: 'Mailgun API failure',
             solutions: [
-              'Check Supabase database connection',
-              'Verify clinic_id exists in email_settings',
-              'Ensure all required fields are populated',
-              'Check server logs for detailed errors'
+              'Verify MAILGUN_API_KEY environment variable is set',
+              'Check mailgun_domain is correct and verified in Mailgun',
+              'Ensure mailgun_email is authorized sender in Mailgun',
+              'Verify network connectivity to api.mailgun.net'
             ]
           }
         ],
         tips: [
-          'Review email_settings table configuration',
-          'Confirm Supabase authentication',
-          'Monitor Gmail sending limits'
+          'Check Mailgun dashboard for sending limits and account status',
+          'Verify domain DNS settings are configured correctly',
+          'Review clinic table mailgun configuration',
+          'Monitor Mailgun logs for detailed error information'
         ]
       }
     };
@@ -1422,16 +1325,15 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
     throw new Error('Invalid email webhook data: missing required fields')
   }
 
-  // Find the clinic based on the email address
-  const { data: clinicSettings } = await supabase
-    .from('email_config')
-    .select('clinic_id, from_email')
-    .eq('from_email', emailData.to)
-    .eq('status', 'active')
+  // Find the clinic based on the mailgun_email in the clinic table
+  const { data: clinic } = await supabase
+    .from('clinic')
+    .select('id, mailgun_email')
+    .eq('mailgun_email', emailData.to)
     .single()
 
-  if (!clinicSettings) {
-    throw new Error('No clinic found with active email settings for email address: ' + emailData.to)
+  if (!clinic) {
+    throw new Error('No clinic found with mailgun email address: ' + emailData.to)
   }
 
   // Find the lead by email address
@@ -1439,11 +1341,11 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
     .from('lead')
     .select('*')
     .eq('email', emailData.from)
-    .eq('clinic_id', clinicSettings.clinic_id)
+    .eq('clinic_id', clinic.id)
     .single()
 
   if (!lead) {
-    logError(`No lead found with email ${emailData.from} for clinic ${clinicSettings.clinic_id}`)
+    logError(`No lead found with email ${emailData.from} for clinic ${clinic.id}`)
     throw new Error('No lead found for this email address')
   }
 
@@ -1453,7 +1355,7 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
     .from('threads')
     .select('*')
     .eq('lead_id', lead.id)
-    .eq('clinic_id', clinicSettings.clinic_id)
+    .eq('clinic_id', clinic.id)
     .single()
 
   if (existingThread) {
@@ -1465,7 +1367,7 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
       .from('threads')
       .insert({
         lead_id: lead.id,
-        clinic_id: clinicSettings.clinic_id,
+        clinic_id: clinic.id,
         status: 'new'
       })
       .select()
