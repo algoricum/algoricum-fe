@@ -33,7 +33,7 @@ const AuthLayout = ({ children, isBack }: Props) => {
             <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/20 to-brand-secondary/50"></div>
 
             {/* Text positioned at the bottom */}
-            <div className="absolute bottom-0 left-0 text-white p-12 z-10 max-w-md">
+            <div className="absolute top-0 left-0 text-white p-12 z-10 max-w-md">
               <h2 className="text-4xl font-bold mb-4">Turn Clicks Into Care.</h2>
               <p className="text-xl">Your Clinic&apos;s AI Growth Assistant Starts Here.</p>
             </div>

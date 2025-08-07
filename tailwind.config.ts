@@ -15,6 +15,20 @@ export default {
         xl: "1300px",
       },
     },
+    // Override the default fontFamily to make HelveticaNeue the default
+    fontFamily: {
+      // Set HelveticaNeue as the default sans-serif font family
+      sans: ["HelveticaNeue", ...defaultTheme.fontFamily.sans],
+      // Keep your custom font families
+      Poppins: ["Poppins", ...defaultTheme.fontFamily.sans],
+      HennyPenny: ["HennyPenny", ...defaultTheme.fontFamily.sans],
+      helvetica: ["HelveticaNeue", ...defaultTheme.fontFamily.sans],
+      "helvetica-500": ["HelveticaNeue-500", ...defaultTheme.fontFamily.sans],
+      "helvetica-700": ["HelveticaNeue-700", ...defaultTheme.fontFamily.sans],
+      // You can also keep other default font families
+      serif: defaultTheme.fontFamily.serif,
+      mono: defaultTheme.fontFamily.mono,
+    },
     extend: {
       screens: {
         xs: "320px",
@@ -91,18 +105,52 @@ export default {
         xl: "var(--shadow-xl)",
         "2xl": "var(--shadow-2xl)",
       },
-    },
-    fontFamily: {
-      Poppins: ["Poppins"],
-      HennyPenny: ["HennyPenny"],
-      helvetica: ["HelveticaNeue"],
-      "helvetica-500": ["HelveticaNeue-500"],
-      "helvetica-700": ["HelveticaNeue-700"],
-    },
-    fontSize: {
-      ...defaultTheme.fontSize,
-      header: ["28px", "38.09px"],
+      fontSize: {
+        ...defaultTheme.fontSize,
+        header: ["28px", "38.09px"],
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    function ({ addBase }: { addBase: any }) {
+      addBase({
+        // Force HelveticaNeue on ALL elements
+        "*": {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        "html, body": {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        "p, input, textarea, select, button, div, span, label": {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        "h1, h2, h3, h4, h5, h6": {
+          fontFamily: 'HelveticaNeue-700, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        // ALL Ant Design components
+        '[class*="ant-"]': {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        '[class*="ant-"] *': {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        // Specific Ant Design components
+        ".ant-form, .ant-form *": {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        ".ant-input, .ant-input *": {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        ".ant-input::placeholder": {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        ".ant-select, .ant-select *": {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+        ".ant-btn, .ant-btn *": {
+          fontFamily: 'HelveticaNeue, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important',
+        },
+      });
+    },
+  ],
 } satisfies Config;
