@@ -36,7 +36,7 @@ const validatePhoneNumber = (phoneNumber: string) => {
         if (parsedPhone) {
           return {
             isValid: false,
-            error: `Please enter a complete phone number for ${parsedPhone.country || "the selected country"}`,
+            error: `Please enter a complete phone number for the selected country}`,
           };
         }
       } catch {
