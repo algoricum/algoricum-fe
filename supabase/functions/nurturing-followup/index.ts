@@ -58,7 +58,7 @@ function logError(message: string, error?: any) {
 }
 
 // Get all follow-up rules except initial_contact
-const FOLLOWUP_RULES = FOLLOW_UP_RULES.filter(rule => rule.name !== 'initial_contact')
+const FOLLOWUP_RULES = FOLLOW_UP_RULES.filter(rule => rule.name !== 'sms_5min_initial')
 
 // Process all follow-ups except initial contact
 async function processNurturingFollowups(supabase: any) {
@@ -67,7 +67,7 @@ async function processNurturingFollowups(supabase: any) {
   try {
     logInfo(`Processing ${FOLLOWUP_RULES.length} follow-up rules:`, FOLLOWUP_RULES.map(r => r.name))
     
-    // Get all clinics with their communication settings
+    // Get all clinics with their SMS settings only (email settings fetched by shared function)
     const { data: clinics, error: clinicError } = await supabase
       .from('clinic')
       .select(`
@@ -82,15 +82,6 @@ async function processNurturingFollowups(supabase: any) {
           twilio_auth_token,
           twilio_phone_number,
           status
-        ),
-        email_settings(
-          smtp_host,
-          smtp_port,
-          smtp_user,
-          smtp_password,
-          smtp_sender_name,
-          smtp_sender_email,
-          smtp_use_tls
         )
       `)
 
@@ -124,23 +115,12 @@ async function processNurturingFollowups(supabase: any) {
       try {
         logInfo(`Processing clinic: ${clinic.name}`)
 
-        // Check what communication methods this clinic has configured
+        // Check SMS capabilities
         const hasSMS = clinic.twilio_config && 
                       clinic.twilio_config.length > 0 && 
                       clinic.twilio_config[0]?.status === 'active'
-        
-        const hasEmail = clinic.email_settings && 
-                        clinic.email_settings.smtp_host
 
-        logInfo(`Clinic ${clinic.name} email capabilities: ${JSON.stringify(clinic.email_settings)}`)
-
-
-        logInfo(`Clinic ${clinic.name} capabilities: SMS=${hasSMS}, Email=${hasEmail}`)
-
-        if (!hasSMS && !hasEmail) {
-          logInfo(`Clinic ${clinic.name} has no communication methods configured`)
-          continue
-        }
+        logInfo(`Clinic ${clinic.name} SMS capability: ${hasSMS}`)
 
         // Get all leads for this clinic
         const { data: leads, error: leadsError } = await supabase
@@ -168,8 +148,8 @@ async function processNurturingFollowups(supabase: any) {
             // Determine which follow-ups this lead should receive
             const applicableRules = await determineFollowUpsForLead(lead, supabase)
             
-            // Filter out initial_contact rule (handled by other function)
-            const followupRules = applicableRules.filter(rule => rule.name !== 'initial_contact')
+            // Filter out initial contact rule (handled by other function)
+            const followupRules = applicableRules.filter(rule => rule.name !== 'sms_5min_initial')
 
             if (followupRules.length === 0) {
               continue // No follow-ups needed for this lead
@@ -180,23 +160,12 @@ async function processNurturingFollowups(supabase: any) {
             // Process each applicable follow-up rule
             for (const rule of followupRules) {
               try {
-                // Check if clinic supports this communication type
+                // Check if clinic supports SMS (for SMS rules)
                 if (rule.communicationType === 'sms' && !hasSMS) {
                   allResults.push({
                     leadId: lead.id,
                     action: 'skipped',
                     reason: 'Clinic does not have SMS configured',
-                    followUpType: rule.name,
-                    communicationType: rule.communicationType
-                  })
-                  continue
-                }
-
-                if (rule.communicationType === 'email' && !hasEmail) {
-                  allResults.push({
-                    leadId: lead.id,
-                    action: 'skipped',
-                    reason: 'Clinic does not have email configured',
                     followUpType: rule.name,
                     communicationType: rule.communicationType
                   })
@@ -252,17 +221,18 @@ async function processNurturingFollowups(supabase: any) {
                     messageContent as string,
                     lead.clinic_id,
                     supabase,
-                    clinic.twilio_config[0]
+                    clinic.twilio_config[0] // Pass SMS settings
                   )
                 } else {
                   const emailContent = messageContent as { subject: string, body: string }
+                  // Let shared function fetch email settings automatically
                   sendResult = await sendEmail(
                     lead.email!,
                     emailContent.subject,
                     emailContent.body,
                     lead.clinic_id,
-                    supabase,
-                    clinic.email_settings
+                    supabase
+                    // No email settings parameter - let the shared function handle it
                   )
                 }
 

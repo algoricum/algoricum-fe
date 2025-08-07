@@ -69,64 +69,232 @@ function logError(message: string, error?: any) {
   console.error(`[${timestamp}] ERROR: ${message}`, error)
 }
 
-// Define follow-up rules - this is where all the logic lives
+// Updated follow-up rules with new SMS and Email schedule
 const FOLLOW_UP_RULES: FollowUpRule[] = [
-  // Initial contact for new leads
+  // SMS FLOW
+  // Initial contact after 5 minutes
   {
-    name: 'initial_contact',
+    name: 'sms_5min_initial',
     timeFromCreated: 5 * 60 * 1000, // 5 minutes
     leadStatus: ['New'],
     communicationType: 'sms',
     onlyOnce: true
   },
   
-  // 4-hour follow-up for engaged leads
+  // SMS after 2 days
   {
-    name: '4h_followup',
-    timeFromCreated: 4 * 60 * 60 * 1000, // 4 hours
-    maxTimeFromCreated: 24 * 60 * 60 * 1000, // 24 hours max
-    leadStatus: ['Engaged'],
+    name: 'sms_2day_followup',
+    timeFromCreated: 2 * 24 * 60 * 60 * 1000, // 2 days
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true
   },
   
-  // 2-day email follow-up
+  // SMS after 5 days
   {
-    name: '2d_email_followup',
-    timeFromCreated: 48 * 60 * 60 * 1000, // 48 hours
-    maxTimeFromCreated: 7 * 24 * 60 * 60 * 1000, // 7 days max
+    name: 'sms_5day_followup',
+    timeFromCreated: 5 * 24 * 60 * 60 * 1000, // 5 days
+    communicationType: 'sms',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // SMS after 10 days
+  {
+    name: 'sms_10day_followup',
+    timeFromCreated: 10 * 24 * 60 * 60 * 1000, // 10 days
+    communicationType: 'sms',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // SMS after 20 days
+  {
+    name: 'sms_20day_followup',
+    timeFromCreated: 20 * 24 * 60 * 60 * 1000, // 20 days
+    communicationType: 'sms',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // EMAIL FLOW (starts from day 21)
+  // Day 21
+  {
+    name: 'email_21day_followup',
+    timeFromCreated: 21 * 24 * 60 * 60 * 1000, // 21 days
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true
   },
   
-  // 7-day email follow-up
+  // Day 24
   {
-    name: '7d_email_followup',
-    timeFromCreated: 7 * 24 * 60 * 60 * 1000, // 7 days
-    maxTimeFromCreated: 14 * 24 * 60 * 60 * 1000, // 14 days max
+    name: 'email_24day_followup',
+    timeFromCreated: 24 * 24 * 60 * 60 * 1000, // 24 days
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true
   },
   
-  // 14-day email follow-up
+  // Day 27
   {
-    name: '14d_email_followup',
-    timeFromCreated: 14 * 24 * 60 * 60 * 1000, // 14 days
-    maxTimeFromCreated: 30 * 24 * 60 * 60 * 1000, // 30 days max
+    name: 'email_27day_followup',
+    timeFromCreated: 27 * 24 * 60 * 60 * 1000, // 27 days
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true
   },
   
-  // 30-day email follow-up (recurring weekly)
+  // Day 30
   {
-    name: '30d_email_followup',
+    name: 'email_30day_followup',
     timeFromCreated: 30 * 24 * 60 * 60 * 1000, // 30 days
     communicationType: 'email',
-    onlyOnce: false, // Can send multiple times
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 33
+  {
+    name: 'email_33day_followup',
+    timeFromCreated: 33 * 24 * 60 * 60 * 1000, // 33 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 36
+  {
+    name: 'email_36day_followup',
+    timeFromCreated: 36 * 24 * 60 * 60 * 1000, // 36 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 39
+  {
+    name: 'email_39day_followup',
+    timeFromCreated: 39 * 24 * 60 * 60 * 1000, // 39 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 42
+  {
+    name: 'email_42day_followup',
+    timeFromCreated: 42 * 24 * 60 * 60 * 1000, // 42 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 45
+  {
+    name: 'email_45day_followup',
+    timeFromCreated: 45 * 24 * 60 * 60 * 1000, // 45 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 50
+  {
+    name: 'email_50day_followup',
+    timeFromCreated: 50 * 24 * 60 * 60 * 1000, // 50 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 55
+  {
+    name: 'email_55day_followup',
+    timeFromCreated: 55 * 24 * 60 * 60 * 1000, // 55 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 60
+  {
+    name: 'email_60day_followup',
+    timeFromCreated: 60 * 24 * 60 * 60 * 1000, // 60 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 70
+  {
+    name: 'email_70day_followup',
+    timeFromCreated: 70 * 24 * 60 * 60 * 1000, // 70 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 80
+  {
+    name: 'email_80day_followup',
+    timeFromCreated: 80 * 24 * 60 * 60 * 1000, // 80 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 90
+  {
+    name: 'email_90day_followup',
+    timeFromCreated: 90 * 24 * 60 * 60 * 1000, // 90 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 100
+  {
+    name: 'email_100day_followup',
+    timeFromCreated: 100 * 24 * 60 * 60 * 1000, // 100 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 110
+  {
+    name: 'email_110day_followup',
+    timeFromCreated: 110 * 24 * 60 * 60 * 1000, // 110 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 115
+  {
+    name: 'email_115day_followup',
+    timeFromCreated: 115 * 24 * 60 * 60 * 1000, // 115 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 118
+  {
+    name: 'email_118day_followup',
+    timeFromCreated: 118 * 24 * 60 * 60 * 1000, // 118 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  
+  // Day 120
+  {
+    name: 'email_120day_followup',
+    timeFromCreated: 120 * 24 * 60 * 60 * 1000, // 120 days
+    communicationType: 'email',
+    onlyOnce: true,
     checkLastActivity: true
   }
 ]
@@ -168,14 +336,6 @@ async function determineFollowUpsForLead(
     if (rule.onlyOnce) {
       const alreadySent = await hasFollowUpBeenSent(lead.id, rule.name, supabase)
       if (alreadySent) {
-        continue
-      }
-    }
-    
-    // For 30-day recurring follow-ups, check if one was sent recently
-    if (!rule.onlyOnce && rule.name === '30d_email_followup') {
-      const recentlySent = await hasRecentFollowUp(lead.id, rule.name, 7 * 24 * 60 * 60 * 1000, supabase) // 7 days
-      if (recentlySent) {
         continue
       }
     }
@@ -223,35 +383,7 @@ async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabas
   }
 }
 
-// Check if a follow-up was sent recently (for recurring follow-ups)
-async function hasRecentFollowUp(leadId: string, followUpName: string, timeWindow: number, supabase: any): Promise<boolean> {
-  try {
-    const { data: thread } = await supabase
-      .from('threads')
-      .select('id')
-      .eq('lead_id', leadId)
-      .single()
-    
-    if (!thread) return false
-    
-    const timeThreshold = new Date(Date.now() - timeWindow).toISOString()
-    
-    const { data: conversations } = await supabase
-      .from('conversation')
-      .select('id')
-      .eq('thread_id', thread.id)
-      .eq('is_from_user', false)
-      .eq('sender_type', 'assistant')
-      .ilike('message', `%${followUpName}%`)
-      .gte('created_at', timeThreshold)
-    
-    return conversations && conversations.length > 0
-    
-  } catch (error) {
-    logError(`Error checking recent follow-up ${followUpName} for lead ${leadId}`, error)
-    return false
-  }
-}
+
 
 // Check if user replied after the last assistant message
 async function hasUserRepliedToLastAssistantMessage(leadId: string, supabase: any): Promise<boolean> {
@@ -1391,4 +1523,3 @@ export {
   handleTwilioWebhook,
   handleEmailWebhook
 }
-
