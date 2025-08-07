@@ -133,27 +133,39 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
     if (errors.phone) setErrors(prev => ({ ...prev, phone: "" }));
   };
 
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-    fields.forEach(f => {
-      if (f.is_required && !formData[f.field_id]) newErrors[f.field_id] = `${f.field_name} is required`;
+const validateForm = () => {
+  const newErrors: { [key: string]: string } = {};
 
-      if (f.field_type === "email" && formData[f.field_id]) {
-        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!regex.test(formData[f.field_id].toString())) newErrors[f.field_id] = "Enter a valid email";
-      }
+  fields.forEach(f => {
+    const value = formData[f.field_id];
 
-      if (f.field_type === "tel" && f.is_required) {
-        const phone = `+${getCountryCallingCode(countryCode)}${phoneNumber}`;
-        const { isValid, error } = validatePhoneNumber(phone);
-        if (!isValid) {
-          newErrors[f.field_id] = error || "Invalid phone number";
-        }
+    // Required field check
+    if (f.is_required && !value) {
+      newErrors[f.field_id] = `${f.field_name} is required`;
+    }
+
+    // Email validation (always if present)
+    if (f.field_type === "email" && value) {
+      const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!regex.test(value.toString())) {
+        newErrors[f.field_id] = "Enter a valid email address";
       }
-    });
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    }
+
+    // Phone validation (always if filled)
+    if (f.field_type === "tel" && phoneNumber) {
+      const phone = `+${getCountryCallingCode(countryCode)}${phoneNumber}`;
+      const { isValid, error } = validatePhoneNumber(phone);
+      if (!isValid) {
+        newErrors[f.field_id] = error || "Invalid phone number";
+      }
+    }
+  });
+
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
