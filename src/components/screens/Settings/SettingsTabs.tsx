@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import LeadCapturingForm from "./LeadCapturingForm";
+// import LeadCapturingForm from "./LeadCapturingForm";
 import ChatbotSettings from "./ChatbotSettings";
 import ClinicSetting from "./ClinicSetting";
 import { Flex } from "antd";
@@ -27,15 +27,15 @@ const SettingsTabs = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <Flex className="border border-[#E8EAEC] rounded-[48px] bg-Gray100 p-2 gap-3">
-        <TabButton isActive={activeTab === "lead"} onClick={() => handleTabChange("lead")} label="Custom Lead Capturing Form" />
+    <div className="flex flex-col">
+      <Flex className="border border-[#E8EAEC] rounded-[48px]  p-2 gap-4 w-[300px]">
+        {/* <TabButton isActive={activeTab === "lead"} onClick={() => handleTabChange("lead")} label="Custom Lead Capturing Form" /> */}
         <TabButton isActive={activeTab === "clinic-setting"} onClick={() => handleTabChange("clinic-setting")} label="Clinic setting" />
         <TabButton isActive={activeTab === "chatbot"} onClick={() => handleTabChange("chatbot")} label="Chatbot Settings" />
       </Flex>
 
-      <div className="bg-white rounded-xl p-6">
-        {activeTab === "lead" && <LeadCapturingForm />}
+      <div className="bg-white rounded-xl py-6">
+        {/* {activeTab === "lead" && <LeadCapturingForm />} */}
         {activeTab === "chatbot" && <ChatbotSettings />}
         {activeTab === "clinic-setting" && <ClinicSetting />}
       </div>

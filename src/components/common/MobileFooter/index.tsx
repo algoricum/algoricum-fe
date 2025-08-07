@@ -37,12 +37,14 @@ const MobileFooter = ({ isSiteDashboard = false }: MobileFooterProps) => {
         return push("/appointments");
       case "staff":
         return push("/staff");
+      case "billing":
+        return push("/billing");
       case "profileSettings":
         return push("/settings/lead-capturing-form");
       case "content":
         return push("/content/articles");
       case "settings":
-        return push("/settings/lead-capturing-form");
+        return push("/settings/clinic-setting");
       default:
         return push("/dashboard");
     }

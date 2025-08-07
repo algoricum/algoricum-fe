@@ -678,9 +678,16 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
   return (
     <div className="max-w-4xl">
-      {renderPreviousQuestions()}
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
+          Lead Capture Setup
+        </Title>
+        <Title level={5} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
+          We can only follow up with leads we can see. Connecting your systems enables us to respond to new inquiries instantly, eliminating
+          manual work for your team.
+        </Title>
+        {renderPreviousQuestions()}
+        <Title level={3} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
           {currentQuestion?.question}
         </Title>
 
@@ -702,7 +709,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               loading={isSubmitting}
             >
               {/* More explicit logic to ensure correct button text */}
-              {currentQuestionIndex < filteredQuestions.length - 1 ? "Continue" : "Complete Onboarding"}
+              {currentQuestionIndex < filteredQuestions.length - 1 ? "Continue" : " Continue"}
             </Button>
           </div>
         )}

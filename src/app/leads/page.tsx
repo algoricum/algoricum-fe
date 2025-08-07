@@ -6,8 +6,7 @@ import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { LeadsTableSkeleton, StatsCardsSkeleton } from "@/components/common/Loaders/skeleton-loader";
 import { Modal } from "antd";
-import LeadGenerationForm from "@/components/Leads/LeadGenerationForm"; // adjust path if needed
-// Import your helper functions
+import LeadGenerationForm from "@/components/Leads/LeadGenerationForm";
 import {
   fetchLeadsForClinic,
   getCurrentUserClinic,
@@ -41,16 +40,23 @@ export default function LeadsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [clinicId, setClinicId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // State for dropdown status updates
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Load leads data
+  // Load leads data - this will re-run whenever refreshKey changes
   useEffect(() => {
     loadData();
-  }, []);
+  }, [refreshKey]); // Added refreshKey as dependency
+
+  const handleClose = () => {
+    setShowLeadForm(false);
+    // Trigger a refresh by incrementing refreshKey
+    setRefreshKey(prev => prev + 1);
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -73,6 +79,7 @@ export default function LeadsPage() {
 
       // Get current user's clinic
       const currentClinicId = await getCurrentUserClinic();
+      setClinicId(currentClinicId); // Store clinicId for later use
 
       // Fetch leads for this clinic
       const leads = await fetchLeadsForClinic(currentClinicId);
@@ -284,14 +291,8 @@ export default function LeadsPage() {
                   </option>
                 ))}
               </select>
-              <button
-                onClick={async () => {
-                  const currentClinicId = await getCurrentUserClinic();
-                  setClinicId(currentClinicId);
-                  setShowLeadForm(true);
-                }}
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
-              >
+
+              <button onClick={() => setShowLeadForm(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
                 Generate Lead
               </button>
             </div>
@@ -408,8 +409,8 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} title="" width={600}>
-        {clinicId && <LeadGenerationForm clinicId={clinicId} />}
+      <Modal open={showLeadForm} onCancel={handleClose} footer={null} title="Generate New Lead" width={600}>
+        {clinicId && <LeadGenerationForm clinicId={clinicId} onSuccess={handleClose} />}
       </Modal>
     </DashboardLayout>
   );
