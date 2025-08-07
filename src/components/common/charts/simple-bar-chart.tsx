@@ -1,5 +1,5 @@
 "use client";
-import type React from "react";
+import React from "react";
 import { Calendar } from "lucide-react";
 
 interface SimpleBarChartProps {
@@ -20,7 +20,6 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ appointmentsData, filte
     );
   }
 
-  // Generate chart data based on actual appointments
   let chartData: any[] = [];
 
   if (filter === "today") {
@@ -42,10 +41,8 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ appointmentsData, filte
 
       return {
         time: hour,
-        completed: hourAppointments.filter(apt => apt.status === "completed").length,
-        pending: hourAppointments.filter(apt => apt.status === "pending").length,
-        cancelled: hourAppointments.filter(apt => apt.status === "cancelled").length,
-        confirmed: hourAppointments.filter(apt => apt.status === "confirmed").length,
+        booked: hourAppointments.filter(apt => apt.status === "Booked").length,
+        converted: hourAppointments.filter(apt => apt.status === "Converted").length,
       };
     });
   } else if (filter === "week") {
@@ -61,10 +58,8 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ appointmentsData, filte
 
       return {
         day: day,
-        completed: dayAppointments.filter(apt => apt.status === "completed").length,
-        pending: dayAppointments.filter(apt => apt.status === "pending").length,
-        cancelled: dayAppointments.filter(apt => apt.status === "cancelled").length,
-        confirmed: dayAppointments.filter(apt => apt.status === "confirmed").length,
+        booked: dayAppointments.filter(apt => apt.status === "Booked").length,
+        converted: dayAppointments.filter(apt => apt.status === "Converted").length,
       };
     });
   } else if (filter === "month") {
@@ -78,10 +73,8 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ appointmentsData, filte
 
       return {
         month: month,
-        completed: monthAppointments.filter(apt => apt.status === "completed").length,
-        pending: monthAppointments.filter(apt => apt.status === "pending").length,
-        cancelled: monthAppointments.filter(apt => apt.status === "cancelled").length,
-        confirmed: monthAppointments.filter(apt => apt.status === "confirmed").length,
+        booked: monthAppointments.filter(apt => apt.status === "Booked").length,
+        converted: monthAppointments.filter(apt => apt.status === "Converted").length,
       };
     });
   } else if (filter === "year") {
@@ -97,48 +90,63 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ appointmentsData, filte
 
       return {
         year: year,
-        completed: yearAppointments.filter(apt => apt.status === "completed").length,
-        pending: yearAppointments.filter(apt => apt.status === "pending").length,
-        cancelled: yearAppointments.filter(apt => apt.status === "cancelled").length,
-        confirmed: yearAppointments.filter(apt => apt.status === "confirmed").length,
+        booked: yearAppointments.filter(apt => apt.status === "Booked").length,
+        converted: yearAppointments.filter(apt => apt.status === "Converted").length,
       };
     });
   }
 
   const maxValue = Math.max(
-    ...chartData.map((item: any) => (item.completed || 0) + (item.pending || 0) + (item.cancelled || 0) + (item.confirmed || 0)),
-    1,
+    ...chartData.map(item => (item.booked || 0) + (item.converted || 0)),
+    1
   );
+
+  const getTicks = (max: number): number[] => {
+    if (max <= 5) return [0, 1, 2, 3, 4, 5].filter(n => n <= max);
+    if (max <= 10) return [0, 2, 4, 6, 8, 10].filter(n => n <= max);
+    if (max <= 20) return [0, 5, 10, 15, 20].filter(n => n <= max);
+    if (max <= 50) return [0, 10, 20, 30, 40, 50].filter(n => n <= max);
+    if (max <= 100) return [0, 25, 50, 75, 100].filter(n => n <= max);
+    return [0, max];
+  };
+
+  const yTicks = getTicks(maxValue);
 
   return (
     <div className="w-full h-80 p-4">
       <div className="relative h-64 border-l border-b border-gray-300">
-        {/* Y-axis labels */}
-        <div className="absolute -left-8 top-0 text-xs text-gray-500">{maxValue}</div>
-        <div className="absolute -left-6 top-12 text-xs text-gray-500">{Math.ceil(maxValue * 0.75)}</div>
-        <div className="absolute -left-6 top-24 text-xs text-gray-500">{Math.ceil(maxValue * 0.5)}</div>
-        <div className="absolute -left-6 top-36 text-xs text-gray-500">{Math.ceil(maxValue * 0.25)}</div>
-        <div className="absolute -left-4 bottom-0 text-xs text-gray-500">0</div>
+        {/* Y-axis labels and grid lines */}
+        {yTicks.map((value, i) => {
+          const positionPercent = value / maxValue;
+          const bottomOffset = positionPercent * 100;
 
-        {/* Grid lines */}
-        <div className="absolute inset-0">
-          {[0, 0.25, 0.5, 0.75, 1].map(value => (
-            <div key={value} className="absolute w-full border-t border-gray-200 border-dashed" style={{ bottom: `${value * 100}%` }} />
-          ))}
-        </div>
+          return (
+            <React.Fragment key={i}>
+              <div
+                className="absolute w-full border-t border-gray-200 border-dashed"
+                style={{ bottom: `${bottomOffset}%` }}
+              />
+              <div
+                className="absolute text-xs text-gray-500 -left-8"
+                style={{
+                  bottom: `${bottomOffset}%`,
+                  transform: "translateY(50%)",
+                }}
+              >
+                {value}
+              </div>
+            </React.Fragment>
+          );
+        })}
 
         {/* Bars */}
         <div className="flex items-end justify-between h-full px-4">
           {chartData.map((item: any, index: number) => {
-            const completed = item.completed || 0;
-            const pending = item.pending || 0;
-            const cancelled = item.cancelled || 0;
-            const confirmed = item.confirmed || 0;
+            const booked = item.booked || 0;
+            const converted = item.converted || 0;
 
-            const completedHeight = maxValue > 0 ? (completed / maxValue) * 240 : 0;
-            const pendingHeight = maxValue > 0 ? (pending / maxValue) * 240 : 0;
-            const cancelledHeight = maxValue > 0 ? (cancelled / maxValue) * 240 : 0;
-            const confirmedHeight = maxValue > 0 ? (confirmed / maxValue) * 240 : 0;
+            const bookedHeight = maxValue > 0 ? (booked / maxValue) * 240 : 0;
+            const convertedHeight = maxValue > 0 ? (converted / maxValue) * 240 : 0;
 
             const label = item.time || item.day || item.month || item.year;
 
@@ -146,32 +154,18 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ appointmentsData, filte
               <div key={index} className="flex flex-col items-center flex-1 mx-1">
                 <div className="flex flex-col items-center justify-end h-60 w-8">
                   <div className="w-full flex flex-col justify-end">
-                    {cancelled > 0 && (
-                      <div
-                        className="w-full bg-red-500 transition-all duration-300 hover:opacity-80"
-                        style={{ height: `${cancelledHeight}px` }}
-                        title={`Cancelled: ${cancelled}`}
-                      />
-                    )}
-                    {pending > 0 && (
-                      <div
-                        className="w-full bg-orange-500 transition-all duration-300 hover:opacity-80"
-                        style={{ height: `${pendingHeight}px` }}
-                        title={`Pending: ${pending}`}
-                      />
-                    )}
-                    {confirmed > 0 && (
+                    {booked > 0 && (
                       <div
                         className="w-full bg-blue-500 transition-all duration-300 hover:opacity-80"
-                        style={{ height: `${confirmedHeight}px` }}
-                        title={`Confirmed: ${confirmed}`}
+                        style={{ height: `${bookedHeight}px` }}
+                        title={`Booked: ${booked}`}
                       />
                     )}
-                    {completed > 0 && (
+                    {converted > 0 && (
                       <div
                         className="w-full bg-green-500 transition-all duration-300 hover:opacity-80"
-                        style={{ height: `${completedHeight}px` }}
-                        title={`Completed: ${completed}`}
+                        style={{ height: `${convertedHeight}px` }}
+                        title={`Converted: ${converted}`}
                       />
                     )}
                   </div>
@@ -186,20 +180,12 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ appointmentsData, filte
       {/* Legend */}
       <div className="flex justify-center mt-4 space-x-6 text-sm">
         <div className="flex items-center">
-          <div className="w-3 h-3 bg-green-500 mr-2 rounded"></div>
-          <span>Completed</span>
-        </div>
-        <div className="flex items-center">
           <div className="w-3 h-3 bg-blue-500 mr-2 rounded"></div>
-          <span>Confirmed</span>
+          <span>Booked</span>
         </div>
         <div className="flex items-center">
-          <div className="w-3 h-3 bg-orange-500 mr-2 rounded"></div>
-          <span>Pending</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-red-500 mr-2 rounded"></div>
-          <span>Cancelled</span>
+          <div className="w-3 h-3 bg-green-500 mr-2 rounded"></div>
+          <span>Converted</span>
         </div>
       </div>
     </div>
