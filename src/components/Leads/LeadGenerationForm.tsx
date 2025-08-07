@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/config/client";
 import { getCountries, getCountryCallingCode } from "react-phone-number-input/input";
 import type { CountryCode } from "libphonenumber-js";
 import getLeadSourceId from "@/utils/lead_source";
+import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 
 
 
@@ -20,6 +21,46 @@ type FormField = {
 type FormData = { [key: string]: string | number };
 
 type Props = { clinicId: string; onSuccess?: () => void };
+
+const validatePhoneNumber = (phoneNumber: string) => {
+  if (!phoneNumber || !phoneNumber.trim()) {
+    return { isValid: false, error: "Phone number is required" };
+  }
+
+  try {
+    const isValid = isValidPhoneNumber(phoneNumber);
+
+    if (!isValid) {
+      try {
+        const parsedPhone = parsePhoneNumber(phoneNumber);
+        if (parsedPhone) {
+          return {
+            isValid: false,
+            error: `Please enter a complete phone number for ${parsedPhone.country || "the selected country"}`,
+          };
+        }
+      } catch {
+        return {
+          isValid: false,
+          error: "Please enter a valid phone number format",
+        };
+      }
+
+      return {
+        isValid: false,
+        error: "Please enter a complete phone number for the selected country",
+      };
+    }
+
+    return { isValid: true, error: null };
+  } catch {
+    return {
+      isValid: false,
+      error: "Please enter a valid phone number",
+    };
+  }
+};
+
 
 const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
   const [fields, setFields] = useState<FormField[]>([]);
@@ -102,8 +143,12 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
         if (!regex.test(formData[f.field_id].toString())) newErrors[f.field_id] = "Enter a valid email";
       }
 
-      if (f.field_type === "tel" && f.is_required && !phoneNumber) {
-        newErrors[f.field_id] = "Enter a valid phone number";
+      if (f.field_type === "tel" && f.is_required) {
+        const phone = `+${getCountryCallingCode(countryCode)}${phoneNumber}`;
+        const { isValid, error } = validatePhoneNumber(phone);
+        if (!isValid) {
+          newErrors[f.field_id] = error || "Invalid phone number";
+        }
       }
     });
     setErrors(newErrors);
@@ -178,6 +223,9 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
               />
             </div>
             {formData.phone && <p className="text-xs text-gray-500 mt-1">Complete: {formData.phone}</p>}
+            {!error && phoneNumber && validatePhoneNumber(`+${getCountryCallingCode(countryCode)}${phoneNumber}`).isValid && (
+              <p className="text-green-600 text-xs mt-1">✓ Valid phone number</p>
+            )}
           </div>
         </div>
       );
