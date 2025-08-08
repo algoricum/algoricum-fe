@@ -1,10 +1,9 @@
 "use client";
+
 import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { UserPlus, CheckCircle, Clock, Search, ChevronDown } from "lucide-react";
+import { UserPlus, CheckCircle, Clock, SearchIcon, ChevronDown } from "lucide-react";
 import { Header } from "@/components/common";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { LeadsTableSkeleton, StatsCardsSkeleton } from "@/components/common/Loaders/skeleton-loader";
 import { Modal } from "antd";
 import LeadGenerationForm from "@/components/Leads/LeadGenerationForm";
 import {
@@ -17,6 +16,10 @@ import {
   LEAD_STATUSES,
   INTEREST_LEVELS,
 } from "@/utils/supabase/leads-helper";
+
+// Restored loaders
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { LeadsTableSkeleton, StatsCardsSkeleton } from "@/components/common/Loaders/skeleton-loader";
 
 interface Lead {
   id: string;
@@ -35,37 +38,39 @@ export default function LeadsPage() {
   const [leadsData, setLeadsData] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [selectedLeadStatus, setSelectedLeadStatus] = useState("all");
   const [selectedInterestLevel, setSelectedInterestLevel] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // State for dropdown status updates
+  // Status dropdown state
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Load leads data - this will re-run whenever refreshKey changes
+  // Load leads data, re-run when refreshKey changes
   useEffect(() => {
     loadData();
-  }, [refreshKey]); // Added refreshKey as dependency
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const handleClose = () => {
     setShowLeadForm(false);
-    // Trigger a refresh by incrementing refreshKey
+    // Trigger refresh after closing form
     setRefreshKey(prev => prev + 1);
   };
 
-  // Close dropdown when clicking outside
+  // Close status dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setOpenDropdownId(null);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -77,11 +82,9 @@ export default function LeadsPage() {
       setLoading(true);
       setError(null);
 
-      // Get current user's clinic
       const currentClinicId = await getCurrentUserClinic();
-      setClinicId(currentClinicId); // Store clinicId for later use
+      setClinicId(currentClinicId);
 
-      // Fetch leads for this clinic
       const leads = await fetchLeadsForClinic(currentClinicId);
       setLeadsData(leads);
     } catch (err) {
@@ -92,20 +95,15 @@ export default function LeadsPage() {
     }
   };
 
-  // Handle status update
+  // Update status
   const handleUpdateStatus = async (leadId: string, newStatus: string) => {
     if (updatingStatus === leadId) return;
-
     try {
       setUpdatingStatus(leadId);
       setOpenDropdownId(null);
-
-      // Update status in database
       await updateLeadStatus(leadId, { status: newStatus });
-
-      // Update local state
-      setLeadsData(prevLeads =>
-        prevLeads.map(lead => (lead.id === leadId ? { ...lead, status: newStatus, updated_at: new Date().toISOString() } : lead)),
+      setLeadsData(prev =>
+        prev.map(lead => (lead.id === leadId ? { ...lead, status: newStatus, updated_at: new Date().toISOString() } : lead)),
       );
     } catch (err) {
       console.error("Error updating status:", err);
@@ -115,16 +113,15 @@ export default function LeadsPage() {
     }
   };
 
-  // Toggle dropdown
+  // Toggle a single row dropdown
   const toggleDropdown = (leadId: string) => {
     setOpenDropdownId(openDropdownId === leadId ? null : leadId);
   };
 
-  // Filter leads based on current filters
+  // Filters
   const filteredLeads = leadsData.filter(lead => {
     if (selectedLeadStatus !== "all" && lead.status !== selectedLeadStatus) return false;
     if (selectedInterestLevel !== "all" && lead.interest_level !== selectedInterestLevel) return false;
-
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -133,30 +130,134 @@ export default function LeadsPage() {
         (lead.phone && lead.phone.toLowerCase().includes(query))
       );
     }
-
     return true;
   });
 
-  // Calculate stats from real data
+  // Stats
   const totalLeads = leadsData.length;
-  const bookedLeads = leadsData.filter(lead => lead.status.toLowerCase() === "booked").length;
-  const newLeads = leadsData.filter(lead => lead.status.toLowerCase() === "new").length;
-  const convertedLeads = leadsData.filter(lead => lead.status.toLowerCase() === "converted").length;
+  const bookedLeads = leadsData.filter(l => l.status.toLowerCase() === "booked").length;
+  const newLeads = leadsData.filter(l => l.status.toLowerCase() === "new").length;
+  const convertedLeads = leadsData.filter(l => l.status.toLowerCase() === "converted").length;
 
+  // Responsive stat card component: icon + label + number in one line
+  const StatCard = ({ icon, iconBg, title, value }: { icon: React.ReactNode; iconBg: string; title: string; value: number }) => (
+    <div className="rounded-lg bg-white p-3 shadow sm:p-5">
+      <div className="flex items-center justify-start gap-2 whitespace-nowrap md:justify-between md:gap-3">
+        <div className="flex min-w-0 items-center gap-2 md:gap-3">
+          <div className={`rounded-full p-2 md:p-3 ${iconBg}`}>{icon}</div>
+          <p className="truncate text-sm font-medium text-gray-600">{title}</p>
+        </div>
+        <p className="shrink-0 text-xl font-semibold text-gray-900 md:ml-auto md:text-2xl">{value}</p>
+      </div>
+    </div>
+  );
+
+  const FiltersBar = () => (
+    <div className="mb-6">
+      {/* Mobile: stack, Desktop: inline */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        {/* Inputs group */}
+        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:gap-4 md:pr-4">
+          {/* Search */}
+          <div className="relative md:w-[320px]">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search leads..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-10 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+
+          {/* Status */}
+          <select
+            value={selectedLeadStatus}
+            onChange={e => setSelectedLeadStatus(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 md:w-[220px]"
+          >
+            <option value="all">All Status</option>
+            {LEAD_STATUSES.map(status => (
+              <option key={status} value={status}>
+                {formatStatus(status)}
+              </option>
+            ))}
+          </select>
+
+          {/* Interest */}
+          <select
+            value={selectedInterestLevel}
+            onChange={e => setSelectedInterestLevel(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 md:w-[220px]"
+          >
+            <option value="all">All Interest</option>
+            {INTEREST_LEVELS.map(level => (
+              <option key={level} value={level}>
+                {level.charAt(0).toUpperCase() + level.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Action button */}
+        <button
+          onClick={() => setShowLeadForm(true)}
+          className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-purple-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-purple-700 md:h-10 md:w-auto"
+        >
+          Generate Lead
+        </button>
+      </div>
+    </div>
+  );
+
+  const ErrorBlock = () => (
+    <div className="flex h-64 flex-col items-center justify-center">
+      <div className="max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+          <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 className="mb-2 text-lg font-semibold text-red-800">Something went wrong</h3>
+        <p className="mb-4 text-red-600">{error}</p>
+        <button
+          onClick={loadData}
+          className="mx-auto flex items-center rounded-lg bg-red-600 px-6 py-2 text-white transition-colors duration-200 hover:bg-red-700"
+        >
+          <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          Try Again
+        </button>
+      </div>
+    </div>
+  );
+
+  // Loading with restored skeletons + spinner
   if (loading) {
     return (
       <DashboardLayout
-        header={<Header title="Lead Management" description="Manage and track your leads through the conversion process." />}
+        header={
+          <Header title="Lead Management" description="Manage and track your leads through the conversion process." showHamburgerMenu />
+        }
       >
-        <div>
+        <div className="space-y-6">
+          {/* Stats skeleton */}
           <StatsCardsSkeleton />
-          <LeadsTableSkeleton />
-
-          {/* Centered loading spinner overlay */}
-          <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-8">
-              <LoadingSpinner message="Loading your leads..." size="lg" />
-            </div>
+          {/* Table skeleton within a card */}
+          <div className="rounded-lg bg-white p-4 shadow sm:p-6">
+            <LeadsTableSkeleton />
+          </div>
+        </div>
+        {/* Subtle centered spinner to indicate background work */}
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+          <div className="rounded-lg bg-white/60 p-3">
+            <LoadingSpinner message="Loading your leads..." size="sm" />
           </div>
         </div>
       </DashboardLayout>
@@ -166,240 +267,165 @@ export default function LeadsPage() {
   if (error) {
     return (
       <DashboardLayout
-        header={<Header title="Lead Management" description="Manage and track your leads through the conversion process." />}
+        header={
+          <Header title="Lead Management" description="Manage and track your leads through the conversion process." showHamburgerMenu />
+        }
       >
-        <div className="flex flex-col items-center justify-center h-64">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md text-center">
-            <div className="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-red-800 mb-2">Something went wrong</h3>
-            <p className="text-red-600 mb-4">{error}</p>
-            <button
-              onClick={loadData}
-              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center mx-auto"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Try Again
-            </button>
-          </div>
-        </div>
+        <ErrorBlock />
       </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout header={<Header title="Lead Management" description="Manage and track your leads through the conversion process." />}>
+    <DashboardLayout
+      header={
+        <Header title="Lead Management" description="Manage and track your leads through the conversion process." showHamburgerMenu />
+      }
+    >
       <div>
-        {/* Lead Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6 transform hover:scale-105 transition-transform duration-200">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-blue-100">
-                <UserPlus className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Leads</p>
-                <p className="text-2xl font-semibold text-gray-900">{totalLeads}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6 transform hover:scale-105 transition-transform duration-200">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-green-100">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Booked</p>
-                <p className="text-2xl font-semibold text-gray-900">{bookedLeads}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6 transform hover:scale-105 transition-transform duration-200">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-yellow-100">
-                <Clock className="w-6 h-6 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">New</p>
-                <p className="text-2xl font-semibold text-gray-900">{newLeads}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6 transform hover:scale-105 transition-transform duration-200">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-purple-100">
-                <CheckCircle className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Converted</p>
-                <p className="text-2xl font-semibold text-gray-900">{convertedLeads}</p>
-              </div>
-            </div>
-          </div>
+        {/* Stat cards: one line layout on mobile */}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            icon={<UserPlus className="h-6 w-6 text-blue-600 md:h-7 md:w-7" />}
+            iconBg="bg-blue-100"
+            title="Total Leads"
+            value={totalLeads}
+          />
+          <StatCard
+            icon={<CheckCircle className="h-6 w-6 text-green-600 md:h-7 md:w-7" />}
+            iconBg="bg-green-100"
+            title="Booked"
+            value={bookedLeads}
+          />
+          <StatCard
+            icon={<Clock className="h-6 w-6 text-yellow-600 md:h-7 md:w-7" />}
+            iconBg="bg-yellow-100"
+            title="New"
+            value={newLeads}
+          />
+          <StatCard
+            icon={<CheckCircle className="h-6 w-6 text-purple-600 md:h-7 md:w-7" />}
+            iconBg="bg-purple-100"
+            title="Converted"
+            value={convertedLeads}
+          />
         </div>
 
-        {/* Leads Table */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Search leads..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
+        {/* Filters - 100% width on mobile, inline on md+ */}
+        <FiltersBar />
 
-              <select
-                value={selectedLeadStatus}
-                onChange={e => setSelectedLeadStatus(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                {LEAD_STATUSES.map(status => (
-                  <option key={status} value={status}>
-                    {formatStatus(status)}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={selectedInterestLevel}
-                onChange={e => setSelectedInterestLevel(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="all">All Interest</option>
-                {INTEREST_LEVELS.map(level => (
-                  <option key={level} value={level}>
-                    {level.charAt(0).toUpperCase() + level.slice(1)}
-                  </option>
-                ))}
-              </select>
-
-              <button onClick={() => setShowLeadForm(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-                Generate Lead
-              </button>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        {/* Table */}
+        <div className="rounded-lg bg-white p-4 shadow sm:p-6">
+          {/* Horizontal scroll on very small screens */}
+          <div className="relative -mx-4 max-w-full overflow-x-auto touch-pan-x overscroll-x-contain md:mx-0 md:overflow-visible">
+            <table className="w-full min-w-[900px] sm:min-w-0">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Lead</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Contact</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Interest</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Created</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-700">Lead</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-700">Contact</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-700">Interest</th>
+                  <th className="whitespace-nowrap px-4 py-3 text-left font-semibold text-gray-700">Created</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 px-4 text-center text-gray-500">
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                       {leadsData.length === 0 ? "No leads found in database" : "No leads match your filters"}
                     </td>
                   </tr>
                 ) : (
                   filteredLeads.map(lead => (
                     <tr key={lead.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4">
+                      {/* Lead */}
+                      <td className="px-4 py-3">
                         <div className="flex items-center">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-semibold">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 font-semibold text-purple-600">
                             {lead.name
                               .split(" ")
                               .map(n => n[0])
                               .join("")
                               .toUpperCase()}
                           </div>
-                          <div className="ml-3">
-                            <p className="font-medium text-gray-900">{lead.name}</p>
-                            <p className="text-sm text-gray-500">{lead.email || "No email"}</p>
+                          <div className="ml-3 min-w-0">
+                            <p className="truncate font-medium text-gray-900">{lead.name}</p>
+                            <p className="truncate text-sm text-gray-500">{lead.email || "No email"}</p>
                           </div>
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-gray-900">{lead.phone || "No phone"}</td>
+                      {/* Contact */}
+                      <td className="px-4 py-3 text-gray-900">{lead.phone || "No phone"}</td>
 
-                      <td className="py-3 px-4">
-                        <div className="relative" ref={openDropdownId === lead.id ? dropdownRef : null}>
-                          <button
-                            onClick={() => toggleDropdown(lead.id)}
-                            disabled={updatingStatus === lead.id}
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium hover:opacity-80 transition-all duration-200 disabled:opacity-50 ${getStatusColor(lead.status)}`}
-                          >
-                            {updatingStatus === lead.id ? (
-                              <span className="flex items-center">
-                                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1"></div>
-                                Updating...
-                              </span>
-                            ) : (
-                              <>
-                                {formatStatus(lead.status)}
-                                <ChevronDown className="w-3 h-3 ml-1" />
-                              </>
-                            )}
-                          </button>
-
-                          {/* Status Dropdown */}
-                          {openDropdownId === lead.id && (
-                            <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                              <div className="py-1">
-                                {LEAD_STATUSES.map(status => (
-                                  <button
-                                    key={status}
-                                    onClick={() => handleUpdateStatus(lead.id, status)}
-                                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${
-                                      lead.status === status ? "bg-purple-50 text-purple-700 font-medium" : "text-gray-700"
-                                    }`}
-                                  >
-                                    <span
-                                      className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                                        getStatusColor(status).includes("bg-green")
-                                          ? "bg-green-500"
-                                          : getStatusColor(status).includes("bg-yellow")
-                                            ? "bg-yellow-500"
-                                            : getStatusColor(status).includes("bg-blue")
-                                              ? "bg-blue-500"
-                                              : getStatusColor(status).includes("bg-purple")
-                                                ? "bg-purple-500"
-                                                : getStatusColor(status).includes("bg-red")
-                                                  ? "bg-red-500"
-                                                  : "bg-gray-500"
-                                      }`}
-                                    ></span>
-                                    {formatStatus(status)}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                      {/* Status with dropdown */}
+                      <td className="relative px-4 py-3" ref={openDropdownId === lead.id ? dropdownRef : null}>
+                        <button
+                          onClick={() => toggleDropdown(lead.id)}
+                          disabled={updatingStatus === lead.id}
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 hover:opacity-80 disabled:opacity-50 ${getStatusColor(
+                            lead.status,
+                          )}`}
+                          type="button"
+                        >
+                          {updatingStatus === lead.id ? (
+                            <span className="flex items-center">
+                              <span className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"></span>
+                              Updating...
+                            </span>
+                          ) : (
+                            <>
+                              {formatStatus(lead.status)}
+                              <ChevronDown className="ml-1 h-3 w-3" />
+                            </>
                           )}
-                        </div>
+                        </button>
+
+                        {/* Status Dropdown */}
+                        {openDropdownId === lead.id && (
+                          <div className="absolute z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <div className="py-1">
+                              {LEAD_STATUSES.map(status => (
+                                <button
+                                  key={status}
+                                  onClick={() => handleUpdateStatus(lead.id, status)}
+                                  className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-50 ${
+                                    lead.status === status ? "bg-purple-50 font-medium text-purple-700" : "text-gray-700"
+                                  }`}
+                                  type="button"
+                                >
+                                  <span
+                                    className={`mr-2 inline-block h-2 w-2 rounded-full ${
+                                      getStatusColor(status).includes("bg-green")
+                                        ? "bg-green-500"
+                                        : getStatusColor(status).includes("bg-yellow")
+                                          ? "bg-yellow-500"
+                                          : getStatusColor(status).includes("bg-blue")
+                                            ? "bg-blue-500"
+                                            : getStatusColor(status).includes("bg-purple")
+                                              ? "bg-purple-500"
+                                              : getStatusColor(status).includes("bg-red")
+                                                ? "bg-red-500"
+                                                : "bg-gray-500"
+                                    }`}
+                                  ></span>
+                                  {formatStatus(status)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </td>
 
-                      <td className="py-3 px-4">
+                      {/* Interest */}
+                      <td className="px-4 py-3">
                         <span className={`font-medium ${getInterestColor(lead.interest_level || "")}`}>
                           {lead.interest_level ? lead.interest_level.charAt(0).toUpperCase() + lead.interest_level.slice(1) : "Not set"}
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 text-gray-900">{new Date(lead.created_at).toLocaleDateString()}</td>
+                      {/* Created */}
+                      <td className="px-4 py-3 text-gray-900">{new Date(lead.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))
                 )}
@@ -409,6 +435,7 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {/* Lead Generation Modal */}
       <Modal open={showLeadForm} onCancel={handleClose} footer={null} title="Generate New Lead" width={600}>
         {clinicId && <LeadGenerationForm clinicId={clinicId} onSuccess={handleClose} />}
       </Modal>

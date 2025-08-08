@@ -2,145 +2,121 @@
 
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-// import DashboardLayout from "@/components/layout/dashboard-layout";
+import { useRouter } from "next/navigation";
+
 import DashboardLayout from "@/layouts/DashboardLayout";
 import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
-import { X, CheckCircle, Upload } from "lucide-react";
 import ConversionFunnel from "@/components/common/charts/conversion-funnel";
 import LeadSourcesLineChart from "@/components/common/charts/lead-sources-line-chart";
 import { Header } from "@/components/common";
-import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import StatsGrid from "./StatsGrid";
+import TodayTasks from "./TodayTasks";
+
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
-import TodayTasks from "./TodayTasks";
-// import { Button } from "antd";
+
+import { X, CheckCircle, Upload } from "lucide-react";
+
+type LeadRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  status: string | null;
+  date: string;
+  source_id: string | null;
+  sourceName: string | null;
+};
 
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  // Loading states
+  // Loading/UI state
   const [loading, setLoading] = useState(true);
-  const [, setCsvUploading] = useState(false);
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [appointmentFilter, setAppointmentFilter] = useState<"today" | "week" | "month" | "year">("month");
 
-  const [appointmentFilter, setAppointmentFilter] = useState("month");
+  // Integrations state
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [csvUploaded, setCsvUploaded] = useState(false);
-  // const [zapierActive, setZapierActive] = useState(true);
-  // const [showZapierBanner, setShowZapierBanner] = useState(true);
   const [pipedriveActive, setPipedriveActive] = useState(true);
+
   const [showPipedriveBanner, setShowPipedriveBanner] = useState(false);
   const [showHubspotBanner, setShowHubspotBanner] = useState(false);
   const [showCsvBanner, setShowCsvBanner] = useState(true);
+
+  // Modal state
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
-  const [leadsData, setLeadsData] = useState<any[]>([]);
+
+  // Data
+  const [leadsData, setLeadsData] = useState<LeadRow[]>([]);
   const [clinicId, setClinicId] = useState<string>("");
 
+  // Fetch clinic info
   useEffect(() => {
-    async function fetchClinicId() {
-      const data = await getClinicData();
-      if (data?.id) {
-        setClinicId(data.id);
+    const fetchClinicId = async () => {
+      try {
+        const data = await getClinicData();
+        if (data?.id) setClinicId(data.id);
+        if (data?.uses_hubspot) setShowHubspotBanner(true);
+        if (data?.use_pipedrive) setShowPipedriveBanner(true);
+      } catch (e) {
+        console.error("Error fetching clinic data:", e);
       }
-      if (data?.uses_hubspot) {
-        setShowHubspotBanner(true);
-      }
-      if (data?.use_pipedrive) {
-        setShowPipedriveBanner(true);
-      }
-      // setLoading(false);
-    }
-
+    };
     fetchClinicId();
   }, []);
 
+  // Fetch leads when clinic ID is available
   useEffect(() => {
-    async function fetchLeads() {
-      if (!clinicId) return; // 🛡️ Prevent running if clinicId is not ready
+    const fetchLeads = async () => {
+      if (!clinicId) return;
+      try {
+        const { data, error } = await supabase
+          .from("lead")
+          .select(
+            `
+            id,
+            first_name,
+            last_name,
+            email,
+            phone,
+            status,
+            created_at,
+            source_id:source_id(id),
+            source:source_id(name)
+          `,
+          )
+          .eq("clinic_id", clinicId);
 
-      const { data, error } = await supabase
-        .from("lead")
-        .select(
-          `
-        id,
-        first_name,
-        last_name,
-        email,
-        phone,
-        status,
-        created_at,
-        source_id:source_id(id),
-        source:source_id(name)
-      `,
-        )
-        .eq("clinic_id", clinicId);
+        if (error) {
+          console.error("Leads fetch error:", error);
+          return;
+        }
 
-      if (error) {
-        // setLoading(false);
-        return;
+        const formatted: LeadRow[] =
+          data?.map((lead: any) => ({
+            id: lead.id,
+            name: `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim(),
+            email: lead.email,
+            phone: lead.phone,
+            status: lead.status,
+            date: lead.created_at,
+            source_id: lead.source_id ?? "Unknown",
+            sourceName: lead.source ?? "Unknown",
+          })) ?? [];
+
+        setLeadsData(formatted);
+      } catch (e) {
+        console.error("Unexpected error fetching leads:", e);
       }
-
-      const formatted = data.map((lead: any) => ({
-        id: lead.id,
-        name: `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim(),
-        email: lead.email,
-        phone: lead.phone,
-        status: lead.status,
-        date: lead.created_at,
-        source_id: lead.source_id ?? "Unknown",
-        sourceName: lead.source ?? "Unknown",
-      }));
-
-      setLeadsData(formatted);
-      // setLoading(false);
-    }
-
+    };
     fetchLeads();
   }, [clinicId, supabase]);
-  // Use only booked/converted leads for chart
-  const filteredLeadsForChart = useMemo(() => {
-    return leadsData.filter(lead => ["booked", "converted"].includes(lead.status?.toLowerCase()));
-  }, [leadsData]);
-  const [newTask, setNewTask] = useState({
-    task: "",
-    priority: "medium",
-    time: "",
-  });
-  // const [loading, setLoading] = useState(true);
 
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      task: "Follow up with John Smith about treatment plan",
-      priority: "high",
-      time: "09:00",
-      completed: false,
-    },
-    {
-      id: 2,
-      task: "Review new patient applications",
-      priority: "medium",
-      time: "11:00",
-      completed: false,
-    },
-    {
-      id: 3,
-      task: "Send appointment confirmations",
-      priority: "low",
-      time: "14:00",
-      completed: true,
-    },
-    {
-      id: 4,
-      task: "Update patient records",
-      priority: "medium",
-      time: "16:00",
-      completed: false,
-    },
-  ]);
-
+  // Gate unauthenticated or first-time staff to reset-password
   useEffect(() => {
     const checkUser = async () => {
       try {
@@ -149,142 +125,57 @@ export default function DashboardPage() {
           data: { user },
           error,
         } = await supabase.auth.getUser();
-
         if (error || !user) {
           console.error("User fetch error:", error);
           return;
         }
-
         const loggedFirst = user.user_metadata?.logged_first;
         const isStaff = user.user_metadata?.is_staff;
-
-        console.log("I am running ....");
-
         if (loggedFirst === true && isStaff) {
           router.push("/reset-password");
         }
       } catch (error) {
         console.error("Error checking user:", error);
       } finally {
-        // Simulate loading time for dashboard data
-        setTimeout(() => {
-          setLoading(false);
-        }, 1500);
+        // simulate small delay for dashboard data readiness
+        setTimeout(() => setLoading(false), 800);
       }
     };
-
     checkUser();
   }, [router, supabase.auth]);
 
-  useEffect(() => {
-    const checkUser = async () => {
-      try {
-        setLoading(true);
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
-
-        if (error || !user) {
-          console.error("User fetch error:", error);
-          return;
-        }
-
-        const loggedFirst = user.user_metadata?.logged_first;
-        const isStaff = user.user_metadata?.is_staff;
-
-        console.log("I am running ....");
-
-        if (loggedFirst === true && isStaff) {
-          router.push("/reset-password");
-        }
-      } catch (error) {
-        console.error("Error checking user:", error);
-      } finally {
-        // Simulate loading time for dashboard data
-        setTimeout(() => {
-          setLoading(false);
-        }, 1500);
-      }
-    };
-
-    checkUser();
-  }, [router, supabase.auth]);
+  // Filtered leads for charts
+  const filteredLeadsForChart = useMemo(
+    () => leadsData.filter(lead => ["booked", "converted"].includes((lead.status ?? "").toLowerCase())),
+    [leadsData],
+  );
 
   const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setCsvUploading(true);
+      // Simulate upload
       setTimeout(() => {
         setCsvUploaded(true);
         setShowCsvBanner(true);
         setCsvUploading(false);
         console.log("CSV file uploaded:", file.name);
-      }, 2000);
+      }, 1200);
     }
   };
 
-  const handleAddTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    const task = {
-      id: Date.now(),
-      ...newTask,
-      completed: false,
-    };
-    setTasks([...tasks, task]);
-    setNewTask({ task: "", priority: "medium", time: "" });
-    setShowAddTaskModal(false);
-  };
-
-  // const toggleTask = (taskId: number) => {
-  //   setTasks(tasks.map(task => (task.id === taskId ? { ...task, completed: !task.completed } : task)));
-  // };
-
-  // const getPriorityBadge = (priority: string) => {
-  //   const priorityConfig = {
-  //     high: { class: "badge-error", label: "HIGH" },
-  //     medium: { class: "badge-warning", label: "MEDIUM" },
-  //     low: { class: "badge-success", label: "LOW" },
-  //   };
-  //   const config = priorityConfig[priority as keyof typeof priorityConfig] || {
-  //     class: "badge-info",
-  //     label: priority.toUpperCase(),
-  //   };
-  //   return <span className={`badge ${config.class}`}>{config.label}</span>;
-  // };
-
-  // const getConversionRate = () => {
-  //   if (leadsData.length === 0) return 0;
-  //   const bookedLeads = leadsData.filter((lead: any) => lead.status === "booked").length;
-  //   return Math.round((bookedLeads / leadsData.length) * 100);
-  // };
-
-  // Show loading spinner while checking user and loading dashboard data
   if (loading) {
     return (
       <DashboardLayout
-        header={<Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." />}
+        header={
+          <Header
+            title="Dashboard Overview"
+            description="Welcome back! Here's what's happening with your clinic today."
+            showHamburgerMenu
+          />
+        }
       >
-        <div className="min-h-[60vh]">
-          <LoadingSpinner message="Loading your dashboard..." size="lg" />
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // const getConversionRate = () => {
-  //   if (leadsData.length === 0) return 0;
-  //   const bookedLeads = leadsData.filter((lead: any) => lead.status === "booked").length;
-  //   return Math.round((bookedLeads / leadsData.length) * 100);
-  // };
-
-  // Show loading spinner while checking user and loading dashboard data
-  if (loading) {
-    return (
-      <DashboardLayout
-        header={<Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." />}
-      >
-        <div className="min-h-[60vh]">
+        <div className="flex min-h-[60vh] items-center justify-center">
           <LoadingSpinner message="Loading your dashboard..." size="lg" />
         </div>
       </DashboardLayout>
@@ -293,142 +184,141 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout
-      header={<Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." />}
+      header={
+        <Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." showHamburgerMenu />
+      }
     >
-      <div className="p-6 space-y-8">
+      <div className="space-y-8 p-4 sm:p-6">
         {/* Integration Banners */}
-        <div className="flex flex-wrap gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* HubSpot */}
           {showHubspotBanner && (
-            <div
-              className={`flex-1 min-w-[200px] p-4 rounded-lg border ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center font-semibold">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${hubspotConnected ? "bg-green-400" : "bg-blue-400"}`} />
-                  <span>HubSpot Integration</span>
-                  {hubspotConnected && <CheckCircle className="w-4 h-4 ml-2 text-green-500" />}
+            <div className={`rounded-lg border p-4 ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center font-semibold text-gray-900">
+                    <span>HubSpot Integration</span>
+                    {hubspotConnected && <CheckCircle className="ml-2 h-4 w-4 text-green-600" />}
+                  </div>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {hubspotConnected
+                      ? "HubSpot is connected and syncing data successfully."
+                      : "Connect your HubSpot account to sync leads and contacts automatically."}
+                  </p>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
                   {!hubspotConnected && (
-                    <button onClick={() => setHubspotConnected(true)} className="btn btn-primary btn-sm">
+                    <button onClick={() => setHubspotConnected(true)} className="btn btn-primary btn-sm w-full md:w-auto">
                       Connect HubSpot
                     </button>
                   )}
-                  <button onClick={() => setShowHubspotBanner(false)} className="text-gray-400 hover:text-gray-600">
-                    <X className="w-4 h-4" />
+                  <button
+                    onClick={() => setShowHubspotBanner(false)}
+                    className="inline-flex w-full items-center justify-center rounded-md px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 md:w-auto"
+                    aria-label="Dismiss HubSpot banner"
+                  >
+                    <X className="mr-1 h-4 w-4" />
+                    Dismiss
                   </button>
                 </div>
-              </div>
-              <div className="text-sm text-gray-600">
-                {hubspotConnected
-                  ? "HubSpot is connected and syncing data successfully."
-                  : "Connect your HubSpot account to sync leads and contacts automatically."}
               </div>
             </div>
           )}
 
+          {/* Pipedrive */}
           {showPipedriveBanner && (
-            <div className="p-4 rounded-lg flex-1 min-w-[200px] p-4 rounded-lg border border min-w-[300px] bg-green-50 border-green-200">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center font-semibold">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${pipedriveActive ? "bg-green-400" : "bg-yellow-400"}`} />
-                  <span>Pipedrive Integration</span>
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center font-semibold text-gray-900">
+                    <span>Pipedrive Integration</span>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {pipedriveActive
+                      ? "Pipedrive integration is active and working properly."
+                      : "Pipedrive integration is currently inactive."}
+                  </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">{pipedriveActive ? "Active" : "Inactive"}</span>
+                <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
                   <button
-                    onClick={() => setPipedriveActive(!pipedriveActive)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                    onClick={() => setPipedriveActive(p => !p)}
+                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
                       pipedriveActive ? "bg-green-500" : "bg-gray-300"
                     }`}
+                    aria-pressed={pipedriveActive}
+                    aria-label="Toggle Pipedrive"
+                    type="button"
                   >
                     <span
-                      className={`inline-block h-5 w-5 rounded-full bg-white transition-transform ${
-                        pipedriveActive ? "translate-x-6" : "translate-x-1"
+                      className={`inline-block h-6 w-6 translate-x-1 rounded-full bg-white transition-transform ${
+                        pipedriveActive ? "translate-x-7" : "translate-x-1"
                       }`}
                     />
                   </button>
-                  <button onClick={() => setShowPipedriveBanner(false)} className="text-gray-400 hover:text-gray-600">
-                    <X className="w-4 h-4" />
+                  <button
+                    onClick={() => setShowPipedriveBanner(false)}
+                    className="inline-flex w-full items-center justify-center rounded-md px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 md:w-auto"
+                    aria-label="Dismiss Pipedrive banner"
+                  >
+                    <X className="mr-1 h-4 w-4" />
+                    Dismiss
                   </button>
                 </div>
-              </div>
-              <div className="text-sm text-gray-600">
-                {pipedriveActive ? "Pipedrive integration is active and working properly." : "Pipedrive integration is currently inactive."}
               </div>
             </div>
           )}
-          {/* {showZapierBanner && (
-            <div className="p-4 rounded-lg border bg-green-50 border-green-200">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center font-semibold">
-                  <div className={`w-2 h-2 rounded-full mr-2 ${zapierActive ? "bg-green-400" : "bg-yellow-400"}`} />
-                  <span>Zapier Integration</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">{zapierActive ? "Active" : "Inactive"}</span>
-                  <button
-                    onClick={() => setZapierActive(!zapierActive)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      zapierActive ? "bg-green-500" : "bg-gray-300"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-5 w-5 rounded-full bg-white transition-transform ${
-                        zapierActive ? "translate-x-6" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                  <button onClick={() => setShowZapierBanner(false)} className="text-gray-400 hover:text-gray-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="text-sm text-gray-600">
-                {zapierActive ? "Zapier integration is active and working properly." : "Zapier integration is currently inactive."}
-              </div>
-            </div>
-          )} */}
 
+          {/* CSV Upload – responsive banner */}
           {showCsvBanner && (
-            <div
-              className={`flex-1 min-w-[200px] p-4 rounded-lg border ${csvUploaded ? "bg-green-50 border-green-200" : "bg-purple-50 border-purple-200"}`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center font-semibold">
-                  <Upload className={`w-5 h-5 mr-2 ${csvUploaded ? "text-green-500" : "text-purple-500"}`} />
-                  <span>CSV Upload</span>
-                  {csvUploaded && <CheckCircle className="w-4 h-4 ml-2 text-green-500" />}
+            <div className={`rounded-lg border p-4 ${csvUploaded ? "bg-green-50 border-green-200" : "bg-purple-50 border-purple-200"}`}>
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                {/* Left: icon + title + desc */}
+                <div className="flex items-start gap-3">
+                  <div className={`mt-0.5 rounded-md p-1.5 ${csvUploaded ? "bg-green-100" : "bg-purple-100"}`}>
+                    <Upload className={`h-4 w-4 ${csvUploaded ? "text-green-600" : "text-purple-600"}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center font-semibold text-gray-900">
+                      <span>CSV Upload</span>
+                      {csvUploaded && <CheckCircle className="ml-2 h-4 w-4 text-green-600" aria-hidden="true" />}
+                    </div>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {csvUploaded ? "CSV file uploaded successfully. Data has been processed." : "Upload your lead data to get started"}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button className="btn btn-secondary btn-sm">View Guide</button>
-                  <label className="btn btn-primary btn-sm cursor-pointer">
-                    {csvUploaded ? "Upload New CSV" : "Upload CSV"}
-                    <input type="file" accept=".csv" onChange={handleCsvUpload} className="hidden" />
+
+                {/* Right: actions – stacked on mobile, inline on md+ */}
+                <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
+                  <button type="button" className="btn btn-secondary btn-sm w-full md:w-auto" aria-label="View CSV upload guide">
+                    View Guide
+                  </button>
+
+                  <label
+                    className="btn btn-primary btn-sm w-full cursor-pointer md:w-auto"
+                    aria-label={csvUploading ? "Uploading CSV..." : "Upload CSV file"}
+                  >
+                    {csvUploading ? "Uploading..." : csvUploaded ? "Upload New CSV" : "Upload CSV"}
+                    <input type="file" accept=".csv" onChange={handleCsvUpload} className="hidden" disabled={csvUploading} />
                   </label>
                 </div>
-              </div>
-              <div className="text-sm text-gray-600">
-                {csvUploaded ? "CSV file uploaded successfully. Data has been processed." : "Upload your lead data to get started"}
               </div>
             </div>
           )}
         </div>
 
         {/* Stats Grid */}
-
         <StatsGrid clinicId={clinicId} />
 
         {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Appointment Trends */}
-          <div className="lg:col-span-2 card">
-            <div className="flex items-center justify-between mb-6">
+        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="card lg:col-span-2">
+            <div className="mb-6 flex items-center justify-between">
               <h3 className="text-lg font-semibold">Appointment Trends</h3>
               <select
-                className="border border-gray-300 rounded-lg px-3 py-1 text-sm"
+                className="rounded-lg border border-gray-300 px-3 py-1 text-sm"
                 value={appointmentFilter}
-                onChange={e => setAppointmentFilter(e.target.value)}
+                onChange={e => setAppointmentFilter(e.target.value as typeof appointmentFilter)}
               >
                 <option value="today">Today</option>
                 <option value="week">This Week</option>
@@ -439,58 +329,26 @@ export default function DashboardPage() {
             <SimpleBarChart appointmentsData={filteredLeadsForChart} filter={appointmentFilter} />
           </div>
 
-          {/* Today's Tasks */}
-          {/* <div className="card">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold">Today&apos;s Tasks</h3>
-              <button onClick={() => setShowAddTaskModal(true)} className="btn btn-primary btn-sm flex items-center">
-                <Plus className="w-4 h-4 mr-1" />
-                Add Task
-              </button>
-            </div>
-            <div className="space-y-4">
-              {tasks.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">
-                  <Calendar className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                  <p>No tasks for today</p>
-                  <p className="text-sm">Add some tasks to get started</p>
-                </div>
-              ) : (
-                tasks.map((task: any) => (
-                  <div key={task.id} className="flex items-start space-x-3">
-                    <input type="checkbox" checked={task.completed} onChange={() => toggleTask(task.id)} className="mt-1 cursor-pointer" />
-                    <div className="flex-1">
-                      <p className={`text-sm ${task.completed ? "line-through text-gray-500" : "text-gray-900"}`}>{task.task}</p>
-                      <div className="flex items-center mt-1 space-x-2">
-                        {getPriorityBadge(task.priority)}
-                        <span className="text-xs text-gray-500">{task.time}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div> */}
           <TodayTasks clinicId={clinicId} />
         </div>
 
-        {/* Lead Sources and Status Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Lead Sources and Conversion */}
+        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="card">
-            <h3 className="text-lg font-semibold mb-6">Conversion Funnel</h3>
+            <h3 className="mb-6 text-lg font-semibold">Conversion Funnel</h3>
             <ConversionFunnel leadsData={leadsData} />
           </div>
           <div className="card">
-            <h3 className="text-lg font-semibold mb-6">Lead Sources Trends</h3>
+            <h3 className="mb-6 text-lg font-semibold">Lead Sources Trends</h3>
             <LeadSourcesLineChart leadsData={leadsData} />
           </div>
         </div>
 
-        {/* AI Activity Log - Move to separate row */}
-        <div className="grid grid-cols-1 gap-6 mb-8">
+        {/* AI Activity Log */}
+        <div className="mb-8 grid grid-cols-1 gap-6">
           <div className="card">
-            <h3 className="text-lg font-semibold mb-6">AI Activity Log</h3>
-            <div className="space-y-4 max-h-96 overflow-y-auto">
+            <h3 className="mb-6 text-lg font-semibold">AI Activity Log</h3>
+            <div className="max-h-96 space-y-4 overflow-y-auto">
               {[
                 {
                   id: 1,
@@ -547,17 +405,17 @@ export default function DashboardPage() {
                   icon: "😊",
                 },
               ].map(activity => (
-                <div key={activity.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50">
+                <div key={activity.id} className="flex items-start space-x-3 rounded-lg p-3 hover:bg-gray-50">
                   <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100">
                       <span className="text-sm">{activity.icon}</span>
                     </div>
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-gray-900">{activity.title}</p>
                       <span
-                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                           activity.status === "completed"
                             ? "bg-green-100 text-green-800"
                             : activity.status === "processing"
@@ -568,77 +426,40 @@ export default function DashboardPage() {
                         {activity.status}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
-                    <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+                    <p className="mt-1 text-sm text-gray-500">{activity.description}</p>
+                    <p className="mt-1 text-xs text-gray-400">{activity.time}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <button className="w-full text-center text-sm text-purple-600 hover:text-purple-800 font-medium">
+            <div className="mt-4 border-t border-gray-200 pt-4">
+              <button className="w-full text-center text-sm font-medium text-purple-600 hover:text-purple-800">
                 View All AI Activities
               </button>
             </div>
           </div>
         </div>
-
-        {/* Add Task Modal */}
-        {showAddTaskModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Add New Task</h3>
-                <button onClick={() => setShowAddTaskModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <form onSubmit={handleAddTask} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
-                  <input
-                    type="text"
-                    required
-                    value={newTask.task}
-                    onChange={e => setNewTask({ ...newTask, task: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                  <select
-                    required
-                    value={newTask.priority}
-                    onChange={e => setNewTask({ ...newTask, priority: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                  <input
-                    type="time"
-                    required
-                    value={newTask.time}
-                    onChange={e => setNewTask({ ...newTask, time: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div className="flex space-x-3 pt-4">
-                  <button type="button" onClick={() => setShowAddTaskModal(false)} className="flex-1 btn btn-secondary">
-                    Cancel
-                  </button>
-                  <button type="submit" className="flex-1 btn btn-primary">
-                    Add Task
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Add Task Modal (kept for parity; closed by default) */}
+      {showAddTaskModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Add New Task</h3>
+              <button
+                onClick={() => setShowAddTaskModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label="Close add task modal"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            {/* Your form implementation can go here */}
+            <p className="text-sm text-gray-600">Add Task form placeholder…</p>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

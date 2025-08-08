@@ -47,6 +47,29 @@ export const headerLinks = [
   },
 ];
 
+export const dashboardHeaderLinks = [
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+  },
+  {
+    href: "/appointments",
+    label: "Appointment",
+  },
+  {
+    href: "/staff",
+    label: "Staff",
+  },
+  {
+    href: "/leads",
+    label: "Leads",
+  },
+  {
+    href:"/billing",
+    label: "Billing",
+  }
+];
+
 export const publicRoutes = ["/login", "/signup", "/forgot-password", "/clinic", "/verify-otp", "/reset-password"];
 
 export const liveEnvironments = ["production", "development"];
