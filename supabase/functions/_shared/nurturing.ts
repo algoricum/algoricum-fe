@@ -576,38 +576,61 @@ async function processRuleForLead(
   }
 }
 
-// Determine which follow-ups a lead should receive
+// Determine which follow-ups a lead should receive - FIXED: Only returns NEXT due follow-up
 async function determineFollowUpsForLead(lead: Lead, supabase: any): Promise<FollowUpRule[]> {
   const now = new Date()
   const leadCreatedAt = new Date(lead.created_at)
   const timeSinceCreated = now.getTime() - leadCreatedAt.getTime()
   
-  const applicableRules: FollowUpRule[] = []
+  // Filter out initial contact for nurturing function and sort by time
+  const followupRules = FOLLOW_UP_RULES
+    .filter(rule => rule.name !== 'sms_5min_initial')
+    .sort((a, b) => a.timeFromCreated - b.timeFromCreated) // Sort by time ascending
   
-  // Filter out initial contact for nurturing function
-  const followupRules = FOLLOW_UP_RULES.filter(rule => rule.name !== 'sms_5min_initial')
+  logInfo(`Checking follow-ups for lead ${lead.id}, age: ${Math.round(timeSinceCreated / (24 * 60 * 60 * 1000))} days`)
   
+  // Find the NEXT due follow-up (not all overdue ones)
   for (const rule of followupRules) {
-    // Check timing
-    if (timeSinceCreated < rule.timeFromCreated) continue
-    if (rule.maxTimeFromCreated && timeSinceCreated > rule.maxTimeFromCreated) continue
+    // Check if enough time has passed since lead creation
+    if (timeSinceCreated < rule.timeFromCreated) {
+      logInfo(`Lead ${lead.id}: ${rule.name} not due yet (need ${Math.round(rule.timeFromCreated / (24 * 60 * 60 * 1000))} days)`)
+      continue
+    }
     
-    // Check status
-    if (rule.leadStatus && !rule.leadStatus.includes(lead.status)) continue
+    // Check if too much time has passed (if rule has max time)
+    if (rule.maxTimeFromCreated && timeSinceCreated > rule.maxTimeFromCreated) {
+      logInfo(`Lead ${lead.id}: ${rule.name} expired (max ${Math.round(rule.maxTimeFromCreated / (24 * 60 * 60 * 1000))} days)`)
+      continue
+    }
     
-    // Check if already sent
-    if (rule.onlyOnce && await hasFollowUpBeenSent(lead.id, rule.name, supabase)) continue
+    // Check if lead status matches (if rule specifies status requirements)
+    if (rule.leadStatus && !rule.leadStatus.includes(lead.status)) {
+      logInfo(`Lead ${lead.id}: ${rule.name} skipped due to status (${lead.status})`)
+      continue
+    }
     
-    // Check user activity
-    if (rule.checkLastActivity && await hasUserRepliedToLastAssistantMessage(lead.id, supabase)) continue
+    // Check if this follow-up has already been sent
+    if (rule.onlyOnce && await hasFollowUpBeenSent(lead.id, rule.name, supabase)) {
+      logInfo(`Lead ${lead.id}: ${rule.name} already sent`)
+      continue
+    }
     
-    applicableRules.push(rule)
+    // Check if user has replied after last assistant message
+    if (rule.checkLastActivity && await hasUserRepliedToLastAssistantMessage(lead.id, supabase)) {
+      logInfo(`Lead ${lead.id}: ${rule.name} skipped - user already replied`)
+      continue
+    }
+    
+    // This is the NEXT due follow-up - return only this one
+    logInfo(`Lead ${lead.id}: Found next due follow-up: ${rule.name}`)
+    return [rule]
   }
   
-  return applicableRules
+  logInfo(`Lead ${lead.id}: No applicable follow-ups found`)
+  return []
 }
 
-// Check if a specific follow-up has already been sent
+// Check if a specific follow-up has already been sent - IMPROVED detection
 async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabase: any): Promise<boolean> {
   try {
     // Get thread for this lead
@@ -619,20 +642,33 @@ async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabas
     
     if (!thread) return false
     
-    // Check if this follow-up type has been sent
-    const { data: conversations } = await supabase
-      .from('conversation')
-      .select('id')
-      .eq('thread_id', thread.id)
-      .eq('is_from_user', false)
-      .eq('sender_type', 'assistant')
-      .ilike('message', `%${followUpName}%`)
+    // Check if this follow-up type has been sent using multiple patterns
+    const searchPatterns = [
+      `%${followUpName}%`,
+      `%${followUpName.toUpperCase()}%`,
+      `%${followUpName.toLowerCase()}%`
+    ]
     
-    return conversations && conversations.length > 0
+    for (const pattern of searchPatterns) {
+      const { data: conversations } = await supabase
+        .from('conversation')
+        .select('id, message')
+        .eq('thread_id', thread.id)
+        .eq('is_from_user', false)
+        .eq('sender_type', 'assistant')
+        .ilike('message', pattern)
+      
+      if (conversations && conversations.length > 0) {
+        logInfo(`Follow-up ${followUpName} already sent for lead ${leadId}`)
+        return true
+      }
+    }
+    
+    return false
     
   } catch (error) {
     logError(`Error checking if follow-up ${followUpName} was sent for lead ${leadId}`, error)
-    return false
+    return false // If we can't check, assume it wasn't sent (safer for follow-ups)
   }
 }
 
