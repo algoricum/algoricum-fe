@@ -1,6 +1,5 @@
 // _shared/nurturing.ts
 
-
 interface Lead {
   id: string
   first_name?: string
@@ -16,7 +15,6 @@ interface Lead {
   created_at: string
   updated_at: string
 }
-
 
 interface Conversation {
   id?: string
@@ -36,16 +34,24 @@ interface Clinic {
   assistant_prompt?: string
   assistant_model?: string
   chatbot_name?: string
+  mailgun_domain?: string
+  mailgun_email?: string
+  twilio_config?: Array<{
+    twilio_account_sid: string
+    twilio_auth_token: string
+    twilio_phone_number: string
+    status: string
+  }>
 }
 
 interface FollowUpRule {
   name: string
   timeFromCreated: number // milliseconds
-  maxTimeFromCreated?: number // milliseconds (optional upper bound)
+  maxTimeFromCreated?: number // milliseconds
   leadStatus?: string[] // which lead statuses to target
   communicationType: 'sms' | 'email'
-  onlyOnce: boolean // should this follow-up only be sent once
-  checkLastActivity?: boolean // should we check if user replied after last assistant message
+  onlyOnce: boolean
+  checkLastActivity?: boolean
 }
 
 interface ProcessingResult {
@@ -57,21 +63,20 @@ interface ProcessingResult {
   error?: string
 }
 
-// Enhanced logging function
+// Enhanced logging
 function logInfo(message: string, data?: any) {
   const timestamp = new Date().toISOString()
-  console.log(`[${timestamp}] INFO: ${message}`, data ? JSON.stringify(data, null, 2) : '')
+  console.log(`[${timestamp}] SHARED: ${message}`, data ? JSON.stringify(data, null, 2) : '')
 }
 
 function logError(message: string, error?: any) {
   const timestamp = new Date().toISOString()
-  console.error(`[${timestamp}] ERROR: ${message}`, error)
+  console.error(`[${timestamp}] SHARED ERROR: ${message}`, error)
 }
 
-// Updated follow-up rules with new SMS and Email schedule
+// Complete follow-up rules
 const FOLLOW_UP_RULES: FollowUpRule[] = [
   // SMS FLOW
-  // Initial contact after 5 minutes
   {
     name: 'sms_5min_initial',
     timeFromCreated: 5 * 60 * 1000, // 5 minutes
@@ -79,8 +84,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     communicationType: 'sms',
     onlyOnce: true
   },
-  
-  // SMS after 2 days
   {
     name: 'sms_2day_followup',
     timeFromCreated: 2 * 24 * 60 * 60 * 1000, // 2 days
@@ -88,8 +91,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // SMS after 5 days
   {
     name: 'sms_5day_followup',
     timeFromCreated: 5 * 24 * 60 * 60 * 1000, // 5 days
@@ -97,8 +98,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // SMS after 10 days
   {
     name: 'sms_10day_followup',
     timeFromCreated: 10 * 24 * 60 * 60 * 1000, // 10 days
@@ -106,8 +105,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // SMS after 20 days
   {
     name: 'sms_20day_followup',
     timeFromCreated: 20 * 24 * 60 * 60 * 1000, // 20 days
@@ -117,7 +114,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   
   // EMAIL FLOW (starts from day 21)
-  // Day 21
   {
     name: 'email_21day_followup',
     timeFromCreated: 21 * 24 * 60 * 60 * 1000, // 21 days
@@ -125,8 +121,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 24
   {
     name: 'email_24day_followup',
     timeFromCreated: 24 * 24 * 60 * 60 * 1000, // 24 days
@@ -134,8 +128,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 27
   {
     name: 'email_27day_followup',
     timeFromCreated: 27 * 24 * 60 * 60 * 1000, // 27 days
@@ -143,8 +135,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 30
   {
     name: 'email_30day_followup',
     timeFromCreated: 30 * 24 * 60 * 60 * 1000, // 30 days
@@ -152,8 +142,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 33
   {
     name: 'email_33day_followup',
     timeFromCreated: 33 * 24 * 60 * 60 * 1000, // 33 days
@@ -161,8 +149,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 36
   {
     name: 'email_36day_followup',
     timeFromCreated: 36 * 24 * 60 * 60 * 1000, // 36 days
@@ -170,8 +156,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 39
   {
     name: 'email_39day_followup',
     timeFromCreated: 39 * 24 * 60 * 60 * 1000, // 39 days
@@ -179,8 +163,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 42
   {
     name: 'email_42day_followup',
     timeFromCreated: 42 * 24 * 60 * 60 * 1000, // 42 days
@@ -188,8 +170,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 45
   {
     name: 'email_45day_followup',
     timeFromCreated: 45 * 24 * 60 * 60 * 1000, // 45 days
@@ -197,8 +177,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 50
   {
     name: 'email_50day_followup',
     timeFromCreated: 50 * 24 * 60 * 60 * 1000, // 50 days
@@ -206,8 +184,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 55
   {
     name: 'email_55day_followup',
     timeFromCreated: 55 * 24 * 60 * 60 * 1000, // 55 days
@@ -215,8 +191,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 60
   {
     name: 'email_60day_followup',
     timeFromCreated: 60 * 24 * 60 * 60 * 1000, // 60 days
@@ -224,8 +198,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 70
   {
     name: 'email_70day_followup',
     timeFromCreated: 70 * 24 * 60 * 60 * 1000, // 70 days
@@ -233,8 +205,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 80
   {
     name: 'email_80day_followup',
     timeFromCreated: 80 * 24 * 60 * 60 * 1000, // 80 days
@@ -242,8 +212,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 90
   {
     name: 'email_90day_followup',
     timeFromCreated: 90 * 24 * 60 * 60 * 1000, // 90 days
@@ -251,8 +219,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 100
   {
     name: 'email_100day_followup',
     timeFromCreated: 100 * 24 * 60 * 60 * 1000, // 100 days
@@ -260,8 +226,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 110
   {
     name: 'email_110day_followup',
     timeFromCreated: 110 * 24 * 60 * 60 * 1000, // 110 days
@@ -269,8 +233,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 115
   {
     name: 'email_115day_followup',
     timeFromCreated: 115 * 24 * 60 * 60 * 1000, // 115 days
@@ -278,8 +240,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 118
   {
     name: 'email_118day_followup',
     timeFromCreated: 118 * 24 * 60 * 60 * 1000, // 118 days
@@ -287,8 +247,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // Day 120
   {
     name: 'email_120day_followup',
     timeFromCreated: 120 * 24 * 60 * 60 * 1000, // 120 days
@@ -298,54 +256,350 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   }
 ]
 
-// Core function to determine which follow-ups a lead should receive
-async function determineFollowUpsForLead(
-  lead: Lead,
-  supabase: any,
-  communicationType?: 'sms' | 'email'
-): Promise<FollowUpRule[]> {
+// MAIN PROCESSING FUNCTION - Processes ALL clinics
+async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email') {
+  logInfo(`=== Starting processAllLeads - Type: ${communicationType || 'all'} ===`)
+  
+  const allResults: ProcessingResult[] = []
+  let totalProcessed = 0
+  let totalErrors = 0
+  
+  try {
+    // Get ALL clinics with their settings
+    const { data: clinics, error: clinicError } = await supabase
+      .from('clinic')
+      .select(`
+        id,
+        name,
+        openai_api_key,
+        assistant_prompt,
+        assistant_model,
+        chatbot_name,
+        mailgun_domain,
+        mailgun_email,
+        twilio_config(
+          twilio_account_sid,
+          twilio_auth_token,
+          twilio_phone_number,
+          status
+        )
+      `)
+
+    if (clinicError) {
+      logError('Failed to fetch clinics', clinicError)
+      return {
+        success: false,
+        error: 'Failed to fetch clinics',
+        results: [],
+        summary: { sent: 0, skipped: 0, errors: 1 }
+      }
+    }
+
+    if (!clinics || clinics.length === 0) {
+      logInfo('No clinics found')
+      return {
+        success: true,
+        results: [],
+        summary: { sent: 0, skipped: 0, errors: 0 }
+      }
+    }
+
+    logInfo(`Processing ${clinics.length} clinics`)
+
+    // Process each clinic independently - errors in one don't affect others
+    for (const clinic of clinics) {
+      try {
+        logInfo(`Processing clinic: ${clinic.name} (${clinic.id})`)
+        
+        // Get leads for this clinic
+        const leads = await getLeadsForClinic(clinic.id, supabase, communicationType)
+        
+        if (leads.length === 0) {
+          logInfo(`No leads found for clinic ${clinic.name}`)
+          continue
+        }
+
+        logInfo(`Found ${leads.length} leads for clinic ${clinic.name}`)
+
+        // Process each lead
+        for (const lead of leads) {
+          try {
+            const leadResults = await processLeadForClinic(lead, clinic, supabase)
+            allResults.push(...leadResults)
+            totalProcessed++
+          } catch (leadError) {
+            logError(`Error processing lead ${lead.id}`, leadError)
+            totalErrors++
+            allResults.push({
+              leadId: lead.id,
+              action: 'error',
+              reason: 'Lead processing failed',
+              followUpType: 'unknown',
+              communicationType: communicationType || 'any',
+              error: leadError.message
+            })
+          }
+        }
+
+      } catch (clinicError) {
+        logError(`Error processing clinic ${clinic.id}`, clinicError)
+        totalErrors++
+        // Continue with next clinic - don't let one clinic's error stop everything
+      }
+    }
+
+    // Calculate final summary
+    const summary = {
+      sent: allResults.filter(r => r.action === 'sent').length,
+      skipped: allResults.filter(r => r.action === 'skipped').length,
+      errors: allResults.filter(r => r.action === 'error').length
+    }
+
+    logInfo(`Processing completed: ${totalProcessed} leads processed, ${totalErrors} lead errors`)
+    logInfo('Final summary', summary)
+
+    return {
+      success: true,
+      results: allResults,
+      summary,
+      totalLeads: totalProcessed
+    }
+
+  } catch (error: any) {
+    logError('Error in processAllLeads', error)
+    return {
+      success: false,
+      error: error.message,
+      results: allResults,
+      summary: { sent: 0, skipped: 0, errors: 1 }
+    }
+  }
+}
+
+// Get leads for a specific clinic
+async function getLeadsForClinic(clinicId: string, supabase: any, communicationType?: 'sms' | 'email'): Promise<Lead[]> {
+  try {
+    let leadQuery = supabase
+      .from('lead')
+      .select('*')
+      .eq('clinic_id', clinicId)
+
+    // Filter by communication requirements
+    if (communicationType === 'sms') {
+      leadQuery = leadQuery.not('phone', 'is', null).neq('phone', '')
+    } else if (communicationType === 'email') {
+      leadQuery = leadQuery.not('email', 'is', null).neq('email', '')
+    } else {
+      // Need either phone or email
+      leadQuery = leadQuery.or('phone.not.is.null,email.not.is.null')
+    }
+
+    const { data: leads, error } = await leadQuery
+
+    if (error) {
+      logError(`Error fetching leads for clinic ${clinicId}`, error)
+      return []
+    }
+
+    return leads || []
+
+  } catch (error) {
+    logError(`Error in getLeadsForClinic for ${clinicId}`, error)
+    return []
+  }
+}
+
+// Process a single lead for a clinic
+async function processLeadForClinic(lead: Lead, clinic: Clinic, supabase: any): Promise<ProcessingResult[]> {
+  const results: ProcessingResult[] = []
+  
+  try {
+    // Get applicable follow-up rules for this lead
+    const applicableRules = await determineFollowUpsForLead(lead, supabase)
+    
+    if (applicableRules.length === 0) {
+      return [{
+        leadId: lead.id,
+        action: 'skipped',
+        reason: 'No applicable follow-up rules',
+        followUpType: 'none',
+        communicationType: 'any'
+      }]
+    }
+
+    // Check clinic capabilities
+    const hasSMS = clinic.twilio_config && 
+                  clinic.twilio_config.length > 0 && 
+                  clinic.twilio_config[0]?.status === 'active'
+    
+    const hasEmail = clinic.mailgun_domain && clinic.mailgun_email
+
+    // Process each rule
+    for (const rule of applicableRules) {
+      try {
+        // Check clinic capabilities for this communication type
+        if (rule.communicationType === 'sms' && !hasSMS) {
+          results.push({
+            leadId: lead.id,
+            action: 'skipped',
+            reason: 'Clinic SMS not configured',
+            followUpType: rule.name,
+            communicationType: rule.communicationType
+          })
+          continue
+        }
+
+        if (rule.communicationType === 'email' && !hasEmail) {
+          results.push({
+            leadId: lead.id,
+            action: 'skipped',
+            reason: 'Clinic email not configured',
+            followUpType: rule.name,
+            communicationType: rule.communicationType
+          })
+          continue
+        }
+
+        // Check lead has required contact info
+        const hasRequiredContact = 
+          (rule.communicationType === 'sms' && lead.phone) ||
+          (rule.communicationType === 'email' && lead.email)
+
+        if (!hasRequiredContact) {
+          results.push({
+            leadId: lead.id,
+            action: 'skipped',
+            reason: `Lead missing ${rule.communicationType} contact`,
+            followUpType: rule.name,
+            communicationType: rule.communicationType
+          })
+          continue
+        }
+
+        // Process this rule
+        const result = await processRuleForLead(lead, clinic, rule, supabase)
+        results.push(result)
+
+      } catch (ruleError) {
+        logError(`Error processing rule ${rule.name} for lead ${lead.id}`, ruleError)
+        results.push({
+          leadId: lead.id,
+          action: 'error',
+          reason: `Rule processing failed: ${ruleError.message}`,
+          followUpType: rule.name,
+          communicationType: rule.communicationType,
+          error: ruleError.message
+        })
+      }
+    }
+
+  } catch (error) {
+    logError(`Error in processLeadForClinic for lead ${lead.id}`, error)
+    results.push({
+      leadId: lead.id,
+      action: 'error',
+      reason: 'Lead processing exception',
+      followUpType: 'unknown',
+      communicationType: 'any',
+      error: error.message
+    })
+  }
+
+  return results
+}
+
+// Process a specific rule for a lead
+async function processRuleForLead(
+  lead: Lead, 
+  clinic: Clinic, 
+  rule: FollowUpRule, 
+  supabase: any
+): Promise<ProcessingResult> {
+  try {
+    // Get or create thread
+    const threadId = await getOrCreateThread(lead, supabase)
+    if (!threadId) {
+      return {
+        leadId: lead.id,
+        action: 'error',
+        reason: 'Failed to create thread',
+        followUpType: rule.name,
+        communicationType: rule.communicationType
+      }
+    }
+
+    // Get conversation history
+    const conversationHistory = await getConversationHistory(threadId, supabase)
+
+    // Generate message
+    const messageContent = await generateIntelligentResponse(
+      lead,
+      clinic,
+      conversationHistory,
+      rule.communicationType === 'email'
+    )
+
+    // Send message
+    const sendResult = await sendMessage(lead, clinic, rule, messageContent, supabase)
+
+    if (sendResult.success) {
+      // Save to history
+      await saveMessageToHistory(threadId, messageContent, rule.name, supabase)
+
+      return {
+        leadId: lead.id,
+        action: 'sent',
+        reason: `Successfully sent ${rule.name}`,
+        followUpType: rule.name,
+        communicationType: rule.communicationType
+      }
+    } else {
+      return {
+        leadId: lead.id,
+        action: 'error',
+        reason: `Send failed: ${sendResult.error}`,
+        followUpType: rule.name,
+        communicationType: rule.communicationType,
+        error: sendResult.error
+      }
+    }
+
+  } catch (error) {
+    return {
+      leadId: lead.id,
+      action: 'error',
+      reason: `Rule processing exception: ${error.message}`,
+      followUpType: rule.name,
+      communicationType: rule.communicationType,
+      error: error.message
+    }
+  }
+}
+
+// Determine which follow-ups a lead should receive
+async function determineFollowUpsForLead(lead: Lead, supabase: any): Promise<FollowUpRule[]> {
   const now = new Date()
   const leadCreatedAt = new Date(lead.created_at)
   const timeSinceCreated = now.getTime() - leadCreatedAt.getTime()
   
   const applicableRules: FollowUpRule[] = []
   
-  for (const rule of FOLLOW_UP_RULES) {
-    // Filter by communication type if specified
-    if (communicationType && rule.communicationType !== communicationType) {
-      continue
-    }
+  // Filter out initial contact for nurturing function
+  const followupRules = FOLLOW_UP_RULES.filter(rule => rule.name !== 'sms_5min_initial')
+  
+  for (const rule of followupRules) {
+    // Check timing
+    if (timeSinceCreated < rule.timeFromCreated) continue
+    if (rule.maxTimeFromCreated && timeSinceCreated > rule.maxTimeFromCreated) continue
     
-    // Check if lead status matches (if rule specifies status requirements)
-    if (rule.leadStatus && !rule.leadStatus.includes(lead.status)) {
-      continue
-    }
+    // Check status
+    if (rule.leadStatus && !rule.leadStatus.includes(lead.status)) continue
     
-    // Check if enough time has passed since lead creation
-    if (timeSinceCreated < rule.timeFromCreated) {
-      continue
-    }
+    // Check if already sent
+    if (rule.onlyOnce && await hasFollowUpBeenSent(lead.id, rule.name, supabase)) continue
     
-    // Check if too much time has passed (if rule has max time)
-    if (rule.maxTimeFromCreated && timeSinceCreated > rule.maxTimeFromCreated) {
-      continue
-    }
-    
-    // Check if this follow-up has already been sent (if onlyOnce is true)
-    if (rule.onlyOnce) {
-      const alreadySent = await hasFollowUpBeenSent(lead.id, rule.name, supabase)
-      if (alreadySent) {
-        continue
-      }
-    }
-    
-    // Check if user has replied after last assistant message (if rule requires it)
-    if (rule.checkLastActivity) {
-      const hasUserReplied = await hasUserRepliedToLastAssistantMessage(lead.id, supabase)
-      if (hasUserReplied) {
-        continue // Skip if user already replied
-      }
-    }
+    // Check user activity
+    if (rule.checkLastActivity && await hasUserRepliedToLastAssistantMessage(lead.id, supabase)) continue
     
     applicableRules.push(rule)
   }
@@ -381,8 +635,6 @@ async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabas
     return false
   }
 }
-
-
 
 // Check if user replied after the last assistant message
 async function hasUserRepliedToLastAssistantMessage(leadId: string, supabase: any): Promise<boolean> {
@@ -423,186 +675,6 @@ async function hasUserRepliedToLastAssistantMessage(leadId: string, supabase: an
     logError(`Error checking user replies for lead ${leadId}`, error)
     return false
   }
-}
-
-// Get all leads that need processing based on the rules
-async function getLeadsForProcessing(supabase: any, communicationType?: 'sms' | 'email'): Promise<Lead[]> {
-  logInfo(`Fetching leads for processing - communication type: ${communicationType || 'all'}`)
-  
-  try {
-    // Get all clinics first
-    const { data: clinics, error: clinicError } = await supabase
-      .from('clinic')
-      .select('id')
-    
-    if (clinicError) {
-      logError('Error fetching clinics', clinicError)
-      return []
-    }
-    
-    if (!clinics || clinics.length === 0) {
-      logInfo('No clinics found')
-      return []
-    }
-    
-    // Get all leads from all clinics that have required contact info
-    let leadQuery = supabase
-      .from('lead')
-      .select('*')
-      .in('clinic_id', clinics.map(c => c.id))
-    
-    // Filter by communication type requirements
-    if (communicationType === 'sms') {
-      leadQuery = leadQuery
-        .not('phone', 'is', null)
-        .neq('phone', '')
-    } else if (communicationType === 'email') {
-      leadQuery = leadQuery
-        .not('email', 'is', null)
-        .neq('email', '')
-    } else {
-      // For 'all', we need either phone or email
-      leadQuery = leadQuery
-        .or('phone.not.is.null,email.not.is.null')
-    }
-    
-    const { data: leads, error: leadsError } = await leadQuery
-    
-    if (leadsError) {
-      logError('Error fetching leads', leadsError)
-      return []
-    }
-    
-    logInfo(`Found ${leads?.length || 0} leads with required contact info`)
-    return leads || []
-    
-  } catch (error) {
-    logError('Error in getLeadsForProcessing', error)
-    return []
-  }
-}
-
-// Process a single lead and return the result
-async function processLead(
-  lead: Lead,
-  clinic: Clinic,
-  supabase: any,
-  communicationType?: 'sms' | 'email'
-): Promise<ProcessingResult[]> {
-  logInfo(`Processing lead ${lead.id} for clinic ${clinic.name}`)
-  
-  const results: ProcessingResult[] = []
-  
-  try {
-    // Determine which follow-ups this lead should receive
-    const applicableRules = await determineFollowUpsForLead(lead, supabase, communicationType)
-    
-    if (applicableRules.length === 0) {
-      results.push({
-        leadId: lead.id,
-        action: 'skipped',
-        reason: 'No applicable follow-up rules',
-        followUpType: 'none',
-        communicationType: communicationType || 'any'
-      })
-      return results
-    }
-    
-    logInfo(`Lead ${lead.id} has ${applicableRules.length} applicable follow-up rules`)
-    
-    // Process each applicable follow-up rule
-    for (const rule of applicableRules) {
-      try {
-        // Check if lead has required contact info for this communication type
-        const hasContactInfo = (rule.communicationType === 'sms' && lead.phone) || 
-                             (rule.communicationType === 'email' && lead.email)
-        
-        if (!hasContactInfo) {
-          results.push({
-            leadId: lead.id,
-            action: 'skipped',
-            reason: `Missing ${rule.communicationType} contact info`,
-            followUpType: rule.name,
-            communicationType: rule.communicationType
-          })
-          continue
-        }
-        
-        // Get or create thread
-        const threadId = await getOrCreateThread(lead, supabase)
-        if (!threadId) {
-          results.push({
-            leadId: lead.id,
-            action: 'error',
-            reason: 'Failed to get or create thread',
-            followUpType: rule.name,
-            communicationType: rule.communicationType,
-            error: 'Thread creation failed'
-          })
-          continue
-        }
-        
-        // Get conversation history for context
-        const conversationHistory = await getConversationHistory(threadId, supabase)
-        
-        // Generate message content using intelligent response
-        const messageContent = await generateMessageContent(lead, clinic, rule, conversationHistory)
-        
-        // Send the message based on communication type
-        const sendResult = await sendMessage(lead, clinic, rule, messageContent, supabase)
-        
-        if (sendResult.success) {
-          // Save the message to conversation history
-          await saveMessageToHistory(threadId, messageContent, rule.name, supabase)
-          
-          results.push({
-            leadId: lead.id,
-            action: 'sent',
-            reason: `Successfully sent ${rule.name}`,
-            followUpType: rule.name,
-            communicationType: rule.communicationType
-          })
-          
-          logInfo(`Successfully sent ${rule.name} to lead ${lead.id}`)
-        } else {
-          results.push({
-            leadId: lead.id,
-            action: 'error',
-            reason: `Failed to send ${rule.name}`,
-            followUpType: rule.name,
-            communicationType: rule.communicationType,
-            error: sendResult.error
-          })
-          
-          logError(`Failed to send ${rule.name} to lead ${lead.id}`, sendResult.error)
-        }
-        
-      } catch (error) {
-        logError(`Error processing rule ${rule.name} for lead ${lead.id}`, error)
-        results.push({
-          leadId: lead.id,
-          action: 'error',
-          reason: `Exception while processing ${rule.name}`,
-          followUpType: rule.name,
-          communicationType: rule.communicationType,
-          error: error.message
-        })
-      }
-    }
-    
-  } catch (error) {
-    logError(`Error processing lead ${lead.id}`, error)
-    results.push({
-      leadId: lead.id,
-      action: 'error',
-      reason: 'Exception during lead processing',
-      followUpType: 'unknown',
-      communicationType: communicationType || 'any',
-      error: error.message
-    })
-  }
-  
-  return results
 }
 
 // Get or create thread for a lead
@@ -667,180 +739,7 @@ async function getConversationHistory(threadId: string, supabase: any): Promise<
   }
 }
 
-// Placeholder functions that will be implemented later
-
-async function generateMessageContent(
-  lead: Lead,
-  clinic: Clinic,
-  rule: FollowUpRule,
-  conversationHistory: Conversation[]
-): Promise<string | { subject: string, body: string }> {
-  logInfo(`Generating message content for ${rule.name}`)
-  
-  // Use the intelligent response generator
-  return await generateIntelligentResponse(
-    lead,
-    clinic,
-    conversationHistory,
-    rule.communicationType === 'email'
-  )
-}
-
-async function sendMessage(
-  lead: Lead,
-  clinic: Clinic,
-  rule: FollowUpRule,
-  messageContent: string | { subject: string, body: string },
-  supabase: any
-): Promise<{ success: boolean, error?: string }> {
-  logInfo(`Sending ${rule.communicationType} message for ${rule.name} to lead ${lead.id}`)
-  
-  try {
-    if (rule.communicationType === 'sms') {
-      if (typeof messageContent === 'string') {
-        return await sendSMS(lead.phone, messageContent, lead.clinic_id, supabase)
-      } else {
-        return { success: false, error: 'Invalid message format for SMS' }
-      }
-    } else if (rule.communicationType === 'email') {
-      if (typeof messageContent === 'object' && messageContent.subject && messageContent.body) {
-        return await sendEmail(
-          lead.email!,
-          messageContent.subject,
-          messageContent.body,
-          lead.clinic_id,
-          supabase
-        )
-      } else {
-        return { success: false, error: 'Invalid message format for email' }
-      }
-    } else {
-      return { success: false, error: `Unsupported communication type: ${rule.communicationType}` }
-    }
-  } catch (error) {
-    logError(`Error in sendMessage for lead ${lead.id}`, error)
-    return { success: false, error: error.message }
-  }
-}
-
-async function saveMessageToHistory(
-  threadId: string,
-  messageContent: string | { subject: string, body: string },
-  followUpType: string,
-  supabase: any
-): Promise<void> {
-  try {
-    const now = new Date().toISOString()
-    let messageText = ''
-    
-    if (typeof messageContent === 'string') {
-      messageText = messageContent
-    } else {
-      messageText = `EMAIL SENT (${followUpType}) - Subject: ${messageContent.subject}\n\n${messageContent.body}`
-    }
-    
-    await supabase
-      .from('conversation')
-      .insert({
-        thread_id: threadId,
-        message: messageText,
-        timestamp: now,
-        is_from_user: false,
-        sender_type: 'assistant'
-      })
-    
-    logInfo(`Saved message to history for thread ${threadId}`)
-    
-  } catch (error) {
-    logError(`Error saving message to history for thread ${threadId}`, error)
-  }
-}
-
-// Main processing function
-async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email') {
-  logInfo(`=== Starting Lead Processing - Type: ${communicationType || 'all'} ===`)
-  
-  try {
-    // Get all leads that need processing
-    const leads = await getLeadsForProcessing(supabase, communicationType)
-    
-    if (leads.length === 0) {
-      logInfo('No leads found for processing')
-      return {
-        success: true,
-        totalLeads: 0,
-        results: [],
-        summary: {
-          sent: 0,
-          skipped: 0,
-          errors: 0
-        }
-      }
-    }
-    
-    logInfo(`Processing ${leads.length} leads`)
-    
-    // Get all clinics for context
-    const { data: clinics } = await supabase
-      .from('clinic')
-      .select('id, name, openai_api_key, assistant_prompt, assistant_model, chatbot_name')
-    
-    const clinicMap = new Map(clinics?.map(c => [c.id, c]) || [])
-    
-    // Process each lead
-    const allResults: ProcessingResult[] = []
-    
-    for (const lead of leads) {
-      const clinic = clinicMap.get(lead.clinic_id)
-      if (!clinic) {
-        allResults.push({
-          leadId: lead.id,
-          action: 'error',
-          reason: 'Clinic not found',
-          followUpType: 'unknown',
-          communicationType: communicationType || 'any',
-          error: `Clinic ${lead.clinic_id} not found`
-        })
-        continue
-      }
-      
-      const leadResults = await processLead(lead, clinic, supabase, communicationType)
-      allResults.push(...leadResults)
-    }
-    
-    // Calculate summary
-    const summary = {
-      sent: allResults.filter(r => r.action === 'sent').length,
-      skipped: allResults.filter(r => r.action === 'skipped').length,
-      errors: allResults.filter(r => r.action === 'error').length
-    }
-    
-    logInfo('Lead processing completed', summary)
-    
-    return {
-      success: true,
-      totalLeads: leads.length,
-      results: allResults,
-      summary
-    }
-    
-  } catch (error) {
-    logError('Error in processAllLeads', error)
-    return {
-      success: false,
-      error: error.message,
-      totalLeads: 0,
-      results: [],
-      summary: {
-        sent: 0,
-        skipped: 0,
-        errors: 1
-      }
-    }
-  }
-}
-
-// Generate intelligent responses based on conversation history
+// Generate intelligent responses using OpenAI
 async function generateIntelligentResponse(
   lead: Lead,
   clinic: Clinic,
@@ -993,6 +892,29 @@ Patient Details:
   return fallbackMessage
 }
 
+// Send message based on communication type
+async function sendMessage(
+  lead: Lead,
+  clinic: Clinic,
+  rule: FollowUpRule,
+  messageContent: string | { subject: string, body: string },
+  supabase: any
+): Promise<{ success: boolean, error?: string }> {
+  if (rule.communicationType === 'sms') {
+    if (typeof messageContent === 'string') {
+      return await sendSMS(lead.phone, messageContent, lead.clinic_id, supabase, clinic.twilio_config?.[0])
+    } else {
+      return { success: false, error: 'Invalid message format for SMS' }
+    }
+  } else {
+    if (typeof messageContent === 'object' && messageContent.subject && messageContent.body) {
+      return await sendEmail(lead.email!, messageContent.subject, messageContent.body, lead.clinic_id, supabase)
+    } else {
+      return { success: false, error: 'Invalid message format for email' }
+    }
+  }
+}
+
 // Enhanced sendSMS function
 async function sendSMS(
   toPhone: string, 
@@ -1131,8 +1053,7 @@ async function sendEmail(
       from: mailgun_email,
       to: toEmail,
       subject: subject,
-      contentLength: body.length,
-      contentPreview: body.substring(0, 150)
+      contentLength: body.length
     });
 
     // Prepare form data for Mailgun API
@@ -1188,27 +1109,42 @@ async function sendEmail(
     logError('Error sending email via Mailgun', error);
     return {
       success: false,
-      error: error.message,
-      troubleshooting: {
-        issues: [
-          {
-            issue: 'Mailgun API failure',
-            solutions: [
-              'Verify MAILGUN_API_KEY environment variable is set',
-              'Check mailgun_domain is correct and verified in Mailgun',
-              'Ensure mailgun_email is authorized sender in Mailgun',
-              'Verify network connectivity to api.mailgun.net'
-            ]
-          }
-        ],
-        tips: [
-          'Check Mailgun dashboard for sending limits and account status',
-          'Verify domain DNS settings are configured correctly',
-          'Review clinic table mailgun configuration',
-          'Monitor Mailgun logs for detailed error information'
-        ]
-      }
+      error: error.message
     };
+  }
+}
+
+// Save message to conversation history
+async function saveMessageToHistory(
+  threadId: string,
+  messageContent: string | { subject: string, body: string },
+  followUpType: string,
+  supabase: any
+): Promise<void> {
+  try {
+    const now = new Date().toISOString()
+    let messageText = ''
+    
+    if (typeof messageContent === 'string') {
+      messageText = `${followUpType.toUpperCase()}: ${messageContent}`
+    } else {
+      messageText = `${followUpType.toUpperCase()} EMAIL - Subject: ${messageContent.subject}\n\n${messageContent.body}`
+    }
+    
+    await supabase
+      .from('conversation')
+      .insert({
+        thread_id: threadId,
+        message: messageText,
+        timestamp: now,
+        is_from_user: false,
+        sender_type: 'assistant'
+      })
+    
+    logInfo(`Saved message to history for thread ${threadId}`)
+    
+  } catch (error) {
+    logError(`Error saving message to history for thread ${threadId}`, error)
   }
 }
 
@@ -1318,6 +1254,7 @@ async function handleTwilioWebhook(formData: FormData, supabase: any) {
   }
 }
 
+// Handle email webhook
 async function handleEmailWebhook(emailData: any, supabase: any) {
   logInfo('Handling email webhook')
   
@@ -1414,7 +1351,7 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
   }
 }
 
-// Update the export statement at the bottom
+// Export all functions
 export { 
   processAllLeads, 
   FOLLOW_UP_RULES, 
