@@ -143,9 +143,7 @@ const ChatbotSettings = () => {
         primary_color: values.primary_color || "#2563EB", // Fallback to default if not set
         font_color: values.font_color || "#000000", // Fallback to default if not set
       };
-      console.log("Faizan testing it to find a bug")
-      console.log("Widget theme being sent:", widgetTheme); // Debug log
-      console.log(".................Something went wrong ..............")
+      
       const clinic = await updateClinic({
         id: clinicData.id,
         assistant_prompt: values.greeting,

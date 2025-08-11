@@ -45,22 +45,42 @@ export default function LeadsPage() {
 
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [clinicId, setClinicId] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  // const [refreshKey, setRefreshKey] = useState(0);
 
   // Status dropdown state
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLTableCellElement>(null);
   // Load leads data, re-run when refreshKey changes
+  // useEffect(() => {
+  //   loadData();
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [refreshKey]);
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey]);
-
-  const handleClose = () => {
+  }, []); // Empty dependency array - only run once on mount
+  
+  const handleClose = (newLead?: any) => {
     setShowLeadForm(false);
-    // Trigger refresh after closing form
-    setRefreshKey(prev => prev + 1);
+
+    // If we have new lead data, add it to the existing list
+    if (newLead) {
+      // Format the new lead to match your Lead interface
+      const formattedLead = {
+        id: newLead.id,
+        first_name: newLead.first_name,
+        last_name: newLead.last_name,
+        name: newLead.first_name || "Unknown", // Adjust based on your data structure
+        email: newLead.email,
+        phone: newLead.phone,
+        status: newLead.status,
+        interest_level: newLead.interest_level,
+        created_at: newLead.created_at,
+        updated_at: newLead.updated_at,
+      };
+
+      setLeadsData(prev => [formattedLead, ...prev]);
+    }
   };
 
   // Close status dropdown on outside click
@@ -435,7 +455,7 @@ export default function LeadsPage() {
       </div>
 
       {/* Lead Generation Modal */}
-      <Modal open={showLeadForm} onCancel={handleClose} footer={null} title="Generate New Lead" width={600}>
+      <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} title="Generate New Lead" width={600}>
         {clinicId && <LeadGenerationForm clinicId={clinicId} onSuccess={handleClose} />}
       </Modal>
     </DashboardLayout>
