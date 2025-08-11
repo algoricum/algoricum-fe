@@ -19,11 +19,9 @@ const ChatbotSettings = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState<string>("");
-  const [formData, setFormData] = useState({
-    primaryColor: "#2563EB",
-    fontColor: "#000000",
-  });
+
   const primaryColor = Form.useWatch("primary_color", form);
+  const fontColor = Form.useWatch("font_color", form);
   const toneSelector = Form.useWatch("toneSelector", form);
   const sentenceLength = Form.useWatch("sentenceLength", form);
   const formalityLevel = Form.useWatch("formalityLevel", form);
@@ -44,17 +42,6 @@ const ChatbotSettings = () => {
     const match = validOptions.find(option => option.toLowerCase().replace(/[_-]/g, "") === normalizedValue);
 
     return match || validOptions[0]; // Return match or default to first option
-  };
-
-  // Handle form state updates
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
-
-    // Also update the form field
-    form.setFieldValue(field === "primaryColor" ? "primary_color" : field === "fontColor" ? "font_color" : field, value);
   };
 
   useEffect(() => {
@@ -151,13 +138,21 @@ const ChatbotSettings = () => {
         avatarUrl = await uploadClinicLogo(user.id, values.chatbotAvatar[0].originFileObj);
       }
 
+      // Fix: Properly construct the widget_theme object with actual color values
+      const widgetTheme = {
+        primary_color: values.primary_color || "#2563EB", // Fallback to default if not set
+        font_color: values.font_color || "#000000", // Fallback to default if not set
+      };
+      console.log("Faizan testing it to find a bug")
+      console.log("Widget theme being sent:", widgetTheme); // Debug log
+      console.log(".................Something went wrong ..............")
       const clinic = await updateClinic({
         id: clinicData.id,
         assistant_prompt: values.greeting,
         widget_logo: logoUrl,
         chatbot_name: values.chatbotName,
         chatbot_avatar: avatarUrl,
-        widget_theme: { primary_color: values.primary_color, font_color: values.font_color },
+        widget_theme: widgetTheme, // Use the properly constructed object
         tone_selector: values.toneSelector,
         sentence_length: values.sentenceLength,
         formality_level: values.formalityLevel,
@@ -391,19 +386,34 @@ const ChatbotSettings = () => {
           <Form.Item label="Widget Appearance">
             <Flex wrap="wrap" gap="middle">
               <ColorConfigurator
-                fieldName="primaryColor"
+                fieldName="primary_color"
                 heading="Primary color"
-                value={formData.primaryColor}
-                onChange={value => handleInputChange("primaryColor", value)}
+                value={primaryColor || "#2563EB"}
+                onChange={value => {
+                  form.setFieldValue("primary_color", value);
+                  form.validateFields(["primary_color"]); // Trigger form update
+                }}
               />
 
               <ColorConfigurator
-                fieldName="fontColor"
+                fieldName="font_color"
                 heading="Font color"
-                value={formData.fontColor}
-                onChange={value => handleInputChange("fontColor", value)}
+                value={fontColor || "#000000"}
+                onChange={value => {
+                  form.setFieldValue("font_color", value);
+                  form.validateFields(["font_color"]); // Trigger form update
+                }}
               />
             </Flex>
+          </Form.Item>
+
+          {/* Hidden form fields to capture color values */}
+          <Form.Item name="primary_color" hidden>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="font_color" hidden>
+            <Input />
           </Form.Item>
 
           <Form.Item label="Tone Selector" name="toneSelector" rules={[{ required: true, message: "Please select a tone" }]}>
@@ -498,7 +508,7 @@ const ChatbotSettings = () => {
       </div>
 
       <Flex flex={1} justify="center" className="max-sm:hidden">
-        <WidgetPreview primaryColor={primaryColor} />
+        <WidgetPreview primaryColor={primaryColor || "#2563EB"} />
       </Flex>
 
       <ChatbotConnectModal apiKey={apiKey} isOpen={isConnectModalOpen} onClose={() => setIsConnectModalOpen(false)} />
