@@ -36,7 +36,7 @@ const validatePhoneNumber = (phoneNumber: string) => {
         if (parsedPhone) {
           return {
             isValid: false,
-            error: `Please enter a complete phone number for the selected country}`,
+            error: `Please enter a complete phone number for the selected country`,
           };
         }
       } catch {
@@ -234,7 +234,6 @@ const validateForm = () => {
                 }`}
               />
             </div>
-            {formData.phone && <p className="text-xs text-gray-500 mt-1">Complete: {formData.phone}</p>}
             {!error && phoneNumber && validatePhoneNumber(`+${getCountryCallingCode(countryCode)}${phoneNumber}`).isValid && (
               <p className="text-green-600 text-xs mt-1">✓ Valid phone number</p>
             )}

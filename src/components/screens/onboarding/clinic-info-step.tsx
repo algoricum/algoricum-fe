@@ -496,13 +496,15 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
         {currentQuestionIndex === questions.length - 1 && renderConsentSection()}
 
         <div className="flex justify-between mt-6">
-          <Button
-            onClick={handlePrevious}
-            className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
-            disabled={currentQuestionIndex === 0 && !onPrev}
-          >
-            Previous
-          </Button>
+          {(currentQuestionIndex > 0 || onPrev) && (
+            <Button
+              onClick={handlePrevious}
+              className="bg-white border border-gray-300 text-gray-700 rounded-lg px-6 py-2 h-auto"
+              disabled={currentQuestionIndex === 0 && !onPrev}
+            >
+              Previous
+            </Button>
+          )}
           <Button
             type="primary"
             onClick={handleNext}

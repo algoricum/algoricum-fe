@@ -143,7 +143,6 @@ export const resetPasswordRequest = async (email: string): Promise<void> => {
     const { data: user, error: userCheckError } = await supabase.from("user").select("id").eq("email", email).single();
 
     if (!user || userCheckError) {
-      ErrorToast("No account exists with this email.");
       throw new Error("No account exists with this email.");
     }
 
@@ -152,12 +151,11 @@ export const resetPasswordRequest = async (email: string): Promise<void> => {
     });
 
     if (resetError) {
-      ErrorToast(`Reset password error: ${resetError.message}`);
       throw resetError;
     }
 
   } catch (error: any) {
-    ErrorToast(`Forgot password error: ${error.message}`);
+    console.error(`Forgot password error: ${error.message}`);
     throw error;
   }
 };
