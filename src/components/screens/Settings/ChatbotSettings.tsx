@@ -31,7 +31,6 @@ const ChatbotSettings = () => {
   const [clinicData, setClinicData] = useState<any>();
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // ... (rest of the code remains unchanged until the Form.Item sections)
   const normalizeValue = (value: string | null | undefined, validOptions: string[]) => {
     if (!value) return validOptions[0]; // Return first option as default
 
@@ -83,6 +82,7 @@ const ChatbotSettings = () => {
           // Get colors from clinic data
           const primaryColor = clinic.widget_theme?.primary_color || "#2563EB";
           const fontColor = clinic.widget_theme?.font_color || "#000000";
+
           // Set form values with normalized data
           const formValues = {
             greeting: clinic.assistant_prompt || "",
@@ -92,7 +92,9 @@ const ChatbotSettings = () => {
             sentenceLength: normalizedLength,
             formalityLevel: normalizedFormality,
             chatbotName: clinic.chatbot_name || "",
-            chatbotAvatar: clinic.chatbot_avatar || null,
+            chatbotAvatar: [], // Initialize as empty array
+            logo: [], // Initialize as empty array
+            servicesDocument: [], // Initialize as empty array
           };
 
           console.log("Setting form values:", formValues); // Debug log
@@ -134,12 +136,18 @@ const ChatbotSettings = () => {
       let logoUrl;
       let avatarUrl;
 
-      if (values.logo) {
+      // Safe check for logo upload
+      if (values.logo && Array.isArray(values.logo) && values.logo.length > 0 && values.logo[0].originFileObj) {
         logoUrl = await uploadClinicLogo(user.id, values.logo[0].originFileObj);
       }
 
-      if (values.chatbotAvatar) {
-        // Using the same upload function for avatar, you might want to create a separate one
+      // Safe check for avatar upload
+      if (
+        values.chatbotAvatar &&
+        Array.isArray(values.chatbotAvatar) &&
+        values.chatbotAvatar.length > 0 &&
+        values.chatbotAvatar[0].originFileObj
+      ) {
         avatarUrl = await uploadClinicLogo(user.id, values.chatbotAvatar[0].originFileObj);
       }
 
@@ -154,6 +162,7 @@ const ChatbotSettings = () => {
         sentence_length: values.sentenceLength,
         formality_level: values.formalityLevel,
       });
+
       const clinicInstructions = generateClinicInstructions({
         name: clinic.legal_business_name || "",
         address: clinic.address,
@@ -166,12 +175,24 @@ const ChatbotSettings = () => {
         formality_level: values.formalityLevel,
         has_uploaded_document: true,
       });
+
       const formDataToSend = new FormData();
       const session = await getSupabaseSession();
       formDataToSend.append("clinic_id", clinic.id);
       formDataToSend.append("name", clinic.legal_business_name || "");
       formDataToSend.append("instructions", clinicInstructions);
       formDataToSend.append("assistant_id", assistantData.id);
+
+      // Add the services document file directly to form data for OpenAI processing
+      if (
+        values.servicesDocument &&
+        Array.isArray(values.servicesDocument) &&
+        values.servicesDocument.length > 0 &&
+        values.servicesDocument[0].originFileObj
+      ) {
+        formDataToSend.append("clinic_document", values.servicesDocument[0].originFileObj);
+      }
+
       try {
         // Call the combined edge function
         const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
@@ -192,6 +213,7 @@ const ChatbotSettings = () => {
         console.error("Failed to create assistant:", assistantError);
         // Continue with onboarding even if assistant creation fails
       }
+
       if (!clinic) throw { message: "Failed to save chatbot settings" };
       SuccessToast("Chatbot settings saved successfully");
     } catch (error: any) {
@@ -214,14 +236,26 @@ const ChatbotSettings = () => {
     form.setFieldsValue({ formalityLevel: value });
   };
 
+  // Fixed normFile function with proper validation
   const normFile = (e: any) => {
+    console.log("Upload event:", e);
+
     if (Array.isArray(e)) {
       return e;
     }
-    return e?.fileList;
+
+    // Ensure fileList is always an array
+    const fileList = e?.fileList || [];
+
+    // Validate that fileList is an array
+    if (!Array.isArray(fileList)) {
+      console.warn("fileList is not an array:", fileList);
+      return [];
+    }
+
+    return fileList;
   };
 
-  // ... (rest of the code remains unchanged)
   if (loading && !dataLoaded) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -232,6 +266,7 @@ const ChatbotSettings = () => {
       </div>
     );
   }
+
   return (
     <div className="flex flex-col md:flex-row gap-6">
       <div className="flex-1 rounded-[20px] border border-gray-200 p-4 bg-Gray100 gap-4">
@@ -248,12 +283,14 @@ const ChatbotSettings = () => {
               </Button>
             </Tooltip>
           </div>
+
           <Form.Item label="Chatbot Name" name="chatbotName" rules={[{ required: true, message: "Please enter a chatbot name" }]}>
             <Input
               placeholder="Enter your chatbot's name (e.g., Dr. Smith Assistant, MedBot)"
               prefix={<UserOutlined className="text-gray-400" />}
             />
           </Form.Item>
+
           <Form.Item label="Chatbot Avatar" name="chatbotAvatar" valuePropName="fileList" getValueFromEvent={normFile}>
             <Upload.Dragger
               name="chatbotAvatar"
@@ -267,6 +304,7 @@ const ChatbotSettings = () => {
               }}
               maxCount={1}
               className="bg-white rounded-md"
+              fileList={form.getFieldValue("chatbotAvatar") || []}
             >
               <p className="flex justify-center mb-2">
                 <UserOutlined className="text-gray-400" />
@@ -277,6 +315,7 @@ const ChatbotSettings = () => {
               <p className="text-center text-xs text-gray-500">JPG, PNG, SVG (recommended: square image)</p>
             </Upload.Dragger>
           </Form.Item>
+
           <Form.Item
             label="Greeting Message For Visitors"
             name="greeting"
@@ -284,6 +323,7 @@ const ChatbotSettings = () => {
           >
             <TextArea rows={4} placeholder="Enter a friendly greeting message" />
           </Form.Item>
+
           <Form.Item name="logo" label="Upload Chatbot Logo" valuePropName="fileList" getValueFromEvent={normFile}>
             <Upload.Dragger
               name="logo"
@@ -297,6 +337,7 @@ const ChatbotSettings = () => {
               }}
               maxCount={1}
               className="bg-white rounded-md"
+              fileList={form.getFieldValue("logo") || []}
             >
               <p className="flex justify-center mb-2">
                 <FileTextOutlined className="text-gray-400" />
@@ -307,7 +348,46 @@ const ChatbotSettings = () => {
               <p className="text-center text-xs text-gray-500">JPG, PNG, SVG</p>
             </Upload.Dragger>
           </Form.Item>
-          {/* ... (rest of the Form remains unchanged) */}
+
+          <Form.Item
+            name="servicesDocument"
+            label="Services and details document for AI processing (PDF, DOC, DOCX)"
+            valuePropName="fileList"
+            getValueFromEvent={normFile}
+          >
+            <Upload.Dragger
+              name="servicesDocument"
+              accept=".pdf,.doc,.docx"
+              beforeUpload={file => {
+                const isValidDocument =
+                  file.type === "application/pdf" ||
+                  file.type === "application/msword" ||
+                  file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                if (!isValidDocument) {
+                  ErrorToast("You can only upload PDF, DOC, or DOCX files!");
+                  return false;
+                }
+                const isValidSize = file.size / 1024 / 1024 < 65;
+                if (!isValidSize) {
+                  ErrorToast("File must be smaller than 65MB!");
+                  return false;
+                }
+                return false; // Prevent automatic upload
+              }}
+              maxCount={1}
+              className="bg-white rounded-md"
+              fileList={form.getFieldValue("servicesDocument") || []}
+            >
+              <p className="flex justify-center mb-2">
+                <FileTextOutlined className="text-gray-400" />
+              </p>
+              <p className="text-center mb-1">
+                Drag and drop files here or click to upload <span className="text-brand-primary">Browse Files</span>
+              </p>
+              <p className="text-center text-xs text-gray-500">PDF, DOC, DOCX (Max 10MB)</p>
+            </Upload.Dragger>
+          </Form.Item>
+
           <Form.Item label="Widget Appearance">
             <Flex wrap="wrap" gap="middle">
               <ColorConfigurator
@@ -325,6 +405,7 @@ const ChatbotSettings = () => {
               />
             </Flex>
           </Form.Item>
+
           <Form.Item label="Tone Selector" name="toneSelector" rules={[{ required: true, message: "Please select a tone" }]}>
             <div className="mb-2">
               <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
@@ -342,6 +423,7 @@ const ChatbotSettings = () => {
               ]}
             />
           </Form.Item>
+
           <Form.Item label="Sentence Length" name="sentenceLength" rules={[{ required: true, message: "Please select a sentence length" }]}>
             <div className="mb-2">
               <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
@@ -358,6 +440,7 @@ const ChatbotSettings = () => {
               ]}
             />
           </Form.Item>
+
           <Form.Item label="Formality Level" name="formalityLevel" rules={[{ required: true, message: "Please select a formality level" }]}>
             <div className="mb-2">
               <p className="text-xs text-gray-500 mb-2">How formal should the language be?</p>
@@ -376,6 +459,7 @@ const ChatbotSettings = () => {
               ]}
             />
           </Form.Item>
+
           {/* Live Preview Section */}
           {(toneSelector || sentenceLength || formalityLevel) && (
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -399,6 +483,7 @@ const ChatbotSettings = () => {
               </div>
             </div>
           )}
+
           <Form.Item>
             <Button
               type="primary"
@@ -408,7 +493,7 @@ const ChatbotSettings = () => {
             >
               Save Changes
             </Button>
-          </Form.Item>{" "}
+          </Form.Item>
         </Form>
       </div>
 

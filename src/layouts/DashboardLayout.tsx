@@ -1,8 +1,8 @@
+"use client";
+
+import { useState, type ReactNode } from "react";
+import { Layout, Flex, type LayoutProps } from "antd";
 import { Sidebar } from "@/components/common";
-import MobileFooter from "@/components/common/MobileFooter";
-import { Flex, Layout, type LayoutProps } from "antd";
-import type { ReactNode } from "react";
-import { useState } from "react";
 
 const { Content } = Layout;
 
@@ -12,30 +12,24 @@ interface DashboardLayoutProps extends LayoutProps {
 
 const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <div className="h-screen overflow-hidden">
-      <Layout className="h-full flex flex-row">
-        {/* <Sidebar /> */}
+    <div className="h-svh w-full overflow-x-hidden">
+      <Layout className="h-full w-full flex flex-row">
         <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-        <Layout className="flex-1">
+
+        {/* Right side: header + content + footer as a column */}
+        <Layout className="flex min-w-0 flex-1 flex-col">
           {header && (
-            <Flex className="w-full border-b border-Gray300" style={{ height: "64px", flexShrink: 0 }}>
-              {header}
-            </Flex>
+            <div className="sticky top-0 z-40 w-full bg-white">
+              <Flex className="w-full border-b border-Gray300" style={{ height: 64, flexShrink: 0 }} align="center" justify="space-between">
+                {header}
+              </Flex>
+            </div>
           )}
 
-          <Content
-            className="bg-white p-4"
-            style={{
-              height: header ? "calc(100vh - 60px - 60px)" : "calc(100vh - 60px)", // Subtract header and footer height
-              overflowY: "auto",
-              overflowX: "hidden",
-            }}
-          >
-            {children}
-          </Content>
-
-          <MobileFooter />
+          {/* Content should scroll, header stays fixed */}
+          <Content className="min-h-0 flex-1 overflow-y-auto bg-white p-4">{children}</Content>
         </Layout>
       </Layout>
     </div>

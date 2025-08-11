@@ -26,6 +26,7 @@ import { createClient } from "@/utils/supabase/config/client";
 import getLeadSourceId from "@/utils/lead_source";
 import getNormalizedLead from "@/utils/normalizeLeadData";
 import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 
 import {
   ONBOARDING_STORAGE_KEY,
@@ -157,6 +158,7 @@ export default function MainOnboarding() {
       // Additional data from new flow
       clinicType: clinicInfo.clinicType || "",
       integrations: integrations,
+      servicesDocument: clinicInfo.servicesDocument?.[0]?.originFileObj || null,
     };
   };
 
@@ -254,6 +256,34 @@ export default function MainOnboarding() {
 
       // Update clinic
       const updatedClinic = await updateClinic(clinicData);
+
+      // Handle services document upload to edge function
+      if (mappedData.servicesDocument) {
+        try {
+          const formDataToSend = new FormData();
+          const session = await getSupabaseSession();
+
+          formDataToSend.append("clinic_document", mappedData.servicesDocument);
+          formDataToSend.append("clinic_id", updatedClinic.id);
+          formDataToSend.append("name", mappedData.legalBusinessName || "Assistant");
+          formDataToSend.append("instructions", "AI Assistant for handling clinic inquiries");
+
+          const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: formDataToSend,
+          });
+
+          if (!response.ok) {
+            console.error("Document upload failed, continuing onboarding");
+          }
+        } catch (error) {
+          console.error("Failed to upload document:", error);
+          // Continue onboarding even if document upload fails
+        }
+      }
 
       // Generate API key for the clinic
       const apiKeyName = `${mappedData.legalBusinessName} Primary Key`;

@@ -5,7 +5,9 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 
 const Page = () => {
   return (
-    <DashboardLayout header={<Header title="Profile Settings" description="Manage your profile and application settings." />}>
+    <DashboardLayout
+      header={<Header title="Profile Settings" description="Manage your profile and application settings." showHamburgerMenu={true} />}
+    >
       <SettingsTabs />
     </DashboardLayout>
   );

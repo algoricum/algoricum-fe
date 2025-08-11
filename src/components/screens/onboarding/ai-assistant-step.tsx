@@ -136,10 +136,10 @@ export default function AiAssistantStep({ onNext, onPrev, initialData = {} }: Ai
       beforeUpload: (file: any) => {
         const isValidType = currentQuestion.acceptedFormats?.includes(file.type);
         if (!isValidType) {
-          message.error(`You can only upload ${currentQuestion.acceptedExtensions} files!`);
+          message.error(`You can only upload files!`);
           return false;
         }
-        const isValidSize = file.size / 1024 / 1024 < 10;
+        const isValidSize = file.size / 1024 / 1024 < 60;
         if (!isValidSize) {
           message.error("File must be smaller than 10MB!");
           return false;
