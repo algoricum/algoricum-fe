@@ -47,7 +47,7 @@ const BASE_STEPS = [
   // { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
   { id: "integrations", title: "Lead Capture Setup", description: "Tools", icon: "⚡" },
   { id: "booking-setup", title: "Booking Link Setup", description: "Appointments", icon: "⚙️" },
-  // { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
+  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
 ];
 
 export default function MainOnboarding() {
