@@ -20,6 +20,7 @@ type FormField = {
 
 type FormData = { [key: string]: string | number };
 
+// eslint-disable-next-line no-unused-vars
 type Props = { clinicId: string; onSuccess?: (newLead?: any) => void;}; // Accept the new lead data };
 
 const validatePhoneNumber = (phoneNumber: string) => {
