@@ -19,8 +19,7 @@ import {
   LinkIcon,
   ExternalLink,
   Copy,
-  Check,
-  ChevronDown,
+  Check
 } from "lucide-react";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";

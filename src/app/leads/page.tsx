@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { UserPlus, CheckCircle, Clock, SearchIcon, ChevronDown } from "lucide-react";
 import { Header } from "@/components/common";
@@ -50,8 +50,7 @@ export default function LeadsPage() {
   // Status dropdown state
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
+  const dropdownRef = useRef<HTMLTableCellElement>(null);
   // Load leads data, re-run when refreshKey changes
   useEffect(() => {
     loadData();
@@ -359,7 +358,7 @@ export default function LeadsPage() {
                       <td className="px-4 py-3 text-gray-900">{lead.phone || "No phone"}</td>
 
                       {/* Status with dropdown */}
-                      <td className="relative px-4 py-3" ref={openDropdownId === lead.id ? dropdownRef : null}>
+                      <td className="relative px-4 py-3" ref={openDropdownId === lead.id ? dropdownRef : undefined}>
                         <button
                           onClick={() => toggleDropdown(lead.id)}
                           disabled={updatingStatus === lead.id}
