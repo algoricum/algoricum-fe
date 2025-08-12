@@ -38,6 +38,11 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const mailgunSigningKey = Deno.env.get('MAILGUN_WEBHOOK_SIGNING_KEY');
+    
+    // Additional environment variables needed for AI responses:
+    // OPENAI_API_KEY - for generating AI responses
+    // MAILGUN_API_KEY - for sending emails  
+    // MAILGUN_DOMAIN - your Mailgun domain
 
     if (!supabaseUrl || !supabaseKey || !mailgunSigningKey) {
       return new Response(JSON.stringify({
@@ -237,7 +242,7 @@ async function processEmailReply(
       .from('clinic')
       .select('id, name, mailgun_email')
       .eq('mailgun_email', recipientEmail.toLowerCase())
-      .limit(1)
+       .limit(1)
       .single();
 
     console.log('Clinic query result:', { clinicData, clinicError });
@@ -495,6 +500,31 @@ async function processEmailReply(
 
     console.log(`✅ Saved conversation record: ${conversationRecord.id}`);
 
+    // Generate and send AI response
+    console.log('🤖 Generating AI response...');
+    const aiResponse = await generateAIResponse(leadData, messageBody, subject, supabaseClient, clinicData);
+    
+    if (aiResponse.success) {
+      console.log('📧 Sending AI response via email...');
+      const emailSent = await sendEmailResponse(
+        senderEmail, 
+        recipientEmail, 
+        subject, 
+        aiResponse.response, 
+        conversationRecord.id
+      );
+      
+      if (emailSent.success) {
+        console.log('💾 Saving AI response to conversation...');
+        await saveAIResponseToConversation(
+          threadId, 
+          aiResponse.response, 
+          emailSent.messageId,
+          supabaseClient
+        );
+      }
+    }
+
     // Update lead's updated_at timestamp and potentially status
     console.log('📝 Updating lead timestamp...');
     const { error: leadUpdateError } = await supabaseClient
@@ -512,10 +542,9 @@ async function processEmailReply(
       console.log('✅ Updated lead timestamp');
     }
 
-
     const responseData = {
       success: true,
-      message: 'Reply processed and saved successfully',
+      message: 'Reply processed and AI response sent successfully',
       data: {
         lead_id: leadData.id,
         conversation_id: conversationRecord.id,
@@ -523,7 +552,8 @@ async function processEmailReply(
         clinic_id: clinicData.id,
         sender: senderEmail,
         lead_created: false,
-        action: 'conversation_created'
+        action: 'conversation_created',
+        ai_response_sent: aiResponse?.success || false
       }
     };
 
@@ -540,3 +570,192 @@ async function processEmailReply(
   }
 }
 
+async function generateAIResponse(
+  leadData: any,
+  messageBody: string,
+  subject: string,
+  supabaseClient: any,
+  clinicData: any,
+  threadId?: string
+): Promise<{ success: boolean; response?: string; error?: string }> {
+  try {
+    console.log('🤖 Calling OpenAI for response generation...');
+    
+    // Get conversation history for context if threadId is provided
+    let conversationContext = '';
+    if (threadId) {
+      const { data: conversationHistory } = await supabaseClient
+        .from('conversation')
+        .select('message, sender_type, created_at')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true })
+        .limit(10);
+
+      conversationContext = conversationHistory
+        ? conversationHistory.map((c: any) => 
+            `${c.sender_type === 'lead' ? 'Lead' : 'Clinic'}: ${c.message}`
+          ).join('\n\n')
+        : '';
+    }
+
+    const prompt = `You are an AI assistant for ${clinicData.name}, a medical clinic. 
+    
+Lead Information:
+- Name: ${leadData.first_name} ${leadData.last_name}
+- Email: ${leadData.email}
+- Status: ${leadData.status}
+
+Current Email:
+Subject: ${subject}
+Message: ${messageBody}
+
+Previous Conversation:
+${conversationContext}
+
+Please generate a helpful, professional response to this lead's email. Be warm, informative, and encourage them to book an appointment if appropriate. Keep the response concise and focused.`;
+
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      console.error('❌ OpenAI API key not found');
+      return { success: false, error: 'OpenAI API key not configured' };
+    }
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a helpful AI assistant for ${clinicData.name}. Respond professionally to patient inquiries.`
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 500,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('❌ OpenAI API error:', response.status, response.statusText);
+      return { success: false, error: 'Failed to generate AI response' };
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0]?.message?.content;
+
+    if (!aiResponse) {
+      console.error('❌ No response generated by AI');
+      return { success: false, error: 'Empty AI response' };
+    }
+
+    console.log('✅ AI response generated successfully');
+    return { success: true, response: aiResponse };
+
+  } catch (error) {
+    console.error('❌ Error generating AI response:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function sendEmailResponse(
+  toEmail: string,
+  fromEmail: string,
+  originalSubject: string,
+  responseMessage: string,
+  conversationId: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    console.log('📧 Sending email via Mailgun...');
+    
+    const mailgunApiKey = Deno.env.get('MAILGUN_API_KEY');
+    const mailgunDomain = Deno.env.get('MAILGUN_BASE_DOMAIN');
+    
+    if (!mailgunApiKey || !mailgunDomain) {
+      console.error('❌ Mailgun credentials not found');
+      return { success: false, error: 'Mailgun credentials not configured' };
+    }
+
+    // Prepare subject line
+    const replySubject = originalSubject.toLowerCase().startsWith('re:') 
+      ? originalSubject 
+      : `Re: ${originalSubject}`;
+
+    const formData = new FormData();
+    formData.append('from', fromEmail);
+    formData.append('to', toEmail);
+    formData.append('subject', replySubject);
+    formData.append('text', responseMessage);
+    formData.append('h:X-Conversation-ID', conversationId);
+
+    const response = await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(`api:${mailgunApiKey}`)}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Mailgun API error:', response.status, errorText);
+      return { success: false, error: 'Failed to send email via Mailgun' };
+    }
+
+    const result = await response.json();
+    console.log('✅ Email sent successfully via Mailgun');
+    
+    return { 
+      success: true, 
+      messageId: result.id 
+    };
+
+  } catch (error) {
+    console.error('❌ Error sending email:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function saveAIResponseToConversation(
+  threadId: string,
+  aiResponse: string,
+  emailMessageId: string | undefined,
+  supabaseClient: any
+): Promise<void> {
+  try {
+    console.log('💾 Saving AI response to conversation thread...');
+    
+    const aiConversationData = {
+      thread_id: threadId,
+      message: aiResponse,
+      timestamp: new Date().toISOString(),
+      is_from_user: true, // This is from the clinic/AI
+      sender_type: 'ai_assistant',
+      email_message_id: emailMessageId || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: aiConversationRecord, error: aiConversationError } = await supabaseClient
+      .from('conversation')
+      .insert(aiConversationData)
+      .select()
+      .single();
+
+    if (aiConversationError) {
+      console.error('❌ Error saving AI response to conversation:', aiConversationError);
+    } else {
+      console.log('✅ AI response saved to conversation:', aiConversationRecord.id);
+    }
+
+  } catch (error) {
+    console.error('❌ Error saving AI response:', error);
+  }
+}
