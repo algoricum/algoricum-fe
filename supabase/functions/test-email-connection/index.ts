@@ -240,8 +240,7 @@ async function processEmailReply(
       .limit(1)
       .single();
 
-    
-      console.log('Clinic query result:', { clinicData, clinicError });
+    console.log('Clinic query result:', { clinicData, clinicError });
 
     if (clinicError || !clinicData) {
       console.error('❌ Error finding clinic or clinic not found:', clinicError);
@@ -256,14 +255,16 @@ async function processEmailReply(
     // Check if sender email exists in lead table for this clinic
     console.log('🔍 Looking for lead with email:', senderEmail.toLowerCase(), 'in clinic:', clinicData.id);
     
-    const { data: leadData, error: leadError } = await supabaseClient
+    const { data: existingLead, error: leadError } = await supabaseClient
       .from('lead')
       .select('id, email, first_name, last_name, status, clinic_id')
       .eq('email', senderEmail.toLowerCase())
       .eq('clinic_id', clinicData.id)
       .single();
 
-    console.log('Lead query result:', { leadData, leadError });
+    console.log('Lead query result:', { leadData: existingLead, leadError });
+
+    let leadData = existingLead;
 
     if (leadError && leadError.code !== 'PGRST116') { // PGRST116 = no rows returned
       console.error('❌ Error checking lead:', leadError);
@@ -275,13 +276,100 @@ async function processEmailReply(
 
     if (!leadData) {
       console.log(`⚠️ No lead found for email: ${senderEmail} in clinic: ${clinicData.id}`);
+      console.log('🆕 Creating new lead for incoming email...');
+      
+      // Find or create default source for email leads
+      let defaultSourceId: string;
+      
+      const { data: existingSource } = await supabaseClient
+        .from('lead_source')
+        .select('id')
+        .eq('name', 'Email')
+        .limit(1)
+        .single();
+
+      if (existingSource) {
+        defaultSourceId = existingSource.id;
+        console.log('✅ Found existing "Email Inbound" source:', defaultSourceId);
+      } else {
+        console.log('🆕 Creating default "Email Inbound" source...');
+        const { data: newSource, error: createSourceError } = await supabaseClient
+          .from('lead_source')
+          .insert({
+            name: 'Email Inbound',
+            description: 'Leads created from inbound emails',
+            created_at: new Date().toISOString()
+          })
+          .select('id')
+          .single();
+
+        if (createSourceError) {
+          console.error('❌ Error creating default source:', createSourceError);
+          return {
+            success: false,
+            message: 'Failed to create default lead source'
+          };
+        }
+        
+        defaultSourceId = newSource.id;
+        console.log('✅ Created default source:', defaultSourceId);
+      }
+      
+      // Extract name from email if possible, otherwise use email prefix
+      const emailPrefix = senderEmail.split('@')[0];
+      const nameFromEmail = emailPrefix.replace(/[._-]/g, ' ').split(' ');
+      
+      const newLeadData = {
+        email: senderEmail.toLowerCase(),
+        first_name: nameFromEmail[0] || emailPrefix,
+        last_name: nameFromEmail.length > 1 ? nameFromEmail.slice(1).join(' ') : null,
+        clinic_id: clinicData.id,
+        source_id: defaultSourceId,
+        status: 'New', // Default status
+        interest_level: null,
+        urgency: null,
+        notes: `Auto-created from inbound email: ${subject}\n\nEmail content:\n${messageBody}`,
+        form_data: { auto_created: true, from_email: true, initial_subject: subject },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('New lead data:', newLeadData);
+
+      const { data: createdLead, error: createLeadError } = await supabaseClient
+        .from('lead')
+        .insert(newLeadData)
+        .select('id, email, first_name, last_name, status, clinic_id')
+        .single();
+
+      console.log('Lead creation result:', { createdLead, createLeadError });
+
+      if (createLeadError) {
+        console.error('❌ Error creating new lead:', createLeadError);
+        return {
+          success: false,
+          message: 'Failed to create new lead'
+        };
+      }
+
+      leadData = createdLead;
+      console.log(`✅ Created new lead: ${leadData.id} - ${leadData.first_name} ${leadData.last_name}`);
+      
+      // For new leads, just return success without creating conversation thread
       return {
         success: true,
-        message: 'Email not from a known lead - ignoring'
+        message: 'New lead created successfully from email',
+        data: {
+          lead_id: leadData.id,
+          clinic_id: clinicData.id,
+          sender: senderEmail,
+          lead_created: true,
+          action: 'lead_created_only'
+        }
       };
+    } else {
+      console.log(`✅ Found existing lead: ${leadData.id} - ${leadData.first_name} ${leadData.last_name}`);
     }
-
-    console.log(`✅ Found lead: ${leadData.id} - ${leadData.first_name} ${leadData.last_name}`);
 
     // Check if this is a reply to a previous email
     const isReply = subject.toLowerCase().includes('re:') || 
@@ -326,7 +414,8 @@ async function processEmailReply(
           .from('threads')
           .insert({
             lead_id: leadData.id,
-            subject: subject,
+            clinic_id: clinicData.id,
+            status: "new",
             created_at: new Date().toISOString()
           })
           .select('id')
@@ -351,7 +440,8 @@ async function processEmailReply(
         .from('threads')
         .insert({
           lead_id: leadData.id,
-          subject: subject,
+          clinic_id: clinicData.id,
+          status: "new",
           created_at: new Date().toISOString()
         })
         .select('id')
@@ -422,9 +512,6 @@ async function processEmailReply(
       console.log('✅ Updated lead timestamp');
     }
 
-    // Optional: Trigger notifications
-    console.log('🔔 Triggering notifications...');
-    await triggerNotifications(leadData, conversationRecord, clinicData, supabaseClient);
 
     const responseData = {
       success: true,
@@ -434,7 +521,9 @@ async function processEmailReply(
         conversation_id: conversationRecord.id,
         thread_id: threadId,
         clinic_id: clinicData.id,
-        sender: senderEmail
+        sender: senderEmail,
+        lead_created: false,
+        action: 'conversation_created'
       }
     };
 
@@ -451,45 +540,3 @@ async function processEmailReply(
   }
 }
 
-async function triggerNotifications(
-  leadData: any, 
-  conversationRecord: any,
-  clinicData: any,
-  supabaseClient: any
-): Promise<void> {
-  try {
-    console.log('🔔 Creating notification for new reply...');
-    
-    // Create notification record for clinic staff
-    const notificationData = {
-      type: 'new_reply',
-      title: `New reply from ${leadData.first_name} ${leadData.last_name}`,
-      message: `Lead ${leadData.email} has replied to your email`,
-      lead_id: leadData.id,
-      clinic_id: clinicData.id,
-      conversation_id: conversationRecord.id,
-      is_read: false,
-      created_at: new Date().toISOString()
-    };
-
-    console.log('Notification data:', notificationData);
-
-    // Note: Adjust table name and structure based on your notifications table
-    const { data: notification, error: notificationError } = await supabaseClient
-      .from('notifications')
-      .insert(notificationData)
-      .select()
-      .single();
-
-    console.log('Notification save result:', { notification, notificationError });
-
-    if (notificationError) {
-      console.error('⚠️ Error saving notification:', notificationError);
-    } else {
-      console.log('✅ Notification created successfully');
-    }
-  } catch (error) {
-    console.error('❌ Error triggering notifications:', error);
-    // Don't fail the main process if notifications fail
-  }
-}
