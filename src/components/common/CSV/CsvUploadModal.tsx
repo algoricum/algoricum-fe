@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useRef, useState } from "react";
-import { Modal,Typography, Popover } from "antd";
+import { Modal, Typography, Popover } from "antd";
 import Papa from "papaparse";
 import { CheckCircleOutlined, ExclamationCircleOutlined, EyeOutlined } from "@ant-design/icons";
 
@@ -26,6 +26,73 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
   // Constants for displaying valid values (no validation, just for user reference)
   const VALID_INTEREST_LEVELS = ["high", "medium", "low"];
 
+  // Add header normalization function
+  const normalizeHeaders = (data: any[]): any[] => {
+    if (!data || data.length === 0) return data;
+
+    // Define variations of email headers to normalize
+    const emailVariations = [
+      "E-mail",
+      "e-mail",
+      "Email",
+      "email ",
+      "Email ",
+      "EMAIL",
+      "mail ",
+      "Mail",
+      "MAIL",
+      "mail",
+      " email",
+      " Email",
+      "e_mail",
+      "E_mail",
+    ];
+
+    // Define variations of phone headers to normalize
+    const phoneVariations = [
+      "Phone",
+      "phone-no",
+      "phone_number",
+      "phone_no",
+      "phone",
+      "PHONE",
+      "phone ",
+      "Phone ",
+      "telephone",
+      "Telephone",
+      "TELEPHONE",
+      "mobile",
+      "Mobile",
+      "MOBILE",
+      " phone",
+      " Phone",
+    ];
+
+    return data.map(row => {
+      const normalizedRow: any = {};
+
+      Object.keys(row).forEach(key => {
+        const trimmedKey = key.trim();
+
+        // Normalize email headers
+        if (emailVariations.includes(trimmedKey)) {
+          normalizedRow["email"] = row[key];
+        }
+        // Normalize phone headers
+        else if (phoneVariations.includes(trimmedKey)) {
+          normalizedRow["phone"] = row[key];
+        }
+        // Keep other headers as-is but trimmed and normalized
+        else {
+          const normalizedKey = trimmedKey.toLowerCase().replace(/\s+/g, "_");
+          normalizedRow[normalizedKey] = row[key];
+        }
+      });
+
+      return normalizedRow;
+    });
+  };
+
   const parseCSVFile = (file: File): Promise<any> => {
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
@@ -43,8 +110,6 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
     const errors: string[] = [];
     const warnings: string[] = [];
     const requiredHeaders = ["email", "phone"];
-    // const optionalHeaders = ["first_name", "last_name", "notes", "interest_level"];
-    // const allValidHeaders = [...requiredHeaders, ...optionalHeaders];
 
     // Check for required headers
     const missingRequired = requiredHeaders.filter(header => !headers.includes(header));
@@ -74,13 +139,16 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
         return;
       }
 
-      const data = result.data;
+      let data = result.data;
 
       if (data.length === 0) {
         setCsvValidationError("CSV file is empty. Please add some leads and try again.");
         setCsvLeads([]);
         return;
       }
+
+      // Normalize headers BEFORE validation
+      data = normalizeHeaders(data);
 
       const headers = Object.keys(data[0] || {});
 
@@ -205,6 +273,7 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
               <li>first_name</li>
               <li>last_name</li>
               <li>notes</li>
+              <li>status : &quot;New&quot;</li>
               <li>
                 interest_level (
                 <Popover content={renderValidValuesContent(VALID_INTEREST_LEVELS)} title="Valid Interest Levels" trigger="hover">
@@ -218,6 +287,23 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
           </div>
         </div>
 
+        {/* Header Normalization Information */}
+        <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+          <Text className="text-sm font-semibold text-yellow-800 mb-2 block">🔄 Automatic Header Normalization:</Text>
+          <div className="text-sm text-yellow-700 space-y-1">
+            <p>We automatically normalize common header variations:</p>
+            <ul className="ml-4 space-y-1 list-disc list-inside">
+              <li>
+                <strong>Email headers:</strong> E-mail, e-mail, Email, EMAIL, mail, Mail, MAIL → <code>email</code>
+              </li>
+              <li>
+                <strong>Phone headers:</strong> Phone, PHONE, telephone, mobile, Mobile → <code>phone</code>
+              </li>
+            </ul>
+            <p className="text-xs mt-2">✨ You don&apos;t need to worry about exact header names - we&apos;ll handle the variations!</p>
+          </div>
+        </div>
+
         {/* Default Values Information */}
         <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
           <Text className="text-sm font-semibold text-green-800 mb-2 block">💡 Default Values:</Text>
@@ -226,6 +312,12 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
             <ul className="ml-4 space-y-1 list-disc list-inside">
               <li>
                 <strong>interest_level:</strong> &quot;medium&quot;
+              </li>
+            </ul>
+            <p>Every new lead inserted from CSV has following status</p>
+            <ul className="ml-4 space-y-1 list-disc list-inside">
+              <li>
+                <strong>status:</strong> &quot;New&quot;
               </li>
             </ul>
           </div>
@@ -254,8 +346,6 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
               hover:file:bg-purple-100"
           />
 
-          {/* Validation Warnings - Remove this section since we don't show warnings */}
-
           {/* Success Message */}
           {csvLeads.length > 0 && !csvValidationError && (
             <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
@@ -282,7 +372,7 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <Text className="text-sm font-semibold text-gray-700 mb-2">📄 Example CSV Format:</Text>
             <div className="text-xs text-gray-600 bg-white p-3 rounded border font-mono">
-              first_name,last_name,email,phone,interest_level,notes
+              first_name,last_name,E-mail,Phone,interest_level,notes
               <br />
               John,Doe,john.doe@email.com,+1234567890,high,Interested in consultation
               <br />
@@ -291,6 +381,8 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
               Bob,Johnson,bob.johnson@email.com,+1234567892,,Contact tomorrow
             </div>
             <div className="text-xs text-gray-500 mt-2 space-y-1">
+              <div>📧 Email headers: All variations (E-mail, Email, EMAIL, mail, etc.) normalized to &quot;email&quot;</div>
+              <div>📱 Phone headers: All variations (Phone, telephone, mobile, etc.) normalized to &quot;phone&quot;</div>
               <div>⚠️ Email and phone columns must have values for all rows</div>
               <div>💡 Optional columns can be empty - backend will assign default values</div>
               <div>🔍 Hover over &quot;Valid Values&quot; to see acceptable values for interest_level</div>

@@ -26,15 +26,17 @@ function normalizeLeadData(lead: Partial<Lead>, rowIndex?: number): Lead {
   }
 
   // Validate and normalize interest_level (optional column)
+  // Validate and normalize interest_level (optional column)
   let interest_level: string | null = null;
   if (Object.prototype.hasOwnProperty.call(lead, "interest_level")) {
     const rawInterestLevel = lead.interest_level?.toString().trim();
     if (rawInterestLevel && rawInterestLevel !== "") {
       const normalized = rawInterestLevel.toLowerCase();
       if (!VALID_INTEREST_LEVELS.includes(normalized)) {
-        interest_level = "medium"; 
+        interest_level = "medium"; // Default for invalid values
+      } else {
+        interest_level = normalized; // Use the valid normalized value
       }
-      interest_level = normalized;
     } else {
       interest_level = "medium"; // Default when column exists but is empty
     }
