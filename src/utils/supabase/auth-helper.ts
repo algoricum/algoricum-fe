@@ -4,7 +4,7 @@ import { User as SupabaseUser, Session } from "@supabase/supabase-js";
 import type { User } from "@/interfaces/services_type";
 import { clearAll, setAccessToken } from "@/helpers/storage-helper";
 import { setUserData } from "./user-helper";
-import { SuccessToast ,ErrorToast} from "@/helpers/toast";
+import { SuccessToast} from "@/helpers/toast";
 
 const supabase = createClient();
 
@@ -147,7 +147,7 @@ export const resetPasswordRequest = async (email: string): Promise<void> => {
     }
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "http://localhost:3001/forgot-password",
+      redirectTo: `${process.env.NEXT_PUBLIC_URL}/forgot-password`,
     });
 
     if (resetError) {

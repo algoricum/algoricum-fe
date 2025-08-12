@@ -20,7 +20,8 @@ type FormField = {
 
 type FormData = { [key: string]: string | number };
 
-type Props = { clinicId: string; onSuccess?: () => void };
+// eslint-disable-next-line no-unused-vars
+type Props = { clinicId: string; onSuccess?: (newLead?: any) => void;}; // Accept the new lead data };
 
 const validatePhoneNumber = (phoneNumber: string) => {
   if (!phoneNumber || !phoneNumber.trim()) {
@@ -167,42 +168,43 @@ const validateForm = () => {
 };
 
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!validateForm()) return;
 
-    setSubmitting(true);
+  setSubmitting(true);
+  const source_id = await getLeadSourceId("Others");
 
-    const source_id=await getLeadSourceId("Others");
+  try {
+    const submissionData = {
+      clinic_id: clinicId,
+      source_id: source_id,
+      first_name: formData.name || null,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      form_data: { ...formData, country_code: countryCode, phone_number: phoneNumber },
+      interest_level: "medium",
+      urgency: "curious",
+      status: "New",
+    };
 
-    try {
-      // const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Phone").single();
+    const { data, error: insertError } = await supabase
+      .from("lead")
+      .insert([submissionData])
+      .select() // Return the inserted data
+      .single();
 
-      // if (sourceError) throw sourceError;
+    if (insertError) throw insertError;
 
-      const submissionData = {
-        clinic_id: clinicId,
-        source_id: source_id,
-        first_name: formData.name || null,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        form_data: { ...formData, country_code: countryCode, phone_number: phoneNumber },
-        interest_level: "medium",
-        urgency: "curious",
-        status: "New",
-      };
-
-      const { error: insertError } = await supabase.from("lead").insert([submissionData]);
-      if (insertError) throw insertError;
-      onSuccess?.();
-
-    } catch (err) {
-      console.error("Submit error:", err);
-      alert("Error submitting form. Try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    // Pass the new lead data to parent instead of just calling onSuccess
+    onSuccess?.(data);
+  } catch (err) {
+    console.error("Submit error:", err);
+    alert("Error submitting form. Try again.");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const renderField = (f: FormField) => {
     const error = errors[f.field_id];

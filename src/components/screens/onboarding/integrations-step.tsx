@@ -9,7 +9,8 @@ import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toa
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
-import Papa from "papaparse";
+import {handleCsvUpload} from "@/utils/csvUtils";
+
 const { Title, Text } = Typography;
 
 interface IntegrationsStepProps {
@@ -64,43 +65,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
-  const handleCsvUpload = async (leadsData: any) => {
-    try {
-      if (!leadsData) {
-        WarningToast("No CSV file selected");
-      }
-
-      const user = await getUserData();
-      if (!user) {
-        throw new Error("User not found. Please log in again.");
-      }
-
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const fileName = `leads-${user.id}-${timestamp}.csv`;
-      const filePath = `${user.id}/${fileName}`;
-
-      let csvData;
-      if (Array.isArray(leadsData)) {
-        csvData = Papa.unparse(leadsData);
-      } else {
-        csvData = leadsData;
-      }
-
-      const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvData, {
-        cacheControl: "3600",
-        upsert: false,
-      });
-
-      if (error) {
-        console.error("Upload error:", error);
-        throw new Error(`Failed to upload CSV: ${error.message}`);
-      }
-
-      localStorage.setItem(ONBOARDING_LEADS_FILE_NAME, filePath);
-    } catch (error) {
-      console.error("Error uploading CSV:", error);
-    }
-  };
 
   const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
   const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -964,7 +928,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         open={showManualLeadsModal}
         onOk={leads => {
           setShowManualLeadsModal(false);
-          handleCsvUpload(leads);
+          handleCsvUpload(leads,false);
           if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
             SuccessToast("Leads saved successfully");
           }

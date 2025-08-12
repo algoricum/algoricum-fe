@@ -1,6 +1,6 @@
 import { Providers } from "@/redux/providers";
 import type { Metadata } from "next";
-import Script from "next/script";
+// import Script from "next/script";
 import { ReactNode } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";
@@ -13,35 +13,20 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode[] | ReactNode }) {
   return (
     <html lang="en">
-      <head>
-        {/* Load hash-sdk.js from Supabase bucket */}
-        <script src="https://eypitkzntyiyvwrndkgy.supabase.co/storage/v1/object/public/sdk//hash-sdk.js" async></script>
-
-        {/* Initialize SDK with custom configuration */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.addEventListener('load', () => {
-                setTimeout(() => {
-                  if (typeof initialize !== 'undefined') {
-                    initialize({
-                      apiKey: "26edc9c551e6ae4410a8163c37422ab6adafd7752d8df9ee7150c72364b84fa2",
-                      elementId: "root-bot-container"
-                    });
-                  }
-                }, 100);
-              });
-            `,
-          }}
-        />
-      </head>
-
       <body>
         <Providers>{children}</Providers>
 
         {/* Load React and ReactDOM from CDN for hash-sdk.js */}
-        <Script src="https://unpkg.com/react@18/umd/react.production.min.js" strategy="beforeInteractive" />
-        <Script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" strategy="beforeInteractive" />
+        {/* <Script src="https://unpkg.com/react@18/umd/react.production.min.js" strategy="beforeInteractive" />
+        <Script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" strategy="beforeInteractive" /> */}
+        <script async crossOrigin={"anonymous"} src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+        <script async crossOrigin={"anonymous"} src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+        <script
+          async
+          src="https://eypitkzntyiyvwrndkgy.supabase.co/storage/v1/object/public/sdk/hash-sdk.js"
+          data-api-key="634f9af6e630aaf4d91ee02b925fad31b05117bb8bb91b9a8b21251fe8ef21e4"
+          data-element-id="root-bot-container"
+        />
       </body>
     </html>
   );

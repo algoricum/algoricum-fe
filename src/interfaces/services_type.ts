@@ -185,7 +185,7 @@ export interface Lead {
   last_name?: string | null;
   email?: string | null;
   phone?: string | null;
-  status: string; // should match your enum, e.g. 'new', 'booked', etc.
+  status?: string; // should match your enum, e.g. 'new', 'booked', etc.
   source_id: string;
   clinic_id: string;
   assigned_to?: string | null;
