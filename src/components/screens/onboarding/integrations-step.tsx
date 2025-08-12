@@ -10,8 +10,7 @@ import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
 import {handleCsvUpload} from "@/utils/csvUtils";
-import { set } from "lodash";
-import { format } from "path";
+
 
 const { Title, Text } = Typography;
 
