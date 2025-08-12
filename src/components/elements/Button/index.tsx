@@ -1,3 +1,4 @@
+// Button Component
 import { Button as AntdButton, ButtonProps } from "antd";
 
 interface AntdButtonProps extends ButtonProps {
@@ -5,7 +6,7 @@ interface AntdButtonProps extends ButtonProps {
   light?: boolean;
 }
 const Button = (props: AntdButtonProps) => {
-  const { children,className, ...btnProps } = props;
+  const { children, className, ...btnProps } = props;
 
   // const styles = outline
   //   ? "text-Primary1000 hover:!text-Primary800 !font-helvetica bg-white border !border-Primary800"
@@ -16,7 +17,7 @@ const Button = (props: AntdButtonProps) => {
   //       : "text-white hover:!text-white bg-Primary1000 hover:!bg-Primary800 hover:!border-Primary800";
 
   return (
-    <AntdButton className={`h-10 !font-helvetica-700 !py-2 !px-3 !rounded-lg !text-sm  ${className}`} {...btnProps}>
+    <AntdButton className={`h-10 !font-helvetica-700 !py-2 !px-3 !rounded-lg !text-sm ${className}`} {...btnProps}>
       {children}
     </AntdButton>
   );

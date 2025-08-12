@@ -148,7 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                     isActive ? "bg-purple-600 text-white" : "text-gray-700 hover:bg-gray-100"
                   } ${item.disabled ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
-                  <div className="w-5 h-5 mr-3 flex items-center justify-center">{isActive ? item.selectedicon : item.icon}</div>
+                  <div className="w-4 h-4 mr-3 flex items-center justify-center">{isActive ? item.selectedicon : item.icon}</div>
                   {item.label}
                 </button>
               );
@@ -170,7 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                     isActive ? "bg-purple-600 text-white" : "text-gray-700 hover:bg-gray-100"
                   } ${isLoggingOut && item.key === "logout" ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
-                  <div className="w-5 h-5 mr-3 flex items-center justify-center">{isActive ? item.selectedicon : item.icon}</div>
+                  <div className="w-4 h-4 mr-3 flex items-center justify-center">{isActive ? item.selectedicon : item.icon}</div>
                   {isLoggingOut && item.key === "logout" ? "Logging out..." : item.label}
                 </button>
               );

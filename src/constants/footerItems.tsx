@@ -3,14 +3,14 @@ import { SettingIcon, LogoutIcon } from "@/icons";
 const footerItems = [
   {
     key: "profileSettings",
-    icon: <SettingIcon />,
-    selectedicon: <SettingIcon color="var(--color-primary-1000)" />,
+    icon: <SettingIcon color="#9564E9" width={16} height={16} />,
+    selectedicon: <SettingIcon color="white" width={16} height={16} />,
     label: "Profile Settings",
   },
   {
     key: "logout",
-    icon: <LogoutIcon />,
-    selectedicon: <LogoutIcon color="var(--color-primary-1000)" />,
+    icon: <LogoutIcon color="#9564E9" width={16} height={16} />,
+    selectedicon: <LogoutIcon color="white" width={16} height={16} />,
     label: "Logout",
   },
 ];

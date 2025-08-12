@@ -4,7 +4,7 @@ import { User as SupabaseUser, Session } from "@supabase/supabase-js";
 import type { User } from "@/interfaces/services_type";
 import { clearAll, setAccessToken } from "@/helpers/storage-helper";
 import { setUserData } from "./user-helper";
-import { SuccessToast } from "@/helpers/toast";
+import { SuccessToast} from "@/helpers/toast";
 
 const supabase = createClient();
 
@@ -139,15 +139,27 @@ export const verifyOtp = async (email: string, otp: string): Promise<void> => {
  */
 export const resetPasswordRequest = async (email: string): Promise<void> => {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "http://localhost:3001/forgot-password",
+    // Check email in a public table you can access
+    const { data: user, error: userCheckError } = await supabase.from("user").select("id").eq("email", email).single();
+
+    if (!user || userCheckError) {
+      throw new Error("No account exists with this email.");
+    }
+
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_URL}/forgot-password`,
     });
-    if (error) throw error;
+
+    if (resetError) {
+      throw resetError;
+    }
+
   } catch (error: any) {
-    console.error("Forgot password error:", error.message);
+    console.error(`Forgot password error: ${error.message}`);
     throw error;
   }
 };
+
 
 /**
  * Update user password
