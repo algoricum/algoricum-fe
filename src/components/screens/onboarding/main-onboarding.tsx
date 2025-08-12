@@ -9,10 +9,10 @@ import StaffHoursStep from "./staff-hours-step";
 // import AiAssistantStep from "./ai-assistant-step";
 import BookingSetupStep from "./booking-setup-step";
 import IntegrationsStep from "./integrations-step";
-
+import {handleCsvLeadsUpload} from "@/utils/csvUtils";
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
-import { Lead } from "@/interfaces/services_type";
+
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 // import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { updateClinic, getClinicData, createEmailSettings } from "@/utils/supabase/clinic-helper";
@@ -22,10 +22,10 @@ import { getUserData } from "@/utils/supabase/user-helper";
 import { useAuth } from "@/hooks/useAuth";
 // import ChatbotSetupStep from "./chatbot-setup-step";
 // import type { MailgunMessageData } from "mailgun.js";
-import { createClient } from "@/utils/supabase/config/client";
-import getLeadSourceId from "@/utils/lead_source";
-import getNormalizedLead from "@/utils/normalizeLeadData";
-import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
+
+
+
+
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 
 import {
@@ -51,7 +51,6 @@ const BASE_STEPS = [
 ];
 
 export default function MainOnboarding() {
-  const supabase = createClient();
   const router = useRouter();
   const { logout } = useAuth();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -162,34 +161,7 @@ export default function MainOnboarding() {
     };
   };
 
-  // Upload CSV leads to Supabase lead table
-  const handleCsvLeadsUpload = async (clinic_id: string) => {
-    const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
 
-    if (leadsFileName) {
-      const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
-
-      // Properly type and extract data
-      const leads: Partial<Lead>[] =
-        result && typeof result === "object" && "data" in result && Array.isArray((result as any).data)
-          ? (result as { data: Partial<Lead>[] }).data
-          : [];
-
-      // Get source_id for 'File'
-      try {
-        const source_id = await getLeadSourceId("File");
-        const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
-        const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
-        if (insertError) {
-          ErrorToast(insertError.message);
-        }
-      } catch (error) {
-        ErrorToast(`${error}`);
-      }
-    } else {
-      console.log("Faizan csv handler is running but no leads file found");
-    }
-  };
 
   // Main submission function (updated to use updateClinic)
   const handleCompleteOnboarding = async () => {

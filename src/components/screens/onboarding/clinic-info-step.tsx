@@ -364,7 +364,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
         download="BAA-Agreement.pdf"
         className="text-purple-600 text-sm underline block hover:text-purple-800"
       >
-        Download the signed agreement (PDF)
+        Download Agreement (PDF)
       </a>
     )}
   </div>

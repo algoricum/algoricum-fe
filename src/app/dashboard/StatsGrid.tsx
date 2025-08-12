@@ -3,10 +3,22 @@
 import { JSX, useEffect, useState } from "react";
 import { UserPlus, Calendar, TrendingUp, Users } from "lucide-react";
 import dayjs from "dayjs";
-import { Skeleton } from "antd";
-import { createClient } from "@/utils/supabase/config/client";
+import isBetween from "dayjs/plugin/isBetween";
 
-const supabase = createClient();
+
+dayjs.extend(isBetween);
+import { Skeleton } from "antd";
+
+type LeadRow = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  status: string | null;
+  date: string;
+  source_id: string | null;
+  sourceName: string | null;
+};
 
 type Stats = {
   totalLeads: { thisMonth: number; lastMonth: number; change: number };
@@ -15,52 +27,66 @@ type Stats = {
   activePatients: { thisMonth: number; lastMonth: number; change: number };
 };
 
-export default function StatsGrid({ clinicId }: { clinicId: string }) {
+interface StatsGridProps {
+  clinicId: string;
+  leadsData: LeadRow[];
+}
+
+export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!clinicId) return;
-    async function fetchStats() {
+    if (!clinicId) {
+      setLoading(true);
+      return;
+    }
+
+    function calculateStats() {
       const now = dayjs();
-      const startOfThisMonth = now.startOf("month").toISOString();
-      const startOfLastMonth = now.subtract(1, "month").startOf("month").toISOString();
-      const endOfLastMonth = now.startOf("month").toISOString();
+      const startOfThisMonth = now.startOf("month");
+      const startOfLastMonth = now.subtract(1, "month").startOf("month");
+      const endOfLastMonth = now.startOf("month");
 
-      const [thisMonth, lastMonth] = await Promise.all([
-        supabase.from("lead").select("id, status, email").eq("clinic_id", clinicId).gte("created_at", startOfThisMonth),
-        supabase
-          .from("lead")
-          .select("id, status, email")
-          .eq("clinic_id", clinicId)
-          .gte("created_at", startOfLastMonth)
-          .lt("created_at", endOfLastMonth),
-      ]);
+      // Filter leads by month
+      const leadsThisMonth = leadsData.filter(lead => dayjs(lead.date).isAfter(startOfThisMonth));
 
-      if (thisMonth.error || lastMonth.error) {
-        setLoading(false);
-        return;
-      }
+      const leadsLastMonth = leadsData.filter(lead => {
+        const leadDate = dayjs(lead.date);
+        return leadDate.isAfter(startOfLastMonth) && leadDate.isBefore(endOfLastMonth);
+      });
 
-      const leadsThis = thisMonth.data || [];
-      const leadsLast = lastMonth.data || [];
-
-      const totalThis = leadsThis.length;
-      const totalLast = leadsLast.length;
+      // Calculate totals
+      const totalThis = leadsThisMonth.length;
+      const totalLast = leadsLastMonth.length;
       const totalChange = getChangePercent(totalThis, totalLast);
 
-      const bookedThis = leadsThis.filter(l => l.status === "Booked").length;
-      const bookedLast = leadsLast.filter(l => l.status === "Booked").length;
+      // Calculate booked appointments
+      const bookedThis = leadsThisMonth.filter(l => l.status === "Booked").length;
+      const bookedLast = leadsLastMonth.filter(l => l.status === "Booked").length;
       const bookedChange = getChangePercent(bookedThis, bookedLast);
-      
-      const convertedThis = new Set(leadsThis.filter(l => l.status === "Converted").map(l => l.email)).size;
-      const convertedLast = new Set(leadsLast.filter(l => l.status === "Converted").map(l => l.email)).size;
+
+      // Calculate converted patients (unique by email)
+      const convertedThis = new Set(
+        leadsThisMonth
+          .filter(l => l.status === "Converted")
+          .map(l => l.email)
+          .filter(email => email !== null),
+      ).size;
+
+      const convertedLast = new Set(
+        leadsLastMonth
+          .filter(l => l.status === "Converted")
+          .map(l => l.email)
+          .filter(email => email !== null),
+      ).size;
+
       const activeChange = getChangePercent(convertedThis, convertedLast);
 
+      // Calculate conversion rates
       const convThis = totalThis === 0 ? 0 : Math.round((convertedThis / totalThis) * 100);
       const convLast = totalLast === 0 ? 0 : Math.round((convertedLast / totalLast) * 100);
       const convChange = getChangePercent(convThis, convLast);
-
 
       setStats({
         totalLeads: { thisMonth: totalThis, lastMonth: totalLast, change: totalChange },
@@ -76,8 +102,8 @@ export default function StatsGrid({ clinicId }: { clinicId: string }) {
       setLoading(false);
     }
 
-    fetchStats();
-  }, [clinicId]);
+    calculateStats();
+  }, [clinicId, leadsData]);
 
   function getChangePercent(current: number, previous: number): number {
     if (previous === 0) return current === 0 ? 0 : 100;

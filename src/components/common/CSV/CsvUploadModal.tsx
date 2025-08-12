@@ -2,9 +2,9 @@
 
 import type React from "react";
 import { useRef, useState } from "react";
-import { Modal, Alert, Typography, Popover } from "antd";
+import { Modal,Typography, Popover } from "antd";
 import Papa from "papaparse";
-import { CheckCircleOutlined, ExclamationCircleOutlined, InfoCircleOutlined, EyeOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, ExclamationCircleOutlined, EyeOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
 
@@ -20,26 +20,11 @@ interface CsvUploadModalProps {
 const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, okText = "Upload CSV", cancelText = "Skip for Now" }) => {
   const [csvLeads, setCsvLeads] = useState<any[]>([]);
   const [csvValidationError, setCsvValidationError] = useState<string | null>(null);
-  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [, setValidationWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Constants for validation levels
+  // Constants for displaying valid values (no validation, just for user reference)
   const VALID_INTEREST_LEVELS = ["high", "medium", "low"];
-  const VALID_URGENCY_LEVELS = ["asap", "this_month", "curious"];
-  const VALID_STATUSES = [
-    "new",
-    "responded",
-    "needs-follow-up",
-    "in-nurture",
-    "cold",
-    "reactivated",
-    "booked",
-    "confirmed",
-    "no-show",
-    "converted",
-    "not-interested",
-    "archived",
-  ];
 
   const parseCSVFile = (file: File): Promise<any> => {
     return new Promise((resolve, reject) => {
@@ -53,49 +38,13 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
     });
   };
 
-  // Enhanced validation function that matches backend logic
-  const validateOptionalColumns = (data: any[]): { errors: string[]; warnings: string[] } => {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    data.forEach((row: any, index: number) => {
-      const rowNum = index + 1;
-
-      // Validate interest_level if present
-      if (Object.prototype.hasOwnProperty.call(row, "interest_level") && row.interest_level !== null && row.interest_level !== undefined) {
-        const value = row.interest_level.toString().trim().toLowerCase();
-        if (value !== "" && !VALID_INTEREST_LEVELS.includes(value)) {
-          errors.push(`Row ${rowNum}: Invalid interest_level "${row.interest_level}". Valid values: ${VALID_INTEREST_LEVELS.join(", ")}`);
-        }
-      }
-
-      // Validate urgency if present
-      if (Object.prototype.hasOwnProperty.call(row, "urgency") && row.urgency !== null && row.urgency !== undefined) {
-        const value = row.urgency.toString().trim().toLowerCase();
-        if (value !== "" && !VALID_URGENCY_LEVELS.includes(value)) {
-          errors.push(`Row ${rowNum}: Invalid urgency "${row.urgency}". Valid values: ${VALID_URGENCY_LEVELS.join(", ")}`);
-        }
-      }
-
-      // Validate status if present
-      if (Object.prototype.hasOwnProperty.call(row, "status") && row.status !== null && row.status !== undefined) {
-        const value = row.status.toString().trim().toLowerCase();
-        if (value !== "" && !VALID_STATUSES.includes(value)) {
-          errors.push(`Row ${rowNum}: Invalid status "${row.status}". Valid values: ${VALID_STATUSES.join(", ")}`);
-        }
-      }
-    });
-
-    return { errors, warnings };
-  };
-
-  // Enhanced header validation
+  // Enhanced header validation - only validate required headers and check optional headers presence
   const validateHeaders = (headers: string[]): { errors: string[]; warnings: string[] } => {
     const errors: string[] = [];
     const warnings: string[] = [];
     const requiredHeaders = ["email", "phone"];
-    const optionalHeaders = ["first_name", "last_name", "notes", "status", "interest_level", "urgency"];
-    const allValidHeaders = [...requiredHeaders, ...optionalHeaders];
+    // const optionalHeaders = ["first_name", "last_name", "notes", "interest_level"];
+    // const allValidHeaders = [...requiredHeaders, ...optionalHeaders];
 
     // Check for required headers
     const missingRequired = requiredHeaders.filter(header => !headers.includes(header));
@@ -103,12 +52,7 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
       errors.push(`Missing required columns: ${missingRequired.join(", ")}`);
     }
 
-    // Check for unknown headers
-    const unknownHeaders = headers.filter(header => !allValidHeaders.includes(header));
-    if (unknownHeaders.length > 0) {
-      warnings.push(`Unknown columns found: ${unknownHeaders.join(", ")}. These will be ignored.`);
-    }
-
+    // No warnings or errors for optional headers - backend will handle defaults
     return { errors, warnings };
   };
 
@@ -149,15 +93,16 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
       }
 
       // Set warnings for unknown columns
-      setValidationWarnings(headerValidation.warnings);
+      setValidationWarnings([]);
 
-      // Validate required fields
+      // Validate only required fields - ensure no missing cells
       const requiredFieldErrors: string[] = [];
       data.forEach((row: any, index: number) => {
         const rowNum = index + 1;
 
+        // Check email is not missing and valid
         if (!row.email || row.email.toString().trim() === "") {
-          requiredFieldErrors.push(`Row ${rowNum}: Email is required`);
+          requiredFieldErrors.push(`Row ${rowNum}: Email is required and cannot be empty`);
         } else {
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           if (!emailRegex.test(row.email.toString().trim())) {
@@ -165,18 +110,17 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
           }
         }
 
+        // Check phone is not missing
         if (!row.phone || row.phone.toString().trim() === "") {
-          requiredFieldErrors.push(`Row ${rowNum}: Phone is required`);
+          requiredFieldErrors.push(`Row ${rowNum}: Phone is required and cannot be empty`);
         }
       });
 
-      // Validate optional columns
-      const optionalValidation = validateOptionalColumns(data);
-      const allErrors = [...requiredFieldErrors, ...optionalValidation.errors];
-
-      if (allErrors.length > 0) {
+      if (requiredFieldErrors.length > 0) {
         const errorMessage =
-          allErrors.length > 5 ? `${allErrors.slice(0, 5).join("\n")}\n... and ${allErrors.length - 5} more errors` : allErrors.join("\n");
+          requiredFieldErrors.length > 5
+            ? `${requiredFieldErrors.slice(0, 5).join("\n")}\n... and ${requiredFieldErrors.length - 5} more errors`
+            : requiredFieldErrors.join("\n");
         setCsvValidationError(errorMessage);
         setCsvLeads([]);
         return;
@@ -239,15 +183,6 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
       centered
     >
       <div className="py-6">
-        <Alert
-          message="Upload your leads via CSV"
-          description="Upload a properly formatted CSV file to import your existing leads into our platform."
-          type="info"
-          showIcon
-          icon={<InfoCircleOutlined />}
-          className="mb-6"
-        />
-
         {/* CSV Format Requirements */}
         <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
           <Text className="text-sm font-semibold text-blue-800 mb-2 block">📋 Required CSV Format:</Text>
@@ -271,31 +206,26 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
               <li>last_name</li>
               <li>notes</li>
               <li>
-                status (
-                <Popover content={renderValidValuesContent(VALID_STATUSES)} title="Valid Status Values" trigger="hover">
-                  <span className="inline-flex items-center gap-1 text-blue-700 cursor-help hover:underline">
-                    Valid Values <EyeOutlined className="text-blue-500" />
-                  </span>
-                </Popover>
-                )
-              </li>
-              <li>
                 interest_level (
                 <Popover content={renderValidValuesContent(VALID_INTEREST_LEVELS)} title="Valid Interest Levels" trigger="hover">
                   <span className="inline-flex items-center gap-1 text-blue-700 cursor-help hover:underline">
                     Valid Values <EyeOutlined className="text-blue-500" />
                   </span>
                 </Popover>
-                )
+                ) - Default: &quot;medium&quot;
               </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Default Values Information */}
+        <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+          <Text className="text-sm font-semibold text-green-800 mb-2 block">💡 Default Values:</Text>
+          <div className="text-sm text-green-700 space-y-1">
+            <p>If optional columns are empty or contain invalid values, these defaults will be used:</p>
+            <ul className="ml-4 space-y-1 list-disc list-inside">
               <li>
-                urgency (
-                <Popover content={renderValidValuesContent(VALID_URGENCY_LEVELS)} title="Valid Urgency Levels" trigger="hover">
-                  <span className="inline-flex items-center gap-1 text-blue-700 cursor-help hover:underline">
-                    Valid Values <EyeOutlined className="text-blue-500" />
-                  </span>
-                </Popover>
-                )
+                <strong>interest_level:</strong> &quot;medium&quot;
               </li>
             </ul>
           </div>
@@ -324,17 +254,7 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
               hover:file:bg-purple-100"
           />
 
-          {/* Validation Warnings */}
-          {validationWarnings.length > 0 && (
-            <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-              <Text className="text-yellow-700 text-sm">
-                <ExclamationCircleOutlined className="mr-1" />
-                <strong>Warnings:</strong>
-                <br />
-                {validationWarnings.join("\n")}
-              </Text>
-            </div>
-          )}
+          {/* Validation Warnings - Remove this section since we don't show warnings */}
 
           {/* Success Message */}
           {csvLeads.length > 0 && !csvValidationError && (
@@ -342,9 +262,6 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
               <Text className="text-green-700 text-sm">
                 <CheckCircleOutlined className="mr-1" />
                 File validated successfully ({csvLeads.length} leads found)
-                {validationWarnings.length > 0 && (
-                  <span className="block mt-1 text-xs">Note: Some columns will use default values or be ignored (see warnings above)</span>
-                )}
               </Text>
             </div>
           )}
@@ -365,16 +282,19 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <Text className="text-sm font-semibold text-gray-700 mb-2">📄 Example CSV Format:</Text>
             <div className="text-xs text-gray-600 bg-white p-3 rounded border font-mono">
-              first_name,last_name,email,phone,status,interest_level,urgency,notes
+              first_name,last_name,email,phone,interest_level,notes
               <br />
-              John,Doe,john.doe@email.com,+1234567890,new,high,asap,Interested in consultation
+              John,Doe,john.doe@email.com,+1234567890,high,Interested in consultation
               <br />
-              Jane,Smith,jane.smith@email.com,+1234567891,responded,medium,this_month,Follow up next week
+              Jane,Smith,jane.smith@email.com,+1234567891,medium,Follow up next week
+              <br />
+              Bob,Johnson,bob.johnson@email.com,+1234567892,,Contact tomorrow
             </div>
             <div className="text-xs text-gray-500 mt-2 space-y-1">
-              <div>⚠️ Make sure email and phone columns have values for all rows</div>
-              <div>💡 Optional columns can be empty - they&apos;ll use default values</div>
-              <div>🔍 Hover over &quot;Valid Values&quot; above to see acceptable values for each column</div>
+              <div>⚠️ Email and phone columns must have values for all rows</div>
+              <div>💡 Optional columns can be empty - backend will assign default values</div>
+              <div>🔍 Hover over &quot;Valid Values&quot; to see acceptable values for interest_level</div>
+              <div>✨ Invalid or empty optional values will be replaced with defaults automatically</div>
             </div>
           </div>
         </div>
