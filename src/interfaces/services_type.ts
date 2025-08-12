@@ -247,25 +247,6 @@ export interface UpdateWidgetProps {
   };
 }
 
-export interface CreateEmailSettingsProps {
-  clinic_id: string;
-  smtp_host?: string;
-  smtp_port?: number;
-  smtp_user?: string;
-  smtp_password?: string;
-  smtp_sender_name?: string;
-  smtp_sender_email?: string;
-  smtp_use_tls?: boolean;
-  imap_server?: string;
-  imap_port?: number;
-  imap_user?: string;
-  imap_password?: string;
-  imap_use_ssl?: boolean;
-  imap_folder?: string;
-  check_frequency_minutes?: number;
-  sms_auto_reply_enabled?: boolean;
-}
-
 export interface EmailSettings {
   id: string;
   clinic_id: string;

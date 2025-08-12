@@ -2,7 +2,7 @@
 import { getLocalClinicData, setLocalClinicData } from '@/helpers/storage-helper';
 import { createClient } from './config/client';
 import { getUserData } from './user-helper';
-import type { Clinic, CreateClinicProps, UpdateClinicProps, EmailSettings } from '@/interfaces/services_type';
+import type { Clinic, CreateClinicProps, UpdateClinicProps } from '@/interfaces/services_type';
 import { getRoleId } from "@/redux/slices/clinic.slice";
 
 const supabase = createClient();
@@ -54,6 +54,42 @@ export const getClinicData = async (): Promise<Clinic | null> => {
 
   return null;
 };
+
+export async function updateMailgunDomainSettings(clinicId: string, mailgunData?: { domain: string; email: string }) {
+  try {
+    // Early return if no Mailgun data is provided
+    if (!mailgunData) {
+      console.log("No Mailgun data provided, skipping update");
+      return null;
+    }
+
+    // Only update the specific Mailgun fields and updated_at timestamp
+    const updateData = {
+      mailgun_domain: mailgunData.domain,
+      mailgun_email: mailgunData.email,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from("clinic")
+      .update(updateData)
+      .eq("id", clinicId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating Mailgun settings:", error);
+      throw new Error("Failed to update Mailgun settings");
+    }
+
+    console.log("Mailgun settings updated:", data);
+    return data;
+  } catch (error) {
+    console.error("Error in updateMailgunDomainSettings:", error);
+    throw error;
+  }
+}
+
 export const getAssistantByClinicId = async (clinicId:string) => {
   try {
     if (!clinicId) {
@@ -194,60 +230,6 @@ export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => 
   }
 
   return clinicData;
-};
-
-export const createEmailSettings = async (clinic_id: string): Promise<EmailSettings> => {
-  try {
-    console.log("Creating email settings with vault password...");
-    
-    // Call the database function that handles vault access internally
-    const { data: settingsId, error: functionError } = await supabase
-      .rpc('create_email_settings_with_vault', {
-        p_clinic_id: clinic_id,
-        p_smtp_host: "smtp.gmail.com",
-        p_smtp_port: 587,
-        p_smtp_user: "abdullah.salman@hashlogics.com",
-        p_smtp_sender_name: "Algoricum",
-        p_smtp_sender_email: "abdullah.salman@hashlogics.com",
-        p_smtp_use_tls: true,
-        p_imap_server: "imap.gmail.com",
-        p_imap_port: 993,
-        p_imap_user: "abdullah.salman@hashlogics.com",
-        p_imap_use_ssl: true,
-        p_imap_folder: "INBOX",
-        p_check_frequency_minutes: 5,
-        p_sms_auto_reply_enabled: true
-      });
-
-    if (functionError) {
-      console.error("Failed to create email settings:", functionError);
-      throw new Error(`Database function failed: ${functionError.message}`);
-    }
-
-    if (!settingsId) {
-      throw new Error("No settings ID returned from database function");
-    }
-
-    console.log("Email settings created successfully with ID:", settingsId);
-
-    // Fetch the created record to return it
-    const { data: emailSettingsResult, error: fetchError } = await supabase
-      .from('email_settings')
-      .select('*')
-      .eq('id', settingsId)
-      .single();
-
-    if (fetchError) {
-      console.error("Failed to fetch created email settings:", fetchError);
-      throw fetchError;
-    }
-
-    return emailSettingsResult;
-
-  } catch (error) {
-    console.error("Error creating email settings:", error);
-    throw error;
-  }
 };
 
 /**

@@ -15,18 +15,6 @@ export default function RootLayout({ children }: { children: ReactNode[] | React
     <html lang="en">
       <body>
         <Providers>{children}</Providers>
-
-        {/* Load React and ReactDOM from CDN for hash-sdk.js */}
-        {/* <Script src="https://unpkg.com/react@18/umd/react.production.min.js" strategy="beforeInteractive" />
-        <Script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" strategy="beforeInteractive" /> */}
-        <script async crossOrigin={"anonymous"} src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-        <script async crossOrigin={"anonymous"} src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-        <script
-          async
-          src="https://eypitkzntyiyvwrndkgy.supabase.co/storage/v1/object/public/sdk/hash-sdk.js"
-          data-api-key="634f9af6e630aaf4d91ee02b925fad31b05117bb8bb91b9a8b21251fe8ef21e4"
-          data-element-id="root-bot-container"
-        />
       </body>
     </html>
   );
