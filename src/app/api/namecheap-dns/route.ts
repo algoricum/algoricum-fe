@@ -269,7 +269,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
   const NAMECHEAP_API_USER = process.env.NAMECHEAP_API_USER
   const NAMECHEAP_API_KEY = process.env.NAMECHEAP_API_KEY
   const NAMECHEAP_USERNAME = process.env.NAMECHEAP_USERNAME
-  const NAMECHEAP_CLIENT_IP = process.env.NAMECHEAP_CLIENT_IP
+  const NAMECHEAP_CLIENT_IP = process.env.NAMECHEAP_CLIENT_IP1 || process.env.NAMECHEAP_CLIENT_IP2;
 
   console.log('Starting DNS setup with proxy', {
     domain,

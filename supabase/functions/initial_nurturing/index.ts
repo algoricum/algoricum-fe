@@ -1,15 +1,14 @@
 // supabase/functions/sms-initial-contact/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts"
 
 // Import shared logic from _shared folder
 import { 
-  processAllLeads, 
   FOLLOW_UP_RULES, 
   generateIntelligentResponse,
   sendSMS,
-  handleTwilioWebhook 
+  handleTwilioWebhook,
+  determineFollowUpsForLead
 } from '../_shared/nurturing.ts'
 
 interface Lead {
@@ -53,20 +52,20 @@ async function processInitialContact(supabase: any) {
   logInfo('=== Starting Initial Contact SMS Processing ===')
   
   try {
-    // Filter for only the initial_contact rule
-    const initialContactRule = FOLLOW_UP_RULES.find(rule => rule.name === 'initial_contact')
+    // Filter for only the initial contact rule
+    const initialContactRule = FOLLOW_UP_RULES.find(rule => rule.name === 'sms_5min_initial')
     
     if (!initialContactRule) {
-      logError('Initial contact rule not found in FOLLOW_UP_RULES')
+      logError('SMS initial contact rule not found in FOLLOW_UP_RULES')
       return {
         success: false,
-        error: 'Initial contact rule not configured',
+        error: 'SMS initial contact rule not configured',
         processed: 0,
         errors: 1
       }
     }
     
-    logInfo('Processing with rule:', initialContactRule)
+    logInfo('Processing with rule:', initialContactRule.name)
     
     // Get all clinics with active Twilio settings
     const { data: clinics, error: clinicError } = await supabase
@@ -121,18 +120,14 @@ async function processInitialContact(supabase: any) {
 
         logInfo(`Processing clinic: ${clinic.name}`)
 
-        // Get NEW leads created in the last 5 minutes with phone numbers
-        const now = new Date()
-        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000)
-
+        // Get NEW leads with phone numbers (simplified query)
         const { data: newLeads, error: leadsError } = await supabase
           .from('lead')
           .select('*')
-          .eq('clinic_id', clinic.id) // Filters by clinic_id
-          .or('status.eq.New,created_at.gte.' + fiveMinutesAgo.toISOString()) // Selects leads where status is 'New' OR created_at is within the last 5 minutes
-          .not('phone', 'is', null) // Filters out leads with null phone
-          .neq('phone', ''); // Filters out leads with empty phone
-
+          .eq('clinic_id', clinic.id)
+          .eq('status', 'New') // Only New leads
+          .not('phone', 'is', null)
+          .neq('phone', '')
 
         if (leadsError) {
           logError(`Error fetching leads for clinic ${clinic.id}`, leadsError)
@@ -142,62 +137,36 @@ async function processInitialContact(supabase: any) {
 
         logInfo(`Found ${newLeads?.length || 0} new leads for clinic ${clinic.name}`)
 
-        // Process each new lead
+        // Process each new lead using shared logic
         for (const lead of newLeads || []) {
           try {
-            // Check if thread exists and if welcome message was already sent
-            const { data: existingThread } = await supabase
-              .from('threads')
-              .select('id')
-              .eq('lead_id', lead.id)
-              .single()
+            // Use shared function to determine if initial contact should be sent
+            const applicableRules = await determineFollowUpsForLead(lead, supabase, 'sms')
+            const shouldSendInitial = applicableRules.some(rule => rule.name === 'sms_5min_initial')
 
-            let threadId = existingThread?.id
-            let shouldSendWelcome = !existingThread
-
-            if (existingThread) {
-              // Check if initial contact was already sent
-              const { data: existingMessages } = await supabase
-                .from('conversation')
-                .select('id')
-                .eq('thread_id', existingThread.id)
-                .eq('is_from_user', false)
-                .eq('sender_type', 'assistant')
-
-              shouldSendWelcome = !existingMessages || existingMessages.length === 0
-            }
-
-            if (!shouldSendWelcome) {
-              logInfo(`Lead ${lead.id} already has initial contact sent`)
+            if (!shouldSendInitial) {
+              logInfo(`Lead ${lead.id} not eligible for initial contact (may already be sent)`)
               results.push({
                 leadId: lead.id,
                 action: 'skipped',
-                reason: 'Initial contact already sent'
+                reason: 'Initial contact not applicable or already sent'
               })
               continue
             }
 
-            // Create thread if needed
+            // Get or create thread (using shared logic pattern)
+            let threadId = await getOrCreateThread(lead, supabase)
             if (!threadId) {
-              const { data: newThread, error: threadError } = await supabase
-                .from('threads')
-                .insert({
-                  lead_id: lead.id,
-                  clinic_id: lead.clinic_id,
-                  status: 'new'
-                })
-                .select('id')
-                .single()
-
-              if (threadError) {
-                logError(`Error creating thread for lead ${lead.id}`, threadError)
-                totalErrors++
-                continue
-              }
-              threadId = newThread.id
+              totalErrors++
+              results.push({
+                leadId: lead.id,
+                action: 'error',
+                reason: 'Failed to create thread'
+              })
+              continue
             }
 
-            // Generate intelligent welcome message
+            // Generate intelligent welcome message using shared function
             const welcomeMessage = await generateIntelligentResponse(
               lead, 
               clinic, 
@@ -205,7 +174,7 @@ async function processInitialContact(supabase: any) {
               false // SMS
             ) as string
 
-            // Send SMS
+            // Send SMS using shared function
             const smsResult = await sendSMS(
               lead.phone, 
               welcomeMessage, 
@@ -220,15 +189,19 @@ async function processInitialContact(supabase: any) {
                 .from('conversation')
                 .insert({
                   thread_id: threadId,
-                  message: `INITIAL_CONTACT: ${welcomeMessage}`,
-                  timestamp: now.toISOString(),
+                  message: `SMS_5MIN_INITIAL: ${welcomeMessage}`,
+                  timestamp: new Date().toISOString(),
                   is_from_user: false,
                   sender_type: 'assistant'
                 })
 
-              const { error: updateError } = await supabase
+              // Update lead status
+              await supabase
                 .from('lead')
-                .update({ status: 'Engaged', updated_at: now.toISOString() })
+                .update({ 
+                  status: 'Engaged', 
+                  updated_at: new Date().toISOString() 
+                })
                 .eq('id', lead.id)
 
               totalProcessed++
@@ -277,7 +250,7 @@ async function processInitialContact(supabase: any) {
       processed: totalProcessed,
       errors: totalErrors,
       results,
-      rule: 'initial_contact',
+      rule: 'sms_5min_initial',
       timestamp: new Date().toISOString()
     }
 
@@ -289,6 +262,45 @@ async function processInitialContact(supabase: any) {
       processed: 0,
       errors: 1
     }
+  }
+}
+
+// Helper function (simplified version of shared logic)
+async function getOrCreateThread(lead: Lead, supabase: any): Promise<string | null> {
+  try {
+    // Try to get existing thread
+    const { data: existingThread } = await supabase
+      .from('threads')
+      .select('id')
+      .eq('lead_id', lead.id)
+      .eq('clinic_id', lead.clinic_id)
+      .single()
+
+    if (existingThread) {
+      return existingThread.id
+    }
+
+    // Create new thread
+    const { data: newThread, error: threadError } = await supabase
+      .from('threads')
+      .insert({
+        lead_id: lead.id,
+        clinic_id: lead.clinic_id,
+        status: 'new'
+      })
+      .select('id')
+      .single()
+
+    if (threadError) {
+      logError(`Error creating thread for lead ${lead.id}`, threadError)
+      return null
+    }
+
+    return newThread.id
+
+  } catch (error) {
+    logError(`Error in getOrCreateThread for lead ${lead.id}`, error)
+    return null
   }
 }
 
@@ -325,7 +337,7 @@ serve(async (req) => {
       logInfo('Processing Twilio webhook')
       const formData = await req.formData()
       
-      const result = await handleTwilioWebhook(formData, supabase)
+      await handleTwilioWebhook(formData, supabase)
       
       return new Response(
         `<?xml version="1.0" encoding="UTF-8"?>

@@ -3,6 +3,7 @@ import { getLocalUserData, setLocalUserData } from '@/helpers/storage-helper';
 import { createClient } from './config/client';
 import type { User } from '@/interfaces/services_type';
 
+
 const supabase = createClient();
 
 /**

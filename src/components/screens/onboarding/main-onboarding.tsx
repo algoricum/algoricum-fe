@@ -9,23 +9,21 @@ import StaffHoursStep from "./staff-hours-step";
 // import AiAssistantStep from "./ai-assistant-step";
 import BookingSetupStep from "./booking-setup-step";
 import IntegrationsStep from "./integrations-step";
-
+import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
-import { Lead } from "@/interfaces/services_type";
+
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 // import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
-import { updateClinic, getClinicData, createEmailSettings } from "@/utils/supabase/clinic-helper";
+import { updateClinic, getClinicData, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
 // import generateClinicInstructions from "@/utils/generateClinicInstructions";
 // import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { useAuth } from "@/hooks/useAuth";
 // import ChatbotSetupStep from "./chatbot-setup-step";
 // import type { MailgunMessageData } from "mailgun.js";
-import { createClient } from "@/utils/supabase/config/client";
-import getLeadSourceId from "@/utils/lead_source";
-import getNormalizedLead from "@/utils/normalizeLeadData";
-import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
+
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 
 import {
   ONBOARDING_STORAGE_KEY,
@@ -60,7 +58,6 @@ const generateSlug = (name: string): string => {
 };
 
 export default function MainOnboarding() {
-  const supabase = createClient();
   const router = useRouter();
   const { logout } = useAuth();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -212,36 +209,8 @@ export default function MainOnboarding() {
       // Additional data from new flow
       clinicType: clinicInfo.clinicType || "",
       integrations: integrations,
+      servicesDocument: clinicInfo.servicesDocument?.[0]?.originFileObj || null,
     };
-  };
-
-  // Upload CSV leads to Supabase lead table
-  const handleCsvLeadsUpload = async (clinic_id: string) => {
-    const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
-
-    if (leadsFileName) {
-      const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
-
-      // Properly type and extract data
-      const leads: Partial<Lead>[] =
-        result && typeof result === "object" && "data" in result && Array.isArray((result as any).data)
-          ? (result as { data: Partial<Lead>[] }).data
-          : [];
-
-      // Get source_id for 'File'
-      try {
-        const source_id = await getLeadSourceId("File");
-        const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
-        const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
-        if (insertError) {
-          ErrorToast(insertError.message);
-        }
-      } catch (error) {
-        ErrorToast(`${error}`);
-      }
-    } else {
-      console.log("Faizan csv handler is running but no leads file found");
-    }
   };
 
   // Main submission function (updated to use updateClinic)
@@ -326,7 +295,44 @@ export default function MainOnboarding() {
         clinicPhone: mappedData.phoneNumber,
         businessAddress: mappedData.clinicAddress,
       };
-      await setupMailgunDomain(updatedClinic, mailgunSetupData, clinicSlug);
+
+      const mailgunResponse = await setupMailgunDomain(updatedClinic, mailgunSetupData, clinicSlug);
+
+      if (mailgunResponse?.success && mailgunResponse.data) {
+        await updateMailgunDomainSettings(updatedClinic.id, {
+          domain: mailgunResponse?.data.domain,
+          email: mailgunResponse.data.email,
+        });
+      } else {
+        console.warn("Mailgun setup response missing or unsuccessful, skipping email settings save");
+      }
+      // Handle services document upload to edge function
+      if (mappedData.servicesDocument) {
+        try {
+          const formDataToSend = new FormData();
+          const session = await getSupabaseSession();
+
+          formDataToSend.append("clinic_document", mappedData.servicesDocument);
+          formDataToSend.append("clinic_id", updatedClinic.id);
+          formDataToSend.append("name", mappedData.legalBusinessName || "Assistant");
+          formDataToSend.append("instructions", "AI Assistant for handling clinic inquiries");
+
+          const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: formDataToSend,
+          });
+
+          if (!response.ok) {
+            console.error("Document upload failed, continuing onboarding");
+          }
+        } catch (error) {
+          console.error("Failed to upload document:", error);
+          // Continue onboarding even if document upload fails
+        }
+      }
 
       // Generate API key for the clinic
       const apiKeyName = `${mappedData.legalBusinessName} Primary Key`;
@@ -421,7 +427,6 @@ export default function MainOnboarding() {
       //   console.error("Failed to set up Twilio:", twilioError);
       // }
 
-      await createEmailSettings(clinic.id);
       await handleCsvLeadsUpload(clinic.id);
       clearStoredProgress();
 

@@ -1,6 +1,4 @@
 // _shared/nurturing.ts
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
-
 
 interface Lead {
   id: string
@@ -17,7 +15,6 @@ interface Lead {
   created_at: string
   updated_at: string
 }
-
 
 interface Conversation {
   id?: string
@@ -37,16 +34,24 @@ interface Clinic {
   assistant_prompt?: string
   assistant_model?: string
   chatbot_name?: string
+  mailgun_domain?: string
+  mailgun_email?: string
+  twilio_config?: Array<{
+    twilio_account_sid: string
+    twilio_auth_token: string
+    twilio_phone_number: string
+    status: string
+  }>
 }
 
 interface FollowUpRule {
   name: string
   timeFromCreated: number // milliseconds
-  maxTimeFromCreated?: number // milliseconds (optional upper bound)
+  maxTimeFromCreated?: number // milliseconds
   leadStatus?: string[] // which lead statuses to target
   communicationType: 'sms' | 'email'
-  onlyOnce: boolean // should this follow-up only be sent once
-  checkLastActivity?: boolean // should we check if user replied after last assistant message
+  onlyOnce: boolean
+  checkLastActivity?: boolean
 }
 
 interface ProcessingResult {
@@ -58,143 +63,574 @@ interface ProcessingResult {
   error?: string
 }
 
-// Enhanced logging function
+// Enhanced logging
 function logInfo(message: string, data?: any) {
   const timestamp = new Date().toISOString()
-  console.log(`[${timestamp}] INFO: ${message}`, data ? JSON.stringify(data, null, 2) : '')
+  console.log(`[${timestamp}] SHARED: ${message}`, data ? JSON.stringify(data, null, 2) : '')
 }
 
 function logError(message: string, error?: any) {
   const timestamp = new Date().toISOString()
-  console.error(`[${timestamp}] ERROR: ${message}`, error)
+  console.error(`[${timestamp}] SHARED ERROR: ${message}`, error)
 }
 
-// Define follow-up rules - this is where all the logic lives
+// Complete follow-up rules
 const FOLLOW_UP_RULES: FollowUpRule[] = [
-  // Initial contact for new leads
+  // SMS FLOW
   {
-    name: 'initial_contact',
+    name: 'sms_5min_initial',
     timeFromCreated: 5 * 60 * 1000, // 5 minutes
     leadStatus: ['New'],
     communicationType: 'sms',
     onlyOnce: true
   },
-  
-  // 4-hour follow-up for engaged leads
   {
-    name: '4h_followup',
-    timeFromCreated: 4 * 60 * 60 * 1000, // 4 hours
-    maxTimeFromCreated: 24 * 60 * 60 * 1000, // 24 hours max
-    leadStatus: ['Engaged'],
+    name: 'sms_2day_followup',
+    timeFromCreated: 2 * 24 * 60 * 60 * 1000, // 2 days
+    communicationType: 'sms',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'sms_5day_followup',
+    timeFromCreated: 5 * 24 * 60 * 60 * 1000, // 5 days
+    communicationType: 'sms',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'sms_10day_followup',
+    timeFromCreated: 10 * 24 * 60 * 60 * 1000, // 10 days
+    communicationType: 'sms',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'sms_20day_followup',
+    timeFromCreated: 20 * 24 * 60 * 60 * 1000, // 20 days
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true
   },
   
-  // 2-day email follow-up
+  // EMAIL FLOW (starts from day 21)
   {
-    name: '2d_email_followup',
-    timeFromCreated: 48 * 60 * 60 * 1000, // 48 hours
-    maxTimeFromCreated: 7 * 24 * 60 * 60 * 1000, // 7 days max
+    name: 'email_21day_followup',
+    timeFromCreated: 21 * 24 * 60 * 60 * 1000, // 21 days
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // 7-day email follow-up
   {
-    name: '7d_email_followup',
-    timeFromCreated: 7 * 24 * 60 * 60 * 1000, // 7 days
-    maxTimeFromCreated: 14 * 24 * 60 * 60 * 1000, // 14 days max
+    name: 'email_24day_followup',
+    timeFromCreated: 24 * 24 * 60 * 60 * 1000, // 24 days
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // 14-day email follow-up
   {
-    name: '14d_email_followup',
-    timeFromCreated: 14 * 24 * 60 * 60 * 1000, // 14 days
-    maxTimeFromCreated: 30 * 24 * 60 * 60 * 1000, // 30 days max
+    name: 'email_27day_followup',
+    timeFromCreated: 27 * 24 * 60 * 60 * 1000, // 27 days
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true
   },
-  
-  // 30-day email follow-up (recurring weekly)
   {
-    name: '30d_email_followup',
+    name: 'email_30day_followup',
     timeFromCreated: 30 * 24 * 60 * 60 * 1000, // 30 days
     communicationType: 'email',
-    onlyOnce: false, // Can send multiple times
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_33day_followup',
+    timeFromCreated: 33 * 24 * 60 * 60 * 1000, // 33 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_36day_followup',
+    timeFromCreated: 36 * 24 * 60 * 60 * 1000, // 36 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_39day_followup',
+    timeFromCreated: 39 * 24 * 60 * 60 * 1000, // 39 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_42day_followup',
+    timeFromCreated: 42 * 24 * 60 * 60 * 1000, // 42 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_45day_followup',
+    timeFromCreated: 45 * 24 * 60 * 60 * 1000, // 45 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_50day_followup',
+    timeFromCreated: 50 * 24 * 60 * 60 * 1000, // 50 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_55day_followup',
+    timeFromCreated: 55 * 24 * 60 * 60 * 1000, // 55 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_60day_followup',
+    timeFromCreated: 60 * 24 * 60 * 60 * 1000, // 60 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_70day_followup',
+    timeFromCreated: 70 * 24 * 60 * 60 * 1000, // 70 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_80day_followup',
+    timeFromCreated: 80 * 24 * 60 * 60 * 1000, // 80 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_90day_followup',
+    timeFromCreated: 90 * 24 * 60 * 60 * 1000, // 90 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_100day_followup',
+    timeFromCreated: 100 * 24 * 60 * 60 * 1000, // 100 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_110day_followup',
+    timeFromCreated: 110 * 24 * 60 * 60 * 1000, // 110 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_115day_followup',
+    timeFromCreated: 115 * 24 * 60 * 60 * 1000, // 115 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_118day_followup',
+    timeFromCreated: 118 * 24 * 60 * 60 * 1000, // 118 days
+    communicationType: 'email',
+    onlyOnce: true,
+    checkLastActivity: true
+  },
+  {
+    name: 'email_120day_followup',
+    timeFromCreated: 120 * 24 * 60 * 60 * 1000, // 120 days
+    communicationType: 'email',
+    onlyOnce: true,
     checkLastActivity: true
   }
 ]
 
-// Core function to determine which follow-ups a lead should receive
-async function determineFollowUpsForLead(
-  lead: Lead,
-  supabase: any,
-  communicationType?: 'sms' | 'email'
-): Promise<FollowUpRule[]> {
+// MAIN PROCESSING FUNCTION - Processes ALL clinics
+async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email') {
+  logInfo(`=== Starting processAllLeads - Type: ${communicationType || 'all'} ===`)
+  
+  const allResults: ProcessingResult[] = []
+  let totalProcessed = 0
+  let totalErrors = 0
+  
+  try {
+    // Get ALL clinics with their settings
+    const { data: clinics, error: clinicError } = await supabase
+      .from('clinic')
+      .select(`
+        id,
+        name,
+        openai_api_key,
+        assistant_prompt,
+        assistant_model,
+        chatbot_name,
+        mailgun_domain,
+        mailgun_email,
+        twilio_config(
+          twilio_account_sid,
+          twilio_auth_token,
+          twilio_phone_number,
+          status
+        )
+      `)
+
+    if (clinicError) {
+      logError('Failed to fetch clinics', clinicError)
+      return {
+        success: false,
+        error: 'Failed to fetch clinics',
+        results: [],
+        summary: { sent: 0, skipped: 0, errors: 1 }
+      }
+    }
+
+    if (!clinics || clinics.length === 0) {
+      logInfo('No clinics found')
+      return {
+        success: true,
+        results: [],
+        summary: { sent: 0, skipped: 0, errors: 0 }
+      }
+    }
+
+    logInfo(`Processing ${clinics.length} clinics`)
+
+    // Process each clinic independently - errors in one don't affect others
+    for (const clinic of clinics) {
+      try {
+        logInfo(`Processing clinic: ${clinic.name} (${clinic.id})`)
+        
+        // Get leads for this clinic
+        const leads = await getLeadsForClinic(clinic.id, supabase, communicationType)
+        
+        if (leads.length === 0) {
+          logInfo(`No leads found for clinic ${clinic.name}`)
+          continue
+        }
+
+        logInfo(`Found ${leads.length} leads for clinic ${clinic.name}`)
+
+        // Process each lead
+        for (const lead of leads) {
+          try {
+            const leadResults = await processLeadForClinic(lead, clinic, supabase)
+            allResults.push(...leadResults)
+            totalProcessed++
+          } catch (leadError) {
+            logError(`Error processing lead ${lead.id}`, leadError)
+            totalErrors++
+            allResults.push({
+              leadId: lead.id,
+              action: 'error',
+              reason: 'Lead processing failed',
+              followUpType: 'unknown',
+              communicationType: communicationType || 'any',
+              error: leadError.message
+            })
+          }
+        }
+
+      } catch (clinicError) {
+        logError(`Error processing clinic ${clinic.id}`, clinicError)
+        totalErrors++
+        // Continue with next clinic - don't let one clinic's error stop everything
+      }
+    }
+
+    // Calculate final summary
+    const summary = {
+      sent: allResults.filter(r => r.action === 'sent').length,
+      skipped: allResults.filter(r => r.action === 'skipped').length,
+      errors: allResults.filter(r => r.action === 'error').length
+    }
+
+    logInfo(`Processing completed: ${totalProcessed} leads processed, ${totalErrors} lead errors`)
+    logInfo('Final summary', summary)
+
+    return {
+      success: true,
+      results: allResults,
+      summary,
+      totalLeads: totalProcessed
+    }
+
+  } catch (error: any) {
+    logError('Error in processAllLeads', error)
+    return {
+      success: false,
+      error: error.message,
+      results: allResults,
+      summary: { sent: 0, skipped: 0, errors: 1 }
+    }
+  }
+}
+
+// Get leads for a specific clinic
+async function getLeadsForClinic(clinicId: string, supabase: any, communicationType?: 'sms' | 'email'): Promise<Lead[]> {
+  try {
+    let leadQuery = supabase
+      .from('lead')
+      .select('*')
+      .eq('clinic_id', clinicId)
+
+    // Filter by communication requirements
+    if (communicationType === 'sms') {
+      leadQuery = leadQuery.not('phone', 'is', null).neq('phone', '')
+    } else if (communicationType === 'email') {
+      leadQuery = leadQuery.not('email', 'is', null).neq('email', '')
+    } else {
+      // Need either phone or email
+      leadQuery = leadQuery.or('phone.not.is.null,email.not.is.null')
+    }
+
+    const { data: leads, error } = await leadQuery
+
+    if (error) {
+      logError(`Error fetching leads for clinic ${clinicId}`, error)
+      return []
+    }
+
+    return leads || []
+
+  } catch (error) {
+    logError(`Error in getLeadsForClinic for ${clinicId}`, error)
+    return []
+  }
+}
+
+// Process a single lead for a clinic
+async function processLeadForClinic(lead: Lead, clinic: Clinic, supabase: any): Promise<ProcessingResult[]> {
+  const results: ProcessingResult[] = []
+  
+  try {
+    // Get applicable follow-up rules for this lead
+    const applicableRules = await determineFollowUpsForLead(lead, supabase)
+    
+    if (applicableRules.length === 0) {
+      return [{
+        leadId: lead.id,
+        action: 'skipped',
+        reason: 'No applicable follow-up rules',
+        followUpType: 'none',
+        communicationType: 'any'
+      }]
+    }
+
+    // Check clinic capabilities
+    const hasSMS = clinic.twilio_config && 
+                  clinic.twilio_config.length > 0 && 
+                  clinic.twilio_config[0]?.status === 'active'
+    
+    const hasEmail = clinic.mailgun_domain && clinic.mailgun_email
+
+    // Process each rule
+    for (const rule of applicableRules) {
+      try {
+        // Check clinic capabilities for this communication type
+        if (rule.communicationType === 'sms' && !hasSMS) {
+          results.push({
+            leadId: lead.id,
+            action: 'skipped',
+            reason: 'Clinic SMS not configured',
+            followUpType: rule.name,
+            communicationType: rule.communicationType
+          })
+          continue
+        }
+
+        if (rule.communicationType === 'email' && !hasEmail) {
+          results.push({
+            leadId: lead.id,
+            action: 'skipped',
+            reason: 'Clinic email not configured',
+            followUpType: rule.name,
+            communicationType: rule.communicationType
+          })
+          continue
+        }
+
+        // Check lead has required contact info
+        const hasRequiredContact = 
+          (rule.communicationType === 'sms' && lead.phone) ||
+          (rule.communicationType === 'email' && lead.email)
+
+        if (!hasRequiredContact) {
+          results.push({
+            leadId: lead.id,
+            action: 'skipped',
+            reason: `Lead missing ${rule.communicationType} contact`,
+            followUpType: rule.name,
+            communicationType: rule.communicationType
+          })
+          continue
+        }
+
+        // Process this rule
+        const result = await processRuleForLead(lead, clinic, rule, supabase)
+        results.push(result)
+
+      } catch (ruleError) {
+        logError(`Error processing rule ${rule.name} for lead ${lead.id}`, ruleError)
+        results.push({
+          leadId: lead.id,
+          action: 'error',
+          reason: `Rule processing failed: ${ruleError.message}`,
+          followUpType: rule.name,
+          communicationType: rule.communicationType,
+          error: ruleError.message
+        })
+      }
+    }
+
+  } catch (error) {
+    logError(`Error in processLeadForClinic for lead ${lead.id}`, error)
+    results.push({
+      leadId: lead.id,
+      action: 'error',
+      reason: 'Lead processing exception',
+      followUpType: 'unknown',
+      communicationType: 'any',
+      error: error.message
+    })
+  }
+
+  return results
+}
+
+// Process a specific rule for a lead
+async function processRuleForLead(
+  lead: Lead, 
+  clinic: Clinic, 
+  rule: FollowUpRule, 
+  supabase: any
+): Promise<ProcessingResult> {
+  try {
+    // Get or create thread
+    const threadId = await getOrCreateThread(lead, supabase)
+    if (!threadId) {
+      return {
+        leadId: lead.id,
+        action: 'error',
+        reason: 'Failed to create thread',
+        followUpType: rule.name,
+        communicationType: rule.communicationType
+      }
+    }
+
+    // Get conversation history
+    const conversationHistory = await getConversationHistory(threadId, supabase)
+
+    // Generate message
+    const messageContent = await generateIntelligentResponse(
+      lead,
+      clinic,
+      conversationHistory,
+      rule.communicationType === 'email'
+    )
+
+    // Send message
+    const sendResult = await sendMessage(lead, clinic, rule, messageContent, supabase)
+
+    if (sendResult.success) {
+      // Save to history
+      await saveMessageToHistory(threadId, messageContent, rule.name, supabase)
+
+      return {
+        leadId: lead.id,
+        action: 'sent',
+        reason: `Successfully sent ${rule.name}`,
+        followUpType: rule.name,
+        communicationType: rule.communicationType
+      }
+    } else {
+      return {
+        leadId: lead.id,
+        action: 'error',
+        reason: `Send failed: ${sendResult.error}`,
+        followUpType: rule.name,
+        communicationType: rule.communicationType,
+        error: sendResult.error
+      }
+    }
+
+  } catch (error) {
+    return {
+      leadId: lead.id,
+      action: 'error',
+      reason: `Rule processing exception: ${error.message}`,
+      followUpType: rule.name,
+      communicationType: rule.communicationType,
+      error: error.message
+    }
+  }
+}
+
+// Determine which follow-ups a lead should receive - FIXED: Only returns NEXT due follow-up
+async function determineFollowUpsForLead(lead: Lead, supabase: any): Promise<FollowUpRule[]> {
   const now = new Date()
   const leadCreatedAt = new Date(lead.created_at)
   const timeSinceCreated = now.getTime() - leadCreatedAt.getTime()
   
-  const applicableRules: FollowUpRule[] = []
+  // Filter out initial contact for nurturing function and sort by time
+  const followupRules = FOLLOW_UP_RULES
+    .filter(rule => rule.name !== 'sms_5min_initial')
+    .sort((a, b) => a.timeFromCreated - b.timeFromCreated) // Sort by time ascending
   
-  for (const rule of FOLLOW_UP_RULES) {
-    // Filter by communication type if specified
-    if (communicationType && rule.communicationType !== communicationType) {
-      continue
-    }
-    
-    // Check if lead status matches (if rule specifies status requirements)
-    if (rule.leadStatus && !rule.leadStatus.includes(lead.status)) {
-      continue
-    }
-    
+  logInfo(`Checking follow-ups for lead ${lead.id}, age: ${Math.round(timeSinceCreated / (24 * 60 * 60 * 1000))} days`)
+  
+  // Find the NEXT due follow-up (not all overdue ones)
+  for (const rule of followupRules) {
     // Check if enough time has passed since lead creation
     if (timeSinceCreated < rule.timeFromCreated) {
+      logInfo(`Lead ${lead.id}: ${rule.name} not due yet (need ${Math.round(rule.timeFromCreated / (24 * 60 * 60 * 1000))} days)`)
       continue
     }
     
     // Check if too much time has passed (if rule has max time)
     if (rule.maxTimeFromCreated && timeSinceCreated > rule.maxTimeFromCreated) {
+      logInfo(`Lead ${lead.id}: ${rule.name} expired (max ${Math.round(rule.maxTimeFromCreated / (24 * 60 * 60 * 1000))} days)`)
       continue
     }
     
-    // Check if this follow-up has already been sent (if onlyOnce is true)
-    if (rule.onlyOnce) {
-      const alreadySent = await hasFollowUpBeenSent(lead.id, rule.name, supabase)
-      if (alreadySent) {
-        continue
-      }
+    // Check if lead status matches (if rule specifies status requirements)
+    if (rule.leadStatus && !rule.leadStatus.includes(lead.status)) {
+      logInfo(`Lead ${lead.id}: ${rule.name} skipped due to status (${lead.status})`)
+      continue
     }
     
-    // For 30-day recurring follow-ups, check if one was sent recently
-    if (!rule.onlyOnce && rule.name === '30d_email_followup') {
-      const recentlySent = await hasRecentFollowUp(lead.id, rule.name, 7 * 24 * 60 * 60 * 1000, supabase) // 7 days
-      if (recentlySent) {
-        continue
-      }
+    // Check if this follow-up has already been sent
+    if (rule.onlyOnce && await hasFollowUpBeenSent(lead.id, rule.name, supabase)) {
+      logInfo(`Lead ${lead.id}: ${rule.name} already sent`)
+      continue
     }
     
-    // Check if user has replied after last assistant message (if rule requires it)
-    if (rule.checkLastActivity) {
-      const hasUserReplied = await hasUserRepliedToLastAssistantMessage(lead.id, supabase)
-      if (hasUserReplied) {
-        continue // Skip if user already replied
-      }
+    // Check if user has replied after last assistant message
+    if (rule.checkLastActivity && await hasUserRepliedToLastAssistantMessage(lead.id, supabase)) {
+      logInfo(`Lead ${lead.id}: ${rule.name} skipped - user already replied`)
+      continue
     }
     
-    applicableRules.push(rule)
+    // This is the NEXT due follow-up - return only this one
+    logInfo(`Lead ${lead.id}: Found next due follow-up: ${rule.name}`)
+    return [rule]
   }
   
-  return applicableRules
+  logInfo(`Lead ${lead.id}: No applicable follow-ups found`)
+  return []
 }
 
-// Check if a specific follow-up has already been sent
+// Check if a specific follow-up has already been sent - IMPROVED detection
 async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabase: any): Promise<boolean> {
   try {
     // Get thread for this lead
@@ -206,50 +642,33 @@ async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabas
     
     if (!thread) return false
     
-    // Check if this follow-up type has been sent
-    const { data: conversations } = await supabase
-      .from('conversation')
-      .select('id')
-      .eq('thread_id', thread.id)
-      .eq('is_from_user', false)
-      .eq('sender_type', 'assistant')
-      .ilike('message', `%${followUpName}%`)
+    // Check if this follow-up type has been sent using multiple patterns
+    const searchPatterns = [
+      `%${followUpName}%`,
+      `%${followUpName.toUpperCase()}%`,
+      `%${followUpName.toLowerCase()}%`
+    ]
     
-    return conversations && conversations.length > 0
+    for (const pattern of searchPatterns) {
+      const { data: conversations } = await supabase
+        .from('conversation')
+        .select('id, message')
+        .eq('thread_id', thread.id)
+        .eq('is_from_user', false)
+        .eq('sender_type', 'assistant')
+        .ilike('message', pattern)
+      
+      if (conversations && conversations.length > 0) {
+        logInfo(`Follow-up ${followUpName} already sent for lead ${leadId}`)
+        return true
+      }
+    }
+    
+    return false
     
   } catch (error) {
     logError(`Error checking if follow-up ${followUpName} was sent for lead ${leadId}`, error)
-    return false
-  }
-}
-
-// Check if a follow-up was sent recently (for recurring follow-ups)
-async function hasRecentFollowUp(leadId: string, followUpName: string, timeWindow: number, supabase: any): Promise<boolean> {
-  try {
-    const { data: thread } = await supabase
-      .from('threads')
-      .select('id')
-      .eq('lead_id', leadId)
-      .single()
-    
-    if (!thread) return false
-    
-    const timeThreshold = new Date(Date.now() - timeWindow).toISOString()
-    
-    const { data: conversations } = await supabase
-      .from('conversation')
-      .select('id')
-      .eq('thread_id', thread.id)
-      .eq('is_from_user', false)
-      .eq('sender_type', 'assistant')
-      .ilike('message', `%${followUpName}%`)
-      .gte('created_at', timeThreshold)
-    
-    return conversations && conversations.length > 0
-    
-  } catch (error) {
-    logError(`Error checking recent follow-up ${followUpName} for lead ${leadId}`, error)
-    return false
+    return false // If we can't check, assume it wasn't sent (safer for follow-ups)
   }
 }
 
@@ -292,186 +711,6 @@ async function hasUserRepliedToLastAssistantMessage(leadId: string, supabase: an
     logError(`Error checking user replies for lead ${leadId}`, error)
     return false
   }
-}
-
-// Get all leads that need processing based on the rules
-async function getLeadsForProcessing(supabase: any, communicationType?: 'sms' | 'email'): Promise<Lead[]> {
-  logInfo(`Fetching leads for processing - communication type: ${communicationType || 'all'}`)
-  
-  try {
-    // Get all clinics first
-    const { data: clinics, error: clinicError } = await supabase
-      .from('clinic')
-      .select('id')
-    
-    if (clinicError) {
-      logError('Error fetching clinics', clinicError)
-      return []
-    }
-    
-    if (!clinics || clinics.length === 0) {
-      logInfo('No clinics found')
-      return []
-    }
-    
-    // Get all leads from all clinics that have required contact info
-    let leadQuery = supabase
-      .from('lead')
-      .select('*')
-      .in('clinic_id', clinics.map(c => c.id))
-    
-    // Filter by communication type requirements
-    if (communicationType === 'sms') {
-      leadQuery = leadQuery
-        .not('phone', 'is', null)
-        .neq('phone', '')
-    } else if (communicationType === 'email') {
-      leadQuery = leadQuery
-        .not('email', 'is', null)
-        .neq('email', '')
-    } else {
-      // For 'all', we need either phone or email
-      leadQuery = leadQuery
-        .or('phone.not.is.null,email.not.is.null')
-    }
-    
-    const { data: leads, error: leadsError } = await leadQuery
-    
-    if (leadsError) {
-      logError('Error fetching leads', leadsError)
-      return []
-    }
-    
-    logInfo(`Found ${leads?.length || 0} leads with required contact info`)
-    return leads || []
-    
-  } catch (error) {
-    logError('Error in getLeadsForProcessing', error)
-    return []
-  }
-}
-
-// Process a single lead and return the result
-async function processLead(
-  lead: Lead,
-  clinic: Clinic,
-  supabase: any,
-  communicationType?: 'sms' | 'email'
-): Promise<ProcessingResult[]> {
-  logInfo(`Processing lead ${lead.id} for clinic ${clinic.name}`)
-  
-  const results: ProcessingResult[] = []
-  
-  try {
-    // Determine which follow-ups this lead should receive
-    const applicableRules = await determineFollowUpsForLead(lead, supabase, communicationType)
-    
-    if (applicableRules.length === 0) {
-      results.push({
-        leadId: lead.id,
-        action: 'skipped',
-        reason: 'No applicable follow-up rules',
-        followUpType: 'none',
-        communicationType: communicationType || 'any'
-      })
-      return results
-    }
-    
-    logInfo(`Lead ${lead.id} has ${applicableRules.length} applicable follow-up rules`)
-    
-    // Process each applicable follow-up rule
-    for (const rule of applicableRules) {
-      try {
-        // Check if lead has required contact info for this communication type
-        const hasContactInfo = (rule.communicationType === 'sms' && lead.phone) || 
-                             (rule.communicationType === 'email' && lead.email)
-        
-        if (!hasContactInfo) {
-          results.push({
-            leadId: lead.id,
-            action: 'skipped',
-            reason: `Missing ${rule.communicationType} contact info`,
-            followUpType: rule.name,
-            communicationType: rule.communicationType
-          })
-          continue
-        }
-        
-        // Get or create thread
-        const threadId = await getOrCreateThread(lead, supabase)
-        if (!threadId) {
-          results.push({
-            leadId: lead.id,
-            action: 'error',
-            reason: 'Failed to get or create thread',
-            followUpType: rule.name,
-            communicationType: rule.communicationType,
-            error: 'Thread creation failed'
-          })
-          continue
-        }
-        
-        // Get conversation history for context
-        const conversationHistory = await getConversationHistory(threadId, supabase)
-        
-        // Generate message content using intelligent response
-        const messageContent = await generateMessageContent(lead, clinic, rule, conversationHistory)
-        
-        // Send the message based on communication type
-        const sendResult = await sendMessage(lead, clinic, rule, messageContent, supabase)
-        
-        if (sendResult.success) {
-          // Save the message to conversation history
-          await saveMessageToHistory(threadId, messageContent, rule.name, supabase)
-          
-          results.push({
-            leadId: lead.id,
-            action: 'sent',
-            reason: `Successfully sent ${rule.name}`,
-            followUpType: rule.name,
-            communicationType: rule.communicationType
-          })
-          
-          logInfo(`Successfully sent ${rule.name} to lead ${lead.id}`)
-        } else {
-          results.push({
-            leadId: lead.id,
-            action: 'error',
-            reason: `Failed to send ${rule.name}`,
-            followUpType: rule.name,
-            communicationType: rule.communicationType,
-            error: sendResult.error
-          })
-          
-          logError(`Failed to send ${rule.name} to lead ${lead.id}`, sendResult.error)
-        }
-        
-      } catch (error) {
-        logError(`Error processing rule ${rule.name} for lead ${lead.id}`, error)
-        results.push({
-          leadId: lead.id,
-          action: 'error',
-          reason: `Exception while processing ${rule.name}`,
-          followUpType: rule.name,
-          communicationType: rule.communicationType,
-          error: error.message
-        })
-      }
-    }
-    
-  } catch (error) {
-    logError(`Error processing lead ${lead.id}`, error)
-    results.push({
-      leadId: lead.id,
-      action: 'error',
-      reason: 'Exception during lead processing',
-      followUpType: 'unknown',
-      communicationType: communicationType || 'any',
-      error: error.message
-    })
-  }
-  
-  return results
 }
 
 // Get or create thread for a lead
@@ -536,180 +775,7 @@ async function getConversationHistory(threadId: string, supabase: any): Promise<
   }
 }
 
-// Placeholder functions that will be implemented later
-
-async function generateMessageContent(
-  lead: Lead,
-  clinic: Clinic,
-  rule: FollowUpRule,
-  conversationHistory: Conversation[]
-): Promise<string | { subject: string, body: string }> {
-  logInfo(`Generating message content for ${rule.name}`)
-  
-  // Use the intelligent response generator
-  return await generateIntelligentResponse(
-    lead,
-    clinic,
-    conversationHistory,
-    rule.communicationType === 'email'
-  )
-}
-
-async function sendMessage(
-  lead: Lead,
-  clinic: Clinic,
-  rule: FollowUpRule,
-  messageContent: string | { subject: string, body: string },
-  supabase: any
-): Promise<{ success: boolean, error?: string }> {
-  logInfo(`Sending ${rule.communicationType} message for ${rule.name} to lead ${lead.id}`)
-  
-  try {
-    if (rule.communicationType === 'sms') {
-      if (typeof messageContent === 'string') {
-        return await sendSMS(lead.phone, messageContent, lead.clinic_id, supabase)
-      } else {
-        return { success: false, error: 'Invalid message format for SMS' }
-      }
-    } else if (rule.communicationType === 'email') {
-      if (typeof messageContent === 'object' && messageContent.subject && messageContent.body) {
-        return await sendEmail(
-          lead.email!,
-          messageContent.subject,
-          messageContent.body,
-          lead.clinic_id,
-          supabase
-        )
-      } else {
-        return { success: false, error: 'Invalid message format for email' }
-      }
-    } else {
-      return { success: false, error: `Unsupported communication type: ${rule.communicationType}` }
-    }
-  } catch (error) {
-    logError(`Error in sendMessage for lead ${lead.id}`, error)
-    return { success: false, error: error.message }
-  }
-}
-
-async function saveMessageToHistory(
-  threadId: string,
-  messageContent: string | { subject: string, body: string },
-  followUpType: string,
-  supabase: any
-): Promise<void> {
-  try {
-    const now = new Date().toISOString()
-    let messageText = ''
-    
-    if (typeof messageContent === 'string') {
-      messageText = messageContent
-    } else {
-      messageText = `EMAIL SENT (${followUpType}) - Subject: ${messageContent.subject}\n\n${messageContent.body}`
-    }
-    
-    await supabase
-      .from('conversation')
-      .insert({
-        thread_id: threadId,
-        message: messageText,
-        timestamp: now,
-        is_from_user: false,
-        sender_type: 'assistant'
-      })
-    
-    logInfo(`Saved message to history for thread ${threadId}`)
-    
-  } catch (error) {
-    logError(`Error saving message to history for thread ${threadId}`, error)
-  }
-}
-
-// Main processing function
-async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email') {
-  logInfo(`=== Starting Lead Processing - Type: ${communicationType || 'all'} ===`)
-  
-  try {
-    // Get all leads that need processing
-    const leads = await getLeadsForProcessing(supabase, communicationType)
-    
-    if (leads.length === 0) {
-      logInfo('No leads found for processing')
-      return {
-        success: true,
-        totalLeads: 0,
-        results: [],
-        summary: {
-          sent: 0,
-          skipped: 0,
-          errors: 0
-        }
-      }
-    }
-    
-    logInfo(`Processing ${leads.length} leads`)
-    
-    // Get all clinics for context
-    const { data: clinics } = await supabase
-      .from('clinic')
-      .select('id, name, openai_api_key, assistant_prompt, assistant_model, chatbot_name')
-    
-    const clinicMap = new Map(clinics?.map(c => [c.id, c]) || [])
-    
-    // Process each lead
-    const allResults: ProcessingResult[] = []
-    
-    for (const lead of leads) {
-      const clinic = clinicMap.get(lead.clinic_id)
-      if (!clinic) {
-        allResults.push({
-          leadId: lead.id,
-          action: 'error',
-          reason: 'Clinic not found',
-          followUpType: 'unknown',
-          communicationType: communicationType || 'any',
-          error: `Clinic ${lead.clinic_id} not found`
-        })
-        continue
-      }
-      
-      const leadResults = await processLead(lead, clinic, supabase, communicationType)
-      allResults.push(...leadResults)
-    }
-    
-    // Calculate summary
-    const summary = {
-      sent: allResults.filter(r => r.action === 'sent').length,
-      skipped: allResults.filter(r => r.action === 'skipped').length,
-      errors: allResults.filter(r => r.action === 'error').length
-    }
-    
-    logInfo('Lead processing completed', summary)
-    
-    return {
-      success: true,
-      totalLeads: leads.length,
-      results: allResults,
-      summary
-    }
-    
-  } catch (error) {
-    logError('Error in processAllLeads', error)
-    return {
-      success: false,
-      error: error.message,
-      totalLeads: 0,
-      results: [],
-      summary: {
-        sent: 0,
-        skipped: 0,
-        errors: 1
-      }
-    }
-  }
-}
-
-// Generate intelligent responses based on conversation history
+// Generate intelligent responses using OpenAI
 async function generateIntelligentResponse(
   lead: Lead,
   clinic: Clinic,
@@ -862,6 +928,38 @@ Patient Details:
   return fallbackMessage
 }
 
+// Send message based on communication type
+async function sendMessage(
+  lead: Lead,
+  clinic: Clinic,
+  rule: FollowUpRule,
+  messageContent: string | { subject: string, body: string },
+  supabase: any
+): Promise<{ success: boolean, error?: string }> {
+  if (rule.communicationType === 'sms') {
+    if (typeof messageContent === 'string') {
+      return await sendSMS(lead.phone, messageContent, lead.clinic_id, supabase, clinic.twilio_config?.[0])
+    } else {
+      return { success: false, error: 'Invalid message format for SMS' }
+    }
+  } else {
+    if (typeof messageContent === 'object' && messageContent.subject && messageContent.body) {
+      // Pass leadId to sendEmail for unsubscribe link
+      return await sendEmail(
+        lead.email!, 
+        messageContent.subject, 
+        messageContent.body, 
+        lead.clinic_id, 
+        supabase,
+        undefined, // emailSettings 
+        lead.id     // leadId for unsubscribe link
+      )
+    } else {
+      return { success: false, error: 'Invalid message format for email' }
+    }
+  }
+}
+
 // Enhanced sendSMS function
 async function sendSMS(
   toPhone: string, 
@@ -937,243 +1035,193 @@ async function sendSMS(
   }
 }
 
-// Enhanced sendEmail function
+// Enhanced sendEmail function using Mailgun
 async function sendEmail(
   toEmail: string,
   subject: string,
   body: string,
   clinicId: string,
   supabase: any,
-  emailSettings?: any
+  emailSettings?: any,
+  leadId?: string // Added leadId parameter for unsubscribe link
 ): Promise<{ success: boolean, error?: string }> {
   logInfo(`Attempting to send email to ${toEmail} for clinic ${clinicId}`);
 
   try {
     let settings = emailSettings;
 
-    // Fetch settings from email_settings table if not provided
+    // Fetch settings from clinic table if not provided
     if (!settings) {
       const { data: fetchedSettings, error: settingsError } = await supabase
-        .from('email_settings')
-        .select('smtp_host, smtp_port, smtp_user, smtp_password, smtp_sender_email, smtp_sender_name, smtp_use_tls')
-        .eq('clinic_id', clinicId)
+        .from('clinic')
+        .select('mailgun_domain, mailgun_email, name')
+        .eq('id', clinicId)
         .single();
 
       if (settingsError) {
-        logError('Error fetching email settings', { clinicId, error: settingsError });
-        return { success: false, error: `Error fetching email settings: ${settingsError.message}` };
+        logError('Error fetching Mailgun settings from clinic table', { clinicId, error: settingsError });
+        return { success: false, error: `Error fetching Mailgun settings: ${settingsError.message}` };
       }
 
       settings = fetchedSettings;
-    
     }
-
-    logInfo('Incomplete email settings for clinic -------------', { 
-        settings, 
-        emailSettings
-      });
 
     // Validate required fields
     const missingFields = [];
-    if (!settings?.smtp_host) missingFields.push('smtp_host');
-    if (!settings?.smtp_port) missingFields.push('smtp_port');
-    if (!settings?.smtp_user) missingFields.push('smtp_user');
-    if (!settings?.smtp_password) missingFields.push('smtp_password');
-    if (!settings?.smtp_sender_email) missingFields.push('smtp_sender_email');
+    if (!settings?.mailgun_domain) missingFields.push('mailgun_domain');
+    if (!settings?.mailgun_email) missingFields.push('mailgun_email');
 
     if (missingFields.length > 0) {
-      logError('Incomplete email settings for clinic', { 
+      logError('Incomplete Mailgun settings for clinic', { 
         clinicId, 
         missingFields
       });
       return { 
         success: false, 
-        error: `Incomplete email settings for clinic. Missing: ${missingFields.join(', ')}` 
+        error: `Incomplete Mailgun settings for clinic. Missing: ${missingFields.join(', ')}` 
       };
     }
 
-    // Gmail SMTP configuration
-    const smtpConfig = {
-      connection: {
-        hostname: settings.smtp_host || 'smtp.gmail.com',
-        port: settings.smtp_port || 587,
-        tls: settings.smtp_use_tls !== false, // Default to true for Gmail
-        auth: {
-          username: settings.smtp_user,
-          password: settings.smtp_password
-        }
-      }
-    };
+    // Get Mailgun API key and Supabase URL from environment
+    const MAILGUN_API_KEY = Deno.env.get('MAILGUN_API_KEY');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    
+    if (!MAILGUN_API_KEY) {
+      logError('MAILGUN_API_KEY environment variable not set');
+      return { 
+        success: false, 
+        error: 'Mailgun API key not configured' 
+      };
+    }
 
-    // Prepare email data
-    const emailData = {
-      from: settings.smtp_sender_name 
-        ? `${settings.smtp_sender_name} <${settings.smtp_sender_email}>`
-        : settings.smtp_sender_email,
+    const { mailgun_domain, mailgun_email, name: clinicName } = settings;
+
+    // Add unsubscribe link to email content if leadId is provided
+    let emailBody = body;
+    let htmlBody = body.replace(/\n/g, '<br>');
+
+    if (leadId && SUPABASE_URL) {
+      const unsubscribeUrl = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?leadId=${leadId}`;
+      
+      // Add unsubscribe footer to text version
+      const textFooter = `\n\n---\nYou're receiving this because you showed interest in our services at ${clinicName || 'our clinic'}.\n\nNot interested anymore? Unsubscribe here: ${unsubscribeUrl}\n\n${clinicName || 'Our Clinic'}`;
+      
+      emailBody += textFooter;
+
+      // Add unsubscribe footer to HTML version
+      const htmlFooter = `
+        <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 40px; font-size: 12px; color: #666; font-family: Arial, sans-serif;">
+          <p>You're receiving this because you showed interest in our services at ${clinicName || 'our clinic'}.</p>
+          <p>
+            Not interested anymore? 
+            <a href="${unsubscribeUrl}" style="color: #666; text-decoration: underline;">Unsubscribe here</a>
+          </p>
+          <div style="margin-top: 15px; color: #999;">
+            <strong>${clinicName || 'Our Clinic'}</strong>
+          </div>
+        </div>
+      `;
+      
+      htmlBody += htmlFooter;
+    }
+
+    logInfo('Sending email via Mailgun', {
+      domain: mailgun_domain,
+      from: mailgun_email,
       to: toEmail,
       subject: subject,
-      html: body.replace(/\n/g, '<br>'), // Convert line breaks to HTML
-      text: body // Include plain text version
-    };
-
-    logInfo('Attempting to send email with data', {
-      from: emailData.from,
-      to: emailData.to,
-      subject: emailData.subject,
-      contentLength: body.length,
-      contentPreview: body.substring(0, 150)
+      contentLength: emailBody.length,
+      hasUnsubscribe: !!leadId
     });
 
-    // Try multiple configurations (similar to sendReplySimple)
-    const configurations = [
-      // Configuration 1: Standard TLS as specified
-      smtpConfig,
-      // Configuration 2: STARTTLS explicit
-      {
-        connection: {
-          hostname: settings.smtp_host || 'smtp.gmail.com',
-          port: settings.smtp_port || 587,
-          tls: false,
-          auth: {
-            username: settings.smtp_user,
-            password: settings.smtp_password
-          }
-        }
+    // Prepare form data for Mailgun API
+    const formData = new FormData();
+    formData.append('from', mailgun_email);
+    formData.append('to', toEmail);
+    formData.append('subject', subject);
+    formData.append('text', emailBody);
+    formData.append('html', htmlBody);
+
+    // Send via Mailgun API
+    const response = await fetch(`https://api.mailgun.net/v3/${mailgun_domain}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(`api:${MAILGUN_API_KEY}`)}`,
       },
-      // Configuration 3: SSL on port 465
-      {
-        connection: {
-          hostname: settings.smtp_host || 'smtp.gmail.com',
-          port: 465,
-          tls: true,
-          auth: {
-            username: settings.smtp_user,
-            password: settings.smtp_password
-          }
-        }
-      }
-    ];
+      body: formData
+    });
 
-    // Try each configuration
-    for (let i = 0; i < configurations.length; i++) {
-      const config = configurations[i];
-      logInfo(`Trying SMTP configuration ${i + 1}`, {
-        hostname: config.connection.hostname,
-        port: config.connection.port,
-        tls: config.connection.tls
+    if (response.ok) {
+      const responseData = await response.json();
+      logInfo('Email sent successfully via Mailgun', { 
+        messageId: responseData.id,
+        message: responseData.message 
       });
-
-      try {
-        const smtpClient = new SMTPClient(config);
-
-        // Try different content field variations (matching sendReplySimple)
-        const emailVariations = [
-          { ...emailData, content: body },
-          { ...emailData, text: body },
-          { ...emailData, html: body.replace(/\n/g, '<br>') },
-          { ...emailData, body: body }
-        ];
-
-        for (const emailVariation of emailVariations) {
-          try {
-            logInfo('Trying email variation with fields', Object.keys(emailVariation));
-            await smtpClient.send(emailVariation);
-            await smtpClient.close();
-            logInfo('Email sent successfully');
-            return { success: true };
-          } catch (sendError) {
-            logInfo(`Email variation failed: ${sendError.message}`);
-            continue;
-          }
-        }
-
-        await smtpClient.close();
-
-      } catch (configError) {
-        logInfo(`Configuration ${i + 1} failed: ${configError.message}`);
-        continue;
-      }
-    }
-
-    // Fallback: Try minimal configuration
-    logInfo('Attempting fallback with minimal configuration');
-    try {
-      const fallbackClient = new SMTPClient({
-        connection: {
-          hostname: settings.smtp_host || 'smtp.gmail.com',
-          port: 587,
-          tls: false, // Start without TLS
-          auth: {
-            username: settings.smtp_user,
-            password: settings.smtp_password
-          }
-        }
-      });
-
-      const simpleEmailData = {
-        from: settings.smtp_sender_email,
-        to: toEmail,
-        subject: subject,
-        text: body // Use only text field
-      };
-
-      await fallbackClient.send(simpleEmailData);
-      await fallbackClient.close();
-
-      logInfo('Fallback method succeeded');
       return { success: true };
-
-    } catch (fallbackError) {
-      logError('Fallback also failed', fallbackError);
-      return {
-        success: false,
-        error: `All email sending attempts failed: ${fallbackError.message}`,
-        troubleshooting: {
-          issues: [
-            {
-              issue: 'SMTP connection failure',
-              solutions: [
-                'Ensure smtp_user is a valid Gmail address',
-                'Verify smtp_password is a valid app-specific password',
-                'Check Gmail security settings for 2FA or less secure apps',
-                'Confirm network connectivity to smtp.gmail.com'
-              ]
-            }
-          ],
-          tips: [
-            'Use an app-specific password if 2FA is enabled (myaccount.google.com/security)',
-            'Check Gmail sending limits (typically 2,000 emails/day)',
-            'Verify port 587 or 465 is open',
-            'Ensure correct SMTP settings in email_settings table'
-          ]
+    } else {
+      const errorText = await response.text();
+      logError('Mailgun API call failed', { 
+        status: response.status, 
+        statusText: response.statusText,
+        error: errorText 
+      });
+      
+      let errorMessage = `Mailgun API error (${response.status}): ${response.statusText}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.message) {
+          errorMessage = `Mailgun error: ${errorJson.message}`;
         }
+      } catch (e) {
+        errorMessage = `Mailgun error: ${errorText}`;
+      }
+
+      return { 
+        success: false, 
+        error: errorMessage 
       };
     }
 
   } catch (error: any) {
-    logError('Error sending email', error);
+    logError('Error sending email via Mailgun', error);
     return {
       success: false,
-      error: error.message,
-      troubleshooting: {
-        issues: [
-          {
-            issue: 'General email sending failure',
-            solutions: [
-              'Check Supabase database connection',
-              'Verify clinic_id exists in email_settings',
-              'Ensure all required fields are populated',
-              'Check server logs for detailed errors'
-            ]
-          }
-        ],
-        tips: [
-          'Review email_settings table configuration',
-          'Confirm Supabase authentication',
-          'Monitor Gmail sending limits'
-        ]
-      }
+      error: error.message
     };
+  }
+}
+
+// Save message to conversation history
+async function saveMessageToHistory(
+  threadId: string,
+  messageContent: string | { subject: string, body: string },
+  followUpType: string,
+  supabase: any
+): Promise<void> {
+  try {
+    const now = new Date().toISOString()
+    let messageText = ''
+    
+    if (typeof messageContent === 'string') {
+      messageText = `${followUpType.toUpperCase()}: ${messageContent}`
+    } else {
+      messageText = `${followUpType.toUpperCase()} EMAIL - Subject: ${messageContent.subject}\n\n${messageContent.body}`
+    }
+    
+    await supabase
+      .from('conversation')
+      .insert({
+        thread_id: threadId,
+        message: messageText,
+        timestamp: now,
+        is_from_user: false,
+        sender_type: 'assistant'
+      })
+    
+    logInfo(`Saved message to history for thread ${threadId}`)
+    
+  } catch (error) {
+    logError(`Error saving message to history for thread ${threadId}`, error)
   }
 }
 
@@ -1283,6 +1331,7 @@ async function handleTwilioWebhook(formData: FormData, supabase: any) {
   }
 }
 
+// Handle email webhook
 async function handleEmailWebhook(emailData: any, supabase: any) {
   logInfo('Handling email webhook')
   
@@ -1290,16 +1339,15 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
     throw new Error('Invalid email webhook data: missing required fields')
   }
 
-  // Find the clinic based on the email address
-  const { data: clinicSettings } = await supabase
-    .from('email_config')
-    .select('clinic_id, from_email')
-    .eq('from_email', emailData.to)
-    .eq('status', 'active')
+  // Find the clinic based on the mailgun_email in the clinic table
+  const { data: clinic } = await supabase
+    .from('clinic')
+    .select('id, mailgun_email')
+    .eq('mailgun_email', emailData.to)
     .single()
 
-  if (!clinicSettings) {
-    throw new Error('No clinic found with active email settings for email address: ' + emailData.to)
+  if (!clinic) {
+    throw new Error('No clinic found with mailgun email address: ' + emailData.to)
   }
 
   // Find the lead by email address
@@ -1307,11 +1355,11 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
     .from('lead')
     .select('*')
     .eq('email', emailData.from)
-    .eq('clinic_id', clinicSettings.clinic_id)
+    .eq('clinic_id', clinic.id)
     .single()
 
   if (!lead) {
-    logError(`No lead found with email ${emailData.from} for clinic ${clinicSettings.clinic_id}`)
+    logError(`No lead found with email ${emailData.from} for clinic ${clinic.id}`)
     throw new Error('No lead found for this email address')
   }
 
@@ -1321,7 +1369,7 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
     .from('threads')
     .select('*')
     .eq('lead_id', lead.id)
-    .eq('clinic_id', clinicSettings.clinic_id)
+    .eq('clinic_id', clinic.id)
     .single()
 
   if (existingThread) {
@@ -1333,7 +1381,7 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
       .from('threads')
       .insert({
         lead_id: lead.id,
-        clinic_id: clinicSettings.clinic_id,
+        clinic_id: clinic.id,
         status: 'new'
       })
       .select()
@@ -1380,7 +1428,7 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
   }
 }
 
-// Update the export statement at the bottom
+// Export all functions
 export { 
   processAllLeads, 
   FOLLOW_UP_RULES, 
@@ -1391,4 +1439,3 @@ export {
   handleTwilioWebhook,
   handleEmailWebhook
 }
-

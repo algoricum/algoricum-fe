@@ -13,7 +13,7 @@ const Input: React.FC<CustomInputProps> = props => {
   return (
     <AntdInput
       ref={inputRef}
-      className={`custom-input h-[44px] border-Black hover:!border-Primary1000 focus-within:!border-Primary1000 focus-within:!shadow-sm ${className}`}
+      className={`custom-input font-helvetica h-[44px] border-Black hover:!border-Primary1000 focus-within:!border-Primary1000 focus-within:!shadow-sm ${className}`}
       {...inputProps}
     />
   );

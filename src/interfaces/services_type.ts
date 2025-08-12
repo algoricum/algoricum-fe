@@ -185,7 +185,7 @@ export interface Lead {
   last_name?: string | null;
   email?: string | null;
   phone?: string | null;
-  status: string; // should match your enum, e.g. 'new', 'booked', etc.
+  status?: string; // should match your enum, e.g. 'new', 'booked', etc.
   source_id: string;
   clinic_id: string;
   assigned_to?: string | null;
@@ -245,25 +245,6 @@ export interface UpdateWidgetProps {
     primary_color?: string;
     font_color?: string;
   };
-}
-
-export interface CreateEmailSettingsProps {
-  clinic_id: string;
-  smtp_host?: string;
-  smtp_port?: number;
-  smtp_user?: string;
-  smtp_password?: string;
-  smtp_sender_name?: string;
-  smtp_sender_email?: string;
-  smtp_use_tls?: boolean;
-  imap_server?: string;
-  imap_port?: number;
-  imap_user?: string;
-  imap_password?: string;
-  imap_use_ssl?: boolean;
-  imap_folder?: string;
-  check_frequency_minutes?: number;
-  sms_auto_reply_enabled?: boolean;
 }
 
 export interface EmailSettings {

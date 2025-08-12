@@ -69,7 +69,7 @@ const SignupPage = () => {
 
       <Form form={form} name="signup" layout="vertical" className="w-full" initialValues={{ remember: true }} onFinish={onFinish}>
         <Flex vertical gap={36}>
-          <Flex vertical gap={18}>
+          <Flex vertical gap={2}>
             <Form.Item
               name="name"
               label="Full Name"

@@ -62,7 +62,10 @@ export const createStaffUser = async ({ email, name, clinicId, roleId }: CreateS
 
     const result: CreateStaffResponse | ApiErrorResponse = await response.json();
 
+    console.log("API....Faizan",response)
+
     if (!response.ok) {
+      console.error("API error:..........Entering",result);
       return {
         error: {
           message: "error" in result ? result.error : "Failed to create staff user",

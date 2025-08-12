@@ -6,7 +6,7 @@ import { Button, Card, Typography,  Skeleton, Tabs } from "antd";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { createClient } from "@/utils/supabase/config/client";
-
+import { ErrorToast } from "@/helpers/toast";
 const supabase = createClient();
 
 interface OnboardingSubscriptionStepProps {
@@ -24,7 +24,11 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
   useEffect(() => {
     const fetchInitialData = async () => {
       const clinic = await getClinicData();
-      if (!clinic) return;
+      console.log(".......Clinic data:.....", clinic);
+      if (!clinic) {
+        ErrorToast("Clinic data not found.");
+        return;
+      }
 
       setClinicId(clinic.id);
 
