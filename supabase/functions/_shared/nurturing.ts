@@ -944,7 +944,16 @@ async function sendMessage(
     }
   } else {
     if (typeof messageContent === 'object' && messageContent.subject && messageContent.body) {
-      return await sendEmail(lead.email!, messageContent.subject, messageContent.body, lead.clinic_id, supabase)
+      // Pass leadId to sendEmail for unsubscribe link
+      return await sendEmail(
+        lead.email!, 
+        messageContent.subject, 
+        messageContent.body, 
+        lead.clinic_id, 
+        supabase,
+        undefined, // emailSettings 
+        lead.id     // leadId for unsubscribe link
+      )
     } else {
       return { success: false, error: 'Invalid message format for email' }
     }
@@ -1033,7 +1042,8 @@ async function sendEmail(
   body: string,
   clinicId: string,
   supabase: any,
-  emailSettings?: any
+  emailSettings?: any,
+  leadId?: string // Added leadId parameter for unsubscribe link
 ): Promise<{ success: boolean, error?: string }> {
   logInfo(`Attempting to send email to ${toEmail} for clinic ${clinicId}`);
 
@@ -1044,7 +1054,7 @@ async function sendEmail(
     if (!settings) {
       const { data: fetchedSettings, error: settingsError } = await supabase
         .from('clinic')
-        .select('mailgun_domain, mailgun_email')
+        .select('mailgun_domain, mailgun_email, name')
         .eq('id', clinicId)
         .single();
 
@@ -1072,8 +1082,10 @@ async function sendEmail(
       };
     }
 
-    // Get Mailgun API key from environment
+    // Get Mailgun API key and Supabase URL from environment
     const MAILGUN_API_KEY = Deno.env.get('MAILGUN_API_KEY');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    
     if (!MAILGUN_API_KEY) {
       logError('MAILGUN_API_KEY environment variable not set');
       return { 
@@ -1082,14 +1094,44 @@ async function sendEmail(
       };
     }
 
-    const { mailgun_domain, mailgun_email } = settings;
+    const { mailgun_domain, mailgun_email, name: clinicName } = settings;
+
+    // Add unsubscribe link to email content if leadId is provided
+    let emailBody = body;
+    let htmlBody = body.replace(/\n/g, '<br>');
+
+    if (leadId && SUPABASE_URL) {
+      const unsubscribeUrl = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?leadId=${leadId}`;
+      
+      // Add unsubscribe footer to text version
+      const textFooter = `\n\n---\nYou're receiving this because you showed interest in our services at ${clinicName || 'our clinic'}.\n\nNot interested anymore? Unsubscribe here: ${unsubscribeUrl}\n\n${clinicName || 'Our Clinic'}`;
+      
+      emailBody += textFooter;
+
+      // Add unsubscribe footer to HTML version
+      const htmlFooter = `
+        <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 40px; font-size: 12px; color: #666; font-family: Arial, sans-serif;">
+          <p>You're receiving this because you showed interest in our services at ${clinicName || 'our clinic'}.</p>
+          <p>
+            Not interested anymore? 
+            <a href="${unsubscribeUrl}" style="color: #666; text-decoration: underline;">Unsubscribe here</a>
+          </p>
+          <div style="margin-top: 15px; color: #999;">
+            <strong>${clinicName || 'Our Clinic'}</strong>
+          </div>
+        </div>
+      `;
+      
+      htmlBody += htmlFooter;
+    }
 
     logInfo('Sending email via Mailgun', {
       domain: mailgun_domain,
       from: mailgun_email,
       to: toEmail,
       subject: subject,
-      contentLength: body.length
+      contentLength: emailBody.length,
+      hasUnsubscribe: !!leadId
     });
 
     // Prepare form data for Mailgun API
@@ -1097,8 +1139,8 @@ async function sendEmail(
     formData.append('from', mailgun_email);
     formData.append('to', toEmail);
     formData.append('subject', subject);
-    formData.append('text', body);
-    formData.append('html', body.replace(/\n/g, '<br>')); // Convert line breaks to HTML
+    formData.append('text', emailBody);
+    formData.append('html', htmlBody);
 
     // Send via Mailgun API
     const response = await fetch(`https://api.mailgun.net/v3/${mailgun_domain}/messages`, {
@@ -1131,7 +1173,6 @@ async function sendEmail(
           errorMessage = `Mailgun error: ${errorJson.message}`;
         }
       } catch (e) {
-        // If response is not JSON, use the text
         errorMessage = `Mailgun error: ${errorText}`;
       }
 
