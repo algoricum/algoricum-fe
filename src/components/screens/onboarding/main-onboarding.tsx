@@ -49,6 +49,16 @@ const BASE_STEPS = [
   { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
 ];
 
+// Helper function to generate slug from clinic name
+const generateSlug = (name: string): string => {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // Remove special characters
+    .replace(/[\s_-]+/g, "-") // Replace spaces and underscores with hyphens
+    .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+};
+
 export default function MainOnboarding() {
   const supabase = createClient();
   const router = useRouter();
@@ -109,6 +119,51 @@ export default function MainOnboarding() {
       localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
     } catch (error) {
       ErrorToast("Error clearing localStorage");
+    }
+  };
+
+  // Mailgun setup function
+  const setupMailgunDomain = async (clinicData: any, formData: any, slug: string) => {
+    console.log("🚀 Starting Mailgun domain setup...");
+
+    if (!clinicData?.id) {
+      console.error("Clinic ID not available. Cannot proceed with mailgun setup.");
+      return;
+    }
+
+    if (!slug) {
+      console.error("Slug not available. Cannot proceed with mailgun setup.");
+      return;
+    }
+
+    try {
+      const requestPayload = {
+        ...formData,
+        clinicId: clinicData.id,
+        slug: slug, // Pass the generated slug
+      };
+
+      console.log("📡 Mailgun setup request payload:", requestPayload);
+
+      const response = await fetch("/api/mailgun-setup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestPayload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Mailgun setup failed:", data.error || `HTTP ${response.status}: ${response.statusText}`);
+        return;
+      }
+
+      console.log("✅ Mailgun setup completed:", data);
+      return data;
+    } catch (error) {
+      console.error("❌ Mailgun setup failed:", error);
     }
   };
 
@@ -213,11 +268,15 @@ export default function MainOnboarding() {
         return;
       }
 
-      // // Upload the logo if provided
-      // let logoUrl = undefined;
-      // if (mappedData.logo) {
-      //   logoUrl = await uploadClinicLogo(user.id, mappedData.logo);
-      // }
+      // Generate slug from clinic name
+      const clinicSlug = generateSlug(mappedData.legalBusinessName || clinic.name || "clinic");
+
+      // Ensure slug is valid
+      if (!clinicSlug || clinicSlug.trim() === "") {
+        throw new Error("Failed to generate valid clinic slug");
+      }
+
+      console.log("🏷️ Generated clinic slug:", clinicSlug);
 
       const clinicData = {
         id: clinic.id, // Include clinic ID for update
@@ -225,6 +284,7 @@ export default function MainOnboarding() {
         name: mappedData.legalBusinessName || `${user.email?.split("@")[0] || "User"}'s Clinic`,
         legal_business_name: mappedData.legalBusinessName || `${user.email?.split("@")[0] || "User"}'s Clinic`,
         dba_name: mappedData.dbaName,
+        slug: clinicSlug, // Add the generated slug
         address: mappedData.clinicAddress,
         phone: mappedData.phoneNumber,
         email: mappedData.emailAddress || user.email,
@@ -255,14 +315,25 @@ export default function MainOnboarding() {
       // Update clinic
       const updatedClinic = await updateClinic(clinicData);
 
+      // Setup Mailgun domain after clinic update
+      const clinicInfoData = allData["clinic-info"] || {};
+      // Ensure all required fields are included
+      const mailgunSetupData = {
+        ...clinicInfoData,
+        clinicName: mappedData.legalBusinessName,
+        clinicType: mappedData.clinicType,
+        primaryContactEmail: mappedData.emailAddress,
+        clinicPhone: mappedData.phoneNumber,
+        businessAddress: mappedData.clinicAddress,
+      };
+      await setupMailgunDomain(updatedClinic, mailgunSetupData, clinicSlug);
+
       // Generate API key for the clinic
       const apiKeyName = `${mappedData.legalBusinessName} Primary Key`;
       await apiKeyService.create({
         name: apiKeyName,
         clinicId: updatedClinic.id,
-      });
-
-      // Handle document upload and assistant creation if we have a clinic ID
+      }); // Handle document upload and assistant creation if we have a clinic ID
       // if (updatedClinic.id && mappedData.clinic_document) {
       //   const hasDocument = !!mappedData.clinic_document;
 
@@ -550,7 +621,7 @@ export default function MainOnboarding() {
         <div className="h-full overflow-y-auto py-11 px-8">
           {isOnboardingComplete ? (
             <div className="max-w-xl mx-auto text-center mt-32">
-              <h1 className="text-2xl font-semibold mb-4">You’re all set! 🎉</h1>
+              <h1 className="text-2xl font-semibold mb-4">You&apos;re all set! 🎉</h1>
               <p className="text-lg text-gray-700">Algoricum is now live and following up with your leads.</p>
               <p className="text-md text-gray-600 mt-4">
                 <strong>Check your inbox</strong> for next steps and tips to get the most out of Algoricum.
