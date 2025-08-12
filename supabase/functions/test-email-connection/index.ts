@@ -104,55 +104,50 @@ async function processQueueBatch(supabaseClient: any) {
     const queueMessage = messages[0];
     console.log(`📧 Processing message ${queueMessage.msg_id} (job ${queueMessage.message.id})`);
 
-    const success = await processEmailJob(queueMessage, supabaseClient);
+    // IMMEDIATELY DELETE MESSAGE FROM QUEUE AFTER READING
+    console.log(`🗑️ Removing message ${queueMessage.msg_id} from queue immediately...`);
+    const { error: deleteError } = await supabaseClient.rpc('delete_email_from_queue', {
+      queue_name: 'email_processing',
+      msg_id: queueMessage.msg_id
+    });
 
-    if (success) {
-      // Delete message from queue
-      await supabaseClient.rpc('delete_email_from_queue', {
-        queue_name: 'email_processing',
-        msg_id: queueMessage.msg_id
+    if (deleteError) {
+      console.error('❌ Error deleting message from queue:', deleteError);
+      results.failed = 1;
+      return results;
+    }
+
+    console.log(`✅ Message ${queueMessage.msg_id} removed from queue`);
+
+    // Process the email job (message already removed from main queue)
+    try {
+      const success = await processEmailJob(queueMessage, supabaseClient);
+
+      if (success) {
+        console.log(`✅ Message ${queueMessage.msg_id} processed successfully`);
+        results.processed = 1;
+      } else {
+        throw new Error('Email processing returned false');
+      }
+    } catch (processingError) {
+      console.error(`❌ Processing failed for message ${queueMessage.msg_id}:`, processingError);
+      
+      // Store in DLQ with detailed error info for investigation/manual retry
+      const jobMessage = queueMessage.message as QueueMessage;
+      jobMessage.attempts = (jobMessage.attempts || 0) + 1;
+      
+      await supabaseClient.rpc('send_email_to_queue', {
+        queue_name: 'email_processing_dlq',
+        message: {
+          ...jobMessage,
+          failed_at: new Date().toISOString(),
+          failure_reason: processingError.message,
+          error_details: processingError.stack,
+          original_msg_id: queueMessage.msg_id
+        }
       });
       
-      console.log(`✅ Message ${queueMessage.msg_id} processed and deleted`);
-      results.processed = 1;
-    } else {
-      // Handle retry logic
-      const jobMessage = queueMessage.message as QueueMessage;
-      jobMessage.attempts++;
-
-      if (jobMessage.attempts >= jobMessage.maxAttempts) {
-        console.log(`❌ Message ${queueMessage.msg_id} failed permanently after ${jobMessage.attempts} attempts`);
-        
-        // Delete from queue (permanent failure)
-        await supabaseClient.rpc('delete_email_from_queue', {
-          queue_name: 'email_processing',
-          msg_id: queueMessage.msg_id
-        });
-        
-        // Optionally store in dead letter queue
-        await supabaseClient.rpc('send_email_to_queue', {
-          queue_name: 'email_processing_dlq',
-          message: jobMessage
-        });
-        
-        results.failed = 1;
-      } else {
-        console.log(`🔄 Message ${queueMessage.msg_id} will retry (attempt ${jobMessage.attempts}/${jobMessage.maxAttempts})`);
-        
-        // Delete current message and re-queue with updated attempt count
-        await supabaseClient.rpc('delete_email_from_queue', {
-          queue_name: 'email_processing',
-          msg_id: queueMessage.msg_id
-        });
-        
-        // Re-queue with updated attempt count
-        await supabaseClient.rpc('send_email_to_queue', {
-          queue_name: 'email_processing',
-          message: jobMessage
-        });
-        
-        results.skipped = 1;
-      }
+      results.failed = 1;
     }
 
     return results;
