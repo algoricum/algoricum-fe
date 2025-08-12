@@ -30,14 +30,14 @@ export const handleCsvLeadsUpload = async (clinic_id: string) => {
         const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
         const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
         if (insertError) {
-          ErrorToast(insertError.message+"faizan1");
+          ErrorToast(insertError.message);
         }
       } catch (error) {
-        ErrorToast(`${error}+"faizan2"`);
+        ErrorToast(`${error}`);
       }
     } else {
       console.log("Faizan csv handler is running but no leads file found");
-    }
+  }
 };
 // Upload CSV file to Supabase storage and handle leads upload
 export const handleCsvUpload = async (leadsData: any, flag: boolean) => {
@@ -70,7 +70,7 @@ try {
 
     if (error) {
         console.error("Upload error:", error);
-        throw new Error(`Failed to upload CSV: ${error.message} Faizan 3`);
+        throw new Error(`Failed to upload CSV: ${error.message}`);
     }
 
     localStorage.setItem(ONBOARDING_LEADS_FILE_NAME, filePath);

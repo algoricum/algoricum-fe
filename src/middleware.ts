@@ -34,7 +34,7 @@ export async function middleware(request: NextRequest) {
     };
 
     // Check if this is a public route or auth route
-    const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route) || pathname === "/");
+    const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route) || pathname === "/login");
 
     const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
 
