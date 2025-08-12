@@ -270,7 +270,6 @@ serve(async (req)=>{
             instructions,
             model
           },
-          { onConflict: ['clinic_id', 'openai_assistant_id'] }  // Specify the columns to conflict on (you can adjust this)
         )
         .select()
         .single();
@@ -306,7 +305,6 @@ serve(async (req)=>{
             file_name: file.name,
             purpose: 'assistants'
           },
-          { onConflict: ['assistant_id', 'openai_file_id'] } // Specify conflict columns
         );
 
       if (fileError) {

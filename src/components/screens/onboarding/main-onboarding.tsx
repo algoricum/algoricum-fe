@@ -9,22 +9,19 @@ import StaffHoursStep from "./staff-hours-step";
 // import AiAssistantStep from "./ai-assistant-step";
 import BookingSetupStep from "./booking-setup-step";
 import IntegrationsStep from "./integrations-step";
-import {handleCsvLeadsUpload} from "@/utils/csvUtils";
+import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
 
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 // import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
-import { updateClinic, getClinicData, createEmailSettings } from "@/utils/supabase/clinic-helper";
+import { updateClinic, getClinicData, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
 // import generateClinicInstructions from "@/utils/generateClinicInstructions";
 // import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { useAuth } from "@/hooks/useAuth";
 // import ChatbotSetupStep from "./chatbot-setup-step";
 // import type { MailgunMessageData } from "mailgun.js";
-
-
-
 
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 
@@ -216,8 +213,6 @@ export default function MainOnboarding() {
     };
   };
 
-
-
   // Main submission function (updated to use updateClinic)
   const handleCompleteOnboarding = async () => {
     try {
@@ -300,7 +295,17 @@ export default function MainOnboarding() {
         clinicPhone: mappedData.phoneNumber,
         businessAddress: mappedData.clinicAddress,
       };
-      await setupMailgunDomain(updatedClinic, mailgunSetupData, clinicSlug);
+
+      const mailgunResponse = await setupMailgunDomain(updatedClinic, mailgunSetupData, clinicSlug);
+
+      if (mailgunResponse?.success && mailgunResponse.data) {
+        await updateMailgunDomainSettings(updatedClinic.id, {
+          domain: mailgunResponse?.data.domain,
+          email: mailgunResponse.data.email,
+        });
+      } else {
+        console.warn("Mailgun setup response missing or unsuccessful, skipping email settings save");
+      }
       // Handle services document upload to edge function
       if (mappedData.servicesDocument) {
         try {
@@ -422,7 +427,6 @@ export default function MainOnboarding() {
       //   console.error("Failed to set up Twilio:", twilioError);
       // }
 
-      await createEmailSettings(clinic.id);
       await handleCsvLeadsUpload(clinic.id);
       clearStoredProgress();
 
