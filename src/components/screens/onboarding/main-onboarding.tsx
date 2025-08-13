@@ -39,12 +39,12 @@ const { Text } = Typography;
 const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
+  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
   // { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
   // { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
   // { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
   { id: "integrations", title: "Lead Capture Setup", description: "Tools", icon: "⚡" },
   { id: "booking-setup", title: "Booking Link Setup", description: "Appointments", icon: "⚙️" },
-  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
 ];
 
 // Helper function to generate slug from clinic name
