@@ -75,8 +75,8 @@ serve(async (req) => {
         return await handleSyncAllConnections(req, requestId);
       }
       
-      // All other POST requests require authentication
-      return await handleAuthenticatedRequest(req, requestId);
+      // All other POST requests require authentication - pass the parsed body
+      return await handleAuthenticatedRequest(req, body, requestId);
       
     } catch (error) {
       console.error(`[${requestId}] Error parsing POST body:`, error);
@@ -89,7 +89,16 @@ serve(async (req) => {
 
   // For authenticated DELETE operations
   if (req.method === "DELETE") {
-    return await handleAuthenticatedRequest(req, requestId);
+    try {
+      const body = await req.json();
+      return await handleAuthenticatedRequest(req, body, requestId);
+    } catch (error) {
+      console.error(`[${requestId}] Error parsing DELETE body:`, error);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
   }
 
   console.log(`[${requestId}] ❌ Method not allowed: ${req.method}`);
@@ -149,20 +158,13 @@ async function handleSyncAllConnections(req: Request, requestId: string) {
       try {
         console.log(`[${requestId}] Syncing contacts for user ${connection.user_id}, clinic ${connection.clinic_id}`);
         
-        // Create a mock request for the existing sync function
-        const mockRequest = new Request("http://localhost/sync-contacts", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "authorization": `Bearer ${supabaseServiceKey}`
-          },
-          body: JSON.stringify({
-            userId: connection.user_id,
-            clinic_id: connection.clinic_id
-          })
-        });
+        // Create sync data object instead of parsing request body
+        const syncData = {
+          userId: connection.user_id,
+          clinic_id: connection.clinic_id
+        };
         
-        const syncResponse = await handleSyncContacts(mockRequest, supabase, `${requestId}-${connection.user_id}`);
+        const syncResponse = await handleSyncContacts(syncData, supabase, `${requestId}-${connection.user_id}`);
         
         if (syncResponse.status === 200) {
           successCount++;
@@ -503,7 +505,8 @@ async function processOAuthCallback(req: Request, requestId: string) {
   }
 }
 
-async function handleAuthenticatedRequest(req: Request, requestId: string) {
+// Updated function signature to accept parsed body
+async function handleAuthenticatedRequest(req: Request, body: any, requestId: string) {
   console.log(`[${requestId}] Handling authenticated request`);
   
   const authHeader = req.headers.get("authorization");
@@ -532,13 +535,13 @@ async function handleAuthenticatedRequest(req: Request, requestId: string) {
   if (req.method === "POST") {
     const url = new URL(req.url);
     if (url.pathname === "/sync-contacts") {
-      return await handleSyncContacts(req, supabase, requestId);
+      return await handleSyncContacts(body, supabase, requestId);
     }
-    return await handleConnect(req, supabase, clientId, redirectUri, requestId);
+    return await handleConnect(body, supabase, clientId, redirectUri, requestId);
   }
 
   if (req.method === "DELETE") {
-    return await handleDisconnect(req, supabase, requestId);
+    return await handleDisconnect(body, supabase, requestId);
   }
 
   return new Response(
@@ -547,10 +550,11 @@ async function handleAuthenticatedRequest(req: Request, requestId: string) {
   );
 }
 
-async function handleSyncContacts(req: Request, supabase: any, requestId: string) {
+// Updated function signature to accept parsed body directly
+async function handleSyncContacts(body: any, supabase: any, requestId: string) {
   console.log(`[${requestId}] Handling contacts sync`);
   
-  const { userId, clinic_id } = await req.json();
+  const { userId, clinic_id } = body;
 
   console.log("data is ", userId, clinic_id)
   
@@ -775,10 +779,11 @@ function createTestSuccessHtml() {
 </body></html>`;
 }
 
-async function handleConnect(req: Request, supabase: any, clientId: string, redirectUri: string, requestId: string) {
+// Updated function signature to accept parsed body directly
+async function handleConnect(body: any, supabase: any, clientId: string, redirectUri: string, requestId: string) {
   console.log(`[${requestId}] Connect handler`);
   
-  const { userId, redirectUrl, clinic_id } = await req.json(); // Extract clinic_id here
+  const { userId, redirectUrl, clinic_id } = body; // Extract clinic_id here
   
   if (!userId || !redirectUrl) {
     return new Response(
@@ -819,10 +824,11 @@ async function handleConnect(req: Request, supabase: any, clientId: string, redi
   );
 }
 
-async function handleDisconnect(req: Request, supabase: any, requestId: string) {
+// Updated function signature to accept parsed body directly
+async function handleDisconnect(body: any, supabase: any, requestId: string) {
   console.log(`[${requestId}] Disconnect handler`);
   
-  const { userId } = await req.json();
+  const { userId } = body;
   
   if (!userId) {
     return new Response(
