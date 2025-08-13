@@ -642,11 +642,35 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handleInputChange = (value: string) => {
-    // Always update local state first
-    setFormData(prev => ({
-      ...prev,
-      [currentQuestion.id]: value,
-    }));
+    clearOAuthState();
+
+    if (currentQuestion.id === "selectedCrm") {
+      if (value === "HubSpot") {
+        setHubspotStatus("disconnected");
+        setShowHubspotModal(true);
+        setShowCompletionButtons(true);
+        // Don't set formData here
+      } else if (value === "Pipedrive") {
+        setPipedriveStatus("disconnected");
+        setShowPipedriveModal(true);
+        setShowCompletionButtons(true);
+        // Don't set formData here
+      } else if (value === "None") {
+        setShowCustomCrmModal(true);
+        setShowCompletionButtons(true);
+        // Set formData for "None" since it doesn't require connection
+        setFormData(prev => ({
+          ...prev,
+          [currentQuestion.id]: value,
+        }));
+      }
+    } else {
+      // For non-CRM questions, set formData normally
+      setFormData(prev => ({
+        ...prev,
+        [currentQuestion.id]: value,
+      }));
+    }
 
     // Save immediately so refresh/redirect works
     const updatedFormData = { ...formData, [currentQuestion.id]: value };
