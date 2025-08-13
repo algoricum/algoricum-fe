@@ -10,8 +10,7 @@ import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
 import Papa from "papaparse";
-import {handleCsvUpload} from "@/utils/csvUtils";
-
+// import {handleCsvUpload} from "@/utils/csvUtils";
 
 const { Title, Text } = Typography;
 
@@ -93,19 +92,19 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       id: "selectedCrm",
       type: "select",
       question: "Do you use a CRM to manage your leads?",
-      options: ["HubSpot", "Pipedrive", "No CRM"],
+      options: ["HubSpot", "Pipedrive", "None of these"],
     },
     {
       id: "adsConnections",
       type: "select",
       question: "Are you running ads that generate leads?",
-      options: ["Facebook Lead Ads", "Google Ads Lead Forms", "No Ads"],
+      options: ["Facebook Lead Ads", "Google Ads Lead Forms", "None of these"],
     },
     {
       id: "leadCaptureForms",
       type: "select",
       question: "Do you collect leads through lead capture forms?",
-      options: ["Google Forms", "No"],
+      options: ["Google Forms", "None of these"],
     },
     {
       id: "uploadLeads",
@@ -115,13 +114,83 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     },
   ];
 
-  const filteredQuestions = formData.selectedCrm === "HubSpot" || formData.selectedCrm === "Pipedrive"
-    ? [questions[0], questions[3]]
-    : questions;
+  const filteredQuestions =
+    formData.selectedCrm === "Hubspot" || formData.selectedCrm === "Pipedrive" ? [questions[0], questions[3]] : questions;
 
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
+  useEffect(() => {
+    return () => {
+      const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
+      const savedPipedriveStatus = localStorage.getItem("pipedrive_oauth_status");
+      const savedGoogleFormStatus = localStorage.getItem("google_form_oauth_status");
+      const savedGoogleLeadFormStatus = localStorage.getItem("google_lead_form_oauth_status");
+      const savedFacebookLeadFormStatus = localStorage.getItem("facebook_lead_form_oauth_status");
+      if (
+        savedHubspotStatus !== "connecting" &&
+        savedPipedriveStatus !== "connecting" &&
+        savedGoogleFormStatus !== "connecting" &&
+        savedGoogleLeadFormStatus !== "connecting" &&
+        savedFacebookLeadFormStatus !== "connecting"
+      ) {
+        // Preserve oauth_form_data for "No CRM" case
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (googleFormStatus === "connected") {
+      fetchGoogleFormSheets();
+    }
+  }, [googleFormStatus]);
+
+  const fetchGoogleFormSheets = async () => {
+    try {
+      const clinicId = await getClinicId();
+      const { data: connection } = await supabase
+        .from("google_form_connections")
+        .select("id")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      console.log("Connection data:", connection);
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          clinic_id: clinicId,
+          connection_id: connection?.id || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch Google Sheets");
+      }
+
+      const data = await response.json();
+      setGoogleFormTreeData(
+        (data.spreadsheets || []).map((spreadsheet: any) => ({
+          title: spreadsheet.spreadsheet_title,
+          value: spreadsheet.spreadsheet_id,
+          selectable: false,
+          children: (spreadsheet.sheets || []).map((sheet: any) => ({
+            title: sheet.sheet_title,
+            value: `${spreadsheet.spreadsheet_id}:${sheet.sheet_id}`,
+            isLeaf: true,
+          })),
+        })),
+      );
+    } catch (error) {
+      ErrorToast("Failed to fetch Google Sheets");
+      console.error(error);
+    }
+  };
   const handleCsvUpload = async (leadsData: any) => {
     try {
       if (!leadsData) {
@@ -163,7 +232,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
-  const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
   const autoProgressToNext = useCallback(() => {
@@ -214,7 +283,45 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     facebookLeadFormAccountInfo,
     onNext,
   ]);
+  const syncPipedriveLeads = async () => {
+    const clinicId = await getClinicId();
 
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No valid session found. Please log in again.");
+      }
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive/sync-leads`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          clinic_id: clinicId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sync leads");
+      }
+
+      const result = await response.json();
+      console.log("✅ Leads synced:", result);
+
+      if (result.synced_count > 0) {
+        SuccessToast(`Successfully synced ${result.synced_count} leads from Pipedrive!`);
+      } else {
+        InfoToast("No new leads to sync from Pipedrive");
+      }
+    } catch (error) {
+      console.error("Lead sync failed:", error);
+      WarningToast("Failed to sync leads from Pipedrive");
+    }
+  };
   useEffect(() => {
     const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
     const savedPipedriveStatus = localStorage.getItem("pipedrive_oauth_status");
@@ -311,7 +418,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           selectedCrm: "HubSpot",
         }));
         localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "HubSpot" }));
-        clearOAuthState();
+        // clearOAuthState();
         autoProgressToNext();
       } else if (event.data.type === "hubspot_error") {
         setHubspotStatus("disconnected");
@@ -405,7 +512,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           ...prev,
           selectedCrm: "HubSpot",
         }));
-        localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "HubSpot" }));
+        // localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "HubSpot" }));
         clearOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
         autoProgressToNext();
@@ -427,7 +534,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           ...prev,
           selectedCrm: "Pipedrive",
         }));
-        localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "Pipedrive" }));
+        // localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "Pipedrive" }));
         clearOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
         setTimeout(() => syncPipedriveLeads(), 1000);
@@ -446,7 +553,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         };
         setGoogleFormStatus("connected");
         setGoogleFormAccountInfo(accountInfo);
-        localStorage.setItem("oauth_form_data", JSON.stringify(formData));
+        // localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Google Forms" }));
         clearOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
         setShowGoogleFormModal(true);
@@ -464,7 +571,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         };
         setGoogleLeadFormStatus("connected");
         setGoogleLeadFormAccountInfo(accountInfo);
-        localStorage.setItem("oauth_form_data", JSON.stringify(formData));
+        // localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "Google Ads Lead Forms" }));
         clearOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
         autoProgressToNext();
@@ -482,7 +589,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         };
         setFacebookLeadFormStatus("connected");
         setFacebookLeadFormAccountInfo(accountInfo);
-        localStorage.setItem("oauth_form_data", JSON.stringify(formData));
+        // localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "Facebook Lead Ads" }));
         clearOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
         autoProgressToNext();
@@ -535,76 +642,62 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handleInputChange = (value: string) => {
-
-    clearOAuthState();
-    
-  
-
-  if (currentQuestion.id === "selectedCrm") {
-    if (value === "HubSpot") {
-      setHubspotStatus("disconnected");
-      setShowHubspotModal(true);
-      setShowCompletionButtons(true);
-      // Don't set formData here
-    } else if (value === "Pipedrive") {
-      setPipedriveStatus("disconnected");
-      setShowPipedriveModal(true);
-      setShowCompletionButtons(true);
-      // Don't set formData here
-    } else if (value === "None") {
-      setShowCustomCrmModal(true);
-      setShowCompletionButtons(true);
-      // Set formData for "None" since it doesn't require connection
-      setFormData(prev => ({
-        ...prev,
-        [currentQuestion.id]: value,
-      }));
-    }
-  } else {
-    // For non-CRM questions, set formData normally
+    // Always update local state first
     setFormData(prev => ({
       ...prev,
       [currentQuestion.id]: value,
     }));
-    localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, [currentQuestion.id]: value }));
 
+    // Save immediately so refresh/redirect works
+    const updatedFormData = { ...formData, [currentQuestion.id]: value };
+    localStorage.setItem("oauth_form_data", JSON.stringify(updatedFormData));
+
+    // CRM-specific logic
     if (currentQuestion.id === "selectedCrm") {
+      clearOAuthState();
       if (value === "HubSpot") {
+        setHubspotStatus("disconnected");
         setShowHubspotModal(true);
         setShowCompletionButtons(true);
       } else if (value === "Pipedrive") {
+        setPipedriveStatus("disconnected");
         setShowPipedriveModal(true);
         setShowCompletionButtons(true);
       } else if (value === "No CRM") {
         setShowCompletionButtons(true);
         setHubspotStatus("disconnected");
         setPipedriveStatus("disconnected");
-        clearOAuthState();
       }
-    } else if (currentQuestion.id === "adsConnections") {
+    }
+
+    // Ads
+    if (currentQuestion.id === "adsConnections") {
       if (value === "Facebook Lead Ads") {
         setShowFacebookLeadFormModal(true);
         setShowCompletionButtons(true);
       } else if (value === "Google Ads Lead Forms") {
         setShowGoogleLeadFormModal(true);
         setShowCompletionButtons(true);
-      } else if (value === "No Ads") {
+      } else {
         setShowCompletionButtons(true);
       }
-    } else if (currentQuestion.id === "leadCaptureForms") {
+    }
+
+    // Lead capture forms
+    if (currentQuestion.id === "leadCaptureForms") {
       if (value === "Google Forms") {
         setShowGoogleFormModal(true);
         setShowCompletionButtons(true);
-      } else if (value === "No") {
+      } else {
         setShowCompletionButtons(true);
       }
     }
 
-    if (currentQuestion.id === "uploadLeads" && value === "Yes") {
-      setTimeout(() => setShowManualLeadsModal(true), 500);
-    }
-
-    if (currentQuestion.id === "uploadLeads" && (value === "Yes" || value === "No")) {
+    // Upload leads
+    if (currentQuestion.id === "uploadLeads") {
+      if (value === "Yes") {
+        setTimeout(() => setShowManualLeadsModal(true), 500);
+      }
       setShowCompletionButtons(true);
     }
   };
@@ -748,53 +841,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   };
 
-  const syncPipedriveLeads = async () => {
-    const clinicId = await getClinicId();
-
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error("No valid session found. Please log in again.");
-      }
-
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive/sync-leads`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          clinic_id: clinicId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to sync leads");
-      }
-
-      const result = await response.json();
-      console.log("✅ Leads synced:", result);
-
-      if (result.synced_count > 0) {
-        SuccessToast(`Successfully synced ${result.synced_count} leads from Pipedrive!`);
-      } else {
-        InfoToast("No new leads to sync from Pipedrive");
-      }
-    } catch (error) {
-      console.error("Lead sync failed:", error);
-      WarningToast("Failed to sync leads from Pipedrive");
-    }
-  };
-
-  const findSheetDetails = (treeData:any, sheetValue:any) => {
+  const findSheetDetails = (treeData: any, sheetValue: any) => {
     const [spreadsheetId, sheetId] = sheetValue.split(":");
 
-    const spreadsheetNode = treeData.find((node:any) => node.value === spreadsheetId);
+    const spreadsheetNode = treeData.find((node: any) => node.value === spreadsheetId);
     if (!spreadsheetNode || !spreadsheetNode.children) return null;
 
-    const sheetNode = spreadsheetNode.children.find((child:any) => child.value === sheetValue);
+    const sheetNode = spreadsheetNode.children.find((child: any) => child.value === sheetValue);
     if (!sheetNode) return null;
 
     return {
@@ -860,7 +913,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
       if (result.synced_count > 0) {
         SuccessToast(`Successfully synced ${result.synced_count} leads from Google Form!`);
-        setGoogleFormAccountInfo((prev:any) => ({ ...prev, responseCount: result.synced_count }));
+        setGoogleFormAccountInfo((prev: any) => ({ ...prev, responseCount: result.synced_count }));
         setGoogleFormLeadsSynced(true);
         setShowGoogleFormModal(false);
         autoProgressToNext();
@@ -949,6 +1002,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     } else {
       setShowHubspotModal(false);
       setShowCompletionButtons(false);
+          setHubspotStatus("disconnected");
+
       setFormData(prev => ({
         ...prev,
         selectedCrm: "",
@@ -962,7 +1017,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       setShowGoogleFormModal(false);
       autoProgressToNext();
     } else {
-      WarningToast("Please select at least one worksheet and sync leads before proceeding.");
+            setShowGoogleFormModal(false);
+      setShowCompletionButtons(false);
+      setFormData(prev => ({
+        ...prev,
+        leadCaptureForms: "",
+      }));
     }
   };
 
@@ -997,7 +1057,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handleHubspotModalCancel = () => {
-
     setShowHubspotModal(false);
     setShowCompletionButtons(false);
     setHubspotStatus("disconnected");
@@ -1044,7 +1103,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       autoProgressToNext();
     } else {
       setShowPipedriveModal(false);
-      setShowCompletionButtons(false);
+            setShowCompletionButtons(false);
+
       setFormData(prev => ({
         ...prev,
         selectedCrm: "",
@@ -1097,7 +1157,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         return;
       }
     } else if (currentQuestion.id === "leadCaptureForms") {
-      if (currentValue === "Google Forms" && (googleFormStatus !== "connected" || selectedGoogleFormWorksheets.length === 0 || !googleFormLeadsSynced)) {
+      if (
+        currentValue === "Google Forms" &&
+        (googleFormStatus !== "connected" || selectedGoogleFormWorksheets.length === 0 || !googleFormLeadsSynced)
+      ) {
         setShowGoogleFormModal(true);
         return;
       }
@@ -1254,7 +1317,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 <Text className="text-lg font-semibold text-gray-900">No CRM Selected</Text>
               </div>
               <Text className="text-gray-900 text-base leading-6">
-                You’ve chosen not to connect a CRM. You can still sync leads via Google Forms, ad platforms, or CSV upload in the next steps.
+                You’ve chosen not to connect a CRM. You can still sync leads via Google Forms, ad platforms, or CSV upload in the next
+                steps.
               </Text>
             </Card>
           )}
@@ -1341,78 +1405,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       );
     }
     return null;
-  };
-
-  useEffect(() => {
-    return () => {
-      const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
-      const savedPipedriveStatus = localStorage.getItem("pipedrive_oauth_status");
-      const savedGoogleFormStatus = localStorage.getItem("google_form_oauth_status");
-      const savedGoogleLeadFormStatus = localStorage.getItem("google_lead_form_oauth_status");
-      const savedFacebookLeadFormStatus = localStorage.getItem("facebook_lead_form_oauth_status");
-      if (
-        savedHubspotStatus !== "connecting" &&
-        savedPipedriveStatus !== "connecting" &&
-        savedGoogleFormStatus !== "connecting" &&
-        savedGoogleLeadFormStatus !== "connecting" &&
-        savedFacebookLeadFormStatus !== "connecting"
-      ) {
-        // Preserve oauth_form_data for "No CRM" case
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (googleFormStatus === "connected") {
-      fetchGoogleFormSheets();
-    }
-  }, [googleFormStatus]);
-
-  const fetchGoogleFormSheets = async () => {
-    try {
-      const clinicId = await getClinicId();
-      const { data: connection } = await supabase
-        .from("google_form_connections")
-        .select("id")
-        .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      console.log("Connection data:", connection);
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          clinic_id: clinicId,
-          connection_id: connection?.id || null,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch Google Sheets");
-      }
-
-      const data = await response.json();
-      setGoogleFormTreeData(
-        (data.spreadsheets || []).map((spreadsheet:any) => ({
-          title: spreadsheet.spreadsheet_title,
-          value: spreadsheet.spreadsheet_id,
-          selectable: false,
-          children: (spreadsheet.sheets || []).map((sheet:any) => ({
-            title: sheet.sheet_title,
-            value: `${spreadsheet.spreadsheet_id}:${sheet.sheet_id}`,
-            isLeaf: true,
-          })),
-        })),
-      );
-    } catch (error) {
-      ErrorToast("Failed to fetch Google Sheets");
-      console.error(error);
-    }
   };
 
   return (
@@ -1797,7 +1789,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                   <div className="flex space-x-2">
                     <Button
                       type="primary"
-                     
                       size="small"
                       onClick={syncGoogleFormLeads}
                       className="bg-yellow-600 border-yellow-600 hover:bg-yellow-700"
@@ -2055,7 +2046,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         open={showManualLeadsModal}
         onOk={leads => {
           setShowManualLeadsModal(false);
-          handleCsvUpload(leads,false);
+          handleCsvUpload(leads);
           if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
             SuccessToast("Leads saved successfully");
           }

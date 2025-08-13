@@ -75,7 +75,7 @@ async function handleAuthStart(req: Request, url: URL) {
     });
   }
 
-  const redirectUri = `https://eypitkzntyiyvwrndkgy.supabase.co/functions/v1/facebook-lead-form/auth/callback`; // must be registered in FB App Valid OAuth Redirect URIs
+  const redirectUri = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/callback`; // must be registered in FB App Valid OAuth Redirect URIs
 
   const state = encodeURIComponent(`${clinic_id}|${redirectTo}`);
 
@@ -113,7 +113,7 @@ async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: any) {
   const redirectTo = redirectToEncoded ? decodeURIComponent(redirectToEncoded) : null;
 
   // const origin = ORIGIN_OVERRIDE || new URL(req.url).origin
-  const redirectUri = `https://eypitkzntyiyvwrndkgy.supabase.co/functions/v1/facebook-lead-form/auth/callback`;
+  const redirectUri = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/callback`;
 
   // Exchange code for short-lived token
   const tokenExchangeUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/oauth/access_token`);
