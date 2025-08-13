@@ -9,8 +9,7 @@ import { SuccessToast, ErrorToast, InfoToast, WarningToast } from "@/helpers/toa
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
-import {handleCsvUpload} from "@/utils/csvUtils";
-
+import { handleCsvUpload } from "@/utils/csvUtils";
 
 const { Title, Text } = Typography;
 
@@ -66,8 +65,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
 
-
-  const SUPABASE_URL = "https://eypitkzntyiyvwrndkgy.supabase.co";
+  const SUPABASE_URL = process.env.SUPABASE_URL || "https://eypitkzntyiyvwrndkgy.supabase.co";
   const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
   const autoProgressToNext = useCallback(() => {
@@ -266,38 +264,35 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handleInputChange = (value: string) => {
-
     clearOAuthState();
-    
-  
 
-  if (currentQuestion.id === "selectedCrm") {
-    if (value === "HubSpot") {
-      setHubspotStatus("disconnected");
-      setShowHubspotModal(true);
-      setShowCompletionButtons(true);
-      // Don't set formData here
-    } else if (value === "Pipedrive") {
-      setPipedriveStatus("disconnected");
-      setShowPipedriveModal(true);
-      setShowCompletionButtons(true);
-      // Don't set formData here
-    } else if (value === "None") {
-      setShowCustomCrmModal(true);
-      setShowCompletionButtons(true);
-      // Set formData for "None" since it doesn't require connection
+    if (currentQuestion.id === "selectedCrm") {
+      if (value === "HubSpot") {
+        setHubspotStatus("disconnected");
+        setShowHubspotModal(true);
+        setShowCompletionButtons(true);
+        // Don't set formData here
+      } else if (value === "Pipedrive") {
+        setPipedriveStatus("disconnected");
+        setShowPipedriveModal(true);
+        setShowCompletionButtons(true);
+        // Don't set formData here
+      } else if (value === "None") {
+        setShowCustomCrmModal(true);
+        setShowCompletionButtons(true);
+        // Set formData for "None" since it doesn't require connection
+        setFormData(prev => ({
+          ...prev,
+          [currentQuestion.id]: value,
+        }));
+      }
+    } else {
+      // For non-CRM questions, set formData normally
       setFormData(prev => ({
         ...prev,
         [currentQuestion.id]: value,
       }));
     }
-  } else {
-    // For non-CRM questions, set formData normally
-    setFormData(prev => ({
-      ...prev,
-      [currentQuestion.id]: value,
-    }));
-  }
 
     if (currentQuestion.id === "uploadLeads" && value === "Yes") {
       setTimeout(() => setShowManualLeadsModal(true), 500);
@@ -452,7 +447,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handleHubspotModalCancel = () => {
-
     setShowHubspotModal(false);
     setShowCompletionButtons(false);
     setHubspotStatus("disconnected");
@@ -946,7 +940,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         open={showManualLeadsModal}
         onOk={leads => {
           setShowManualLeadsModal(false);
-          handleCsvUpload(leads,false);
+          handleCsvUpload(leads, false);
           if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
             SuccessToast("Leads saved successfully");
           }
