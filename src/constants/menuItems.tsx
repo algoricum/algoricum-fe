@@ -3,6 +3,7 @@ import { DashboardIcon } from "@/icons";
 import { StaffManagementIcon } from "@/icons";
 // import { CalendarIcon } from "@/icons";
 import { BillingIcon } from "@/icons";
+import IntegrationIcon from "@/icons/IntegrationIcon";
 
 const menuItems = [
   {
@@ -40,6 +41,14 @@ const menuItems = [
     label: "Billing",
     disabled: false,
   },
+  {
+    key: "integrations",
+    icon: <IntegrationIcon color="#9564E9" width={16} height={16} />,
+    selectedicon: <IntegrationIcon color="white" width={16} height={16} />,
+    label: "Integrations",
+    disabled: false,
+  },
+  
 ];
 
 export default menuItems;

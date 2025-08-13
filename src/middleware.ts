@@ -4,14 +4,15 @@ import { createClient } from "./utils/supabase/config/middleware";
 
 // List of public routes that don't require authentication
 const publicRoutes = [
-  "/login",
-  "/signup",
-  "/forgot-password",
-  "/verify-otp",
-  "/auth/callback",
-  "/auth/oauth-redirect",
-  "/schedule-meeting",
-  "/api/namecheap-dns",
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-otp',
+  '/auth/callback',
+  '/auth/oauth-redirect',
+  '/schedule-meeting',
+  '/api/namecheap-dns'
 ];
 
 // Paths that should redirect to dashboard if already authenticated
@@ -33,7 +34,7 @@ export async function middleware(request: NextRequest) {
     };
 
     // Check if this is a public route or auth route
-    const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route) || pathname === "/");
+    const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route) || pathname === "/login");
 
     const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
 
@@ -168,5 +169,5 @@ async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>
 }
 
 export const config = {
-  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)"],
+  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)']
 };

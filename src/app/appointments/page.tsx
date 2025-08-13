@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect,useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   Calendar,
@@ -68,6 +68,7 @@ export default function AppointmentsPage() {
     meeting_link: "",
   });
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const dropdownRef = useRef<HTMLTableCellElement>(null);
 
   // Load appointments data from Supabase
   useEffect(() => {
@@ -117,13 +118,14 @@ export default function AppointmentsPage() {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest(".dropdown-container")) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setActiveDropdown(null);
       }
     };
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   // Clear message after 5 seconds
@@ -471,7 +473,7 @@ export default function AppointmentsPage() {
           </div>
 
           {/* Table wrapper: allows horizontal scroll on small screens */}
-          <div className="-mx-4 overflow-x-auto sm:mx-0">
+          <div className="relative -mx-4 max-w-full overflow-x-auto touch-pan-x overscroll-x-contain md:mx-0 md:overflow-visible">
             <table className="w-full min-w-[900px] sm:min-w-0">
               <thead>
                 <tr className="border-b border-gray-200">
@@ -594,7 +596,7 @@ export default function AppointmentsPage() {
                           </span>
                         </td>
                         {/* Actions */}
-                        <td className="px-4 py-3">
+                        <td className="relative px-4 py-3" ref={activeDropdown === appointment.id ? dropdownRef : undefined}>
                           <div className="dropdown-container relative">
                             <button
                               onClick={e => toggleDropdown(e, appointment.id)}
@@ -606,7 +608,7 @@ export default function AppointmentsPage() {
 
                             {/* Dropdown Menu */}
                             {activeDropdown === appointment.id && (
-                              <div className="absolute right-0 top-10 z-50 min-w-[140px] rounded-lg border border-gray-200 bg-white shadow-lg">
+                              <div className="absolute z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
                                 <button
                                   onClick={e => {
                                     e.stopPropagation();

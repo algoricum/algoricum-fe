@@ -7,7 +7,7 @@ import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 import { FileTextOutlined } from "@ant-design/icons";
 import { ErrorToast } from "@/helpers/toast";
-import { generateAndDownloadBAA } from "@/utils/generateDummyPdf"; // Import the PDF generation function
+
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -336,38 +336,39 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
   };
 
   // Update the renderConsentSection function to use the PDF generator
-  const renderConsentSection = () => (
-    <div className="mt-6 mb-6 space-y-3">
-      <div>
-        <label className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={consentData.acceptedBAA}
-            onChange={e => setConsentData(prev => ({ ...prev, acceptedBAA: e.target.checked }))}
-          />
-          <span className="text-sm text-gray-800">I accept the Business Associate Agreement (BAA).</span>
-        </label>
-      </div>
-      <div>
-        <label className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={consentData.acceptedLeadConsent}
-            onChange={e => setConsentData(prev => ({ ...prev, acceptedLeadConsent: e.target.checked }))}
-          />
-          <span className="text-sm text-gray-800">I consent to Algoricum securely handling lead data.</span>
-        </label>
-      </div>
-      {consentData.acceptedBAA && consentData.acceptedLeadConsent && (
-        <button
-          onClick={generateAndDownloadBAA}
-          className="text-purple-600 text-sm underline block bg-transparent border-none cursor-pointer hover:text-purple-800"
-        >
-          Download the signed agreement (PDF)
-        </button>
-      )}
+     const renderConsentSection = () => (
+  <div className="mt-6 mb-6 space-y-3">
+    <div>
+      <label className="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          checked={consentData.acceptedBAA}
+          onChange={e => setConsentData(prev => ({ ...prev, acceptedBAA: e.target.checked }))}
+        />
+        <span className="text-sm text-gray-800">I accept the Business Associate Agreement (BAA).</span>
+      </label>
     </div>
-  );
+    <div>
+      <label className="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          checked={consentData.acceptedLeadConsent}
+          onChange={e => setConsentData(prev => ({ ...prev, acceptedLeadConsent: e.target.checked }))}
+        />
+        <span className="text-sm text-gray-800">I consent to Algoricum securely handling lead data.</span>
+      </label>
+    </div>
+    {consentData.acceptedBAA && consentData.acceptedLeadConsent && (
+      <a
+        href="/documents/baa-agreement.pdf"
+        download="BAA-Agreement.pdf"
+        className="text-purple-600 text-sm underline block hover:text-purple-800"
+      >
+        Download Agreement (PDF)
+      </a>
+    )}
+  </div>
+);
 
   const isCurrentFieldValid = () => {
     if (currentQuestionIndex === questions.length - 1) {

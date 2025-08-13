@@ -9,7 +9,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing name or email" }, { status: 400 });
     }
 
-    const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard`;
+    const dashboardUrl = `${process.env.NEXT_PUBLIC_URL || "http://localhost:3000"}/dashboard`;
 
     const result = await sendGoLiveEmail({ name, email, dashboardUrl });
 

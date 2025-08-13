@@ -1,8 +1,11 @@
+// Better approach: Direct state updates and proper data flow
+
 "use client";
 
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { handleCsvUpload } from "@/utils/csvUtils";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
 import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
@@ -12,11 +15,14 @@ import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import StatsGrid from "./StatsGrid";
 import TodayTasks from "./TodayTasks";
+import { SuccessToast } from "@/helpers/toast";
+import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
 
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 
 import { X, CheckCircle, Upload } from "lucide-react";
+import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
 
 type LeadRow = {
   id: string;
@@ -35,17 +41,16 @@ export default function DashboardPage() {
 
   // Loading/UI state
   const [loading, setLoading] = useState(true);
-  const [csvUploading, setCsvUploading] = useState(false);
   const [appointmentFilter, setAppointmentFilter] = useState<"today" | "week" | "month" | "year">("month");
 
   // Integrations state
   const [hubspotConnected, setHubspotConnected] = useState(false);
-  const [csvUploaded, setCsvUploaded] = useState(false);
   const [pipedriveActive, setPipedriveActive] = useState(true);
+  const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
 
   const [showPipedriveBanner, setShowPipedriveBanner] = useState(false);
   const [showHubspotBanner, setShowHubspotBanner] = useState(false);
-  const [showCsvBanner, setShowCsvBanner] = useState(true);
+  const [showCsvBanner] = useState(true);
 
   // Modal state
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -69,52 +74,55 @@ export default function DashboardPage() {
     fetchClinicId();
   }, []);
 
+  // Centralized function to fetch leads data
+  const fetchLeads = useCallback(async () => {
+    if (!clinicId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("lead")
+        .select(
+          `
+          id,
+          first_name,
+          last_name,
+          email,
+          phone,
+          status,
+          created_at,
+          source_id:source_id(id),
+          source:source_id(name)
+        `,
+        )
+        .eq("clinic_id", clinicId);
+
+      if (error) {
+        console.error("Leads fetch error:", error);
+        return;
+      }
+
+      const formatted: LeadRow[] =
+        data?.map((lead: any) => ({
+          id: lead.id,
+          name: `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim(),
+          email: lead.email,
+          phone: lead.phone,
+          status: lead.status,
+          date: lead.created_at,
+          source_id: lead.source_id ?? "Unknown",
+          sourceName: lead.source ?? "Unknown",
+        })) ?? [];
+
+      setLeadsData(formatted);
+    } catch (e) {
+      console.error("Unexpected error fetching leads:", e);
+    }
+  }, [clinicId, supabase]);
+
   // Fetch leads when clinic ID is available
   useEffect(() => {
-    const fetchLeads = async () => {
-      if (!clinicId) return;
-      try {
-        const { data, error } = await supabase
-          .from("lead")
-          .select(
-            `
-            id,
-            first_name,
-            last_name,
-            email,
-            phone,
-            status,
-            created_at,
-            source_id:source_id(id),
-            source:source_id(name)
-          `,
-          )
-          .eq("clinic_id", clinicId);
-
-        if (error) {
-          console.error("Leads fetch error:", error);
-          return;
-        }
-
-        const formatted: LeadRow[] =
-          data?.map((lead: any) => ({
-            id: lead.id,
-            name: `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim(),
-            email: lead.email,
-            phone: lead.phone,
-            status: lead.status,
-            date: lead.created_at,
-            source_id: lead.source_id ?? "Unknown",
-            sourceName: lead.source ?? "Unknown",
-          })) ?? [];
-
-        setLeadsData(formatted);
-      } catch (e) {
-        console.error("Unexpected error fetching leads:", e);
-      }
-    };
     fetchLeads();
-  }, [clinicId, supabase]);
+  }, [fetchLeads]);
 
   // Gate unauthenticated or first-time staff to reset-password
   useEffect(() => {
@@ -144,25 +152,30 @@ export default function DashboardPage() {
     checkUser();
   }, [router, supabase.auth]);
 
+  // Handle CSV upload completion - refetch data after successful upload
+  const handleCsvUploadComplete = async (leads: any) => {
+    try {
+      setShowManualLeadsModal(false);
+
+      // Process the CSV upload
+      await handleCsvUpload(leads, true);
+
+      if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
+        SuccessToast("Leads uploaded successfully");
+      }
+
+      // Refetch leads data to get the updated information
+      await fetchLeads();
+    } catch (error) {
+      console.error("Error handling CSV upload:", error);
+    }
+  };
+
   // Filtered leads for charts
   const filteredLeadsForChart = useMemo(
     () => leadsData.filter(lead => ["booked", "converted"].includes((lead.status ?? "").toLowerCase())),
     [leadsData],
   );
-
-  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setCsvUploading(true);
-      // Simulate upload
-      setTimeout(() => {
-        setCsvUploaded(true);
-        setShowCsvBanner(true);
-        setCsvUploading(false);
-        console.log("CSV file uploaded:", file.name);
-      }, 1200);
-    }
-  };
 
   if (loading) {
     return (
@@ -270,45 +283,40 @@ export default function DashboardPage() {
 
           {/* CSV Upload – responsive banner */}
           {showCsvBanner && (
-            <div className={`rounded-lg border p-4 ${csvUploaded ? "bg-green-50 border-green-200" : "bg-purple-50 border-purple-200"}`}>
+            <div className="rounded-lg border p-4 bg-purple-50 border-purple-200">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 {/* Left: icon + title + desc */}
                 <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 rounded-md p-1.5 ${csvUploaded ? "bg-green-100" : "bg-purple-100"}`}>
-                    <Upload className={`h-4 w-4 ${csvUploaded ? "text-green-600" : "text-purple-600"}`} />
+                  <div className="mt-0.5 rounded-md p-1.5 bg-purple-100">
+                    <Upload className="h-4 w-4 text-purple-600" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center font-semibold text-gray-900">
                       <span>CSV Upload</span>
-                      {csvUploaded && <CheckCircle className="ml-2 h-4 w-4 text-green-600" aria-hidden="true" />}
                     </div>
-                    <p className="mt-1 text-sm text-gray-600">
-                      {csvUploaded ? "CSV file uploaded successfully. Data has been processed." : "Upload your lead data to get started"}
-                    </p>
                   </div>
                 </div>
 
                 {/* Right: actions – stacked on mobile, inline on md+ */}
                 <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
-                  <button type="button" className="btn btn-secondary btn-sm w-full md:w-auto" aria-label="View CSV upload guide">
-                    View Guide
+                  <button
+                    type="button"
+                    onClick={() => setShowManualLeadsModal(true)}
+                    className="btn btn-secondary btn-sm w-full md:w-auto"
+                    aria-label="View CSV upload guide"
+                  >
+                    Upload Now
                   </button>
 
-                  <label
-                    className="btn btn-primary btn-sm w-full cursor-pointer md:w-auto"
-                    aria-label={csvUploading ? "Uploading CSV..." : "Upload CSV file"}
-                  >
-                    {csvUploading ? "Uploading..." : csvUploaded ? "Upload New CSV" : "Upload CSV"}
-                    <input type="file" accept=".csv" onChange={handleCsvUpload} className="hidden" disabled={csvUploading} />
-                  </label>
+                  <label className="btn btn-primary btn-sm w-full cursor-pointer md:w-auto"></label>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Stats Grid */}
-        <StatsGrid clinicId={clinicId} />
+        {/* Stats Grid - Pass leadsData directly for real-time updates */}
+        <StatsGrid clinicId={clinicId} leadsData={leadsData} />
 
         {/* Charts Grid */}
         <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -460,6 +468,8 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      <CsvUploadModal open={showManualLeadsModal} onOk={handleCsvUploadComplete} onCancel={() => setShowManualLeadsModal(false)} />
     </DashboardLayout>
   );
 }

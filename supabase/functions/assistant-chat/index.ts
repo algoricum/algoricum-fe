@@ -90,7 +90,7 @@ const parseLeadAssessment = (message) => {
   }
   
   // Validate values are from allowed lists - YOUR EXACT VALIDATION LOGIC
-  const validStatuses = ['new', 'engaged', 'booked', 'cold'];
+  const validStatuses = ['New', 'Engaged', 'Booked', 'Converted', 'Cold'];
   const validInterestLevels = ['high', 'medium', 'low'];
   const validUrgencies = ['asap', 'this_month', 'curious'];
   

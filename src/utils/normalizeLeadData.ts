@@ -4,7 +4,6 @@ import { Lead } from "@/interfaces/services_type";
 function normalizeLeadData(lead: Partial<Lead>, rowIndex?: number): Lead {
   // Valid values according to database constraints
   const VALID_INTEREST_LEVELS = ["high", "medium", "low"];
-  const VALID_URGENCY_LEVELS = ["asap", "this_month", "curious"];
 
   const rowInfo = rowIndex !== undefined ? ` at row ${rowIndex + 1}` : "";
 
@@ -27,41 +26,23 @@ function normalizeLeadData(lead: Partial<Lead>, rowIndex?: number): Lead {
   }
 
   // Validate and normalize interest_level (optional column)
+  // Validate and normalize interest_level (optional column)
   let interest_level: string | null = null;
   if (Object.prototype.hasOwnProperty.call(lead, "interest_level")) {
     const rawInterestLevel = lead.interest_level?.toString().trim();
     if (rawInterestLevel && rawInterestLevel !== "") {
       const normalized = rawInterestLevel.toLowerCase();
       if (!VALID_INTEREST_LEVELS.includes(normalized)) {
-        throw new Error(
-          `Invalid interest_level for lead${rowInfo}: "${rawInterestLevel}". Valid values are: ${VALID_INTEREST_LEVELS.join(", ")}`,
-        );
+        interest_level = "medium"; // Default for invalid values
+      } else {
+        interest_level = normalized; // Use the valid normalized value
       }
-      interest_level = normalized;
     } else {
       interest_level = "medium"; // Default when column exists but is empty
     }
   } else {
     interest_level = "medium"; // Default when column doesn't exist
   }
-
-  // Validate and normalize urgency (optional column)
-  let urgency: string | null = null;
-  if (Object.prototype.hasOwnProperty.call(lead, "urgency")) {
-    const rawUrgency = lead.urgency?.toString().trim();
-    if (rawUrgency && rawUrgency !== "") {
-      const normalized = rawUrgency.toLowerCase();
-      if (!VALID_URGENCY_LEVELS.includes(normalized)) {
-        throw new Error(`Invalid urgency for lead${rowInfo}: "${rawUrgency}". Valid values are: ${VALID_URGENCY_LEVELS.join(", ")}`);
-      }
-      urgency = normalized;
-    } else {
-      urgency = "this_month"; // Default when column exists but is empty
-    }
-  } else {
-    urgency = "this_month"; // Default when column doesn't exist
-  }
-
 
   // Handle other optional columns
   let first_name: string | null = null;
@@ -84,12 +65,12 @@ function normalizeLeadData(lead: Partial<Lead>, rowIndex?: number): Lead {
     last_name,
     email,
     phone,
-    status:"New",
+    status: "New",
     source_id: lead.source_id!, // will be set in getNormalizedLead
     clinic_id: lead.clinic_id!, // will be set in getNormalizedLead
     notes,
     interest_level,
-    urgency,
+    urgency: "this_month",
   };
 }
 

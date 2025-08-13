@@ -103,7 +103,7 @@ const VerifyOTPPage = () => {
       try {
         const clinic = await createClinic(clinicData);
         setClinicData(clinic);
-        SuccessToast("Clinic created successfully!");
+        // SuccessToast("Clinic created successfully!");
         router.push("/onboarding");
       } catch (error: any) {
         ErrorToast(error.message || "Failed to create clinic");

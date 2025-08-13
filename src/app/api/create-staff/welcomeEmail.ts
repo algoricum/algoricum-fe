@@ -15,7 +15,7 @@ export async function sendWelcomeEmail(email: string, name: string, password: st
       key: process.env.MAILGUN_API_KEY || "",
     });
 
-    const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/login`;
+    const loginUrl = `${process.env.NEXT_PUBLIC_URL || "http://localhost:3001"}/login`;
 
     // Generate beautiful email template
     const { html: emailHtml, text: textContent } = emailTemplate({

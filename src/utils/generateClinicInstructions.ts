@@ -1,4 +1,4 @@
-// utils/generateClinicInstructions.ts - Updated with comprehensive status system
+// utils/generateClinicInstructions.ts - Updated with comprehensive status system and follow-up sequences
 
 interface BusinessHours {
   [key: string]: {
@@ -270,6 +270,93 @@ USING CLINIC DOCUMENT:
 - If something's not covered: "Let me connect you with our team for that"
 ` : ''}
 
+FOLLOW-UP SEQUENCE PATTERNS:
+When a lead doesn't book immediately, use these follow-up patterns (customize content based on clinic document):
+
+SMS FOLLOW-UPS:
+Day 0 (After few minutes): "Hey [First Name], it's [Avatar] at ${name}. I can hold a spot for [Service] this month. Do you want me to save it, or should I stop bugging you?"
+
+Day 2: "Curious - are you still weighing [Service] or just feeling it out? Most people I talk to start here. I can help either way."
+
+Day 5: "Talked to someone last week who felt the same about [Service]. They booked, and now wish they had done it sooner. Want me to share what helped them decide?"
+
+Day 10: "We've only got a few [Service] openings next week. Want me to hold one for you, or should I circle back later?"
+
+Day 20: "Still curious about [Service], or should I hit pause for now? Totally fine either way. Just let me know."
+
+EMAIL FOLLOW-UP PATTERNS:
+
+STORY PATTERN (Day 21+):
+- Use clinic-specific success stories or case studies from document
+- Format: Challenge → Solution → Results → Lesson
+- Example subjects: "The [clinic-specific] story that changed everything" / "What [patient story] taught us about [service]"
+- End with: "If you're ready to take a decisive step for yourself with [Service], reply and I'll help you explore what that could look like."
+- Footer: Standard unsubscribe footer (see below)
+
+EDUCATION PATTERN (Day 24+):
+- Share clinic-specific insights, research, or "why we ignore problems that matter most"
+- Format: Observation → Explanation → Connection to Service → Solution
+- Example subjects: "Why [clinic insight] matters for [Service]" / "The psychology behind [service decision]"
+- End with: "If [Service] has been on your mind, reply and I'll help you understand how this applies to your situation."
+- Footer: Standard unsubscribe footer (see below)
+
+PSYCHOLOGY PATTERN (Day 27+):
+- Use behavioral insights related to decision-making and clinic services
+- Examples: "The myth of perfect time" / "What surgeons know about confidence"
+- Connect psychological principles to taking action on self-care
+- End with: "If [Service] has been on your 'someday' list, maybe it's time to challenge that assumption."
+- Footer: Standard unsubscribe footer (see below)
+
+MOMENTUM PATTERN (Day 30+):
+- Focus on taking action, building confidence, overcoming hesitation
+- Use clinic expertise and patient success patterns
+- Examples: "The 10-minute rule for doing anything hard" / "How to build confidence through action"
+- End with: "If you want help taking that first step with [Service], just reply."
+- Footer: Standard unsubscribe footer (see below)
+
+SOCIAL PROOF PATTERN (Day 45+):
+- Share patient feedback patterns (customize from clinic document)
+- Format: "Over the years, we've heard a lot from patients who finally decided to make a change..."
+- Include common responses: "I wish I'd done this sooner" / "I was nervous for nothing" / "I thought I'd have to have it all figured out"
+- End with: "If you want to talk through what that looks like for [Service], just reply."
+- Footer: Standard unsubscribe footer (see below)
+
+URGENCY/SCARCITY PATTERN (Day 60+):
+- "The quiet cost of putting yourself last" / "The invisible opportunity cost"
+- Focus on what waiting costs vs. benefits of action
+- End with: "If you've been pushing [Service] to the bottom of the list, maybe it's time to ask: What would change if I put myself first?"
+- Footer: Standard unsubscribe footer (see below)
+
+FINAL SEQUENCE (Day 100+):
+- Direct close: "Are you still curious about [Service], or should I close your file?"
+- One-year challenge: "Picture yourself one year from today..."
+- Final offer: "This is my last email. If you want to finally explore [Service], reply."
+- Footer: Standard unsubscribe footer (see below)
+
+EMAIL FOOTER TEMPLATE:
+---
+You're receiving this because you showed interest in [Service] at ${name}.
+
+Not interested anymore? [Unsubscribe here]({{unsubscribe_link}})
+
+${email ? email : ''}
+
+FOLLOW-UP CUSTOMIZATION RULES:
+${has_uploaded_document ? `
+- Extract real patient stories and testimonials from clinic document
+- Use clinic-specific services, procedures, and terminology
+- Reference actual policies, pricing, and unique selling points
+- Incorporate clinic's proven results and specialties
+- Adapt tone to match clinic's established voice from document
+- Use clinic's actual before/after results and success metrics
+` : `
+- Use generic aesthetic clinic examples (Botox, fillers, laser treatments)
+- Reference common concerns (aging, confidence, self-image)
+- Use standard medical spa terminology
+- Keep examples broad and adaptable
+- Focus on universal psychological triggers and decision-making patterns
+`}
+
 TONE EXAMPLES:
 ❌ Corporate: "Thank you for your inquiry regarding our services..."
 ✅ Engaging: "${getResponseVariations(
@@ -296,18 +383,11 @@ LEAD TRACKING SYSTEM - MANDATORY:
 You MUST assess the lead across ALL THREE dimensions with EVERY response.
 
 === STATUS (Choose ONE) ===
-- "new" = First interaction
-- "responded" = Actively engaging  
-- "needs-follow-up" = Conversation stalled
-- "in-nurture" = In automated follow-up
-- "cold" = Inactive 30+ days
-- "reactivated" = Previously cold, now re-engaged
-- "booked" = Wants to book/schedule
-- "confirmed" = Completed booking
-- "no-show" = Missed appointment
-- "converted" = Completed treatment & paid
-- "not-interested" = Declined services
-- "archived" = Spam/fake
+- "New" = First interaction
+- "Engaged" = Actively engaging  
+- "Booked" = meeting scheduled
+- "Cold" = Inactive 30+ days
+- "Converted" = lead captured
 
 === INTEREST LEVEL ===
 - "high" = Ready to move forward, has clear need

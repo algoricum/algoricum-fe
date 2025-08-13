@@ -259,14 +259,21 @@ serve(async (req)=>{
       });
       openaiAssistantId = newAssistant.id;
       // Store the assistant info in our database
-      const { data: createdAssistant, error: createError } = await supabaseClient.from('assistants').insert({
-        clinic_id,
-        openai_assistant_id: openaiAssistantId,
-        assistant_name: name,
-        assistant_description: description,
-        instructions,
-        model
-      }).select().single();
+      const { data: createdAssistant, error: createError } = await supabaseClient
+        .from('assistants')
+        .upsert(
+          {
+            clinic_id,
+            openai_assistant_id: openaiAssistantId,
+            assistant_name: name,
+            assistant_description: description,
+            instructions,
+            model
+          },
+        )
+        .select()
+        .single();
+
       if (createError) {
         // Need to clean up the OpenAI assistant if our DB insert fails
         try {
@@ -289,17 +296,23 @@ serve(async (req)=>{
     }
     // If we have a file, save its reference in the database
     if (openaiFileId) {
-      const { error: fileError } = await supabaseClient.from('assistant_files').insert({
-        assistant_id: assistantResult.id,
-        openai_file_id: openaiFileId,
-        file_name: file.name,
-        purpose: 'assistants'
-      });
+      const { error: fileError } = await supabaseClient
+        .from('assistant_files')
+        .upsert(
+          {
+            assistant_id: assistantResult.id,
+            openai_file_id: openaiFileId,
+            file_name: file.name,
+            purpose: 'assistants'
+          },
+        );
+
       if (fileError) {
         console.error('Failed to save file reference in database', fileError);
-      // Continue anyway as the assistant was created successfully
+        // Continue anyway as the assistant was created successfully
       }
     }
+
     return new Response(JSON.stringify({
       message: assistant_id ? 'Assistant updated successfully' : 'Assistant created successfully',
       assistant: assistantResult
