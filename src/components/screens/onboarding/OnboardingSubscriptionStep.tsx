@@ -121,9 +121,10 @@ const PricingSelector = ({ plans, subscribingId, handleSubscribe }: PricingSelec
         className="px-6 mb-2"
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mt-6 mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mt-6 mx-auto">
        {filteredPlans.map(plan => {
   const isPopular = plan.name.toLowerCase().includes("conversion"); // Highlight "Most Popular" plan
+  const notAvailble = plan.name.toLowerCase().includes("nurturing"); // Highlight "Not Available" plan
 
   return (
 <Card
@@ -163,7 +164,8 @@ const PricingSelector = ({ plans, subscribingId, handleSubscribe }: PricingSelec
       type="primary"
       block
       size="large"
-      className="bg-brand-primary hover:!bg-brand-secondary !text-white rounded-lg mt-4"
+      disabled={notAvailble}
+      className={`bg-brand-primary ${notAvailble?"hover:!bg-gray-200":"hover:!bg-brand-secondary"} ${notAvailble?"!text-gray":"!text-white"} rounded-lg mt-4`}
       onClick={() => handleSubscribe(plan.price_id)}
       loading={subscribingId === plan.price_id}
     >
