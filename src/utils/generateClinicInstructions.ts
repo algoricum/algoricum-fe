@@ -339,9 +339,6 @@ You're receiving this because you showed interest in [Service] at ${name}.
 
 Not interested anymore? [Unsubscribe here]({{unsubscribe_link}})
 
-${name}
-${address ? address : ''}
-${phone ? phone : ''}
 ${email ? email : ''}
 
 FOLLOW-UP CUSTOMIZATION RULES:
