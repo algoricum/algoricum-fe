@@ -52,6 +52,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
         return push("/staff");
       case "billing":
         return push("/billing");
+        case "integrations":
+        return push("/integrations");
       case "profileSettings":
         return push("/settings/clinic-setting");
       case "setup":
