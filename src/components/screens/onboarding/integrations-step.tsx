@@ -641,16 +641,20 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   };
 
   const handleInputChange = (value: string) => {
-    clearOAuthState();
+    // clearOAuthState();
+    setFormData(prev => ({
+      ...prev,
+      [currentQuestion.id]: value,
+    }));
 
     if (currentQuestion.id === "selectedCrm") {
       if (value === "HubSpot") {
-        setHubspotStatus("disconnected");
+        // setHubspotStatus("disconnected");
         setShowHubspotModal(true);
         setShowCompletionButtons(true);
         // Don't set formData here
       } else if (value === "Pipedrive") {
-        setPipedriveStatus("disconnected");
+        // setPipedriveStatus("disconnected");
         setShowPipedriveModal(true);
         setShowCompletionButtons(true);
         // Don't set formData here
@@ -658,19 +662,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setShowCustomCrmModal(true);
         setShowCompletionButtons(true);
         // Set formData for "None" since it doesn't require connection
-        setFormData(prev => ({
-          ...prev,
-          [currentQuestion.id]: value,
-        }));
       }
-    } else {
-      // For non-CRM questions, set formData normally
-      setFormData(prev => ({
-        ...prev,
-        [currentQuestion.id]: value,
-      }));
     }
-
     // Save immediately so refresh/redirect works
     const updatedFormData = { ...formData, [currentQuestion.id]: value };
     localStorage.setItem("oauth_form_data", JSON.stringify(updatedFormData));
@@ -1025,7 +1018,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     } else {
       setShowHubspotModal(false);
       setShowCompletionButtons(false);
-          setHubspotStatus("disconnected");
+      setHubspotStatus("disconnected");
 
       setFormData(prev => ({
         ...prev,
@@ -1040,7 +1033,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       setShowGoogleFormModal(false);
       autoProgressToNext();
     } else {
-            setShowGoogleFormModal(false);
+      setShowGoogleFormModal(false);
       setShowCompletionButtons(false);
       setFormData(prev => ({
         ...prev,
@@ -1126,7 +1119,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       autoProgressToNext();
     } else {
       setShowPipedriveModal(false);
-            setShowCompletionButtons(false);
+      setShowCompletionButtons(false);
 
       setFormData(prev => ({
         ...prev,
