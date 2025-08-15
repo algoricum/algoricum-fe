@@ -1,6 +1,6 @@
 "use client";
 
-import { useState,useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button, Input, Radio, Card, Space, Typography } from "antd";
 // import { forEach } from "lodash";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
@@ -39,17 +39,16 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
       },
     },
   ];
- 
 
   useEffect(() => {
     if (JSON.parse(localStorage.getItem(ONBOARDING_COMPLETED_STEPS_KEY) || "[]").includes(4)) {
-      if(formData.hasBookingLink === "Yes, I have a booking link"){
+      if (formData.hasBookingLink === "Yes, I have a booking link") {
         setCurrentQuestionIndex(questions.length - 1);
-      }else if(formData.hasBookingLink==="No, I don't have one"){
+      } else if (formData.hasBookingLink === "No, I don't have one") {
         setCurrentQuestionIndex(0);
       }
     }
-  },[formData.hasBookingLink,questions.length])
+  }, [formData.hasBookingLink, questions.length]);
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentValue = formData[currentQuestion.id as keyof typeof formData];
@@ -124,7 +123,7 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
                   className={`rounded-xl border-2 cursor-pointer ${
                     currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"
                   }`}
-                  style={{ padding: "16px" }}
+                  styles={{ body: { padding: "16px" } }}
                   onClick={() => handleInputChange(option)}
                 >
                   <Radio value={option} className="text-lg text-black">
@@ -137,7 +136,7 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
 
           {/* Show info card for "No" option */}
           {currentValue === "No, I don't have one" && (
-            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" style={{ padding: "20px" }}>
+            <Card className="rounded-xl bg-blue-50 border-2 border-blue-500 mt-6" styles={{ body: { padding: "20px" } }}>
               <div className="flex items-center mb-3">
                 <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
                   <Text className="text-white text-base">✓</Text>
@@ -145,8 +144,8 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
                 <Text className="text-lg font-semibold text-blue-900">We&apos;ve got you covered!</Text>
               </div>
               <Text className="text-blue-900 text-base leading-6">
-                No worries! You&apos;ll be able to use our integrated booking system. We&apos;ll help you set up a seamless appointment scheduling
-                experience for your patients.
+                No worries! You&apos;ll be able to use our integrated booking system. We&apos;ll help you set up a seamless appointment
+                scheduling experience for your patients.
               </Text>
             </Card>
           )}
@@ -160,7 +159,8 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
         placeholder={currentQuestion.placeholder}
         value={currentValue}
         onChange={e => handleInputChange(e.target.value)}
-        className="text-xs p-3 rounded-xl border-2 border-gray-200 bg-white w-full mb-6"
+        className="w-full mb-6"
+        size="large"
         autoFocus
       />
     );
@@ -173,7 +173,11 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
 
       {/* Current Question */}
       <div>
-        <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
+        <Title
+          level={1}
+          className="text-gray-800 mb-5 font-semibold leading-8"
+          style={{ margin: 0, marginBottom: "21px", fontSize: "24px", lineHeight: "32px" }}
+        >
           {currentQuestion.question}
         </Title>
 
@@ -194,7 +198,7 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
             disabled={!currentValue.trim()}
             className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
           >
-           Countine
+            Continue
           </Button>
         </div>
       </div>
