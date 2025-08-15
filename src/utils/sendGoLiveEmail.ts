@@ -21,7 +21,7 @@ export async function sendGoLiveEmail({
     const { html, text } = algoricumGoLiveTemplate({ name, dashboardUrl });
 
     const mailData = {
-      from: `Algoricum <${process.env.MAILGUN_FROM_EMAIL || "noreply@yourdomain.com"}>`,
+      from: `Algoricum <no-reply@algoricum.com>`,
       to: [email],
       subject: "Congrats! Algoricum is live for your clinic",
       html,
