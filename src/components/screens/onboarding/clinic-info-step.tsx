@@ -7,11 +7,11 @@ import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 import { FileTextOutlined } from "@ant-design/icons";
 import { ErrorToast } from "@/helpers/toast";
-
+import { createClient } from "@/utils/supabase/config/client";
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
-
+const supabase = createClient();
 interface ClinicInfoStepProps {
   // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
@@ -109,7 +109,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       id: "servicesDocument",
       type: "file",
       question: "Upload services document for AI processing",
-      placeholder: "PDF, DOC, DOCX (Max 60MB)",
+      placeholder: "PDF, DOC, DOCX (Max 50MB)",
       required: true,
     },
     {
@@ -148,41 +148,80 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     return fileList;
   };
 
-  const handleFileChange = (info: any) => {
-    const fileList = normFile(info);
-    // perform safeguard validation here as well
-    const validatedList = fileList.filter((file: any) => {
-      // If file has originFileObj we can check size/type; otherwise accept (could be initialData)
-      const fileObj = file.originFileObj || file;
-      const sizeOk = typeof fileObj.size === "number" ? fileObj.size / 1024 / 1024 < 60 : true; // <60MB
-      const type = fileObj.type || "";
-      const isValidType =
-        type === "application/pdf" ||
-        type === "application/msword" ||
-        type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        // allow fallback by extension if type is missing:
-        (file.name && /\.(pdf|docx?|DOCX?|PDF)$/.test(file.name));
-      if (!isValidType) {
-        // remove invalid file from list and alert
-        // eslint-disable-next-line no-console
-        ErrorToast(`Rejected file type: ${file.name}`);
-        console.warn("Rejected file type:", file.name);
-        return false;
-      }
-      if (!sizeOk) {
-        // eslint-disable-next-line no-console
-        console.warn("Rejected file size:", file.name);
-        ErrorToast(`Rejected file size: ${file.name}`);
-        return false;
-      }
-      return true;
-    });
+  const handleFileChange = async (info: any) => {
+  const fileList = normFile(info);
 
-    setFormData(prev => ({
-      ...prev,
-      servicesDocument: validatedList,
-    }));
-  };
+  // Filter & validate
+  const validatedList = fileList.filter((file: any) => {
+    const fileObj = file.originFileObj || file;
+    const sizeOk =
+      typeof fileObj.size === "number"
+        ? fileObj.size / 1024 / 1024 < 50
+        : true; // <60MB
+    const type = fileObj.type || "";
+    const isValidType =
+      type === "application/pdf" ||
+      type === "application/msword" ||
+      type ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      (file.name && /\.(pdf|docx?|DOCX?|PDF)$/.test(file.name));
+
+    if (!isValidType) {
+      ErrorToast(`Rejected file type: ${file.name}`);
+      console.warn("Rejected file type:", file.name);
+      return false;
+    }
+    if (!sizeOk) {
+      console.warn("Rejected file size:", file.name);
+      ErrorToast(`Rejected file size: ${file.name}`);
+      return false;
+    }
+    return true;
+  });
+
+  const uploadedFiles: { name: any; path: string; signedUrl: string; }[] = [];
+
+  for (const file of validatedList) {
+    const fileObj = file.originFileObj || file;
+
+    const path = `services/${Date.now()}-${fileObj.name}`;
+
+    // Upload to Supabase (private bucket)
+    const { error: uploadError } = await supabase.storage
+      .from('Assistant-File')
+      .upload(path, fileObj);
+
+    if (uploadError) {
+      console.error("Upload failed:", uploadError);
+      ErrorToast(`Failed to upload: ${fileObj.name}`);
+      continue;
+    }
+
+    // Generate a signed URL (1 hour expiry)
+    const { data: signedUrlData, error: signedUrlError } =
+      await supabase.storage
+        .from('Assistant-File')
+        .createSignedUrl(path, 60 * 60);
+
+    if (signedUrlError) {
+      console.error("Signed URL failed:", signedUrlError);
+      ErrorToast(`Failed to get URL for: ${fileObj.name}`);
+      continue;
+    }
+
+    uploadedFiles.push({
+      name: fileObj.name,
+      path,
+      signedUrl: signedUrlData.signedUrl,
+    });
+  }
+
+  // Store in state — no raw binary, just path + URL
+  setFormData((prev) => ({
+    ...prev,
+    servicesDocument: uploadedFiles,
+  }));
+};
 
   const handleInputChange = (value: string) => {
     setFormData(prev => ({
@@ -215,7 +254,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
         if (fileObj) {
           const sizeMB = typeof fileObj.size === "number" ? fileObj.size / 1024 / 1024 : 0;
           if (sizeMB >= 60) {
-            return "File must be smaller than 60MB";
+            return "File must be smaller than 50MB";
           }
           const type = fileObj.type || "";
           const isValidType =
@@ -401,7 +440,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       return (
         <div className="mb-8">
           <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">
-            {currentQuestion.placeholder || "PDF, DOC, DOCX (Max 60MB)"}
+            {currentQuestion.placeholder || "PDF, DOC, DOCX (Max 50MB)"}
           </Text>
           <Upload.Dragger
             name="servicesDocument"
@@ -416,9 +455,9 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
                 alert("You can only upload PDF, DOC, or DOCX files!");
                 return Upload.LIST_IGNORE;
               }
-              const isValidSize = file.size / 1024 / 1024 < 60; // < 60MB
+              const isValidSize = file.size / 1024 / 1024 < 50; // < 60MB
               if (!isValidSize) {
-                alert("File must be smaller than 60MB!");
+                alert("File must be smaller than 50MB!");
                 return Upload.LIST_IGNORE;
               }
               // prevent automatic upload; we'll manage fileList in state
@@ -435,7 +474,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             <p className="text-center mb-1">
               Drag and drop files here or click to upload <span className="text-purple-600">Browse Files</span>
             </p>
-            <p className="text-center text-xs text-gray-500">PDF, DOC, DOCX (Max 60MB)</p>
+            <p className="text-center text-xs text-gray-500">PDF, DOC, DOCX (Max 50MB)</p>
           </Upload.Dragger>
           {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
         </div>
