@@ -7,8 +7,7 @@ function getCorsHeaders(request) {
   const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3001',
-    'https://algoricum.hashlogics.com',
-    "https://app.algoricum.com"
+    'https://algoricum.hashlogics.com'
   ];
   const isAllowed = allowedOrigins.includes(origin ?? '');
   return {

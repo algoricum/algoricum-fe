@@ -106,7 +106,7 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
 
     const tabItems = [
       { key: "month", label: "Monthly" },
-      // { key: "year", label: "Yearly" },
+      { key: "year", label: "Yearly" },
     ];
 
     return (
