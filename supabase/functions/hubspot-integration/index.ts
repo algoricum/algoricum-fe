@@ -5,19 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Credentials": "true",
 };
-
-// Helper function to get the frontend URL
-function getFrontendUrl(): string {
-  const frontendUrl = Deno.env.get("FRONTEND_URL");
-  if (!frontendUrl) {
-    console.warn("FRONTEND_URL not set, falling back to localhost:3000");
-    return "http://localhost:3000";
-  }
-  // Ensure URL doesn't end with slash
-  return frontendUrl.endsWith("/") ? frontendUrl.slice(0, -1) : frontendUrl;
-}
 
 serve(async (req) => {
   const requestId = crypto.randomUUID();
@@ -69,8 +57,7 @@ serve(async (req) => {
         public: true,
         environment: {
           hasClientId: !!Deno.env.get("HUBSPOT_CLIENT_ID"),
-          redirectUri: Deno.env.get("HUBSPOT_REDIRECT_URI"),
-          frontendUrl: getFrontendUrl()
+          redirectUri: Deno.env.get("HUBSPOT_REDIRECT_URI")
         }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -240,11 +227,10 @@ async function processOAuthCallback(req: Request, requestId: string) {
   const error = url.searchParams.get("error");
 
   const htmlHeaders = { "Content-Type": "text/html", ...corsHeaders };
-  const frontendUrl = getFrontendUrl();
 
   if (error) {
     console.error(`[${requestId}] OAuth error: ${error}`);
-    let redirectUrl = `${frontendUrl}/onboarding`;
+    let redirectUrl = "http://localhost:3001/onboarding";
     try {
       if (state) {
         const stateData = JSON.parse(atob(state));
@@ -269,7 +255,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
   if (!code || !state) {
     console.error(`[${requestId}] Missing parameters`, { hasCode: !!code, hasState: !!state });
-    const redirectUrl = `${frontendUrl}/onboarding`;
+    const redirectUrl = "http://localhost:3001/onboarding";
     const redirectUrlWithError = new URL(redirectUrl);
     redirectUrlWithError.searchParams.set("hubspot_status", "error");
     redirectUrlWithError.searchParams.set("error_message", "Missing code or state parameter");
@@ -476,7 +462,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
       dealCount: 0,
     };
 
-    const redirectUrl = stateData.redirectUrl || `${frontendUrl}/onboarding`;
+    const redirectUrl = stateData.redirectUrl || "http://localhost:3001/onboarding";
     const redirectUrlWithParams = new URL(redirectUrl);
     redirectUrlWithParams.searchParams.set("hubspot_status", "success");
     redirectUrlWithParams.searchParams.set("account_name", accountInfo.accountName);
@@ -495,7 +481,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
   } catch (error) {
     console.error(`[${requestId}] Callback processing error`, { error: error.message, stack: error.stack });
-    let redirectUrl = `${frontendUrl}/onboarding`;
+    let redirectUrl = "http://localhost:3001/onboarding";
     try {
       const stateData = JSON.parse(atob(state));
       redirectUrl = stateData.redirectUrl || redirectUrl;
