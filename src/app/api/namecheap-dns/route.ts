@@ -262,6 +262,44 @@ async function setNamecheapDNSRecords(sld: string, tld: string, records: any[], 
   }
 }
 
+// Helper function to execute Namecheap API calls with IP fallback
+async function executeWithIpFallback<T>(
+  // eslint-disable-next-line no-unused-vars
+  operation: (_clientIp: string) => Promise<T>,
+  operationName: string
+): Promise<T> {
+  const ip1 = process.env.NAMECHEAP_CLIENT_IP1
+  const ip2 = process.env.NAMECHEAP_CLIENT_IP2
+  
+  // Try with first IP
+  if (ip1) {
+    try {
+      console.log(`${operationName}: Trying with IP1 (${ip1})`)
+      return await operation(ip1)
+    } catch (error: any) {
+      // Check if it's an IP mismatch error
+      if (error.message.includes('Invalid request IP') && ip2) {
+        console.log(`${operationName}: IP1 failed (${error.message}), retrying with IP2 (${ip2})`)
+        try {
+          return await operation(ip2)
+        } catch (ip2Error: any) {
+          console.error(`${operationName}: Both IPs failed. IP1 error: ${error.message}, IP2 error: ${ip2Error.message}`)
+          throw ip2Error
+        }
+      } else {
+        // Non-IP related error, don't retry
+        throw error
+      }
+    }
+  } else if (ip2) {
+    // Only IP2 available
+    console.log(`${operationName}: Only IP2 available (${ip2})`)
+    return await operation(ip2)
+  } else {
+    throw new Error('No Namecheap Client IPs configured')
+  }
+}
+
 // Main DNS setup function - handles dynamic DKIM records from Mailgun
 async function createNamecheapDNSRecords(domain: string, subdomain: string, mailgunDnsRecords: MailgunDnsRecords) {
   const startTime = Date.now()
@@ -269,20 +307,23 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
   const NAMECHEAP_API_USER = process.env.NAMECHEAP_API_USER
   const NAMECHEAP_API_KEY = process.env.NAMECHEAP_API_KEY
   const NAMECHEAP_USERNAME = process.env.NAMECHEAP_USERNAME
-  const NAMECHEAP_CLIENT_IP = process.env.NAMECHEAP_CLIENT_IP1 || process.env.NAMECHEAP_CLIENT_IP2;
+  const NAMECHEAP_CLIENT_IP1 = process.env.NAMECHEAP_CLIENT_IP1
+  const NAMECHEAP_CLIENT_IP2 = process.env.NAMECHEAP_CLIENT_IP2
 
-  console.log('Starting DNS setup with proxy', {
+  console.log('Starting DNS setup with IP fallback', {
     domain,
     subdomain,
     hasApiUser: !!NAMECHEAP_API_USER,
     hasApiKey: !!NAMECHEAP_API_KEY,
     hasUsername: !!NAMECHEAP_USERNAME,
-    hasClientIp: !!NAMECHEAP_CLIENT_IP,
+    hasClientIp1: !!NAMECHEAP_CLIENT_IP1,
+    hasClientIp2: !!NAMECHEAP_CLIENT_IP2,
     hasProxy: !!process.env.FIXIE_PROXY_URL,
-    clientIp: NAMECHEAP_CLIENT_IP
+    clientIp1: NAMECHEAP_CLIENT_IP1,
+    clientIp2: NAMECHEAP_CLIENT_IP2
   })
 
-  if (!NAMECHEAP_API_USER || !NAMECHEAP_API_KEY || !NAMECHEAP_USERNAME || !NAMECHEAP_CLIENT_IP) {
+  if (!NAMECHEAP_API_USER || !NAMECHEAP_API_KEY || !NAMECHEAP_USERNAME || (!NAMECHEAP_CLIENT_IP1 && !NAMECHEAP_CLIENT_IP2)) {
     console.warn('Namecheap API credentials incomplete')
     return { 
       automated: false, 
@@ -291,7 +332,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
         apiUser: !NAMECHEAP_API_USER,
         apiKey: !NAMECHEAP_API_KEY,
         username: !NAMECHEAP_USERNAME,
-        clientIp: !NAMECHEAP_CLIENT_IP
+        clientIp: !NAMECHEAP_CLIENT_IP1 && !NAMECHEAP_CLIENT_IP2
       }
     }
   }
@@ -326,9 +367,12 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       console.log(`Successfully found ${dkimRecords.length} DKIM record(s) - will add them all to DNS`)
     }
 
-    // Step 1: Get existing DNS records
+    // Step 1: Get existing DNS records with IP fallback
     console.log('Fetching existing DNS records')
-    const existingRecords = await getNamecheapDNSRecords(sld, tld, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP)
+    const existingRecords = await executeWithIpFallback(
+      (clientIp) => getNamecheapDNSRecords(sld, tld, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, clientIp),
+      'getNamecheapDNSRecords'
+    )
     
     // Step 2: Filter out existing records for this subdomain (MX, TXT, CNAME)
     const preservedRecords = existingRecords.filter(record => {
@@ -435,7 +479,10 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       newMailgunRecords: mailgunRecordsSummary
     })
     
-    const updateResult = await setNamecheapDNSRecords(sld, tld, newRecords, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP)
+    const updateResult = await executeWithIpFallback(
+      (clientIp) => setNamecheapDNSRecords(sld, tld, newRecords, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, clientIp),
+      'setNamecheapDNSRecords'
+    )
 
     const totalMailgunRecords = 4 + dkimRecords.length // 2 MX + 1 SPF + 1 CNAME + N DKIM records
     console.log('DNS records updated successfully', {
