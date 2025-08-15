@@ -22,7 +22,7 @@ import { getUserData } from "@/utils/supabase/user-helper";
 import { useAuth } from "@/hooks/useAuth";
 // import ChatbotSetupStep from "./chatbot-setup-step";
 // import type { MailgunMessageData } from "mailgun.js";
-
+import { createClient } from "@/utils/supabase/config/client";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 
 import {
@@ -35,7 +35,7 @@ import {
 import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
 
 const { Text } = Typography;
-
+const supabase = createClient();
 const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
@@ -164,6 +164,7 @@ export default function MainOnboarding() {
     }
   };
 
+
   // Map new flow data to old flow structure for Supabase
   const mapDataForSubmission = (data: Record<string, any>) => {
     const clinicInfo = data["clinic-info"] || {};
@@ -209,10 +210,33 @@ export default function MainOnboarding() {
       // Additional data from new flow
       clinicType: clinicInfo.clinicType || "",
       integrations: integrations,
-      servicesDocument: clinicInfo.servicesDocument?.[0]?.originFileObj || null,
+      servicesDocument: null,
+      DocumnetPath: clinicInfo.servicesDocument?.[0].path || null,
     };
   };
+  console.log("📋 Mapping data for submission:", mapDataForSubmission(allData));
+    async function getFile(bucket: any, path: any) {
+    const { data, error } = await supabase.storage.from(bucket).download(path);
 
+    if (error) {
+      console.error("Error downloading file:", error);
+      return null;
+    }
+
+    return data; // This is a Blob
+  }
+  async function getFileAsFile(bucket: any, path: any) {
+    const blob = await getFile(bucket, path);
+    if (!blob) return null;
+
+    // Convert blob to File
+    const fileName = path.split("/").pop() || "file";
+    const file = new File([blob], fileName, { type: blob.type });
+
+    return file;
+  }
+
+  
   // Main submission function (updated to use updateClinic)
   const handleCompleteOnboarding = async () => {
     try {
@@ -307,12 +331,16 @@ export default function MainOnboarding() {
         console.warn("Mailgun setup response missing or unsuccessful, skipping email settings save");
       }
       // Handle services document upload to edge function
-      if (mappedData.servicesDocument) {
+
+      if (mappedData.DocumnetPath) {
+        let file= await getFileAsFile("Assistant-File", mappedData.DocumnetPath);
         try {
           const formDataToSend = new FormData();
           const session = await getSupabaseSession();
+if (file !== null) {
 
-          formDataToSend.append("clinic_document", mappedData.servicesDocument);
+          formDataToSend.append("clinic_document", file,file.name);
+}
           formDataToSend.append("clinic_id", updatedClinic.id);
           formDataToSend.append("name", mappedData.legalBusinessName || "Assistant");
           formDataToSend.append("instructions", "AI Assistant for handling clinic inquiries");
@@ -325,7 +353,7 @@ export default function MainOnboarding() {
             body: formDataToSend,
           });
 
-          if (!response.ok) {
+          if (!response?.ok) {
             console.error("Document upload failed, continuing onboarding");
           }
         } catch (error) {

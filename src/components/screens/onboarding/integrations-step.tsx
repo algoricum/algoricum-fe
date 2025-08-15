@@ -109,6 +109,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       id: "uploadLeads",
       type: "radio",
       question: "Do you want to upload your existing leads via CSV?",
+      subtitle:"Importing your current leads means we can start following up immediately. No waiting, no missed opportunities.",
       options: ["Yes", "No"],
     },
   ];
@@ -1384,6 +1385,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     } else if (currentQuestion?.type === "radio") {
       return (
         <div className="mb-6">
+          {currentQuestion.subtitle && <Text className="text-gray-600 text-sm mb-4 block">{currentQuestion.subtitle}</Text>}
           <Radio.Group value={currentValue} onChange={e => handleInputChange(e.target.value)} className="w-full">
             <Space direction="vertical" size="middle" className="w-full">
               {currentQuestion.options?.map(option => (
@@ -1430,13 +1432,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           Lead Capture Setup
         </Title>
         <Title level={5} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
-          We can only follow up with leads we can see. Connecting your systems enables us to respond to new inquiries instantly, eliminating
-          manual work for your team.
+          Every lead has a short shelf life. If they sit unseen in an inbox, the odds of booking them drop fast - and usually to zero.
+          Connecting your CRM here ensures we can follow up right away, while interest is highest.
         </Title>
         {renderPreviousQuestions()}
         <Title level={3} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
           {currentQuestion?.question}
         </Title>
+      
 
         {renderCurrentInput()}
 

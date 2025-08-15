@@ -1,17 +1,17 @@
 "use client";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Input, Button, Typography, Upload } from "antd";
-import PhoneInput, { isValidPhoneNumber} from "react-phone-number-input";
+import { Input, Button, Typography, Upload, Modal } from "antd";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 import { FileTextOutlined } from "@ant-design/icons";
 import { ErrorToast } from "@/helpers/toast";
-
-
+import { createClient } from "@/utils/supabase/config/client";
+import { LEAD_CONSENT_CONTENT,BAA_DOCUMENT_CONTENT} from "@/utils/document/document";
 const { TextArea } = Input;
 const { Title, Text } = Typography;
-
+const supabase = createClient();
 interface ClinicInfoStepProps {
   // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
@@ -56,6 +56,7 @@ const validatePhoneNumber = (phoneNumber: string) => {
   }
 };
 
+
 export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showAllQuestions = false }: ClinicInfoStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [formData, setFormData] = useState({
@@ -73,6 +74,10 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     acceptedBAA: initialData.acceptedBAA || false,
     acceptedLeadConsent: initialData.acceptedLeadConsent || false,
   });
+
+  // Modal states
+  const [showBAAModal, setShowBAAModal] = useState(false);
+  const [showLeadConsentModal, setShowLeadConsentModal] = useState(false);
 
   // Insert servicesDocument question right after businessAddress
   const questions = [
@@ -109,7 +114,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       id: "servicesDocument",
       type: "file",
       question: "Upload services document for AI processing",
-      placeholder: "PDF, DOC, DOCX (Max 60MB)",
+      placeholder: "PDF, DOC, DOCX (Max 50MB)",
       required: true,
     },
     {
@@ -148,41 +153,80 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     return fileList;
   };
 
-  const handleFileChange = (info: any) => {
-    const fileList = normFile(info);
-    // perform safeguard validation here as well
-    const validatedList = fileList.filter((file: any) => {
-      // If file has originFileObj we can check size/type; otherwise accept (could be initialData)
-      const fileObj = file.originFileObj || file;
-      const sizeOk = typeof fileObj.size === "number" ? fileObj.size / 1024 / 1024 < 60 : true; // <60MB
-      const type = fileObj.type || "";
-      const isValidType =
-        type === "application/pdf" ||
-        type === "application/msword" ||
-        type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        // allow fallback by extension if type is missing:
-        (file.name && /\.(pdf|docx?|DOCX?|PDF)$/.test(file.name));
-      if (!isValidType) {
-        // remove invalid file from list and alert
-        // eslint-disable-next-line no-console
-        ErrorToast(`Rejected file type: ${file.name}`);
-        console.warn("Rejected file type:", file.name);
-        return false;
-      }
-      if (!sizeOk) {
-        // eslint-disable-next-line no-console
-        console.warn("Rejected file size:", file.name);
-        ErrorToast(`Rejected file size: ${file.name}`);
-        return false;
-      }
-      return true;
-    });
+  const handleFileChange = async (info: any) => {
+  const fileList = normFile(info);
 
-    setFormData(prev => ({
-      ...prev,
-      servicesDocument: validatedList,
-    }));
-  };
+  // Filter & validate
+  const validatedList = fileList.filter((file: any) => {
+    const fileObj = file.originFileObj || file;
+    const sizeOk =
+      typeof fileObj.size === "number"
+        ? fileObj.size / 1024 / 1024 < 50
+        : true; // <60MB
+    const type = fileObj.type || "";
+    const isValidType =
+      type === "application/pdf" ||
+      type === "application/msword" ||
+      type ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      (file.name && /\.(pdf|docx?|DOCX?|PDF)$/.test(file.name));
+
+    if (!isValidType) {
+      ErrorToast(`Rejected file type: ${file.name}`);
+      console.warn("Rejected file type:", file.name);
+      return false;
+    }
+    if (!sizeOk) {
+      console.warn("Rejected file size:", file.name);
+      ErrorToast(`Rejected file size: ${file.name}`);
+      return false;
+    }
+    return true;
+  });
+
+  const uploadedFiles: { name: any; path: string; signedUrl: string; }[] = [];
+
+  for (const file of validatedList) {
+    const fileObj = file.originFileObj || file;
+
+    const path = `services/${Date.now()}-${fileObj.name}`;
+
+    // Upload to Supabase (private bucket)
+    const { error: uploadError } = await supabase.storage
+      .from('Assistant-File')
+      .upload(path, fileObj);
+
+    if (uploadError) {
+      console.error("Upload failed:", uploadError);
+      ErrorToast(`Failed to upload: ${fileObj.name}`);
+      continue;
+    }
+
+    // Generate a signed URL (1 hour expiry)
+    const { data: signedUrlData, error: signedUrlError } =
+      await supabase.storage
+        .from('Assistant-File')
+        .createSignedUrl(path, 60 * 60);
+
+    if (signedUrlError) {
+      console.error("Signed URL failed:", signedUrlError);
+      ErrorToast(`Failed to get URL for: ${fileObj.name}`);
+      continue;
+    }
+
+    uploadedFiles.push({
+      name: fileObj.name,
+      path,
+      signedUrl: signedUrlData.signedUrl,
+    });
+  }
+
+  // Store in state — no raw binary, just path + URL
+  setFormData((prev) => ({
+    ...prev,
+    servicesDocument: uploadedFiles,
+  }));
+};
 
   const handleInputChange = (value: string) => {
     setFormData(prev => ({
@@ -215,7 +259,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
         if (fileObj) {
           const sizeMB = typeof fileObj.size === "number" ? fileObj.size / 1024 / 1024 : 0;
           if (sizeMB >= 60) {
-            return "File must be smaller than 60MB";
+            return "File must be smaller than 50MB";
           }
           const type = fileObj.type || "";
           const isValidType =
@@ -280,6 +324,36 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     }
   };
 
+  // Handle BAA checkbox click
+  const handleBAAClick = (checked: boolean) => {
+    if (checked) {
+      setShowBAAModal(true);
+    } else {
+      setConsentData(prev => ({ ...prev, acceptedBAA: false }));
+    }
+  };
+
+  // Handle Lead Consent checkbox click
+  const handleLeadConsentClick = (checked: boolean) => {
+    if (checked) {
+      setShowLeadConsentModal(true);
+    } else {
+      setConsentData(prev => ({ ...prev, acceptedLeadConsent: false }));
+    }
+  };
+
+  // Handle BAA modal acceptance
+  const handleBAAAccept = () => {
+    setConsentData(prev => ({ ...prev, acceptedBAA: true }));
+    setShowBAAModal(false);
+  };
+
+  // Handle Lead Consent modal acceptance
+  const handleLeadConsentAccept = () => {
+    setConsentData(prev => ({ ...prev, acceptedLeadConsent: true }));
+    setShowLeadConsentModal(false);
+  };
+
   const renderPreviousQuestions = () => {
     return questions.slice(0, currentQuestionIndex).map(q => {
       const value = formData[q.id as keyof typeof formData];
@@ -335,40 +409,95 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     });
   };
 
-  // Update the renderConsentSection function to use the PDF generator
-     const renderConsentSection = () => (
-  <div className="mt-6 mb-6 space-y-3">
-    <div>
-      <label className="flex items-center space-x-2">
-        <input
-          type="checkbox"
-          checked={consentData.acceptedBAA}
-          onChange={e => setConsentData(prev => ({ ...prev, acceptedBAA: e.target.checked }))}
-        />
-        <span className="text-sm text-gray-800">I accept the Business Associate Agreement (BAA).</span>
-      </label>
-    </div>
-    <div>
-      <label className="flex items-center space-x-2">
-        <input
-          type="checkbox"
-          checked={consentData.acceptedLeadConsent}
-          onChange={e => setConsentData(prev => ({ ...prev, acceptedLeadConsent: e.target.checked }))}
-        />
-        <span className="text-sm text-gray-800">I consent to Algoricum securely handling lead data.</span>
-      </label>
-    </div>
-    {consentData.acceptedBAA && consentData.acceptedLeadConsent && (
-      <a
-        href="/documents/baa-agreement.pdf"
-        download="BAA-Agreement.pdf"
-        className="text-purple-600 text-sm underline block hover:text-purple-800"
+  // Updated consent section with modal triggers
+  const renderConsentSection = () => (
+    <div className="mt-6 mb-6 space-y-4">
+      <div>
+        <label className="flex items-start space-x-3 cursor-pointer">
+          <input type="checkbox" checked={consentData.acceptedBAA} onChange={e => handleBAAClick(e.target.checked)} className="mt-1" />
+          <div>
+            <span className="text-sm text-gray-800 block">I accept the Business Associate Agreement (BAA).</span>
+            <button type="button" onClick={() => setShowBAAModal(true)} className="text-purple-600 text-xs underline hover:text-purple-800">
+              Click to read the agreement
+            </button>
+          </div>
+        </label>
+      </div>
+
+      <div>
+        <label className="flex items-start space-x-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={consentData.acceptedLeadConsent}
+            onChange={e => handleLeadConsentClick(e.target.checked)}
+            className="mt-1"
+          />
+          <div>
+            <span className="text-sm text-gray-800 block">I consent to Algoricum securely handling lead data.</span>
+            <button
+              type="button"
+              onClick={() => setShowLeadConsentModal(true)}
+              className="text-purple-600 text-xs underline hover:text-purple-800"
+            >
+              Click to read the consent details
+            </button>
+          </div>
+        </label>
+      </div>
+
+      {consentData.acceptedBAA && consentData.acceptedLeadConsent && (
+        <a
+          href="/documents/baa-agreement.pdf"
+          download="BAA-Agreement.pdf"
+          className="text-purple-600 text-sm underline block hover:text-purple-800 mt-4"
+        >
+          Download Agreement (PDF)
+        </a>
+      )}
+
+      {/* BAA Modal */}
+      <Modal
+        title="Business Associate Agreement (BAA)"
+        open={showBAAModal}
+        onCancel={() => setShowBAAModal(false)}
+        footer={[
+          <Button key="decline" onClick={() => setShowBAAModal(false)}>
+            Decline
+          </Button>,
+          <Button key="accept" type="primary" onClick={handleBAAAccept}>
+            I Accept
+          </Button>,
+        ]}
+        width={800}
+        style={{ top: 20 }}
       >
-        Download Agreement (PDF)
-      </a>
-    )}
-  </div>
-);
+        <div style={{ maxHeight: "60vh", overflowY: "auto", padding: "16px 0" }}>
+          <pre style={{ whiteSpace: "pre-wrap", fontSize: "14px", lineHeight: "1.5" }}>{BAA_DOCUMENT_CONTENT}</pre>
+        </div>
+      </Modal>
+
+      {/* Lead Consent Modal */}
+      <Modal
+        title="Lead Data Handling Consent"
+        open={showLeadConsentModal}
+        onCancel={() => setShowLeadConsentModal(false)}
+        footer={[
+          <Button key="decline" onClick={() => setShowLeadConsentModal(false)}>
+            Decline
+          </Button>,
+          <Button key="accept" type="primary" onClick={handleLeadConsentAccept}>
+            I Consent
+          </Button>,
+        ]}
+        width={800}
+        style={{ top: 20 }}
+      >
+        <div style={{ maxHeight: "60vh", overflowY: "auto", padding: "16px 0" }}>
+          <pre style={{ whiteSpace: "pre-wrap", fontSize: "14px", lineHeight: "1.5" }}>{LEAD_CONSENT_CONTENT}</pre>
+        </div>
+      </Modal>
+    </div>
+  );
 
   const isCurrentFieldValid = () => {
     if (currentQuestionIndex === questions.length - 1) {
@@ -401,7 +530,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       return (
         <div className="mb-8">
           <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">
-            {currentQuestion.placeholder || "PDF, DOC, DOCX (Max 60MB)"}
+            {currentQuestion.placeholder || "PDF, DOC, DOCX (Max 50MB)"}
           </Text>
           <Upload.Dragger
             name="servicesDocument"
@@ -416,9 +545,9 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
                 alert("You can only upload PDF, DOC, or DOCX files!");
                 return Upload.LIST_IGNORE;
               }
-              const isValidSize = file.size / 1024 / 1024 < 60; // < 60MB
+              const isValidSize = file.size / 1024 / 1024 < 50; // < 60MB
               if (!isValidSize) {
-                alert("File must be smaller than 60MB!");
+                alert("File must be smaller than 50MB!");
                 return Upload.LIST_IGNORE;
               }
               // prevent automatic upload; we'll manage fileList in state
@@ -435,7 +564,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             <p className="text-center mb-1">
               Drag and drop files here or click to upload <span className="text-purple-600">Browse Files</span>
             </p>
-            <p className="text-center text-xs text-gray-500">PDF, DOC, DOCX (Max 60MB)</p>
+            <p className="text-center text-xs text-gray-500">PDF, DOC, DOCX (Max 50MB)</p>
           </Upload.Dragger>
           {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
         </div>
