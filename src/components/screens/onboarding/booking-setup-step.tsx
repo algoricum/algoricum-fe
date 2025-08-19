@@ -14,7 +14,33 @@ interface BookingSetupStepProps {
   initialData?: any;
 }
 
+const validateBookingUrl = (url: string) => {
+  if (!url || !url.trim()) return { isValid: false, error: "Booking link is required" };
+
+  // Basic URL regex pattern
+  const urlRegex = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+
+  // Check if it's a valid URL format
+  if (!urlRegex.test(url)) {
+    return { isValid: false, error: "Please enter a valid URL (must start with http:// or https://)" };
+  }
+
+  // Check for booking-related keywords
+  const bookingKeywords =
+    /\b(calendly|acuity|booksy|square|meet|zoom|teams|appointy|setmore|simplybook|booknow|schedule|appointment|booking)\b/i;
+
+  if (!bookingKeywords.test(url)) {
+    return {
+      isValid: false,
+      error: "Please enter a valid booking link (should contain booking service keywords like calendly, meet, zoom, etc.)",
+    };
+  }
+
+  return { isValid: true, error: null };
+};
+
 export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: BookingSetupStepProps) {
+  const [validationError, setValidationError] = useState("");
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [formData, setFormData] = useState({
     hasBookingLink: initialData.hasBookingLink || "",
@@ -58,9 +84,24 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
       ...prev,
       [currentQuestion.id]: value,
     }));
+
+    // Clear validation error when user starts typing
+    if (currentQuestion.id === "bookingLinkUrl") {
+      setValidationError("");
+    }
   };
 
   const handleNext = () => {
+
+    // Validate booking URL if it's the current question
+    if (currentQuestion.id === "bookingLinkUrl") {
+      const validation = validateBookingUrl(currentValue);
+      if (!validation.isValid) {
+        setValidationError(validation.error || "");
+        return;
+      }
+    }
+    
     // Check if we should skip the URL question
     if (currentQuestionIndex === 0 && formData.hasBookingLink === "No, I don't have one") {
       onNext(formData);
@@ -154,15 +195,18 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
     }
 
     return (
-      <Input
-        type="text"
-        placeholder={currentQuestion.placeholder}
-        value={currentValue}
-        onChange={e => handleInputChange(e.target.value)}
-        className="w-full mb-6"
-        size="large"
-        autoFocus
-      />
+      <div>
+        <Input
+          type="text"
+          placeholder={currentQuestion.placeholder}
+          value={currentValue}
+          onChange={e => handleInputChange(e.target.value)}
+          className={`w-full mb-2 ${validationError ? "border-red-500" : ""}`}
+          size="large"
+          autoFocus
+        />
+        {validationError && <p className="text-red-500 text-sm mb-4">{validationError}</p>}
+      </div>
     );
   };
 
