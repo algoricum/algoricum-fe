@@ -4,7 +4,7 @@ import { Flex, Form, Input, Select, Tooltip, Upload } from "antd";
 import { Button } from "@/components/elements";
 import { FileTextOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons";
 import { SuccessToast, ErrorToast } from "@/helpers/toast";
-import { ColorConfigurator, WidgetPreview } from "@/components/common";
+import { ColorConfigurator } from "@/components/common";
 import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx";
 import { getAssistantByClinicId, getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
@@ -12,6 +12,7 @@ import { getUserData } from "@/utils/supabase/user-helper";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getPreviewText } from "@/utils/getPreviewChatbot";
+import ChatbotPreview from "@/components/common/WidgetPreview/ChatbotPreview";
 
 const { TextArea } = Input;
 
@@ -19,13 +20,17 @@ const ChatbotSettings = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState<string>("");
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false); // Declare the variable
 
   const primaryColor = Form.useWatch("primary_color", form);
   const fontColor = Form.useWatch("font_color", form);
   const toneSelector = Form.useWatch("toneSelector", form);
   const sentenceLength = Form.useWatch("sentenceLength", form);
   const formalityLevel = Form.useWatch("formalityLevel", form);
-  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const chatbotName = Form.useWatch("chatbotName", form);
+  const logo = Form.useWatch("logo", form);
+  const chatbotAvatar = Form.useWatch("chatbotAvatar", form);
+
   const [clinicData, setClinicData] = useState<any>();
   const [dataLoaded, setDataLoaded] = useState(false);
 
@@ -143,7 +148,7 @@ const ChatbotSettings = () => {
         primary_color: values.primary_color || "#2563EB", // Fallback to default if not set
         font_color: values.font_color || "#000000", // Fallback to default if not set
       };
-      
+
       const clinic = await updateClinic({
         id: clinicData.id,
         assistant_prompt: values.greeting,
@@ -506,7 +511,14 @@ const ChatbotSettings = () => {
       </div>
 
       <Flex flex={1} justify="center" className="max-sm:hidden">
-        <WidgetPreview primaryColor={primaryColor || "#2563EB"} />
+        <ChatbotPreview
+          primaryColor={primaryColor || "#2563EB"}
+          chatbotName={chatbotName || "Ava"}
+          logo={logo && logo.length > 0 ? URL.createObjectURL(logo[0].originFileObj || logo[0]) : null}
+          chatbotAvatar={
+            chatbotAvatar && chatbotAvatar.length > 0 ? URL.createObjectURL(chatbotAvatar[0].originFileObj || chatbotAvatar[0]) : null
+          }
+        />
       </Flex>
 
       <ChatbotConnectModal apiKey={apiKey} isOpen={isConnectModalOpen} onClose={() => setIsConnectModalOpen(false)} />
