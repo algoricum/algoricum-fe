@@ -848,7 +848,6 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
     sender_email: clinicEmail,
     domain_verified: domainInfo.verified || false,
     status: 'active',
-    route_id: routeInfo?.id || null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }
