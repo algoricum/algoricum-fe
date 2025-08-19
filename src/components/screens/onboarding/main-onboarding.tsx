@@ -438,7 +438,7 @@ export default function MainOnboarding() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: clinicData.dba_name || clinicData.legal_business_name,
+          name: clinicData.legal_business_name || clinicData.dba_name,
           email: clinicData.email || user.email || "",
         }),
       });

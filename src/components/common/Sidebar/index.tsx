@@ -9,6 +9,7 @@ import menuItems from "@/constants/menuItems";
 import { createClient } from "@/utils/supabase/config/client";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"; // Import your LoadingSpinner
 import { User } from "@supabase/supabase-js";
+import Image from "next/image";
 interface SidebarProps {
   sidebarOpen: boolean;
   // eslint-disable-next-line no-unused-vars
@@ -116,7 +117,9 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       {/* Header of side bar*/}
       <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
         <div className="flex items-center">
-          <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">A</div>
+          <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
+            <Image src="logo.svg" alt="Logo" width={50} height={50} />
+          </div>
           <div className="ml-3">
             <div className="text-lg font-semibold text-gray-900">Algoricum</div>
             <div className="text-xs text-gray-500">Healthcare AI</div>
