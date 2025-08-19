@@ -165,7 +165,6 @@ export default function MainOnboarding() {
     }
   };
 
-
   // Map new flow data to old flow structure for Supabase
   const mapDataForSubmission = (data: Record<string, any>) => {
     const clinicInfo = data["clinic-info"] || {};
@@ -216,7 +215,7 @@ export default function MainOnboarding() {
     };
   };
   console.log("📋 Mapping data for submission:", mapDataForSubmission(allData));
-    async function getFile(bucket: any, path: any) {
+  async function getFile(bucket: any, path: any) {
     const { data, error } = await supabase.storage.from(bucket).download(path);
 
     if (error) {
@@ -237,7 +236,6 @@ export default function MainOnboarding() {
     return file;
   }
 
-  
   // Main submission function (updated to use updateClinic)
   const handleCompleteOnboarding = async () => {
     try {
@@ -334,14 +332,13 @@ export default function MainOnboarding() {
       // Handle services document upload to edge function
 
       if (mappedData.DocumnetPath) {
-        let file= await getFileAsFile("Assistant-File", mappedData.DocumnetPath);
+        let file = await getFileAsFile("Assistant-File", mappedData.DocumnetPath);
         try {
           const formDataToSend = new FormData();
           const session = await getSupabaseSession();
-if (file !== null) {
-
-          formDataToSend.append("clinic_document", file,file.name);
-}
+          if (file !== null) {
+            formDataToSend.append("clinic_document", file, file.name);
+          }
           formDataToSend.append("clinic_id", updatedClinic.id);
           formDataToSend.append("name", mappedData.legalBusinessName || "Assistant");
           formDataToSend.append("instructions", "AI Assistant for handling clinic inquiries");
@@ -467,7 +464,7 @@ if (file !== null) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: clinicData.dba_name || clinicData.legal_business_name,
+          name: clinicData.legal_business_name,
           email: clinicData.email || user.email || "",
         }),
       });
