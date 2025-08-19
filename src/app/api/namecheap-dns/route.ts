@@ -15,6 +15,7 @@ interface MailgunDnsRecord {
 
 interface MailgunDnsRecords {
   sending_dns_records: MailgunDnsRecord[]
+  receiving_dns_records?: MailgunDnsRecord[]
 }
 
 // Use fetch with proxy support (Fixed for Vercel/Node.js)
@@ -262,6 +263,64 @@ async function setNamecheapDNSRecords(sld: string, tld: string, records: any[], 
   }
 }
 
+// Helper function to fetch DMARC record from Mailgun or create default
+async function getDmarcRecord(domain: string, subdomain: string, mailgunDnsRecords: MailgunDnsRecords) {
+  // Check if DMARC record exists in Mailgun DNS records
+  const allRecords = [
+    ...(mailgunDnsRecords.sending_dns_records || []),
+    ...(mailgunDnsRecords.receiving_dns_records || [])
+  ]
+  
+  const existingDmarc = allRecords.find(record => 
+    record.record_type === 'TXT' && 
+    record.name.includes('_dmarc')
+  )
+
+  if (existingDmarc) {
+    console.log('Found existing DMARC record from Mailgun:', {
+      name: existingDmarc.name,
+      value: existingDmarc.value
+    })
+    
+    // Clean up the host name (remove domain if present)
+    let dmarcHost = existingDmarc.name
+    if (dmarcHost.includes(domain)) {
+      dmarcHost = dmarcHost.replace(`.${domain}`, '')
+    }
+    
+    return {
+      name: dmarcHost,
+      type: 'TXT',
+      address: existingDmarc.value,
+      mxPref: '',
+      ttl: '300',
+      source: 'mailgun'
+    }
+  }
+
+  // If no DMARC record from Mailgun, create a default one
+  console.log('No DMARC record found in Mailgun DNS, creating default DMARC policy')
+  
+  // Extract subdomain host for DMARC
+  const subdomainHost = subdomain.replace(`.${domain}`, '')
+  
+  // Create a basic DMARC policy
+  // p=quarantine: quarantine emails that fail authentication
+  // rua= for aggregate reports (optional - you can modify this)
+  // ruf= for forensic reports (optional - you can modify this)
+  // pct=100: apply policy to 100% of emails
+  const dmarcValue = `v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@${subdomain}; ruf=mailto:dmarc-failures@${subdomain}; pct=100; adkim=s; aspf=s;`
+  
+  return {
+    name: `_dmarc.${subdomainHost}`,
+    type: 'TXT',
+    address: dmarcValue,
+    mxPref: '',
+    ttl: '300',
+    source: 'generated'
+  }
+}
+
 // Helper function to execute Namecheap API calls with IP fallback
 async function executeWithIpFallback<T>(
   // eslint-disable-next-line no-unused-vars
@@ -300,7 +359,7 @@ async function executeWithIpFallback<T>(
   }
 }
 
-// Main DNS setup function - handles dynamic DKIM records from Mailgun
+// Main DNS setup function - handles dynamic DKIM records from Mailgun + DMARC
 async function createNamecheapDNSRecords(domain: string, subdomain: string, mailgunDnsRecords: MailgunDnsRecords) {
   const startTime = Date.now()
 
@@ -367,6 +426,14 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       console.log(`Successfully found ${dkimRecords.length} DKIM record(s) - will add them all to DNS`)
     }
 
+    // Get DMARC record
+    const dmarcRecord = await getDmarcRecord(domain, subdomain, mailgunDnsRecords)
+    console.log('DMARC record prepared:', {
+      name: dmarcRecord.name,
+      source: dmarcRecord.source,
+      value_preview: `${dmarcRecord.address.substring(0, 50)}...`
+    })
+
     // Step 1: Get existing DNS records with IP fallback
     console.log('Fetching existing DNS records')
     const existingRecords = await executeWithIpFallback(
@@ -391,6 +458,11 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
         return false
       }
       
+      // Remove existing DMARC record for this subdomain
+      if (record.type === 'TXT' && record.name === dmarcRecord.name) {
+        return false
+      }
+      
       return true
     })
 
@@ -398,7 +470,8 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       totalExisting: existingRecords.length,
       toPreserve: preservedRecords.length,
       toReplace: existingRecords.length - preservedRecords.length,
-      dkimRecordsFound: dkimRecords.length
+      dkimRecordsFound: dkimRecords.length,
+      dmarcRecordSource: dmarcRecord.source
     })
 
     // Step 3: Build new DNS records
@@ -427,6 +500,8 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
         mxPref: '',
         ttl: '300'
       },
+      // DMARC TXT Record
+      dmarcRecord,
       // CNAME Record for tracking opens/clicks/unsubscribes
       {
         name: `email.${subdomainHost}`,
@@ -470,6 +545,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       `${subdomainHost} MX mxa.mailgun.org`,
       `${subdomainHost} MX mxb.mailgun.org`, 
       `${subdomainHost} TXT SPF`,
+      `${dmarcRecord.name} TXT DMARC`,
       `email.${subdomainHost} CNAME mailgun.org`,
       ...dkimRecords.map((r: MailgunDnsRecord) => `${r.name.replace(`.${subdomain}`, '')} TXT DKIM`)
     ]
@@ -484,14 +560,15 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       'setNamecheapDNSRecords'
     )
 
-    const totalMailgunRecords = 4 + dkimRecords.length // 2 MX + 1 SPF + 1 CNAME + N DKIM records
+    const totalMailgunRecords = 5 + dkimRecords.length // 2 MX + 1 SPF + 1 DMARC + 1 CNAME + N DKIM records
     console.log('DNS records updated successfully', {
       domain,
       subdomain,
       recordsSet: totalMailgunRecords,
       breakdown: {
         mx_records: 2,
-        spf_record: 1, 
+        spf_record: 1,
+        dmarc_record: 1,
         cname_record: 1,
         dkim_records: dkimRecords.length
       },
@@ -503,6 +580,12 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       { host: subdomainHost, type: 'MX', address: 'mxa.mailgun.org', priority: 10 },
       { host: subdomainHost, type: 'MX', address: 'mxb.mailgun.org', priority: 10 },
       { host: subdomainHost, type: 'TXT', address: 'v=spf1 include:mailgun.org ~all', note: 'SPF Record' },
+      { 
+        host: dmarcRecord.name, 
+        type: 'TXT', 
+        address: dmarcRecord.address, 
+        note: `DMARC Record (${dmarcRecord.source})` 
+      },
       { host: `email.${subdomainHost}`, type: 'CNAME', address: 'mailgun.org', note: 'Tracking Record' },
       ...dkimRecords.map((dkim: MailgunDnsRecord) => ({
         host: dkim.name,
@@ -518,6 +601,11 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       recordsCreated,
       existingRecordsPreserved: preservedRecords.length,
       dkimRecordsAdded: dkimRecords.length,
+      dmarcRecord: {
+        added: true,
+        source: dmarcRecord.source,
+        value: dmarcRecord.address
+      },
       duration: Date.now() - startTime
     }
 
@@ -547,6 +635,9 @@ export async function POST(req: Request) {
             mailgunDnsRecords: {
               sending_dns_records: [
                 { record_type: 'TXT', name: 'mx._domainkey.domain.com', value: 'k=rsa; p=...' }
+              ],
+              receiving_dns_records: [
+                { record_type: 'TXT', name: '_dmarc.domain.com', value: 'v=DMARC1; p=quarantine; ...' }
               ]
             }
           }
