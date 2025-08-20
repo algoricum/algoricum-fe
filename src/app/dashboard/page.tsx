@@ -16,7 +16,7 @@ import TodayTasks from "./TodayTasks";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 
-import { X, CheckCircle, Upload } from "lucide-react";
+import { X, CheckCircle, Bot } from "lucide-react";
 // import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
 import AiActivityLog from "./AiActivityLogs";
 import ChatbotTrainingModal from "@/components/common/TrainingChatbotModal/chatbot-training-modal";
