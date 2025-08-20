@@ -64,6 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
           setIsLoggingOut(true);
           const success = await signOut();
           if (success) {
+            localStorage.clear(); // Clear local storage on logout
             SuccessToast("Logout Successfully");
             setTimeout(() => {
               push("/login");
@@ -117,8 +118,8 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       {/* Header of side bar*/}
       <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
         <div className="flex items-center">
-          <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
-            <Image src="logo.svg" alt="Logo" width={50} height={50} />
+          <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
+            <Image src="/logo.svg" alt="Logo" width={48} height={48} />
           </div>
           <div className="ml-3">
             <div className="text-lg font-semibold text-gray-900">Algoricum</div>

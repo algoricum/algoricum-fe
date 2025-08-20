@@ -2,15 +2,15 @@
 import { useState, useEffect } from "react";
 import { Flex, Form, Input, Select, Tooltip, Upload } from "antd";
 import { Button } from "@/components/elements";
-import { FileTextOutlined, MessageOutlined, UserOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import {  MessageOutlined, UserOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { SuccessToast, ErrorToast } from "@/helpers/toast";
 import { ColorConfigurator } from "@/components/common";
 import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx";
-import { getAssistantByClinicId, getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
+import { getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { getUserData } from "@/utils/supabase/user-helper";
-import generateClinicInstructions from "@/utils/generateClinicInstructions";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+// import generateClinicInstructions from "@/utils/generateClinicInstructions";
+// import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getPreviewText } from "@/utils/getPreviewChatbot";
 // import ChatbotPreview from "@/components/common/WidgetPreview/ChatbotPreview";
 
@@ -86,7 +86,7 @@ const ChatbotSettings = () => {
             chatbotName: clinic.chatbot_name || "",
             chatbotAvatar: [], // Initialize as empty array
             logo: [], // Initialize as empty array
-            servicesDocument: [], // Initialize as empty array
+            // servicesDocument: [], // Initialize as empty array
           };
 
           console.log("Setting form values:", formValues); // Debug log
@@ -124,7 +124,7 @@ const ChatbotSettings = () => {
         setLoading(false);
         return;
       }
-      const assistantData = await getAssistantByClinicId(clinicData.id);
+      // const assistantData = await getAssistantByClinicId(clinicData.id);
       let logoUrl;
       let avatarUrl;
 
@@ -161,56 +161,58 @@ const ChatbotSettings = () => {
         formality_level: values.formalityLevel,
       });
 
-      const clinicInstructions = generateClinicInstructions({
-        name: clinic.legal_business_name || "",
-        address: clinic.address,
-        phone: clinic.phone,
-        email: clinic.email || user.email,
-        business_hours: clinic.business_hours,
-        calendly_link: clinic.calendly_link,
-        tone_selector: values.toneSelector,
-        sentence_length: values.sentenceLength,
-        formality_level: values.formalityLevel,
-        has_uploaded_document: true,
-      });
+      // Below comment code is for assistant file upload. 
 
-      const formDataToSend = new FormData();
-      const session = await getSupabaseSession();
-      formDataToSend.append("clinic_id", clinic.id);
-      formDataToSend.append("name", clinic.legal_business_name || "");
-      formDataToSend.append("instructions", clinicInstructions);
-      formDataToSend.append("assistant_id", assistantData.id);
+      // const clinicInstructions = generateClinicInstructions({
+      //   name: clinic.legal_business_name || "",
+      //   address: clinic.address,
+      //   phone: clinic.phone,
+      //   email: clinic.email || user.email,
+      //   business_hours: clinic.business_hours,
+      //   calendly_link: clinic.calendly_link,
+      //   tone_selector: values.toneSelector,
+      //   sentence_length: values.sentenceLength,
+      //   formality_level: values.formalityLevel,
+      //   // has_uploaded_document: true,
+      // });
 
-      // Add the services document file directly to form data for OpenAI processing
-      if (
-        values.servicesDocument &&
-        Array.isArray(values.servicesDocument) &&
-        values.servicesDocument.length > 0 &&
-        values.servicesDocument[0].originFileObj
-      ) {
-        formDataToSend.append("clinic_document", values.servicesDocument[0].originFileObj);
-      }
+      // const formDataToSend = new FormData();
+      // const session = await getSupabaseSession();
+      // formDataToSend.append("clinic_id", clinic.id);
+      // formDataToSend.append("name", clinic.legal_business_name || "");
+      // formDataToSend.append("instructions", clinicInstructions);
+      // formDataToSend.append("assistant_id", assistantData.id);
 
-      try {
-        // Call the combined edge function
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: formDataToSend,
-        });
+      // // Add the services document file directly to form data for OpenAI processing
+      // if (
+      //   values.servicesDocument &&
+      //   Array.isArray(values.servicesDocument) &&
+      //   values.servicesDocument.length > 0 &&
+      //   values.servicesDocument[0].originFileObj
+      // ) {
+      //   formDataToSend.append("clinic_document", values.servicesDocument[0].originFileObj);
+      // }
 
-        const result = await response.json();
+      // try {
+      //   // Call the combined edge function
+      //   const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
+      //     method: "POST",
+      //     headers: {
+      //       Authorization: `Bearer ${session.access_token}`,
+      //     },
+      //     body: formDataToSend,
+      //   });
 
-        if (!response.ok) {
-          console.error("Assistant creation error:", result.error);
-          // We'll still continue with the onboarding process even if assistant creation fails
-        }
-      } catch (assistantError) {
-        console.error("Failed to create assistant:", assistantError);
-        // Continue with onboarding even if assistant creation fails
-      }
+      //   const result = await response.json();
+
+      //   if (!response.ok) {
+      //     console.error("Assistant creation error:", result.error);
+      //     // We'll still continue with the onboarding process even if assistant creation fails
+      //   }
+      // } catch (assistantError) {
+      //   console.error("Failed to create assistant:", assistantError);
+      //   // Continue with onboarding even if assistant creation fails
+      // }
 
       if (!clinic) throw { message: "Failed to save chatbot settings" };
       SuccessToast("Chatbot settings saved successfully");
@@ -349,7 +351,7 @@ const ChatbotSettings = () => {
             <TextArea rows={4} placeholder="Enter a friendly greeting message" />
           </Form.Item>
 
-          <Form.Item
+          {/* <Form.Item
             name="servicesDocument"
             label={
               <div className="flex items-center gap-2">
@@ -393,7 +395,7 @@ const ChatbotSettings = () => {
               </p>
               <p className="text-center text-xs text-gray-500">PDF, DOC, DOCX (Max 10MB)</p>
             </Upload.Dragger>
-          </Form.Item>
+          </Form.Item> */}
 
           <Form.Item label={
             <div className="flex items-center gap-2">

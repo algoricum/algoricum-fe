@@ -327,20 +327,21 @@ export default function DashboardPage() {
           <TodayTasks clinicId={clinicId} />
         </div>
 
-        {/* Lead Sources and Conversion */}
-        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="card">
-            <h3 className="mb-6 text-lg font-semibold">Conversion Funnel</h3>
-            <ConversionFunnel leadsData={leadsData} />
-          </div>
-          {/* <div className="card">
-            <h3 className="mb-6 text-lg font-semibold">Lead Sources Trends</h3>
-            <LeadSourcesLineChart leadsData={leadsData} />
-          </div> */}
-        </div>
+        {/* Conversion Funnel and AI Activity Log - Horizontal Layout */}
+        {clinicId && (
+          <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Left Side - Conversion Funnel */}
+            <div className="card">
+              <h3 className="mb-6 text-lg font-semibold">Conversion Funnel</h3>
+              <ConversionFunnel clinicId={clinicId} />
+            </div>
 
-        {/* AI Activity Log */}
-        <AiActivityLog clinicId={clinicId} />
+            {/* Right Side - AI Activity Log */}
+            <div className="card">
+              <AiActivityLog clinicId={clinicId} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Task Modal (kept for parity; closed by default) */}
