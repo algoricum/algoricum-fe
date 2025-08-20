@@ -32,9 +32,12 @@ export async function middleware(request: NextRequest) {
     const redirect = (path: string) => {
       return NextResponse.redirect(new URL(path, request.url));
     };
-
+    // Handle homepage separately - always redirect
+    if (pathname === "/") {
+        return redirect("/login");
+    }
     // Check if this is a public route or auth route
-    const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route) || pathname === "/login");
+    const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
 
     const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
 
@@ -63,7 +66,7 @@ export async function middleware(request: NextRequest) {
       userError = error;
     }
 
-    // CASE 1: User is not logged in
+    // CASE 1: User is not logged in (homepage already handled above)
     if (!user || userError) {
       // If trying to access a protected route, redirect to login
       if (!isPublicRoute) {
@@ -98,7 +101,7 @@ export async function middleware(request: NextRequest) {
     try {
       const clinicPromise = checkIfUserHasClinic(supabase, user.id);
       const clinicTimeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Clinic check timeout")), 3000));
-
+      
       hasClinic = (await Promise.race([clinicPromise, clinicTimeoutPromise])) as boolean;
     } catch (error) {
       console.error("Clinic check timeout or error:", error);
@@ -116,7 +119,19 @@ export async function middleware(request: NextRequest) {
       return redirect("/onboarding");
     }
 
-    // If user has clinic and is on a public route (like homepage), redirect to dashboard
+    // If user is on homepage, redirect based on clinic status
+    if (pathname === "/") {
+      if (hasClinic) {
+        return redirect("/dashboard");
+      } else {
+        // No clinic, send to onboarding (unless staff first-time)
+        if (!(isStaff && loggedFirst === true)) {
+          return redirect("/onboarding");
+        }
+      }
+    }
+
+    // If user has clinic and is on other public routes, redirect to dashboard
     // But don't redirect staff on first login from change-password
     if (isPublicRoute && hasClinic && !(isStaff && loggedFirst === true && isChangePasswordRoute)) {
       return redirect("/dashboard");
@@ -169,5 +184,5 @@ async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>
 }
 
 export const config = {
-  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico|favicon.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)']
+  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)']
 };
