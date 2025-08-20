@@ -1,13 +1,19 @@
 "use client";
 
+import React from "react";
 // components/HomePage/HomePage.jsx - Preview Component (No Functionality)
 import { Flex } from "antd";
 import { Input } from "antd";
 import { HomeOutlined, MessageOutlined } from "@ant-design/icons";
 import { Avatar } from "antd";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
-const Avatars = ({ chatbotAvatar }) => {
+interface AvatarsProps {
+  chatbotAvatar?: string | null;
+}
+
+const Avatars = ({ chatbotAvatar }: AvatarsProps) => {
   console.log("Rendering Avatars with chatbotAvatar:", chatbotAvatar);
   return (
     <div>
@@ -31,7 +37,19 @@ const HeaderIcon = ({ primaryColor = "#4C2EEB", ...props }) => (
   </svg>
 );
 
-const ChatbotHeader = ({ primaryColor = "#2563EB", chatbotName = "Ava", logo, chatbotAvatar }) => {
+interface ChatbotHeaderProps {
+  primaryColor?: string;
+  chatbotName?: string;
+  logo?: string | null;
+  chatbotAvatar?: string | null;
+}
+
+const ChatbotHeader = ({
+  primaryColor = "#2563EB",
+  chatbotName = "Ava",
+  logo,
+  chatbotAvatar,
+}: ChatbotHeaderProps) => {
   // Add key to force re-render when props change
   const headerKey = `header-${primaryColor}-${chatbotName}-${logo}-${chatbotAvatar}`;
 
@@ -42,13 +60,13 @@ const ChatbotHeader = ({ primaryColor = "#2563EB", chatbotName = "Ava", logo, ch
         <div className="flex justify-between items-start">
           {logo ? (
             <div className="bg-white p-2 flex justify-center items-center rounded-full shadow-sm">
-              <img
+              <Image
                 src={logo}
                 alt="logo"
                 className="w-[34px] h-[34px] rounded-full object-cover"
                 onError={e => {
                   console.error("Logo failed to load:", logo);
-                  e.target.style.display = "none";
+                  (e.target as HTMLImageElement).style.display = "none";
                 }}
                 onLoad={() => {
                   console.log("Logo loaded successfully:", logo);
@@ -109,7 +127,23 @@ const RightFilledArrowIcon = ({ width = 16, height = 14, fill = "#1A202C" }) => 
   );
 };
 
-const InputField = ({ containerClassName, inputClassName = "", placeHolder, buttonClassName = "", buttonIcon, buttonLabel = "" }) => {
+interface InputFieldProps {
+  containerClassName: string;
+  inputClassName?: string;
+  placeHolder?: string;
+  buttonClassName?: string;
+  buttonIcon?: React.ReactNode;
+  buttonLabel?: string;
+}
+
+const InputField = ({
+  containerClassName,
+  inputClassName = "",
+  placeHolder,
+  buttonClassName = "",
+  buttonIcon,
+  buttonLabel = "",
+}: InputFieldProps) => {
   return (
     <div className={`${containerClassName}`}>
       <Input
@@ -165,7 +199,7 @@ const ChatbotPreview = ({ primaryColor = "#2563EB", chatbotName = "Ava", logo = 
           />
 
           <Flex className="cursor-pointer border-2 border-gray-200 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-            <img src="/images/home.png" className="w-full max-w-full rounded-xl" alt="Help" />
+            <Image src="/images/home.png" className="w-full max-w-full rounded-xl" alt="Help" />
           </Flex>
         </Flex>
         <TabBar primaryColor={primaryColor} />
