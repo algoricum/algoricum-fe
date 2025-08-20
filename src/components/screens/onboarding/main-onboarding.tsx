@@ -22,7 +22,7 @@ import { getUserData } from "@/utils/supabase/user-helper";
 import { useAuth } from "@/hooks/useAuth";
 // import ChatbotSetupStep from "./chatbot-setup-step";
 // import type { MailgunMessageData } from "mailgun.js";
-
+import { createClient } from "@/utils/supabase/config/client";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 
 import {
@@ -35,7 +35,7 @@ import {
 import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
 
 const { Text } = Typography;
-
+const supabase = createClient();
 const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
@@ -209,9 +209,31 @@ export default function MainOnboarding() {
       // Additional data from new flow
       clinicType: clinicInfo.clinicType || "",
       integrations: integrations,
-      servicesDocument: clinicInfo.servicesDocument?.[0]?.originFileObj || null,
+      servicesDocument: null,
+      DocumnetPath: clinicInfo.servicesDocument?.[0].path || null,
     };
   };
+  console.log("📋 Mapping data for submission:", mapDataForSubmission(allData));
+  async function getFile(bucket: any, path: any) {
+    const { data, error } = await supabase.storage.from(bucket).download(path);
+
+    if (error) {
+      console.error("Error downloading file:", error);
+      return null;
+    }
+
+    return data; // This is a Blob
+  }
+  async function getFileAsFile(bucket: any, path: any) {
+    const blob = await getFile(bucket, path);
+    if (!blob) return null;
+
+    // Convert blob to File
+    const fileName = path.split("/").pop() || "file";
+    const file = new File([blob], fileName, { type: blob.type });
+
+    return file;
+  }
 
   // Main submission function (updated to use updateClinic)
   const handleCompleteOnboarding = async () => {
@@ -307,12 +329,15 @@ export default function MainOnboarding() {
         console.warn("Mailgun setup response missing or unsuccessful, skipping email settings save");
       }
       // Handle services document upload to edge function
-      if (mappedData.servicesDocument) {
+
+      if (mappedData.DocumnetPath) {
+        let file = await getFileAsFile("Assistant-File", mappedData.DocumnetPath);
         try {
           const formDataToSend = new FormData();
           const session = await getSupabaseSession();
-
-          formDataToSend.append("clinic_document", mappedData.servicesDocument);
+          if (file !== null) {
+            formDataToSend.append("clinic_document", file, file.name);
+          }
           formDataToSend.append("clinic_id", updatedClinic.id);
           formDataToSend.append("name", mappedData.legalBusinessName || "Assistant");
           formDataToSend.append("instructions", "AI Assistant for handling clinic inquiries");
@@ -325,7 +350,7 @@ export default function MainOnboarding() {
             body: formDataToSend,
           });
 
-          if (!response.ok) {
+          if (!response?.ok) {
             console.error("Document upload failed, continuing onboarding");
           }
         } catch (error) {
@@ -399,33 +424,33 @@ export default function MainOnboarding() {
       //   }
       // }
 
-      try {
-        const session = await getSupabaseSession();
-        if (!session.access_token) {
-          throw new Error("Not authenticated");
-        }
+      // try {
+      //   const session = await getSupabaseSession();
+      //   if (!session.access_token) {
+      //     throw new Error("Not authenticated");
+      //   }
 
-        const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            clinic_id: updatedClinic.id,
-            phone_number: mappedData.phoneNumber,
-            name: mappedData.legalBusinessName,
-          }),
-        });
+      //   const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
+      //     method: "POST",
+      //     headers: {
+      //       Authorization: `Bearer ${session.access_token}`,
+      //       "Content-Type": "application/json",
+      //     },
+      //     body: JSON.stringify({
+      //       clinic_id: updatedClinic.id,
+      //       phone_number: mappedData.phoneNumber,
+      //       name: mappedData.legalBusinessName,
+      //     }),
+      //   });
 
-        const twilioResult = await twilioResponse.json();
+      //   const twilioResult = await twilioResponse.json();
 
-        if (!twilioResponse.ok) {
-          console.error("Twilio setup error:", twilioResult.error);
-        }
-      } catch (twilioError) {
-        console.error("Failed to set up Twilio:", twilioError);
-      }
+      //   if (!twilioResponse.ok) {
+      //     console.error("Twilio setup error:", twilioResult.error);
+      //   }
+      // } catch (twilioError) {
+      //   console.error("Failed to set up Twilio:", twilioError);
+      // }
 
       await handleCsvLeadsUpload(clinic.id);
       clearStoredProgress();
@@ -438,7 +463,7 @@ export default function MainOnboarding() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: clinicData.legal_business_name || clinicData.dba_name,
+          name: clinicData.legal_business_name,
           email: clinicData.email || user.email || "",
         }),
       });
