@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Button, Input, Select, Switch, Typography, Upload } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
 import { updateClinic, getClinicData } from "@/utils/supabase/clinic-helper";
 import { SuccessToast, ErrorToast } from "@/helpers/toast";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
@@ -12,8 +11,6 @@ import { TIME_OPTIONS, DAYS, CLINIC_FIELDS } from "@/constants";
 
 const { Title } = Typography;
 const { Option } = Select;
-
-
 
 const supabase = createClient();
 
@@ -39,7 +36,7 @@ const ClinicSetting = () => {
       const data = await getClinicData();
       if (data) {
         let logoUrl = null;
-        if(data.logo && /^https?:\/\//.test(data.logo)) {
+        if (data.logo && /^https?:\/\//.test(data.logo)) {
           logoUrl = data.logo;
         } else if (data.logo) {
           const { data: publicUrlData } = supabase.storage.from("clinic-logos").getPublicUrl(data.logo);
@@ -94,6 +91,11 @@ const ClinicSetting = () => {
       const previewUrl = URL.createObjectURL(file);
       setFormData((prev: typeof formData) => ({ ...prev, logo: previewUrl }));
     }
+  };
+
+  const handleRemoveLogo = () => {
+    setFormData((prev: any) => ({ ...prev, logo: null }));
+    setFileList([]);
   };
 
   const handleDayToggle = (day: string, enabled: boolean) => {
@@ -176,22 +178,89 @@ const ClinicSetting = () => {
           ))}
         </div>
 
-        <div className="w-full sm:w-full lg:w-2/5 flex flex-col items-center justify-center border border-gray-200 rounded-[20px] p-6 bg-white">
-          <Upload
-            accept="image/*"
-            showUploadList={false}
-            beforeUpload={() => false}
-            onChange={handleLogoUpload}
-            maxCount={1}
-            fileList={fileList}
-          >
-            <Button icon={<UploadOutlined />}>Upload Logo</Button>
-          </Upload>
+        {/* Improved Logo Upload Section */}
+        <div className="w-full sm:w-full lg:w-2/5 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-[20px] p-6 bg-white hover:border-brand-primary hover:bg-gray-50 transition-all duration-200 min-h-[400px]">
+          {formData.logo ? (
+            // Logo preview state
+            <div className="flex flex-col items-center justify-center w-full h-full">
+              <div className="relative w-full max-w-xs">
+                <div className="relative w-full h-[200px] mb-4">
+                  <Image src={formData.logo} alt="Clinic Logo" fill className="object-contain rounded-lg shadow-sm" />
+                </div>
 
-          {formData.logo && (
-            <div className="relative w-full max-w-xs h-[300px] mt-4">
-              <Image src={formData.logo} alt="Clinic Logo" fill className="object-contain border border-gray-200 rounded" />
+                <div className="text-center space-y-4">
+                  <p className="text-sm font-medium text-gray-700">Current Logo</p>
+
+                  <div className="flex justify-center gap-3">
+                    <Upload
+                      accept="image/*"
+                      showUploadList={false}
+                      beforeUpload={() => false}
+                      onChange={handleLogoUpload}
+                      maxCount={1}
+                      fileList={fileList}
+                    >
+                      <Button
+                        type="default"
+                        className="border-brand-primary text-brand-primary hover:!bg-brand-primary hover:!text-white transition-all duration-200"
+                      >
+                        Change Logo
+                      </Button>
+                    </Upload>
+
+                    <Button
+                      onClick={handleRemoveLogo}
+                      className="border-red-500 text-red-500 hover:!bg-red-500 hover:!text-white transition-all duration-200"
+                    >
+                      Remove Logo
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
+          ) : (
+            // Upload state
+            <Upload
+              accept="image/*"
+              showUploadList={false}
+              beforeUpload={() => false}
+              onChange={handleLogoUpload}
+              maxCount={1}
+              fileList={fileList}
+              className="w-full h-full flex items-center justify-center"
+            >
+              <div className="flex flex-col items-center justify-center w-full h-full cursor-pointer group">
+                {/* Upload Icon */}
+                <div className="w-20 h-20 rounded-full bg-brand-primary/10 flex items-center justify-center mb-6 group-hover:bg-brand-primary/20 transition-colors duration-200">
+                  <svg className="w-10 h-10 text-brand-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                    />
+                  </svg>
+                </div>
+
+                {/* Upload Text */}
+                <div className="text-center space-y-3">
+                  <p className="text-xl font-semibold text-gray-700 group-hover:text-brand-primary transition-colors duration-200">
+                    Upload Clinic Logo
+                  </p>
+                  <p className="text-base text-gray-500">
+                    Drag & drop your logo here, or <span className="text-brand-primary font-medium underline">click to browse</span>
+                  </p>
+                  <p className="text-sm text-gray-400">Supports: PNG, JPG, GIF (Max 5MB)</p>
+                </div>
+
+                {/* Visual Enhancement */}
+                <div className="mt-8 flex space-x-2">
+                  <div className="w-3 h-3 bg-brand-primary/30 rounded-full"></div>
+                  <div className="w-3 h-3 bg-brand-primary/50 rounded-full"></div>
+                  <div className="w-3 h-3 bg-brand-primary rounded-full"></div>
+                </div>
+              </div>
+            </Upload>
           )}
         </div>
       </div>

@@ -565,6 +565,7 @@ async function handleSyncLeads(req: Request) {
     }
 
     // Get or create lead source for Pipedrive
+    // I think this query will not work as there is no clinic_id column in lead_source
     const { data: leadSource, error: sourceError } = await supabase
       .from('lead_source')
       .select('id')

@@ -375,7 +375,7 @@ const TabButton = ({ isActive, onClick, label }: { isActive: boolean; onClick: (
     <DashboardLayout
       header={<Header title="Billing" description="Manage your subscription and view billing activity." showHamburgerMenu={true} />}
     >
-      <Flex className="border border-[#E8EAEC] rounded-[48px] p-2 gap-4 w-fit mb-6">
+      <Flex className="border border-[#E8EAEC] rounded-[48px] p-2 gap-4 w-fit mb-6 mt-2">
         <TabButton isActive={activeTab === "overview"} onClick={() => setActiveTab("overview")} label="Overview" />
         <TabButton isActive={activeTab === "invoices"} onClick={() => setActiveTab("invoices")} label="Invoices" />
       </Flex>
