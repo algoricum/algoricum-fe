@@ -23,6 +23,7 @@ import { createClient } from "@/utils/supabase/config/client";
 
 import { X, CheckCircle, Upload } from "lucide-react";
 import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
+import AiActivityLog from "./AiActivityLogs";
 
 type LeadRow = {
   id: string;
@@ -353,100 +354,7 @@ export default function DashboardPage() {
         </div>
 
         {/* AI Activity Log */}
-        <div className="mb-8 grid grid-cols-1 gap-6">
-          <div className="card">
-            <h3 className="mb-6 text-lg font-semibold">AI Activity Log</h3>
-            <div className="max-h-96 space-y-4 overflow-y-auto">
-              {[
-                {
-                  id: 1,
-                  type: "analysis",
-                  title: "Patient Risk Assessment",
-                  description: "AI analyzed 12 patient records for cardiovascular risk factors",
-                  time: "2 min ago",
-                  status: "completed",
-                  icon: "🤖",
-                },
-                {
-                  id: 2,
-                  type: "prediction",
-                  title: "Appointment No-Show Prediction",
-                  description: "Predicted 3 high-risk no-show appointments for tomorrow",
-                  time: "15 min ago",
-                  status: "completed",
-                  icon: "📊",
-                },
-                {
-                  id: 3,
-                  type: "recommendation",
-                  title: "Treatment Recommendation",
-                  description: "Generated personalized treatment plan for Sarah Johnson",
-                  time: "1 hour ago",
-                  status: "completed",
-                  icon: "💡",
-                },
-                {
-                  id: 4,
-                  type: "processing",
-                  title: "Lead Scoring Update",
-                  description: "Recalculating lead scores based on recent interactions",
-                  time: "2 hours ago",
-                  status: "processing",
-                  icon: "⚡",
-                },
-                {
-                  id: 5,
-                  type: "alert",
-                  title: "Anomaly Detection",
-                  description: "Detected unusual pattern in appointment cancellations",
-                  time: "3 hours ago",
-                  status: "alert",
-                  icon: "⚠️",
-                },
-                {
-                  id: 6,
-                  type: "analysis",
-                  title: "Sentiment Analysis",
-                  description: "Analyzed patient feedback from last week's appointments",
-                  time: "4 hours ago",
-                  status: "completed",
-                  icon: "😊",
-                },
-              ].map(activity => (
-                <div key={activity.id} className="flex items-start space-x-3 rounded-lg p-3 hover:bg-gray-50">
-                  <div className="flex-shrink-0">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100">
-                      <span className="text-sm">{activity.icon}</span>
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          activity.status === "completed"
-                            ? "bg-green-100 text-green-800"
-                            : activity.status === "processing"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {activity.status}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-gray-500">{activity.description}</p>
-                    <p className="mt-1 text-xs text-gray-400">{activity.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 border-t border-gray-200 pt-4">
-              <button className="w-full text-center text-sm font-medium text-purple-600 hover:text-purple-800">
-                View All AI Activities
-              </button>
-            </div>
-          </div>
-        </div>
+        <AiActivityLog clinicId={clinicId} />
       </div>
 
       {/* Add Task Modal (kept for parity; closed by default) */}
