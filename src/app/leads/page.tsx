@@ -455,7 +455,7 @@ export default function LeadsPage() {
       </div>
 
       {/* Lead Generation Modal */}
-      <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} title="Generate New Lead" width={600}>
+      <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null}  width={600}>
         {clinicId && <LeadGenerationForm clinicId={clinicId} onSuccess={handleClose} />}
       </Modal>
     </DashboardLayout>

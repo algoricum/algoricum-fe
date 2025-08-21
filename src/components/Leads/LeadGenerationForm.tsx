@@ -1,12 +1,11 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import type React from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/config/client";
 import { getCountries, getCountryCallingCode } from "react-phone-number-input/input";
 import type { CountryCode } from "libphonenumber-js";
 import getLeadSourceId from "@/utils/lead_source";
 import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
-
-
 
 type FormField = {
   id: string;
@@ -14,14 +13,14 @@ type FormField = {
   field_name: string;
   field_type: string;
   is_required: boolean;
-  field_options?: string[];
   field_order: number;
+  field_options?: string[];
 };
 
 type FormData = { [key: string]: string | number };
 
 // eslint-disable-next-line no-unused-vars
-type Props = { clinicId: string; onSuccess?: (newLead?: any) => void;}; // Accept the new lead data };
+type Props = { clinicId: string; onSuccess?: (newLead?: any) => void }; // Accept the new lead data };
 
 const validatePhoneNumber = (phoneNumber: string) => {
   if (!phoneNumber || !phoneNumber.trim()) {
@@ -62,13 +61,23 @@ const validatePhoneNumber = (phoneNumber: string) => {
   }
 };
 
-
 const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
-  const [fields, setFields] = useState<FormField[]>([]);
+  const staticFields: FormField[] = [
+    {
+      id: "1",
+      field_id: "first_name",
+      field_name: "First Name",
+      field_type: "text",
+      is_required: true,
+      field_order: 1,
+    },
+    { id: "2", field_id: "email", field_name: "Email", field_type: "email", is_required: true, field_order: 2 },
+    { id: "3", field_id: "phone", field_name: "Phone Number", field_type: "tel", is_required: true, field_order: 3 },
+  ];
+
   const [formData, setFormData] = useState<FormData>({});
   const [countryCode, setCountryCode] = useState<CountryCode>("US");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -79,38 +88,6 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
     value: c,
     label: `${c} (+${getCountryCallingCode(c)})`,
   }));
-
-  useEffect(() => {
-    const fetchFormFields = async () => {
-      try {
-        
-        const { data, error } = await supabase
-          .from("clinic_lead_form")
-          .select("*")
-          .eq("clinic_id", clinicId)
-          .order("field_order", { ascending: true });
-
-        if (error) throw error;
-
-        setFields(
-          data?.length
-            ? data
-            : [
-                { id: "1", field_id: "name", field_name: "Full Name", field_type: "text", is_required: true, field_order: 1 },
-                { id: "2", field_id: "email", field_name: "Email Address", field_type: "email", is_required: true, field_order: 2 },
-                { id: "3", field_id: "phone", field_name: "Phone Number", field_type: "tel", is_required: false, field_order: 3 },
-              ],
-        );
-      } catch (err) {
-        console.error("Error fetching form fields:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (clinicId) fetchFormFields();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clinicId]);
 
   useEffect(() => {
     if (phoneNumber && countryCode) {
@@ -134,77 +111,76 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
     if (errors.phone) setErrors(prev => ({ ...prev, phone: "" }));
   };
 
-const validateForm = () => {
-  const newErrors: { [key: string]: string } = {};
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
 
-  fields.forEach(f => {
-    const value = formData[f.field_id];
+    staticFields.forEach(f => {
+      const value = formData[f.field_id];
 
-    // Required field check
-    if (f.is_required && !value) {
-      newErrors[f.field_id] = `${f.field_name} is required`;
-    }
-
-    // Email validation (always if present)
-    if (f.field_type === "email" && value) {
-      const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!regex.test(value.toString())) {
-        newErrors[f.field_id] = "Enter a valid email address";
+      // Required field check
+      if (f.is_required && !value) {
+        newErrors[f.field_id] = `${f.field_name} is required`;
       }
-    }
 
-    // Phone validation (always if filled)
-    if (f.field_type === "tel" && phoneNumber) {
-      const phone = `+${getCountryCallingCode(countryCode)}${phoneNumber}`;
-      const { isValid, error } = validatePhoneNumber(phone);
-      if (!isValid) {
-        newErrors[f.field_id] = error || "Invalid phone number";
+      // Email validation (always if present)
+      if (f.field_type === "email" && value) {
+        const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!regex.test(value.toString())) {
+          newErrors[f.field_id] = "Enter a valid email address";
+        }
       }
+
+      // Phone validation (always if filled)
+      if (f.field_type === "tel" && phoneNumber) {
+        const phone = `+${getCountryCallingCode(countryCode)}${phoneNumber}`;
+        const { isValid, error } = validatePhoneNumber(phone);
+        if (!isValid) {
+          newErrors[f.field_id] = error || "Invalid phone number";
+        }
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setSubmitting(true);
+    const source_id = await getLeadSourceId("Others");
+
+    try {
+      const submissionData = {
+        clinic_id: clinicId,
+        source_id: source_id,
+        first_name: formData.first_name || null,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        form_data: { ...formData, country_code: countryCode, phone_number: phoneNumber },
+        interest_level: "medium",
+        urgency: "curious",
+        status: "New",
+      };
+
+      const { data, error: insertError } = await supabase
+        .from("lead")
+        .insert([submissionData])
+        .select() // Return the inserted data
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Pass the new lead data to parent instead of just calling onSuccess
+      onSuccess?.(data);
+    } catch (err) {
+      console.error("Submit error:", err);
+      alert("Error submitting form. Try again.");
+    } finally {
+      setSubmitting(false);
     }
-  });
-
-  setErrors(newErrors);
-  return Object.keys(newErrors).length === 0;
-};
-
-
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!validateForm()) return;
-
-  setSubmitting(true);
-  const source_id = await getLeadSourceId("Others");
-
-  try {
-    const submissionData = {
-      clinic_id: clinicId,
-      source_id: source_id,
-      first_name: formData.name || null,
-      email: formData.email || null,
-      phone: formData.phone || null,
-      form_data: { ...formData, country_code: countryCode, phone_number: phoneNumber },
-      interest_level: "medium",
-      urgency: "curious",
-      status: "New",
-    };
-
-    const { data, error: insertError } = await supabase
-      .from("lead")
-      .insert([submissionData])
-      .select() // Return the inserted data
-      .single();
-
-    if (insertError) throw insertError;
-
-    // Pass the new lead data to parent instead of just calling onSuccess
-    onSuccess?.(data);
-  } catch (err) {
-    console.error("Submit error:", err);
-    alert("Error submitting form. Try again.");
-  } finally {
-    setSubmitting(false);
-  }
-};
+  };
 
   const renderField = (f: FormField) => {
     const error = errors[f.field_id];
@@ -279,8 +255,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     );
   };
 
-  if (loading) return <div className="p-10 text-center">Loading form...</div>;
-
   if (submitted) {
     return (
       <div className="p-10 text-center">
@@ -303,11 +277,10 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 
   return (
-    <div className="">
       <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow-lg">
         <h1 className="text-3xl font-bold mb-6 text-center">Add a new lead</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {fields.map(f => (
+          {staticFields.map(f => (
             <div key={f.field_id}>
               <label className="block text-sm font-medium mb-2">
                 {f.field_name} {f.is_required && <span className="text-red-500">*</span>}
@@ -317,13 +290,16 @@ const handleSubmit = async (e: React.FormEvent) => {
             </div>
           ))}
           {onSuccess && (
-            <button type="submit" disabled={submitting} className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-[#a200e6] text-white py-3 rounded-lg hover:bg-[#7a00b3] transition duration-300"
+            >
               {submitting ? "Submitting..." : "Submit"}
             </button>
           )}
         </form>
       </div>
-    </div>
   );
 };
 
