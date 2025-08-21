@@ -37,22 +37,26 @@ const ScheduleMeetingForm = ({ supabase, clinicId, onSuccess }: ScheduleMeetingF
       }
 
       // Insert into meeting_schedule
-      const { error } = await supabase.from("meeting_schedule").upsert([
-        {
-          username: `${values.first_name} ${values.last_name}`.trim(),
-          email: values.email,
-          phone_number: phoneNumber,
-          preferred_meeting_time: fullDateTime,
-          meeting_notes: values.meeting_notes || null,
-          clinic_id: clinicId,
-        },
-      ]);
+      const { error } = await supabase.from("meeting_schedule").upsert(
+        [
+          {
+            username: `${values.first_name} ${values.last_name}`.trim(),
+            email: values.email,
+            phone_number: phoneNumber || values.phone_number,
+            preferred_meeting_time: fullDateTime,
+            meeting_notes: values.meeting_notes || null,
+            clinic_id: clinicId,
+          },
+        ],
+        { onConflict: "email" }, 
+      );
+
 
       // Fetch lead source id
       const { data: leadSourceData, error: leadSourceError } = await supabase
         .from("lead_source")
         .select("id")
-        .eq("name", "others")
+        .eq("name", "Others")
         .single();
 
       // Insert into leads
@@ -61,12 +65,14 @@ const ScheduleMeetingForm = ({ supabase, clinicId, onSuccess }: ScheduleMeetingF
           first_name: values.first_name.trim(),
           last_name: values.last_name.trim(),
           email: values.email,
-          phone: phoneNumber,
+          phone: phoneNumber || values.phone_number,
           status: "Booked",
           clinicId: clinicId,
+          interest:"medium",
           lead_source: leadSourceData?.id,
         },
-      ]);
+      ], { onConflict: "email,clinic_id" }
+    );
 
       if (error || leadError || leadSourceError) {
         if (error?.code === "23505") {

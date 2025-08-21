@@ -8,6 +8,7 @@ export interface MeetingSchedule {
   id: string;
   username: string;
   email: string;
+  phone_number: string | null; 
   created_at: string;
   preferred_meeting_time: string | null;
   meeting_link: string | null;
