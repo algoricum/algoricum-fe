@@ -26,7 +26,7 @@ export const handleCsvLeadsUpload = async (clinic_id: string) => {
 
       // Get source_id for 'File'
       try {
-        const source_id = await getLeadSourceId("File");
+        const source_id = await getLeadSourceId("Csv_File ");
         const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
         const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
         if (insertError) {

@@ -27,6 +27,7 @@ const Header = ({ title = "", description = "", showHamburgerMenu = false }: Hea
       setIsLoggingOut(true);
       const success = await signOut();
       if (success) {
+        localStorage.clear();
         SuccessToast("Logout Successfully");
         router.push("/login");
       } else {
@@ -84,10 +85,10 @@ const Header = ({ title = "", description = "", showHamburgerMenu = false }: Hea
   ];
 
   return (
-    <Flex className="w-full bg-white px-4 py-3" justify="space-between" align="center">
+    <Flex className="w-full bg-white px-4 py-1" justify="space-between" align="center">
       {/* Title and Description */}
       <Flex vertical className="min-w-0">
-        <Text className="mt-2 text-xl font-helvetica-700 text-Gray900 sm:text-header truncate">{title}</Text>
+        <Text className="mt-7 text-xl font-helvetica-700 text-Gray900 sm:text-header truncate">{title}</Text>
         <Text className="mb-2 text-xs font-helvetica text-Gray600 sm:text-sm truncate">{description}</Text>
       </Flex>
 

@@ -12,6 +12,7 @@ import IntegrationsStep from "./integrations-step";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
+import Image from "next/image";
 
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 // import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
@@ -425,33 +426,33 @@ export default function MainOnboarding() {
       //   }
       // }
 
-      // try {
-      //   const session = await getSupabaseSession();
-      //   if (!session.access_token) {
-      //     throw new Error("Not authenticated");
-      //   }
+      try {
+        const session = await getSupabaseSession();
+        if (!session.access_token) {
+          throw new Error("Not authenticated");
+        }
 
-      //   const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
-      //     method: "POST",
-      //     headers: {
-      //       Authorization: `Bearer ${session.access_token}`,
-      //       "Content-Type": "application/json",
-      //     },
-      //     body: JSON.stringify({
-      //       clinic_id: updatedClinic.id,
-      //       phone_number: mappedData.phoneNumber,
-      //       name: mappedData.legalBusinessName,
-      //     }),
-      //   });
+        const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            clinic_id: updatedClinic.id,
+            phone_number: mappedData.phoneNumber,
+            name: mappedData.legalBusinessName,
+          }),
+        });
 
-      //   const twilioResult = await twilioResponse.json();
+        const twilioResult = await twilioResponse.json();
 
-      //   if (!twilioResponse.ok) {
-      //     console.error("Twilio setup error:", twilioResult.error);
-      //   }
-      // } catch (twilioError) {
-      //   console.error("Failed to set up Twilio:", twilioError);
-      // }
+        if (!twilioResponse.ok) {
+          console.error("Twilio setup error:", twilioResult.error);
+        }
+      } catch (twilioError) {
+        console.error("Failed to set up Twilio:", twilioError);
+      }
 
       await handleCsvLeadsUpload(clinic.id);
       clearStoredProgress();
@@ -523,6 +524,7 @@ export default function MainOnboarding() {
     try {
       const success = await logout();
       if (success) {
+        localStorage.clear();
         localStorage.removeItem(ONBOARDING_STORAGE_KEY);
         localStorage.removeItem(ONBOARDING_STEP_KEY);
         localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
@@ -577,7 +579,9 @@ export default function MainOnboarding() {
         {/* Logo */}
         <div className="flex items-center mb-5">
           <div className="w-7 h-7 bg-white rounded-md flex items-center justify-center mr-2">
-            <Text className="text-purple-500 text-sm font-bold">A</Text>
+            <Text className="text-purple-500 text-sm font-bold">
+              <Image src="logo.svg" alt="Logo" width={50} height={50} />
+            </Text>
           </div>
           <Text className="text-white text-lg font-semibold">Algoricum</Text>
         </div>
