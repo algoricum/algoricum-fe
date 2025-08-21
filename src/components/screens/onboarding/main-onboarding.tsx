@@ -115,6 +115,7 @@ export default function MainOnboarding() {
       localStorage.removeItem(ONBOARDING_STEP_KEY);
       localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
       localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
+      localStorage.removeItem("oauth_form_data"); // Clear any OAuth form data
     } catch (error) {
       ErrorToast("Error clearing localStorage");
     }
