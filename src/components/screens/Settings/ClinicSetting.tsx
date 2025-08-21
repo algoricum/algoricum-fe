@@ -172,8 +172,15 @@ const ClinicSetting = () => {
           <Title level={3}>Clinic Profile</Title>
           {CLINIC_FIELDS.map(([label, key]) => (
             <div key={key}>
-              <label className="font-medium">{label}</label>
-              <Input value={formData[key] ?? ""} onChange={e => handleChange(key, e.target.value)} placeholder={label} className="mb-4" />
+              <label className="font-medium">
+                {label === "Legal Business Name" ? "Clinic Name" : label === "DBA Name" ? "Primary Contact Name" : label}
+              </label>
+              <Input
+                value={formData[key] ?? ""}
+                onChange={e => handleChange(key, e.target.value)}
+                placeholder={label === "Legal Business Name" ? "Clinic Name" : label === "DBA Name" ? "Primary Contact Name" : label}
+                className="mb-4"
+              />
             </div>
           ))}
         </div>

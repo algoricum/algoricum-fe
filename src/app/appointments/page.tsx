@@ -3,29 +3,19 @@
 import type React from "react";
 import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import {
-  Calendar,
-  CheckCircle,
-  Clock,
-  X,
-  SearchIcon,
-  Plus,
-  MoreVertical,
-  Edit,
-  Trash2,
-  AlertTriangle,
-  Mail,
-  LinkIcon,
-  ExternalLink,
-  Copy,
-  Check,
-} from "lucide-react";
+import { Calendar, CheckCircle, Clock, X, SearchIcon, Plus, MoreVertical, Edit, Trash2, Mail, PhoneIcon } from "lucide-react";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import { appointmentHelper, type MeetingSchedule, type MeetingStatus, formatMeetingDate } from "@/utils/appointment-helper";
-import { createClient } from "@supabase/supabase-js";
-import ScheduleMeetingForm from "@/components/schedule-meetings/ScheduleMeetingForm";
+import { appointmentHelper, type MeetingSchedule } from "@/utils/appointment-helper";
+import { Form } from "antd";
+import { createClient } from "@/utils/supabase/config/client";
+import dayjs from "dayjs";
+import "react-phone-number-input/style.css";
+import { StatCard } from "@/components/appointments/stat-card";
+import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
+import { EditStatusModal } from "@/components/appointments/edit-status-modal";
+import { DeleteConfirmationModal } from "@/components/appointments/delete-confirmation-modal";
 
 interface Message {
   type: "error" | "success";
@@ -46,10 +36,12 @@ export default function AppointmentsPage() {
   const [message, setMessage] = useState<Message | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [, setPhoneError] = useState<string>("");
+  const [form] = Form.useForm();
   const dropdownRef = useRef<HTMLTableCellElement>(null);
 
-  // Initialize Supabase client
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const supabase = createClient();
 
   // Load appointments data from Supabase
   useEffect(() => {
@@ -129,6 +121,7 @@ export default function AppointmentsPage() {
     }
   }, [copiedLink]);
 
+
   const handleAddAppointment = async () => {
     if (!clinicId) {
       setMessage({
@@ -140,19 +133,78 @@ export default function AppointmentsPage() {
     setShowAddAppointmentModal(true);
   };
 
-  // Handle successful meeting creation from ScheduleMeetingForm
-  const handleMeetingSuccess = async () => {
-    setMessage({ type: "success", text: "Meeting scheduled successfully!" });
-    setShowAddAppointmentModal(false);
-
-    // Reload appointments to show the new one
-    if (clinicId) {
-      try {
-        const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
-        setAppointmentsData(meetings);
-      } catch (error) {
-        console.error("Error reloading appointments:", error);
+  const handleSubmitMeeting = async (values: any) => {
+    try {
+      setIsSubmitting(true);
+      let fullDateTime = null;
+      if (values.preferred_meeting_date && values.preferred_meeting_time) {
+        const date = dayjs(values.preferred_meeting_date).format("YYYY-MM-DD");
+        const time = dayjs(values.preferred_meeting_time).format("HH:mm:ss");
+        fullDateTime = `${date} ${time}`;
       }
+      
+      const { error } = await supabase.from("meeting_schedule").upsert([
+        {
+          username: `${values.first_name} ${values.last_name}`.trim(),
+          email: values.email,
+          phone_number: values.phone_number || phoneNumber,
+          preferred_meeting_time: fullDateTime,
+          meeting_notes: values.meeting_notes || null,
+          clinic_id: clinicId,
+        },
+      ], { onConflict: "email" });
+
+      const { data: leadSourceData, error: leadSourceError } = await supabase
+        .from("lead_source")
+        .select("id")
+        .eq("name", "Others")
+        .single();
+
+      const { error: leadError } = await supabase.from("lead").upsert([
+        {
+          first_name: values.first_name.trim(),
+          last_name: values.last_name.trim(),
+          email: values.email,
+          phone: values.phone_number || phoneNumber,
+          status: "Booked",
+          interest: "medium",
+          clinic_id: clinicId,
+          source_id: leadSourceData?.id,
+        },
+      ],{ onConflict: "email,clinic_id" });
+
+      if (error || leadError || leadSourceError) {
+        if (error?.code === "23505") {
+          setMessage({
+            type: "error",
+            text: "This email is already registered for a meeting",
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      // Reload appointments data
+      const meetings = await appointmentHelper.getMeetingsByClinic(clinicId!);
+      setAppointmentsData(meetings);
+
+      setMessage({
+        type: "success",
+        text: "Meeting schedule saved successfully!",
+      });
+      form.resetFields();
+      setPhoneNumber("");
+      setPhoneError("");
+      setShowAddAppointmentModal(false);
+    } catch (error: any) {
+      console.error("Error saving meeting schedule:", error);
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to save meeting schedule",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -217,14 +269,7 @@ export default function AppointmentsPage() {
     setActiveDropdown(null);
   };
 
-  const copyToClipboard = async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedLink(id);
-    } catch (err) {
-      console.error("Failed to copy: ", err);
-    }
-  };
+
 
   // Filter appointments based on search and status
   const filteredAppointments = appointmentsData.filter(appointment => {
@@ -381,8 +426,8 @@ export default function AppointmentsPage() {
                 <tr className="border-b border-gray-200">
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Patient</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Email</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Phone</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Date & Time</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Meeting Link</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Meeting Notes</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Actions</th>
@@ -442,42 +487,19 @@ export default function AppointmentsPage() {
                             <span className="truncate text-gray-900">{appointment.email}</span>
                           </div>
                         </td>
+                        {/* Phone */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center">
+                            <PhoneIcon className="mr-2 h-4 w-4 text-gray-400" />
+                            <span className="text-gray-900">{appointment.phone_number || "No phone"}</span>
+                          </div>
+                        </td>
                         {/* Date & Time */}
                         <td className="px-4 py-3">
                           <div>
                             <p className="text-gray-900">{date}</p>
                             <p className="text-sm text-gray-500">{time}</p>
                           </div>
-                        </td>
-                        {/* Meeting Link */}
-                        <td className="px-4 py-3">
-                          {appointment.meeting_link ? (
-                            <div className="flex items-center space-x-2">
-                              <a
-                                href={appointment.meeting_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center text-blue-600 transition-colors hover:text-blue-800"
-                              >
-                                <LinkIcon className="mr-1 h-4 w-4" />
-                                <span className="text-sm">Join Meeting</span>
-                                <ExternalLink className="ml-1 h-3 w-3" />
-                              </a>
-                              <button
-                                onClick={() => copyToClipboard(appointment.meeting_link!, appointment.id)}
-                                className="p-1 text-gray-400 transition-colors hover:text-gray-600"
-                                title="Copy link"
-                              >
-                                {copiedLink === appointment.id ? (
-                                  <Check className="h-4 w-4 text-green-500" />
-                                ) : (
-                                  <Copy className="h-4 w-4" />
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-400">No link</span>
-                          )}
                         </td>
                         {/* Notes */}
                         <td className="px-4 py-3">
@@ -546,175 +568,45 @@ export default function AppointmentsPage() {
           </div>
         </div>
 
-        {/* Add Appointment Modal - Using ScheduleMeetingForm component */}
-        {showAddAppointmentModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6">
-              <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-purple-600" />
-                  <h3 className="text-lg font-semibold">Schedule a Meeting</h3>
-                </div>
-                <button onClick={() => setShowAddAppointmentModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-
-              {/* Use the ScheduleMeetingForm component */}
-              <div className="ant-design-form-wrapper">
-                <ScheduleMeetingForm supabase={supabase} clinicId={clinicId} onSuccess={handleMeetingSuccess} />
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Add Appointment Modal - Enhanced Schedule Meeting Form */}
+        <AddAppointmentModal
+          isOpen={showAddAppointmentModal}
+          onClose={() => {
+            setShowAddAppointmentModal(false);
+            form.resetFields();
+            setPhoneNumber("");
+            setPhoneError("");
+          }}
+          onSubmit={handleSubmitMeeting}
+          isSubmitting={isSubmitting}
+          clinicId={clinicId}
+        />
 
         {/* Edit Status Modal */}
-        {showEditStatusModal && selectedAppointment && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="w-full max-w-md rounded-lg bg-white p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Edit Appointment Status</h3>
-                <button
-                  onClick={() => {
-                    setShowEditStatusModal(false);
-                    setSelectedAppointment(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                  disabled={isSubmitting}
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-
-              <div className="mb-4 rounded-lg bg-gray-50 p-4">
-                <p className="mb-1 text-sm text-gray-600">Patient</p>
-                <p className="font-medium text-gray-900">{selectedAppointment.username}</p>
-                <p className="mt-2 mb-1 text-sm text-gray-600">Email</p>
-                <p className="text-gray-900">{selectedAppointment.email}</p>
-                <p className="mt-2 mb-1 text-sm text-gray-600">Date & Time</p>
-                <p className="text-gray-900">{formatMeetingDate(selectedAppointment.preferred_meeting_time)}</p>
-                <p className="mt-2 mb-1 text-sm text-gray-600">Meeting Notes</p>
-                <p className="text-sm text-gray-900">{selectedAppointment.meeting_notes || "No notes"}</p>
-              </div>
-
-              {isSubmitting && (
-                <div className="mb-4">
-                  <LoadingSpinner message="Updating status..." size="sm" />
-                </div>
-              )}
-
-              <form onSubmit={handleEditStatus} className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Status</label>
-                  <select
-                    value={selectedAppointment.status}
-                    onChange={e =>
-                      setSelectedAppointment({
-                        ...selectedAppointment,
-                        status: e.target.value as MeetingStatus,
-                      })
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
-                    disabled={isSubmitting}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                  </select>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditStatusModal(false);
-                      setSelectedAppointment(null);
-                    }}
-                    className="flex-1 rounded-lg bg-gray-300 px-4 py-2 text-gray-700 transition-colors duration-200 hover:bg-gray-400"
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? "Updating..." : "Update Status"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        <EditStatusModal
+          isOpen={showEditStatusModal}
+          onClose={() => {
+            setShowEditStatusModal(false);
+            setSelectedAppointment(null);
+          }}
+          onSubmit={handleEditStatus}
+          isSubmitting={isSubmitting}
+          appointment={selectedAppointment}
+          onStatusChange={status => setSelectedAppointment(prev => (prev ? { ...prev, status } : null))}
+        />
 
         {/* Delete Confirmation Modal */}
-        {showDeleteConfirmation && selectedAppointment && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="w-full max-w-md rounded-lg bg-white p-6">
-              <div className="mb-4 flex items-center justify-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                  <AlertTriangle className="h-6 w-6 text-red-600" />
-                </div>
-              </div>
-              <div className="mb-6 text-center">
-                <h3 className="mb-2 text-lg font-semibold text-gray-900">Delete Appointment</h3>
-                <p className="mb-4 text-gray-600">Are you sure you want to delete this appointment? This action cannot be undone.</p>
-                <div className="rounded-lg bg-gray-50 p-4 text-left">
-                  <p className="mb-1 text-sm text-gray-600">Patient</p>
-                  <p className="mb-2 font-medium text-gray-900">{selectedAppointment.username}</p>
-                  <p className="mb-1 text-sm text-gray-600">Email</p>
-                  <p className="mb-2 text-gray-900">{selectedAppointment.email}</p>
-                  <p className="mb-1 text-sm text-gray-600">Date & Time</p>
-                  <p className="mb-2 text-gray-900">{formatMeetingDate(selectedAppointment.preferred_meeting_time)}</p>
-                  <p className="mb-1 text-sm text-gray-600">Meeting Notes</p>
-                  <p className="text-sm text-gray-900">{selectedAppointment.meeting_notes || "No notes"}</p>
-                </div>
-              </div>
-
-              {isSubmitting && (
-                <div className="mb-4">
-                  <LoadingSpinner message="Deleting appointment..." size="sm" />
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirmation(false);
-                    setSelectedAppointment(null);
-                  }}
-                  className="flex-1 rounded-lg bg-gray-300 px-4 py-2 text-gray-700 transition-colors duration-200 hover:bg-gray-400"
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteAppointment}
-                  className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Deleting..." : "Yes, Delete"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <DeleteConfirmationModal
+          isOpen={showDeleteConfirmation}
+          onClose={() => {
+            setShowDeleteConfirmation(false);
+            setSelectedAppointment(null);
+          }}
+          onConfirm={handleDeleteAppointment}
+          isSubmitting={isSubmitting}
+          appointment={selectedAppointment}
+        />
       </div>
     </DashboardLayout>
-  );
-}
-
-// Compact, single-line stat card with responsive icon sizing
-function StatCard({ icon, iconBg, title, value }: { icon: React.ReactNode; iconBg: string; title: string; value: number }) {
-  return (
-    <div className="rounded-lg bg-white p-3 shadow sm:p-5">
-      <div className="flex items-center justify-start gap-2 whitespace-nowrap md:justify-between md:gap-3">
-        <div className="flex min-w-0 items-center gap-2 md:gap-3">
-          <div className={`rounded-full p-2 md:p-3 ${iconBg}`}>{icon}</div>
-          <p className="truncate text-sm font-medium text-gray-600">{title}</p>
-        </div>
-        <p className="shrink-0 text-xl font-semibold text-gray-900 md:ml-auto md:text-2xl">{value}</p>
-      </div>
-    </div>
   );
 }
