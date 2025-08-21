@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect,useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   Calendar,
@@ -14,35 +14,22 @@ import {
   Edit,
   Trash2,
   AlertTriangle,
-  User,
   Mail,
   LinkIcon,
   ExternalLink,
   Copy,
-  Check
+  Check,
 } from "lucide-react";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import {
-  appointmentHelper,
-  type MeetingSchedule,
-  type CreateMeetingRequest,
-  type MeetingStatus,
-  formatMeetingDate,
-} from "@/utils/appointment-helper";
+import { appointmentHelper, type MeetingSchedule, type MeetingStatus, formatMeetingDate } from "@/utils/appointment-helper";
+import { createClient } from "@supabase/supabase-js";
+import ScheduleMeetingForm from "@/components/schedule-meetings/ScheduleMeetingForm";
 
 interface Message {
   type: "error" | "success";
   text: string;
-}
-interface NewMeetingForm {
-  username: string;
-  email: string;
-  preferred_meeting_date: string;
-  preferred_meeting_time: string;
-  meeting_notes: string;
-  meeting_link: string;
 }
 
 export default function AppointmentsPage() {
@@ -59,16 +46,10 @@ export default function AppointmentsPage() {
   const [message, setMessage] = useState<Message | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
-  const [newMeeting, setNewMeeting] = useState<NewMeetingForm>({
-    username: "",
-    email: "",
-    preferred_meeting_date: "",
-    preferred_meeting_time: "",
-    meeting_notes: "",
-    meeting_link: "",
-  });
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const dropdownRef = useRef<HTMLTableCellElement>(null);
+
+  // Initialize Supabase client
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
   // Load appointments data from Supabase
   useEffect(() => {
@@ -159,92 +140,19 @@ export default function AppointmentsPage() {
     setShowAddAppointmentModal(true);
   };
 
-  const handleSubmitMeeting = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Clear previous validation errors
-    setValidationErrors([]);
+  // Handle successful meeting creation from ScheduleMeetingForm
+  const handleMeetingSuccess = async () => {
+    setMessage({ type: "success", text: "Meeting scheduled successfully!" });
+    setShowAddAppointmentModal(false);
 
-    if (!clinicId) {
-      setValidationErrors(["No clinic found. Please make sure you have a clinic set up."]);
-      return;
-    }
-
-    // Client-side validation
-    const errors: string[] = [];
-    if (!newMeeting.username.trim()) {
-      errors.push("Name is required");
-    }
-    if (!newMeeting.email.trim()) {
-      errors.push("Email is required");
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newMeeting.email)) {
-      errors.push("Please enter a valid email address");
-    }
-    if (!newMeeting.preferred_meeting_date) {
-      errors.push("Meeting date is required");
-    }
-    if (!newMeeting.preferred_meeting_time) {
-      errors.push("Meeting time is required");
-    }
-    if (newMeeting.preferred_meeting_date && newMeeting.preferred_meeting_time) {
-      const meetingDateTime = new Date(`${newMeeting.preferred_meeting_date} ${newMeeting.preferred_meeting_time}`);
-      if (meetingDateTime < new Date()) {
-        errors.push("Meeting time cannot be in the past");
+    // Reload appointments to show the new one
+    if (clinicId) {
+      try {
+        const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
+        setAppointmentsData(meetings);
+      } catch (error) {
+        console.error("Error reloading appointments:", error);
       }
-    }
-    if (newMeeting.meeting_link && !/^https?:\/\/.+/.test(newMeeting.meeting_link)) {
-      errors.push("Please enter a valid meeting link URL");
-    }
-    if (errors.length > 0) {
-      setValidationErrors(errors);
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // Combine date and time into a full datetime
-      let fullDateTime: string | null = null;
-      if (newMeeting.preferred_meeting_date && newMeeting.preferred_meeting_time) {
-        fullDateTime = `${newMeeting.preferred_meeting_date} ${newMeeting.preferred_meeting_time}:00`;
-      }
-      // Prepare meeting data
-      const meetingData: CreateMeetingRequest = {
-        username: newMeeting.username,
-        email: newMeeting.email,
-        preferred_meeting_time: fullDateTime || undefined,
-        meeting_notes: newMeeting.meeting_notes || undefined,
-        meeting_link: newMeeting.meeting_link || undefined,
-        clinic_id: clinicId,
-        status: "pending",
-      };
-
-      // Check if email already exists
-      const emailExists = await appointmentHelper.checkEmailExists(newMeeting.email, clinicId);
-      if (emailExists) {
-        setValidationErrors(["This email is already registered for a meeting in this clinic"]);
-        return;
-      }
-
-      // Create the meeting
-      const createdMeeting = await appointmentHelper.createMeeting(meetingData);
-
-      // Update local state
-      setAppointmentsData(prev => [createdMeeting, ...prev]);
-      setMessage({ type: "success", text: "Meeting scheduled successfully!" });
-      setNewMeeting({
-        username: "",
-        email: "",
-        preferred_meeting_date: "",
-        preferred_meeting_time: "",
-        meeting_notes: "",
-        meeting_link: "",
-      });
-      setValidationErrors([]);
-      setShowAddAppointmentModal(false);
-    } catch (error: any) {
-      console.error("Error saving meeting schedule:", error);
-      setValidationErrors([error.message || "Failed to schedule meeting"]);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -316,12 +224,6 @@ export default function AppointmentsPage() {
     } catch (err) {
       console.error("Failed to copy: ", err);
     }
-  };
-
-  // Get today's date in YYYY-MM-DD format for min date
-  const getTodayDate = () => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
   };
 
   // Filter appointments based on search and status
@@ -644,7 +546,7 @@ export default function AppointmentsPage() {
           </div>
         </div>
 
-        {/* Add Appointment Modal - Schedule Meeting Form */}
+        {/* Add Appointment Modal - Using ScheduleMeetingForm component */}
         {showAddAppointmentModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6">
@@ -653,185 +555,15 @@ export default function AppointmentsPage() {
                   <Calendar className="h-5 w-5 text-purple-600" />
                   <h3 className="text-lg font-semibold">Schedule a Meeting</h3>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowAddAppointmentModal(false);
-                    setNewMeeting({
-                      username: "",
-                      email: "",
-                      preferred_meeting_date: "",
-                      preferred_meeting_time: "",
-                      meeting_notes: "",
-                      meeting_link: "",
-                    });
-                    setValidationErrors([]);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                  disabled={isSubmitting}
-                >
+                <button onClick={() => setShowAddAppointmentModal(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="h-6 w-6" />
                 </button>
               </div>
 
-              <p className="mb-6 text-gray-600">Fill out the form below to schedule your meeting with us</p>
-
-              {/* Validation Errors */}
-              {validationErrors.length > 0 && (
-                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4">
-                  <div className="flex items-start">
-                    <AlertTriangle className="mr-2 h-5 w-5 flex-shrink-0 text-red-600" />
-                    <div>
-                      <h4 className="mb-1 text-sm font-medium text-red-800">Please fix the following errors:</h4>
-                      <ul className="space-y-1 text-sm text-red-700">
-                        {validationErrors.map((error, index) => (
-                          <li key={index} className="flex items-start">
-                            <span className="mr-2 mt-2 h-1 w-1 flex-shrink-0 rounded-full bg-red-600"></span>
-                            {error}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {isSubmitting && (
-                <div className="mb-4">
-                  <LoadingSpinner message="Scheduling meeting..." size="sm" />
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitMeeting} className="space-y-6">
-                {/* Name and Email */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <User className="h-4 w-4" />
-                      Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={50}
-                      value={newMeeting.username}
-                      onChange={e => setNewMeeting({ ...newMeeting, username: e.target.value })}
-                      placeholder="Enter your name"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <Mail className="h-4 w-4" />
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      maxLength={100}
-                      value={newMeeting.email}
-                      onChange={e => setNewMeeting({ ...newMeeting, email: e.target.value })}
-                      placeholder="Enter your email"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                </div>
-
-                {/* Date and Time */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <Calendar className="h-4 w-4" />
-                      Preferred Meeting Date *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      min={getTodayDate()}
-                      value={newMeeting.preferred_meeting_date}
-                      onChange={e => setNewMeeting({ ...newMeeting, preferred_meeting_date: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
-                      <Clock className="h-4 w-4" />
-                      Preferred Meeting Time *
-                    </label>
-                    <input
-                      type="time"
-                      required
-                      value={newMeeting.preferred_meeting_time}
-                      onChange={e => setNewMeeting({ ...newMeeting, preferred_meeting_time: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                </div>
-
-                {/* Meeting Link */}
-                <div>
-                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <LinkIcon className="h-4 w-4" />
-                    Meeting Link
-                  </label>
-                  <input
-                    type="url"
-                    value={newMeeting.meeting_link}
-                    onChange={e => setNewMeeting({ ...newMeeting, meeting_link: e.target.value })}
-                    placeholder="https://meet.google.com/... or https://zoom.us/..."
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
-                    disabled={isSubmitting}
-                  />
-                  <p className="mt-1 text-xs text-gray-500">Optional: Add a video meeting link (Google Meet, Zoom, etc.)</p>
-                </div>
-
-                {/* Meeting Notes */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Meeting Notes</label>
-                  <textarea
-                    rows={4}
-                    value={newMeeting.meeting_notes}
-                    onChange={e => setNewMeeting({ ...newMeeting, meeting_notes: e.target.value })}
-                    placeholder="Add any additional notes or topics you'd like to discuss..."
-                    className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
-                    disabled={isSubmitting}
-                  />
-                  <div className="mt-1 text-right text-xs text-gray-500">{newMeeting.meeting_notes.length} characters</div>
-                </div>
-
-                {/* Submit */}
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddAppointmentModal(false);
-                      setNewMeeting({
-                        username: "",
-                        email: "",
-                        preferred_meeting_date: "",
-                        preferred_meeting_time: "",
-                        meeting_notes: "",
-                        meeting_link: "",
-                      });
-                      setValidationErrors([]);
-                    }}
-                    className="flex-1 rounded-lg bg-gray-300 px-4 py-2 text-gray-700 transition-colors duration-200 hover:bg-gray-400"
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? "Scheduling..." : "Schedule Meeting"}
-                  </button>
-                </div>
-              </form>
+              {/* Use the ScheduleMeetingForm component */}
+              <div className="ant-design-form-wrapper">
+                <ScheduleMeetingForm supabase={supabase} clinicId={clinicId} onSuccess={handleMeetingSuccess} />
+              </div>
             </div>
           </div>
         )}

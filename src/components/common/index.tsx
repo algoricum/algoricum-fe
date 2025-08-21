@@ -18,7 +18,7 @@ import Sidebar from "./Sidebar";
 import SocialButton from "./SocialButton";
 import TextArea from "./TextArea";
 import TransformSupport from "./TransformSupport";
-import WidgetPreview from "./WidgetPreview";
+
 
 export {
   ArticleHeader,
@@ -40,6 +40,5 @@ export {
   Sidebar,
   SocialButton,
   TextArea,
-  TransformSupport,
-  WidgetPreview,
+  TransformSupport
 };

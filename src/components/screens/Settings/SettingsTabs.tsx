@@ -27,11 +27,11 @@ const SettingsTabs = () => {
   };
 
   return (
-    <div className="flex flex-col">
-      <Flex className="border border-[#E8EAEC] rounded-[48px]  p-2 gap-4 w-[300px]">
+    <div className="flex flex-col mt-2">
+      <Flex className="border border-[#E8EAEC] rounded-[48px] p-2 gap-4 max-w-md inline-flex">
         {/* <TabButton isActive={activeTab === "lead"} onClick={() => handleTabChange("lead")} label="Custom Lead Capturing Form" /> */}
-        <TabButton isActive={activeTab === "clinic-setting"} onClick={() => handleTabChange("clinic-setting")} label="Clinic setting" />
-        <TabButton isActive={activeTab === "chatbot"} onClick={() => handleTabChange("chatbot")} label="Chatbot Settings" />
+        <TabButton isActive={activeTab === "clinic-setting"} onClick={() => handleTabChange("clinic-setting")} label="Clinic Setting" />
+        <TabButton isActive={activeTab === "chatbot"} onClick={() => handleTabChange("chatbot")} label="AI Assistant Settings" />
       </Flex>
 
       <div className="bg-white rounded-xl py-6">
@@ -47,11 +47,13 @@ const TabButton = ({ isActive, onClick, label }: { isActive: boolean; onClick: (
   return (
     <button
       onClick={onClick}
-      className={`flex-1 p-2 text-center transition-all rounded-[48px] ${
-        isActive ? "bg-brand-primary text-white" : "bg-Gray100 text-gray-600 hover:bg-gray-200"
-      }`}
+      className={`
+        flex-1 px-6 py-3 text-center transition-all rounded-[48px] 
+        text-sm font-medium whitespace-nowrap
+        ${isActive ? "bg-brand-primary text-white" : "bg-Gray100 text-gray-600 hover:bg-gray-200"}
+      `}
     >
-      {label}
+      <span className="block">{label}</span>
     </button>
   );
 };

@@ -114,8 +114,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     },
   ];
 
-  const filteredQuestions =
-    formData.selectedCrm === "Hubspot" || formData.selectedCrm === "Pipedrive" ? [questions[0], questions[3]] : questions;
+  const filteredQuestions = formData.selectedCrm === "HubSpot" || formData.selectedCrm === "Pipedrive" ? [questions[0]] : questions;
 
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];

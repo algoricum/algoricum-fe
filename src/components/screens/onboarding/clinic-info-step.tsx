@@ -1,14 +1,13 @@
 "use client";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Input, Button, Typography, Upload, Modal } from "antd";
+import { Input, Button, Typography, Upload} from "antd";
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 import { FileTextOutlined } from "@ant-design/icons";
-import { ErrorToast } from "@/helpers/toast";
+import { ErrorToast, WarningToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
-import { LEAD_CONSENT_CONTENT,BAA_DOCUMENT_CONTENT} from "@/utils/document/document";
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 const supabase = createClient();
@@ -71,13 +70,13 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
   });
 
   const [consentData, setConsentData] = useState({
-    acceptedBAA: initialData.acceptedBAA || false,
-    acceptedLeadConsent: initialData.acceptedLeadConsent || false,
+    acceptedTermsandConditions: initialData.acceptedBAA || false,
+    acceptedPrivacyPolicy: initialData.acceptedLeadConsent || false,
   });
 
-  // Modal states
-  const [showBAAModal, setShowBAAModal] = useState(false);
-  const [showLeadConsentModal, setShowLeadConsentModal] = useState(false);
+  const handleConsentChange = (field: keyof typeof consentData, value: boolean) => {
+    setConsentData(prev => ({ ...prev, [field]: value }));
+  };
 
   // Insert servicesDocument question right after businessAddress
   const questions = [
@@ -304,8 +303,8 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       return;
     }
 
-    if (currentQuestionIndex === questions.length - 1 && (!consentData.acceptedBAA || !consentData.acceptedLeadConsent)) {
-      alert("Please accept both BAA and data handling consent to continue.");
+    if (currentQuestionIndex === questions.length - 1 && (!consentData.acceptedTermsandConditions || !consentData.acceptedPrivacyPolicy)) {
+      WarningToast("Please accept both Terms and Conditions and Privacy Policy to continue.");
       return;
     }
 
@@ -324,35 +323,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     }
   };
 
-  // Handle BAA checkbox click
-  const handleBAAClick = (checked: boolean) => {
-    if (checked) {
-      setShowBAAModal(true);
-    } else {
-      setConsentData(prev => ({ ...prev, acceptedBAA: false }));
-    }
-  };
-
-  // Handle Lead Consent checkbox click
-  const handleLeadConsentClick = (checked: boolean) => {
-    if (checked) {
-      setShowLeadConsentModal(true);
-    } else {
-      setConsentData(prev => ({ ...prev, acceptedLeadConsent: false }));
-    }
-  };
-
-  // Handle BAA modal acceptance
-  const handleBAAAccept = () => {
-    setConsentData(prev => ({ ...prev, acceptedBAA: true }));
-    setShowBAAModal(false);
-  };
-
-  // Handle Lead Consent modal acceptance
-  const handleLeadConsentAccept = () => {
-    setConsentData(prev => ({ ...prev, acceptedLeadConsent: true }));
-    setShowLeadConsentModal(false);
-  };
 
   const renderPreviousQuestions = () => {
     return questions.slice(0, currentQuestionIndex).map(q => {
@@ -414,11 +384,22 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     <div className="mt-6 mb-6 space-y-4">
       <div>
         <label className="flex items-start space-x-3 cursor-pointer">
-          <input type="checkbox" checked={consentData.acceptedBAA} onChange={e => handleBAAClick(e.target.checked)} className="mt-1" />
+          <input
+            type="checkbox"
+            checked={consentData.acceptedTermsandConditions}
+            onChange={() => {
+              handleConsentChange("acceptedTermsandConditions", !consentData.acceptedTermsandConditions);
+            }}
+            className="mt-1"
+          />
           <div>
-            <span className="text-sm text-gray-800 block">I accept the Business Associate Agreement (BAA).</span>
-            <button type="button" onClick={() => setShowBAAModal(true)} className="text-purple-600 text-xs underline hover:text-purple-800">
-              Click to read the agreement
+            <span className="text-sm text-gray-800 block">I accept the Terms and Conditions.</span>
+            <button
+              type="button"
+              onClick={() => window.open("https://algoricum.com/termsofservice/", "_blank")}
+              className="text-purple-600 text-xs underline hover:text-purple-800"
+            >
+              Click to read the Terms and Conditions
             </button>
           </div>
         </label>
@@ -428,80 +409,30 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
         <label className="flex items-start space-x-3 cursor-pointer">
           <input
             type="checkbox"
-            checked={consentData.acceptedLeadConsent}
-            onChange={e => handleLeadConsentClick(e.target.checked)}
+            checked={consentData.acceptedPrivacyPolicy}
+            onChange={() => {
+              handleConsentChange("acceptedPrivacyPolicy", !consentData.acceptedPrivacyPolicy);
+            }}
             className="mt-1"
           />
           <div>
-            <span className="text-sm text-gray-800 block">I consent to Algoricum securely handling lead data.</span>
+            <span className="text-sm text-gray-800 block">I consent to Algoricum Privacy Policy.</span>
             <button
               type="button"
-              onClick={() => setShowLeadConsentModal(true)}
+              onClick={() => window.open("https://algoricum.com/privacypolicy/", "_blank")}
               className="text-purple-600 text-xs underline hover:text-purple-800"
             >
-              Click to read the consent details
+              Click to read the Privacy Policy
             </button>
           </div>
         </label>
       </div>
-
-      {consentData.acceptedBAA && consentData.acceptedLeadConsent && (
-        <a
-          href="/documents/baa-agreement.pdf"
-          download="BAA-Agreement.pdf"
-          className="text-purple-600 text-sm underline block hover:text-purple-800 mt-4"
-        >
-          Download Agreement (PDF)
-        </a>
-      )}
-
-      {/* BAA Modal */}
-      <Modal
-        title="Business Associate Agreement (BAA)"
-        open={showBAAModal}
-        onCancel={() => setShowBAAModal(false)}
-        footer={[
-          <Button key="decline" onClick={() => setShowBAAModal(false)}>
-            Decline
-          </Button>,
-          <Button key="accept" type="primary" onClick={handleBAAAccept}>
-            I Accept
-          </Button>,
-        ]}
-        width={800}
-        style={{ top: 20 }}
-      >
-        <div style={{ maxHeight: "60vh", overflowY: "auto", padding: "16px 0" }}>
-          <pre style={{ whiteSpace: "pre-wrap", fontSize: "14px", lineHeight: "1.5" }}>{BAA_DOCUMENT_CONTENT}</pre>
-        </div>
-      </Modal>
-
-      {/* Lead Consent Modal */}
-      <Modal
-        title="Lead Data Handling Consent"
-        open={showLeadConsentModal}
-        onCancel={() => setShowLeadConsentModal(false)}
-        footer={[
-          <Button key="decline" onClick={() => setShowLeadConsentModal(false)}>
-            Decline
-          </Button>,
-          <Button key="accept" type="primary" onClick={handleLeadConsentAccept}>
-            I Consent
-          </Button>,
-        ]}
-        width={800}
-        style={{ top: 20 }}
-      >
-        <div style={{ maxHeight: "60vh", overflowY: "auto", padding: "16px 0" }}>
-          <pre style={{ whiteSpace: "pre-wrap", fontSize: "14px", lineHeight: "1.5" }}>{LEAD_CONSENT_CONTENT}</pre>
-        </div>
-      </Modal>
     </div>
   );
 
   const isCurrentFieldValid = () => {
     if (currentQuestionIndex === questions.length - 1) {
-      return !getFieldError() && consentData.acceptedBAA && consentData.acceptedLeadConsent;
+      return !getFieldError() && consentData.acceptedPrivacyPolicy && consentData.acceptedTermsandConditions;
     }
     return !getFieldError();
   };

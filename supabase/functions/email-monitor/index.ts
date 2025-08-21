@@ -451,6 +451,8 @@ async function checkIMAPEmails(settings) {
     await imap.logout();
   }
 }
+
+//Note : Email is removed in supabase.
 async function processIncomingEmail(supabaseClient, settings, email) {
   try {
     const fromEmail = email.from;
@@ -469,6 +471,7 @@ async function processIncomingEmail(supabaseClient, settings, email) {
       };
     }
     // Get or create email lead source
+    //Note:Email is removed in lead source table so below  query never work.
     let emailSource;
     const { data: existingSource } = await supabaseClient.from('lead_source').select('id').eq('name', 'Email').single();
     if (existingSource) {

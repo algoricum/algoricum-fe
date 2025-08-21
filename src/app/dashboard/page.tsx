@@ -1,29 +1,25 @@
-// Better approach: Direct state updates and proper data flow
-
 "use client";
-
-import type React from "react";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { handleCsvUpload } from "@/utils/csvUtils";
+// import { handleCsvUpload } from "@/utils/csvUtils"
+import { Button } from "antd";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
 import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
 import ConversionFunnel from "@/components/common/charts/conversion-funnel";
-import LeadSourcesLineChart from "@/components/common/charts/lead-sources-line-chart";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import StatsGrid from "./StatsGrid";
 import TodayTasks from "./TodayTasks";
-import { SuccessToast } from "@/helpers/toast";
-import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
+// import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys"
 
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 
-import { X, CheckCircle, Upload } from "lucide-react";
-import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
+import { X, CheckCircle, Bot } from "lucide-react";
+// import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
 import AiActivityLog from "./AiActivityLogs";
+import ChatbotTrainingModal from "@/components/common/TrainingChatbotModal/chatbot-training-modal";
 
 type LeadRow = {
   id: string;
@@ -47,11 +43,12 @@ export default function DashboardPage() {
   // Integrations state
   const [hubspotConnected, setHubspotConnected] = useState(false);
   const [pipedriveActive, setPipedriveActive] = useState(true);
-  const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
+  // const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
+  const [showTrainingModal, setShowTrainingModal] = useState(false);
 
   const [showPipedriveBanner, setShowPipedriveBanner] = useState(false);
   const [showHubspotBanner, setShowHubspotBanner] = useState(false);
-  const [showCsvBanner] = useState(true);
+  // const [showCsvBanner] = useState(true)
 
   // Modal state
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -152,25 +149,6 @@ export default function DashboardPage() {
     };
     checkUser();
   }, [router, supabase.auth]);
-
-  // Handle CSV upload completion - refetch data after successful upload
-  const handleCsvUploadComplete = async (leads: any) => {
-    try {
-      setShowManualLeadsModal(false);
-
-      // Process the CSV upload
-      await handleCsvUpload(leads, true);
-
-      if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
-        SuccessToast("Leads uploaded successfully");
-      }
-
-      // Refetch leads data to get the updated information
-      await fetchLeads();
-    } catch (error) {
-      console.error("Error handling CSV upload:", error);
-    }
-  };
 
   // Filtered leads for charts
   const filteredLeadsForChart = useMemo(
@@ -282,38 +260,46 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* CSV Upload – responsive banner */}
-          {showCsvBanner && (
-            <div className="rounded-lg border p-4 bg-purple-50 border-purple-200">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                {/* Left: icon + title + desc */}
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-md p-1.5 bg-purple-100">
-                    <Upload className="h-4 w-4 text-purple-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center font-semibold text-gray-900">
-                      <span>CSV Upload</span>
-                    </div>
-                  </div>
+          {/* ChatBot Training Banner */}
+          <div className="rounded-lg border p-4 bg-purple-50 border-purple-200">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              {/* Left: icon + title + desc */}
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-md p-1.5 bg-purple-100">
+                  <Bot className="h-4 w-4 text-purple-600" />
                 </div>
-
-                {/* Right: actions – stacked on mobile, inline on md+ */}
-                <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setShowManualLeadsModal(true)}
-                    className="btn btn-secondary btn-sm w-full md:w-auto"
-                    aria-label="View CSV upload guide"
-                  >
-                    Upload Now
-                  </button>
-
-                  <label className="btn btn-primary btn-sm w-full cursor-pointer md:w-auto"></label>
+                <div className="min-w-0">
+                  <div className="flex items-center font-semibold text-gray-900">
+                    <span>Train Your ChatBot Now</span>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Upload training documents to enhance your ChatBot&apos;s knowledge and improve patient interactions.
+                  </p>
                 </div>
               </div>
+
+              {/* Right: actions – stacked on mobile, inline on md+ */}
+              <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
+                <Button
+                  type="primary"
+                  onClick={() => setShowTrainingModal(true)}
+                  icon={<Bot className="h-4 w-4" />}
+                  className="w-full md:w-auto"
+                  style={{
+                    backgroundColor: "#9D5EE3",
+                    borderColor: "#9D5EE3",
+                    height: "40px",
+                    paddingLeft: "20px",
+                    paddingRight: "20px",
+                    fontWeight: "500",
+                  }}
+                  aria-label="Open ChatBot training modal"
+                >
+                  Train Now
+                </Button>
+              </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Stats Grid - Pass leadsData directly for real-time updates */}
@@ -341,20 +327,21 @@ export default function DashboardPage() {
           <TodayTasks clinicId={clinicId} />
         </div>
 
-        {/* Lead Sources and Conversion */}
-        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="card">
-            <h3 className="mb-6 text-lg font-semibold">Conversion Funnel</h3>
-            <ConversionFunnel leadsData={leadsData} />
-          </div>
-          <div className="card">
-            <h3 className="mb-6 text-lg font-semibold">Lead Sources Trends</h3>
-            <LeadSourcesLineChart leadsData={leadsData} />
-          </div>
-        </div>
+        {/* Conversion Funnel and AI Activity Log - Horizontal Layout */}
+        {clinicId && (
+          <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Left Side - Conversion Funnel */}
+            <div className="card">
+              <h3 className="mb-6 text-lg font-semibold">Conversion Funnel</h3>
+              <ConversionFunnel clinicId={clinicId} />
+            </div>
 
-        {/* AI Activity Log */}
-        <AiActivityLog clinicId={clinicId} />
+            {/* Right Side - AI Activity Log */}
+            <div className="card">
+              <AiActivityLog clinicId={clinicId} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Task Modal (kept for parity; closed by default) */}
@@ -377,7 +364,13 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <CsvUploadModal open={showManualLeadsModal} onOk={handleCsvUploadComplete} onCancel={() => setShowManualLeadsModal(false)} />
+      {/* <CsvUploadModal
+        open={showManualLeadsModal}
+        onOk={handleCsvUploadComplete}
+        onCancel={() => setShowManualLeadsModal(false)}
+      /> */}
+
+      <ChatbotTrainingModal open={showTrainingModal} onClose={() => setShowTrainingModal(false)} />
     </DashboardLayout>
   );
 }
