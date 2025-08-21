@@ -34,13 +34,14 @@ import {
 } from "@/constants/localStorageKeys";
 // import { log } from "console";
 import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
+import generateClinicInstructions from "@/utils/generateClinicInstructions";
 
 const { Text } = Typography;
 const supabase = createClient();
 const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
-  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
+  // { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
   // { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
   // { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
   // { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
@@ -167,11 +168,11 @@ export default function MainOnboarding() {
   };
 
   // Map new flow data to old flow structure for Supabase
+  // Map new flow data to old flow structure for Supabase
   const mapDataForSubmission = (data: Record<string, any>) => {
     const clinicInfo = data["clinic-info"] || {};
     const staffHours = data["staff-hours"] || {};
     const toneIdentity = data["tone-identity"] || {};
-    // const aiAssistant = data["ai-assistant"] || {};
     const bookingSetup = data["booking-setup"] || {};
     const integrations = data["integrations"] || {};
 
@@ -201,43 +202,48 @@ export default function MainOnboarding() {
       phoneNumber: clinicInfo.clinicPhone || "",
       calendlyLink: bookingSetup.hasBookingLink === "Yes, I have a booking link" ? bookingSetup.bookingLinkUrl : "",
 
-      // // Step 3 - Brand Config
-      // logo: aiAssistant.logoUpload?.[0]?.originFileObj || null,
-      tone_selector: toneIdentity.toneSelector || "friendly",
-      // sentence_length: toneIdentity.sentenceLength || "",
-      // formality_level: toneIdentity.formalityLevel || "",
-      // clinic_document: aiAssistant.clinicDetailsUpload?.[0]?.originFileObj || null,
+      // AI Assistant Configuration
+      toneSelector: toneIdentity.toneSelector || "friendly",
+      sentenceLength: clinicInfo.sentenceLength || "medium",
+      formalityLevel: clinicInfo.formalityLevel || "formal",
 
       // Additional data from new flow
       clinicType: clinicInfo.clinicType || "",
       integrations: integrations,
-      servicesDocument: null,
-      DocumnetPath: clinicInfo.servicesDocument?.[0].path || null,
+
+      // Three document types with their paths
+      servicesDocumentPath: clinicInfo.servicesDocument?.[0]?.path || null,
+      pricingDocumentPath: clinicInfo.pricingDocument?.[0]?.path || null,
+      testimonialsDocumentPath: clinicInfo.testimonialsDocument?.[0]?.path || null,
+
+      // Business hours for generateClinicInstructions
+      businessHoursText: clinicInfo.businessHours || "",
     };
   };
-  console.log("📋 Mapping data for submission:", mapDataForSubmission(allData));
-  async function getFile(bucket: any, path: any) {
-    const { data, error } = await supabase.storage.from(bucket).download(path);
 
-    if (error) {
-      console.error("Error downloading file:", error);
+  // Helper function to convert file path to File object
+  async function getFileAsFile(bucket: any, path: any) {
+    if (!path) return null;
+
+    try {
+      const { data, error } = await supabase.storage.from(bucket).download(path);
+
+      if (error) {
+        console.error("Error downloading file:", error);
+        return null;
+      }
+
+      // Convert blob to File
+      const fileName = path.split("/").pop() || "file";
+      const file = new File([data], fileName, { type: data.type });
+      return file;
+    } catch (error) {
+      console.error("Error converting file:", error);
       return null;
     }
-
-    return data; // This is a Blob
-  }
-  async function getFileAsFile(bucket: any, path: any) {
-    const blob = await getFile(bucket, path);
-    if (!blob) return null;
-
-    // Convert blob to File
-    const fileName = path.split("/").pop() || "file";
-    const file = new File([blob], fileName, { type: blob.type });
-
-    return file;
   }
 
-  // Main submission function (updated to use updateClinic)
+  // Main submission function (updated to handle three document types)
   const handleCompleteOnboarding = async () => {
     try {
       setIsSubmitting(true);
@@ -283,11 +289,10 @@ export default function MainOnboarding() {
         email: mappedData.emailAddress || user.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink || `https://algoricum.hashlogics.com/schedule-meeting?clinic_id=${clinic.id}`,
-        // logo: logoUrl,
-        tone_selector: "friendly",
-        // sentence_length: mappedData.sentence_length,
-        // formality_level: mappedData.formality_level,
+        calendly_link: mappedData.calendlyLink || `${process.env.NEXT_PUBLIC_URL}/schedule-meeting?clinic_id=${clinic.id}`,
+        tone_selector: mappedData.toneSelector,
+        sentence_length: mappedData.sentenceLength,
+        formality_level: mappedData.formalityLevel,
         clinic_type: mappedData.clinicType,
         uses_hubspot: mappedData.integrations.usesHubspot === "Yes",
         uses_ads: mappedData.integrations.usesAds === "Yes",
@@ -330,20 +335,58 @@ export default function MainOnboarding() {
       } else {
         console.warn("Mailgun setup response missing or unsuccessful, skipping email settings save");
       }
-      // Handle services document upload to edge function
 
-      if (mappedData.DocumnetPath) {
-        let file = await getFileAsFile("Assistant-File", mappedData.DocumnetPath);
+      // Handle multiple document uploads to enhanced edge function
+      const hasDocuments = mappedData.servicesDocumentPath || mappedData.pricingDocumentPath || mappedData.testimonialsDocumentPath;
+
+      if (hasDocuments) {
         try {
           const formDataToSend = new FormData();
           const session = await getSupabaseSession();
-          if (file !== null) {
-            formDataToSend.append("clinic_document", file, file.name);
-          }
+
+          // Add basic fields
           formDataToSend.append("clinic_id", updatedClinic.id);
           formDataToSend.append("name", mappedData.legalBusinessName || "Assistant");
-          formDataToSend.append("instructions", "AI Assistant for handling clinic inquiries");
 
+          // Generate clinic instructions with all collected data
+          const clinicInstructions = generateClinicInstructions({
+            name: mappedData.legalBusinessName || "",
+            address: mappedData.clinicAddress || "",
+            phone: mappedData.phoneNumber || "",
+            email: mappedData.emailAddress || user.email || "",
+            business_hours: mappedData.businessHoursText || "",
+            calendly_link: mappedData.calendlyLink || "",
+            tone_selector: mappedData.toneSelector || "professional",
+            sentence_length: mappedData.sentenceLength || "medium",
+            formality_level: mappedData.formalityLevel || "formal",
+            has_uploaded_document: true,
+          });
+
+          formDataToSend.append("instructions", clinicInstructions);
+
+          // Download and append files based on their document type
+          if (mappedData.servicesDocumentPath) {
+            const serviceFile = await getFileAsFile("Assistant-File", mappedData.servicesDocumentPath);
+            if (serviceFile) {
+              formDataToSend.append("service_document", serviceFile);
+            }
+          }
+
+          if (mappedData.pricingDocumentPath) {
+            const pricingFile = await getFileAsFile("Assistant-File", mappedData.pricingDocumentPath);
+            if (pricingFile) {
+              formDataToSend.append("pricing_document", pricingFile);
+            }
+          }
+
+          if (mappedData.testimonialsDocumentPath) {
+            const testimonialsFile = await getFileAsFile("Assistant-File", mappedData.testimonialsDocumentPath);
+            if (testimonialsFile) {
+              formDataToSend.append("testimonials_document", testimonialsFile);
+            }
+          }
+
+          // Call the enhanced edge function
           const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
             method: "POST",
             headers: {
@@ -352,12 +395,18 @@ export default function MainOnboarding() {
             body: formDataToSend,
           });
 
-          if (!response?.ok) {
-            console.error("Document upload failed, continuing onboarding");
+          const result = await response.json();
+
+          if (!response.ok) {
+            console.error("Assistant creation failed:", result.error);
+            // Continue onboarding even if assistant creation fails
+          } else {
+            console.log("Assistant created successfully:", result);
+            console.log(`✅ Assistant created with ${result.filesUploaded} documents: ${result.updatedDocumentTypes?.join(", ")}`);
           }
         } catch (error) {
-          console.error("Failed to upload document:", error);
-          // Continue onboarding even if document upload fails
+          console.error("Failed to create assistant with documents:", error);
+          // Continue onboarding even if assistant creation fails
         }
       }
 
@@ -366,98 +415,40 @@ export default function MainOnboarding() {
       await apiKeyService.create({
         name: apiKeyName,
         clinicId: updatedClinic.id,
-      }); // Handle document upload and assistant creation if we have a clinic ID
-      // if (updatedClinic.id && mappedData.clinic_document) {
-      //   const hasDocument = !!mappedData.clinic_document;
+      });
 
-      //   if (hasDocument) {
-      //     // Prepare form data for the edge function
-      //     const formDataToSend = new FormData();
-      //     formDataToSend.append("clinic_document", mappedData.clinic_document);
-      //     formDataToSend.append("clinic_id", updatedClinic.id);
-      //     formDataToSend.append("name", mappedData.legalBusinessName);
-      //     formDataToSend.append("description", `AI Assistant for ${mappedData.legalBusinessName}`);
-
-      //     // Generate customized instructions based on clinic settings
-      //     const clinicInstructions = generateClinicInstructions({
-      //       name: mappedData.legalBusinessName,
-      //       address: mappedData.clinicAddress,
-      //       phone: mappedData.phoneNumber,
-      //       email: mappedData.emailAddress || user.email,
-      //       business_hours: mappedData.businessHours,
-      //       calendly_link: mappedData.calendlyLink,
-      //       tone_selector: mappedData.tone_selector,
-      //       sentence_length: mappedData.sentence_length,
-      //       formality_level: mappedData.formality_level,
-      //       has_uploaded_document: true,
-      //     });
-
-      //     formDataToSend.append("instructions", clinicInstructions);
-      //     formDataToSend.append("model", "gpt-4o");
-      //     formDataToSend.append("tools", JSON.stringify([{ type: "file_search" }]));
-
-      //     // Get the token for authorization
-      //     const session = await getSupabaseSession();
-
-      //     if (!session.access_token) {
-      //       throw new Error("Not authenticated");
-      //     }
-
-      //     try {
-      //       // Call the combined edge function
-      //       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
-      //         method: "POST",
-      //         headers: {
-      //           Authorization: `Bearer ${session.access_token}`,
-      //         },
-      //         body: formDataToSend,
-      //       });
-
-      //       await response.json();
-
-      //       if (!response.ok) {
-      //         ErrorToast("Assistant creation error");
-      //         // Continue with onboarding even if assistant creation fails
-      //       }
-      //     } catch (assistantError) {
-      //       ErrorToast("Failed to create assistant");
-      //       // Continue with onboarding even if assistant creation fails
-      //     }
+      // Setup Twilio
+      // try {
+      //   const session = await getSupabaseSession();
+      //   if (!session.access_token) {
+      //     throw new Error("Not authenticated");
       //   }
+
+      //   const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
+      //     method: "POST",
+      //     headers: {
+      //       Authorization: `Bearer ${session.access_token}`,
+      //       "Content-Type": "application/json",
+      //     },
+      //     body: JSON.stringify({
+      //       clinic_id: updatedClinic.id,
+      //       phone_number: mappedData.phoneNumber,
+      //       name: mappedData.legalBusinessName,
+      //     }),
+      //   });
+
+      //   const twilioResult = await twilioResponse.json();
+
+      //   if (!twilioResponse.ok) {
+      //     console.error("Twilio setup error:", twilioResult.error);
+      //   }
+      // } catch (twilioError) {
+      //   console.error("Failed to set up Twilio:", twilioError);
       // }
-
-      try {
-        const session = await getSupabaseSession();
-        if (!session.access_token) {
-          throw new Error("Not authenticated");
-        }
-
-        const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            clinic_id: updatedClinic.id,
-            phone_number: mappedData.phoneNumber,
-            name: mappedData.legalBusinessName,
-          }),
-        });
-
-        const twilioResult = await twilioResponse.json();
-
-        if (!twilioResponse.ok) {
-          console.error("Twilio setup error:", twilioResult.error);
-        }
-      } catch (twilioError) {
-        console.error("Failed to set up Twilio:", twilioError);
-      }
 
       await handleCsvLeadsUpload(clinic.id);
       clearStoredProgress();
 
-      // router.push("/dashboard?onboarding=success");
       SuccessToast("You're all set!");
       await fetch("/api/sendConfiramtionMail", {
         method: "POST",
@@ -469,7 +460,7 @@ export default function MainOnboarding() {
           email: clinicData.email || user.email || "",
         }),
       });
-      setIsOnboardingComplete(true); // new state you'll add below
+      setIsOnboardingComplete(true);
     } catch (error: any) {
       ErrorToast(error.message || "Failed to update clinic");
     } finally {
