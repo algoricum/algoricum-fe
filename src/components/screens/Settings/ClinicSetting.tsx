@@ -8,6 +8,7 @@ import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { createClient } from "@/utils/supabase/config/client";
 import Image from "next/image";
 import { TIME_OPTIONS, DAYS, CLINIC_FIELDS } from "@/constants";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -154,14 +155,7 @@ const ClinicSetting = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading clinic settings...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading clinic settings..." size="lg" />;
   }
 
   return (
@@ -192,7 +186,7 @@ const ClinicSetting = () => {
             <div className="flex flex-col items-center justify-center w-full h-full">
               <div className="relative w-full max-w-xs">
                 <div className="relative w-full h-[200px] mb-4">
-                  <Image src={formData.logo} alt="Clinic Logo" fill className="object-contain rounded-lg shadow-sm" />
+                  <Image src={formData.logo || "/placeholder.svg"} alt="Clinic Logo" fill className="object-contain rounded-lg shadow-sm" />
                 </div>
 
                 <div className="text-center space-y-4">
