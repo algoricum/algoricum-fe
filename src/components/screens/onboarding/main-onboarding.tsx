@@ -40,7 +40,7 @@ const supabase = createClient();
 const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
-  // { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
+  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
   // { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
   // { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
   // { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
@@ -425,33 +425,33 @@ export default function MainOnboarding() {
       //   }
       // }
 
-      // try {
-      //   const session = await getSupabaseSession();
-      //   if (!session.access_token) {
-      //     throw new Error("Not authenticated");
-      //   }
+      try {
+        const session = await getSupabaseSession();
+        if (!session.access_token) {
+          throw new Error("Not authenticated");
+        }
 
-      //   const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
-      //     method: "POST",
-      //     headers: {
-      //       Authorization: `Bearer ${session.access_token}`,
-      //       "Content-Type": "application/json",
-      //     },
-      //     body: JSON.stringify({
-      //       clinic_id: updatedClinic.id,
-      //       phone_number: mappedData.phoneNumber,
-      //       name: mappedData.legalBusinessName,
-      //     }),
-      //   });
+        const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            clinic_id: updatedClinic.id,
+            phone_number: mappedData.phoneNumber,
+            name: mappedData.legalBusinessName,
+          }),
+        });
 
-      //   const twilioResult = await twilioResponse.json();
+        const twilioResult = await twilioResponse.json();
 
-      //   if (!twilioResponse.ok) {
-      //     console.error("Twilio setup error:", twilioResult.error);
-      //   }
-      // } catch (twilioError) {
-      //   console.error("Failed to set up Twilio:", twilioError);
-      // }
+        if (!twilioResponse.ok) {
+          console.error("Twilio setup error:", twilioResult.error);
+        }
+      } catch (twilioError) {
+        console.error("Failed to set up Twilio:", twilioError);
+      }
 
       await handleCsvLeadsUpload(clinic.id);
       clearStoredProgress();
