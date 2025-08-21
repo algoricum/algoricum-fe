@@ -1,16 +1,17 @@
 import { Modal, Alert, Button, TreeSelect, Typography, Spin, Upload } from "antd";
 import { LinkOutlined, CalendarOutlined, UploadOutlined } from "@ant-design/icons";
-import React from "react";
+import React, { useEffect } from "react";
 
 const { Text } = Typography;
 
 interface ModalProps {
   open: boolean;
   status: "disconnected" | "connecting" | "connected";
-  accountInfo: any;
+  accountInfo?: any;
   onOk: () => void;
   onCancel: () => void;
-  onConnect?: () => void;
+  // eslint-disable-next-line no-unused-vars
+  onConnect?: (token?: string) => void;
   onSyncLeads?: () => void;
   onDisconnect?: () => void;
   treeData?: any[];
@@ -56,7 +57,7 @@ export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, 
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={onConnect}
+              onClick={()=>onConnect}
               className="bg-orange-500 border-orange-500 hover:bg-orange-600 h-12 px-8 text-lg font-medium"
             >
               Connect to HubSpot
@@ -130,7 +131,7 @@ export const PipedriveModal: React.FC<ModalProps> = ({ open, status, accountInfo
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={onConnect}
+              onClick={()=>onConnect}
               className="bg-green-600 border-green-600 hover:bg-green-700 h-12 px-8 text-lg font-medium"
             >
               Connect to Pipedrive
@@ -277,7 +278,7 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={onConnect}
+              onClick={()=>onConnect}
               className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 h-12 px-8 text-lg font-medium"
             >
               Connect to Google Forms
@@ -370,16 +371,7 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
   </Modal>
 );
 
-export const GoogleLeadFormModal: React.FC<ModalProps> = ({
-  open,
-  status,
-  accountInfo,
-  onOk,
-  onCancel,
-  onConnect,
-  onSyncLeads,
-  onDisconnect,
-}) => (
+export const GoogleLeadFormModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect, onSyncLeads, onDisconnect }) => (
   <Modal
     title={
       <div className="flex items-center">
@@ -413,7 +405,7 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={onConnect}
+              onClick={() => onConnect?.()}
               className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 h-12 px-8 text-lg font-medium"
             >
               Connect to Google Ads Lead Forms
@@ -462,7 +454,7 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                 <Button
                   type="primary"
                   size="small"
-                  onClick={()=>onSyncLeads}
+                  onClick={() => onSyncLeads}
                   className="bg-yellow-600 border-yellow-600 hover:bg-yellow-700"
                 >
                   Sync Leads
@@ -528,7 +520,7 @@ export const FacebookLeadFormModal: React.FC<ModalProps> = ({ open, status, acco
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={onConnect}
+              onClick={()=>onConnect?.()}
               className="bg-blue-600 border-blue-600 hover:bg-blue-700 h-12 px-8 text-lg font-medium"
             >
               Connect to Facebook Lead Ads
@@ -631,7 +623,7 @@ export const TypeformModal: React.FC<ModalProps> = ({
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={onConnect}
+              onClick={() => onConnect?.()}
               className="bg-black border-black hover:bg-gray-800 h-12 px-8 text-lg font-medium"
             >
               Connect to Typeform
@@ -658,7 +650,7 @@ export const TypeformModal: React.FC<ModalProps> = ({
           </div>
         </div>
       )}
-      {status === "connected" && accountInfo && (
+      {status === "connected" && (
         <>
           <Alert
             message="Successfully Connected!"
@@ -694,7 +686,7 @@ export const TypeformModal: React.FC<ModalProps> = ({
                 <Button
                   type="primary"
                   size="small"
-                  onClick={()=>onSyncLeads?.()}
+                  onClick={() => onSyncLeads?.()}
                   className="bg-gray-800 border-gray-800 hover:bg-gray-900"
                 >
                   Sync Leads
@@ -723,6 +715,195 @@ export const TypeformModal: React.FC<ModalProps> = ({
     </div>
   </Modal>
 );
+
+
+export const JotformModal: React.FC<ModalProps> = ({
+  open,
+  status,
+  onOk,
+  onCancel,
+  onConnect,
+  onSyncLeads,
+  onDisconnect,
+  treeData,
+  selectedForms,
+  onSelectForms,
+}) => {
+  useEffect(() => {
+    if (!window.JF) {
+      const script = document.createElement("script");
+      script.src = "https://js.jotform.com/JotForm.min.js";
+      script.async = true;
+      script.onload = () => {
+        window.JF.initialize({
+          appName: window.location.host || "MyApp",
+          accessType: "full",  // or "readOnly"
+          enableCookieAuth: true,
+        });
+      };
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  const handleConnect = () => {
+    if (!window.JF) return;
+    window.JF.login(
+      () => {
+        const token = window.JF.getAPIKey();
+        window.JF.getUser(() => {
+          console.log("Jotform auth successful",token);
+          onConnect?.(token);
+          
+        });
+      },
+      () => {
+        console.error("Jotform auth failed");
+      }
+    );
+  };
+
+  return (
+    <Modal
+      title={
+        <div className="flex items-center">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+            <Text className="text-white font-bold text-sm">J</Text>
+          </div>
+          <span className="text-xl font-semibold">Connect to Jotform</span>
+        </div>
+      }
+      open={open}
+      onOk={onOk}
+      onCancel={onCancel}
+      okText={status === "connected" ? "Continue" : "Skip for Now"}
+      cancelText="Cancel"
+      okButtonProps={{ className: "bg-blue-600 border-blue-600" }}
+      width={500}
+      centered
+    >
+      <div className="py-6">
+        {status === "disconnected" && (
+          <>
+            <Alert
+              message="Connect your Jotform"
+              description="We can automatically sync leads from your Jotform forms to our platform."
+              type="info"
+              showIcon
+              className="mb-6"
+            />
+            <div className="text-center">
+              <Button
+                type="primary"
+                size="large"
+                icon={<LinkOutlined />}
+                onClick={handleConnect}
+                className="bg-blue-600 border-blue-600 hover:bg-blue-700 h-12 px-8 text-lg font-medium"
+              >
+                Connect to Jotform
+              </Button>
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <Text className="text-sm text-gray-600">
+                  <strong>What happens next:</strong>
+                  <br />• A Jotform login popup opens
+                  <br />• Grant access to your forms
+                  <br />• We’ll sync your leads automatically
+                  <br />• Takes less than 30 seconds
+                </Text>
+              </div>
+            </div>
+          </>
+        )}
+
+        {status === "connecting" && (
+          <div className="text-center py-8">
+            <Spin size="large" />
+            <div className="mt-4">
+              <Text className="text-lg">Connecting to Jotform...</Text>
+              <br />
+              <Text className="text-gray-500">
+                Please complete the authorization
+              </Text>
+            </div>
+          </div>
+        )}
+
+        {status === "connected" && (
+          <>
+            <Alert
+              message="Successfully Connected!"
+              // description={`Connected to ${accountInfo.accountName}. Your integration is ready!`}
+              type="success"
+              showIcon
+              className="mb-4"
+            />
+            <div className="mt-4">
+              <Text className="block mb-2">Select forms to sync leads from:</Text>
+              <TreeSelect
+                style={{ width: "100%" }}
+                dropdownStyle={{ maxHeight: 400, overflow: "auto" }}
+                placeholder="Select forms"
+                treeData={treeData}
+                multiple
+                treeCheckable
+                showCheckedStrategy={TreeSelect.SHOW_CHILD}
+                value={selectedForms}
+                onChange={onSelectForms}
+              />
+            </div>
+            <div className="bg-blue-50 rounded-lg p-4 mt-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <Text strong className="text-blue-800">
+                    Jotform Integration Active
+                  </Text>
+                  <br />
+                  <Text className="text-blue-600 text-sm">
+                    {/* {accountInfo.responseCount || 0} responses synced */}
+                  </Text>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={() => onSyncLeads?.()}
+                    className="bg-blue-700 border-blue-700 hover:bg-blue-800"
+                  >
+                    Sync Leads
+                  </Button>
+                  <Button
+                    type="link"
+                    danger
+                    onClick={onDisconnect}
+                    className="text-red-500"
+                  >
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 text-center">
+              <Text className="text-gray-600">
+                ⚡ Your Jotform integration is ready! Need help?
+              </Text>
+              <br />
+              <Button
+                type="primary"
+                size="small"
+                icon={<CalendarOutlined />}
+                onClick={() =>
+                  window.open("https://calendly.com/your-team/jotform-setup", "_blank")
+                }
+                className="mt-2 bg-blue-600 border-blue-600 hover:bg-blue-700"
+              >
+                Book a Support Meeting
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+};
 
 export const CsvUploadModal: React.FC<{
   open: boolean;

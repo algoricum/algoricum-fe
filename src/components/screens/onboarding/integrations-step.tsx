@@ -20,6 +20,8 @@ import {
   ErrorToast,
   SuccessToast,
   InfoToast,
+  createJotformConnection,
+  syncJotformLeads,
 } from "../../../utils/integration-utils";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ONBOARDING_LEADS_FILE_NAME } from "../../../constants/integration-constants";
 import {
@@ -31,8 +33,10 @@ import {
   TypeformModal,
   CustomCrmModal,
   CsvUploadModal,
+  JotformModal,
 } from "../../modals/Modals";
 import { createClient } from "@/utils/supabase/config/client";
+
 
 const { Title, Text } = Typography;
 
@@ -46,12 +50,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
   const [showCustomCrmModal, setShowCustomCrmModal] = useState(false);
   const [showTypeformModal, setShowTypeformModal] = useState(false);
+  const [showJotformModal, setShowJotformModal] = useState(false);
   const [hubspotStatus, setHubspotStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [googleFormStatus, setGoogleFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [googleLeadFormStatus, setGoogleLeadFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [facebookLeadFormStatus, setFacebookLeadFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [pipedriveStatus, setPipedriveStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [typeformStatus, setTypeformStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+  const [jotformStatus, setJotformStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null);
   const [googleFormAccountInfo, setGoogleFormAccountInfo] = useState<any>(null);
   const [googleLeadFormAccountInfo, setGoogleLeadFormAccountInfo] = useState<any>(null);
@@ -60,10 +66,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [typeformAccountInfo, setTypeformAccountInfo] = useState<any>(null);
   const [googleFormTreeData, setGoogleFormTreeData] = useState([]);
   const [TypeformTreeData, setTypeFormTreeData] = useState([]);
+  const [jotformTreeData, setJotformTreeData] = useState([]);
   const [selectedGoogleFormWorksheets, setSelectedGoogleFormWorksheets] = useState<any[]>([]);
   const [selectedTypeformForms, setSelectedTypeformForms] = useState<any[]>([]);
+  const [selectedJotformForms, setSelectedJotformForms] = useState<any[]>([]);
   const [googleFormLeadsSynced, setGoogleFormLeadsSynced] = useState(false);
   const [typeformLeadsSynced, setTypeformLeadsSynced] = useState(false);
+  const [jotformLeadsSynced, setJotformLeadsSynced] = useState(false);
   const [showCompletionButtons, setShowCompletionButtons] = useState(false);
   const [autoProgressing, setAutoProgressing] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -91,7 +100,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       id: "leadCaptureForms",
       type: "select",
       question: "Do you collect leads through lead capture forms?",
-      options: ["Google Forms", "Typeform", "None of these"],
+      options: ["Google Forms", "Typeform", "Jotform","None of these"],
     },
     {
       id: "uploadLeads",
@@ -138,6 +147,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       fetchTypeformForms();
     }
   }, [typeformStatus]);
+  useEffect(() => {
+    if (jotformStatus === "connected") {
+      fetchJotformForms();
+    }
+  }, [jotformStatus]);
 
   const fetchGoogleFormSheets = async () => {
     try {
@@ -214,7 +228,37 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       console.error(error);
     }
   };
+ const fetchJotformForms = async () => {
+    try {
+      const clinicId = await getClinicId();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/jotform-integration`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          action: "get_forms",
+          clinic_id: clinicId
+        }),
+      });
 
+      if (!response.ok) throw new Error("Failed to fetch Jotform forms");
+
+      const data = await response.json();
+      setJotformTreeData(
+        (data.content || []).map((form: any) => ({
+          title: form.title,
+          value: form.id,
+          isLeaf: true,
+        })),
+      );
+      console.log("Jotform forms fetched:", jotformTreeData);
+    } catch (error) {
+      ErrorToast("Failed to fetch Typeform forms");
+      console.error(error);
+    }
+  };
   const autoProgressToNext = useCallback(() => {
     if (autoProgressing) return;
     setAutoProgressing(true);
@@ -575,6 +619,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       } else if (value === "Typeform") {
         setShowTypeformModal(true);
         setShowCompletionButtons(true);
+      } else if (value === "Jotform") {
+        setShowJotformModal(true);
+        setShowCompletionButtons(true);
       } else {
         setShowCompletionButtons(true);
       }
@@ -625,6 +672,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setShowCompletionButtons(true);
       } else if (currentValue === "Typeform") {
         setShowTypeformModal(true);
+        setShowCompletionButtons(true);
+      } else if (currentValue === "Jotform") {
+        setShowJotformModal(true);
         setShowCompletionButtons(true);
       } else {
         setShowCompletionButtons(true);
@@ -1145,7 +1195,61 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           setTypeformAccountInfo(null);
         }}
       />
+      <JotformModal
+        open={showJotformModal}
+        status={ jotformStatus}
+         treeData={jotformTreeData}
+        selectedForms={selectedJotformForms}
+        onSelectForms={setSelectedJotformForms}
+        onConnect={async (token:any) => {
+          localStorage.setItem("oauth_form_data",JSON.stringify({ ...formData, leadCaptureForms: "Jotform" }));
+         const res=await createJotformConnection(await getClinicId(),token)
+         console.log(res)
+         if(!res){
+            ErrorToast("Failed to connect to Jotform. Please try again.");
+            return;
+         }
+         SuccessToast("Jotform connected successfully");
+          setJotformStatus("connected");
+       
+        }}
+        onSyncLeads={() => {
 
+           syncJotformLeads(selectedJotformForms);
+          setJotformLeadsSynced(true);
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Jotform" }));
+          setShowJotformModal(false);
+          autoProgressToNext();
+        }
+        }
+        onOk={() => {
+          if (jotformStatus === "connected" && jotformLeadsSynced) {
+            setShowJotformModal(false);
+            autoProgressToNext();
+          } else {
+            setShowJotformModal(false);
+            setShowCompletionButtons(false);
+            setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+            localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
+          }
+        }}
+        onCancel={() => {
+          setShowTypeformModal(false);
+          setShowCompletionButtons(false);
+          setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
+        }}
+        // onSyncLeads={() => {
+        //   syncTypeformLeads(selectedTypeformForms);
+        //   setTypeformLeadsSynced(true);
+        //   localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Typeform" }));
+        //   setShowTypeformModal(false);
+        //   autoProgressToNext();
+        // }}
+        onDisconnect={() => {
+          setJotformStatus("disconnected");
+        }}
+      />
       <CsvUploadModal
         open={showManualLeadsModal}
         onOk={leads => {

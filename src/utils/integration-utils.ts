@@ -126,6 +126,37 @@ export const syncTypeformLeads = async (forms: string[]) => {
     return false;
   }
 };
+export const syncJotformLeads = async (forms: string[]) => {
+  console.log("Syncing Typeform leads for forms:", forms);
+  if (!forms || forms.length === 0) {
+    ErrorToast("No Jotform forms selected for syncing");
+    return false;
+  }
+  try {
+    const clinicId = await getClinicId();
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/jotform-integration`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        // apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+         action: "save_forms",
+        clinic_id: clinicId,
+        forms: forms,
+      }),
+    });
+
+    if (!response.ok) throw new Error("Failed to sync Typeform leads");
+    SuccessToast("Jotform leads synced successfully");
+    return true;
+  } catch (error) {
+    ErrorToast("Failed to sync Jotform leads");
+    console.error(error);
+    return false;
+  }
+};
 
 export const clearOAuthState = () => {
   localStorage.removeItem("hubspot_oauth_status");
@@ -316,4 +347,27 @@ export const findSheetDetails = (treeData: any, sheetValue: any) => {
     sheet_id: sheetId,
     sheet_title: sheetNode.title,
   };
+};
+
+export const createJotformConnection = async (clinicId: string, jotformToken: string) => {
+  const { data: integration } = await supabase.from("integrations").select("id").eq("name", "Jotform").single();
+  const res = await supabase
+    .from("integration_connections")
+    .upsert(
+      {
+        clinic_id: clinicId,
+        integration_id: integration?.id,
+        status: "active",
+        created_at: "now()",
+        updated_at: "now()",
+        auth_data: { forms: [], access_token: jotformToken },
+      },
+      { onConflict: "clinic_id,integration_id" },
+    )
+    
+    if (res.error) {
+      console.error("Error creating Jotform connection:", res.error);
+      throw new Error("Failed to create Jotform connection");
+    }
+    return true
 };
