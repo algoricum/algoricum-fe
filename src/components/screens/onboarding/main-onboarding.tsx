@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button, Typography } from "antd";
 import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import ClinicInfoStep from "./clinic-info-step";
 import StaffHoursStep from "./staff-hours-step";
 // import ToneIdentityStep from "./tone-identity-step";
@@ -636,10 +637,7 @@ export default function MainOnboarding() {
         {/* Loading overlay when submitting */}
         {isSubmitting && (
           <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Setting up your clinic...</p>
-            </div>
+            <LoadingSpinner message="Setting up your clinic..." size="lg" />
           </div>
         )}
 

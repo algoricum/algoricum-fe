@@ -679,7 +679,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       } else {
         setShowCompletionButtons(true);
       }
-      return;
     }
 
     if (currentQuestionIndex < filteredQuestions.length - 1) {

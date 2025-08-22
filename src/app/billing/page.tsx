@@ -1,34 +1,17 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import {
-  Button,
-  Skeleton,
-  Alert,
-  Card,
-  Typography,
-  Row,
-  Col,
-  Tag,
-  Flex,
-} from "antd";
-import {
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  ExternalLink,
-  Download,
-} from "lucide-react";
+import { Button, Alert, Card, Typography, Row, Col, Tag, Flex } from "antd";
+import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Download } from "lucide-react";
 import { createClient } from "@/utils/supabase/config/client";
 import { Header } from "@/components/common";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
-// import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
-// import { Header } from "@/components/common";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 
 dayjs.extend(utc);
 dayjs.extend(relativeTime);
@@ -70,11 +53,7 @@ const BillingPage = () => {
           .limit(1)
           .maybeSingle();
 
-        const { data: planData } = await supabase
-          .from("plans")
-          .select("*")
-          .eq("active", true)
-          .order("amount", { ascending: true });
+        const { data: planData } = await supabase.from("plans").select("*").eq("active", true).order("amount", { ascending: true });
 
         if (subscription) {
           setSubscriptionStatus(subscription.status);
@@ -280,7 +259,7 @@ const BillingPage = () => {
             </Row>
           )}
 
-          {loading && <Skeleton active paragraph={{ rows: 6 }} className="mt-6" />}
+          {loading && <LoadingSpinner message="Loading billing information..." size="lg" />}
 
           {subscriptionEvents.length > 0 && (
             <div className="grid grid-cols-1 gap-6 mb-8">
@@ -359,18 +338,18 @@ const BillingPage = () => {
       ),
     },
   ];
-const TabButton = ({ isActive, onClick, label }: { isActive: boolean; onClick: () => void; label: string }) => {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-2 px-6 text-center transition-all rounded-[48px] ${
-        isActive ? "bg-brand-primary text-white" : "bg-Gray100 text-gray-600 hover:bg-gray-200"
-      }`}
-    >
-      {label}
-    </button>
-  );
-};
+  const TabButton = ({ isActive, onClick, label }: { isActive: boolean; onClick: () => void; label: string }) => {
+    return (
+      <button
+        onClick={onClick}
+        className={`flex-1 py-2 px-6 text-center transition-all rounded-[48px] ${
+          isActive ? "bg-brand-primary text-white" : "bg-Gray100 text-gray-600 hover:bg-gray-200"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
   return (
     <DashboardLayout
       header={<Header title="Billing" description="Manage your subscription and view billing activity." showHamburgerMenu={true} />}
