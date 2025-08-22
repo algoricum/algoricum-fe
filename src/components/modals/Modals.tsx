@@ -57,7 +57,7 @@ export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, 
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={()=>onConnect?.()}
+              onClick={() => onConnect?.()}
               className="bg-orange-500 border-orange-500 hover:bg-orange-600 h-12 px-8 text-lg font-medium"
             >
               Connect to HubSpot
@@ -97,7 +97,16 @@ export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, 
   </Modal>
 );
 
-export const PipedriveModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect, onSyncLeads, onDisconnect }) => (
+export const PipedriveModal: React.FC<ModalProps> = ({
+  open,
+  status,
+  accountInfo,
+  onOk,
+  onCancel,
+  onConnect,
+  onSyncLeads,
+  onDisconnect,
+}) => (
   <Modal
     title={
       <div className="flex items-center">
@@ -131,7 +140,7 @@ export const PipedriveModal: React.FC<ModalProps> = ({ open, status, accountInfo
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={()=>onConnect?.()}
+              onClick={() => onConnect?.()}
               className="bg-green-600 border-green-600 hover:bg-green-700 h-12 px-8 text-lg font-medium"
             >
               Connect to Pipedrive
@@ -202,7 +211,7 @@ export const PipedriveModal: React.FC<ModalProps> = ({ open, status, accountInfo
                 <Button
                   type="primary"
                   size="small"
-                  onClick={()=>onSyncLeads?.()}
+                  onClick={() => onSyncLeads?.()}
                   className="bg-green-600 border-green-600 hover:bg-green-700"
                 >
                   Sync Leads
@@ -278,7 +287,7 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={()=>onConnect?.()}
+              onClick={() => onConnect?.()}
               className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 h-12 px-8 text-lg font-medium"
             >
               Connect to Google Forms
@@ -341,7 +350,7 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
                 <Button
                   type="primary"
                   size="small"
-                  onClick={()=>onSyncLeads?.()}
+                  onClick={() => onSyncLeads?.()}
                   className="bg-yellow-600 border-yellow-600 hover:bg-yellow-700"
                 >
                   Sync Leads
@@ -371,7 +380,16 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
   </Modal>
 );
 
-export const GoogleLeadFormModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect, onSyncLeads, onDisconnect }) => (
+export const GoogleLeadFormModal: React.FC<ModalProps> = ({
+  open,
+  status,
+  accountInfo,
+  onOk,
+  onCancel,
+  onConnect,
+  onSyncLeads,
+  onDisconnect,
+}) => (
   <Modal
     title={
       <div className="flex items-center">
@@ -520,7 +538,7 @@ export const FacebookLeadFormModal: React.FC<ModalProps> = ({ open, status, acco
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={()=>onConnect?.()}
+              onClick={() => onConnect?.()}
               className="bg-blue-600 border-blue-600 hover:bg-blue-700 h-12 px-8 text-lg font-medium"
             >
               Connect to Facebook Lead Ads
@@ -716,7 +734,6 @@ export const TypeformModal: React.FC<ModalProps> = ({
   </Modal>
 );
 
-
 export const JotformModal: React.FC<ModalProps> = ({
   open,
   status,
@@ -737,7 +754,7 @@ export const JotformModal: React.FC<ModalProps> = ({
       script.onload = () => {
         window.JF.initialize({
           appName: window.location.host || "MyApp",
-          accessType: "full",  // or "readOnly"
+          accessType: "full", // or "readOnly"
           enableCookieAuth: true,
         });
       };
@@ -751,14 +768,13 @@ export const JotformModal: React.FC<ModalProps> = ({
       () => {
         const token = window.JF.getAPIKey();
         window.JF.getUser(() => {
-          console.log("Jotform auth successful",token);
+          console.log("Jotform auth successful", token);
           onConnect?.(token);
-          
         });
       },
       () => {
         console.error("Jotform auth failed");
-      }
+      },
     );
   };
 
@@ -820,9 +836,7 @@ export const JotformModal: React.FC<ModalProps> = ({
             <div className="mt-4">
               <Text className="text-lg">Connecting to Jotform...</Text>
               <br />
-              <Text className="text-gray-500">
-                Please complete the authorization
-              </Text>
+              <Text className="text-gray-500">Please complete the authorization</Text>
             </div>
           </div>
         )}
@@ -857,9 +871,7 @@ export const JotformModal: React.FC<ModalProps> = ({
                     Jotform Integration Active
                   </Text>
                   <br />
-                  <Text className="text-blue-600 text-sm">
-                    {/* {accountInfo.responseCount || 0} responses synced */}
-                  </Text>
+                  <Text className="text-blue-600 text-sm">{/* {accountInfo.responseCount || 0} responses synced */}</Text>
                 </div>
                 <div className="flex space-x-2">
                   <Button
@@ -870,29 +882,20 @@ export const JotformModal: React.FC<ModalProps> = ({
                   >
                     Sync Leads
                   </Button>
-                  <Button
-                    type="link"
-                    danger
-                    onClick={onDisconnect}
-                    className="text-red-500"
-                  >
+                  <Button type="link" danger onClick={onDisconnect} className="text-red-500">
                     Disconnect
                   </Button>
                 </div>
               </div>
             </div>
             <div className="mt-4 text-center">
-              <Text className="text-gray-600">
-                ⚡ Your Jotform integration is ready! Need help?
-              </Text>
+              <Text className="text-gray-600">⚡ Your Jotform integration is ready! Need help?</Text>
               <br />
               <Button
                 type="primary"
                 size="small"
                 icon={<CalendarOutlined />}
-                onClick={() =>
-                  window.open("https://calendly.com/your-team/jotform-setup", "_blank")
-                }
+                onClick={() => window.open("https://calendly.com/your-team/jotform-setup", "_blank")}
                 className="mt-2 bg-blue-600 border-blue-600 hover:bg-blue-700"
               >
                 Book a Support Meeting
@@ -1001,9 +1004,7 @@ export const CustomCrmModal: React.FC<{
         className="mb-6"
       />
       <div className="text-center">
-        <Text className="text-sm text-gray-600">
-          Please contact our support team to set up your custom CRM integration.
-        </Text>
+        <Text className="text-sm text-gray-600">Please contact our support team to set up your custom CRM integration.</Text>
         <br />
         <Button
           type="primary"
@@ -1015,6 +1016,98 @@ export const CustomCrmModal: React.FC<{
           Book a Support Meeting
         </Button>
       </div>
+    </div>
+  </Modal>
+);
+
+
+export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect }) => (
+  <Modal
+    title={
+      <div className="flex items-center">
+        <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
+          <Text className="text-white font-bold text-sm">G</Text>
+        </div>
+        <span className="text-xl font-semibold">Connect to GoHighLevel</span>
+      </div>
+    }
+    open={open}
+    onOk={onOk}
+    onCancel={onCancel}
+    okText={status === "connected" ? "Continue" : "Skip for Now"}
+    cancelText="Cancel"
+    okButtonProps={{ className: "bg-purple-500 border-purple-500" }}
+    width={500}
+    centered
+  >
+    <div className="py-6">
+      {status === "disconnected" && (
+        <>
+          <Alert
+            message="Connect your GoHighLevel Account"
+            description="We can automatically sync leads from your GoHighLevel contacts to our platform."
+            type="info"
+            showIcon
+            className="mb-6"
+          />
+          <div className="text-center">
+            <Button
+              type="primary"
+              size="large"
+              icon={<LinkOutlined />}
+              onClick={() => onConnect?.()}
+              className="bg-green-600 border-green-600 hover:bg-green-700 h-12 px-8 text-lg font-medium"
+            >
+              Connect to GoHighLevel
+            </Button>
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <Text className="text-sm text-gray-600">
+                <strong>What happens next:</strong>
+                <br />• You&apos;ll be redirected to GoHighLevel to sign in
+                <br />• Grant permission to access your contacts
+                <br />• We&apos;ll automatically sync your leads
+                <br />• Takes less than 30 seconds!
+              </Text>
+            </div>
+          </div>
+        </>
+      )}
+      {status === "connecting" && (
+        <div className="text-center py-8">
+          <Spin size="large" />
+          <div className="mt-4">
+            <Text className="text-lg">Connecting to GoHighLevel...</Text>
+            <br />
+            <Text className="text-gray-500">Please complete the authorization process</Text>
+          </div>
+        </div>
+      )}
+      {status === "connected" && accountInfo && (
+        <>
+          <Alert
+            message="Successfully Connected!"
+            description={`Connected to ${accountInfo.accountName}. Your GoHighLevel integration is ready!`}
+            type="success"
+            showIcon
+            className="mb-4"
+          />
+          <div className="mt-4 text-center">
+            <Text className="text-gray-600">
+              ⚡ Your GoHighLevel integration is ready! Need further help? Book a support meeting.
+            </Text>
+            <br />
+            <Button
+              type="primary"
+              size="small"
+              icon={<CalendarOutlined />}
+              onClick={() => window.open("https://calendly.com/your-team/gohighlevel-setup", "_blank")}
+              className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
+            >
+              Book a Support Meeting
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   </Modal>
 );

@@ -222,6 +222,36 @@ export const connectToHubSpot = async () => {
   }
 };
 const supabase = createClient();
+export const connectToGHL = async()=>{
+ try {
+    
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/GHL-integration/auth/start?clinic_id=${await getClinicId()}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("Response status:", response.status);
+    const responseText = await response.text();
+    console.log("Response body:", responseText);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`);
+    }
+
+    const data = JSON.parse(responseText);
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    console.log("🚀 Redirecting to Go High Level OAuth:", data.authUrl);
+    window.location.href = data.url;
+  } catch (error) {
+    console.error("Connection failed:", error);
+    ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Go High Level. Please try again"}`);
+  }  
+}
 export const connectToPipedrive = async () => {
   try {
     const {

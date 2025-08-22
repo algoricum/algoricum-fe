@@ -242,7 +242,7 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
             disabled={!currentValue.trim()}
             className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
           >
-            Continue
+            Complete Setup
           </Button>
         </div>
       </div>
