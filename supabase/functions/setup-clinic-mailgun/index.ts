@@ -616,15 +616,6 @@ serve(async (req) => {
       throw new Error(`Clinic not found: ${clinicError?.message || 'No clinic data returned'}`)
     }
 
-    logger.success('Clinic data retrieved', {
-      id: clinic.id,
-      name: clinic.name,
-      slug: clinic.slug,
-      currentDomain: clinic.domain,
-      currentEmail: clinic.email,
-      createdAt: clinic.created_at
-    })
-
     if (action === 'setup') {
       return await handleSetupAction(clinic, BASE_DOMAIN, MAILGUN_API_KEY, WEBHOOK_BASE_URL, supabase, logger, requestStart, clinicName, slug)
     } else if (action === 'verify') {
@@ -730,17 +721,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
   }
 
   const subdomain = `${clinicSlug}.${baseDomain}`
-  const clinicEmail = `contact@${subdomain}`
-
-  setupLogger.info('🌐 Generated clinic domain configuration', {
-    clinicId: clinic.id,
-    clinicSlug,
-    baseDomain,
-    subdomain,
-    clinicEmail,
-    previousDomain: clinic.domain,
-    previousEmail: clinic.email
-  })
+  const clinicEmail = `assistant@${subdomain}`
 
   setupLogger.step('Creating domain in Mailgun')
   const mailgunData = await createMailgunDomain(subdomain, mailgunApiKey, setupLogger)
@@ -821,7 +802,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
 
   const clinicUpdateData = {
     domain: subdomain,
-    email: clinicEmail,
+    mailgun_email: clinicEmail,
     slug: clinicSlug,
     updated_at: new Date().toISOString()
   }
@@ -848,7 +829,6 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
     sender_email: clinicEmail,
     domain_verified: domainInfo.verified || false,
     status: 'active',
-    route_id: routeInfo?.id || null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }

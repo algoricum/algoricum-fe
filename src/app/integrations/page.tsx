@@ -1,21 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-import {
-  Card,
-  Modal,
-  Skeleton,
-  Tag,
-  Button,
-  Alert,
-  TreeSelect,
-  Typography,
-} from "antd";
+import { Card, Modal, Tag, Button, Alert, TreeSelect, Typography } from "antd";
 import { createClient } from "@/utils/supabase/config/client";
 import dayjs from "dayjs";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { Header } from "@/components/common";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -67,26 +59,21 @@ export default function IntegrationsPage() {
 
         if (savedError) throw savedError;
 
-        const savedSheetKeys = savedSheets.map(
-          (s) => `${s.spreadsheet_id}:${s.sheet_id}`
-        );
+        const savedSheetKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
         // 3️⃣ Fetch spreadsheets from Edge Function
-        const res = await fetch(
-          `${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-              apikey: SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify({
-              connection_id: connData.id,
-              clinic_id: clinicData.id,
-            }),
-          }
-        );
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            apikey: SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            connection_id: connData.id,
+            clinic_id: clinicData.id,
+          }),
+        });
 
         if (!res.ok) throw new Error(await res.text());
 
@@ -128,18 +115,16 @@ export default function IntegrationsPage() {
 
       if (savedError) throw savedError;
 
-      const savedKeys = savedSheets.map(
-        (s) => `${s.spreadsheet_id}:${s.sheet_id}`
-      );
+      const savedKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
       // 2️⃣ Filter only new sheets
-      const newSheets = selectedSheets.filter((key) => !savedKeys.includes(key));
+      const newSheets = selectedSheets.filter(key => !savedKeys.includes(key));
 
       // 3️⃣ Remove deselected sheets directly from DB
-      const removedSheets = savedKeys.filter((key) => !selectedSheets.includes(key));
+      const removedSheets = savedKeys.filter(key => !selectedSheets.includes(key));
       if (removedSheets.length > 0) {
         await Promise.all(
-          removedSheets.map(async (key) => {
+          removedSheets.map(async key => {
             const [spreadsheet_id, sheet_id] = key.split(":");
             await supabase
               .from("google_form_sheets")
@@ -147,7 +132,7 @@ export default function IntegrationsPage() {
               .eq("connection_id", connection?.id)
               .eq("spreadsheet_id", spreadsheet_id)
               .eq("sheet_id", sheet_id);
-          })
+          }),
         );
       }
 
@@ -159,47 +144,40 @@ export default function IntegrationsPage() {
       }
 
       // ✅ FIX: Map strings into objects before sending
-      const newSheetsPayload = newSheets.map((key) => {
-  const [spreadsheet_id, sheet_id] = key.split(":");
+      const newSheetsPayload = newSheets.map(key => {
+        const [spreadsheet_id, sheet_id] = key.split(":");
 
-  // Find spreadsheet and sheet titles from tree data
-  const spreadsheet = googleFormTreeData.find(s => s.value === spreadsheet_id);
-  const sheet = spreadsheet?.children?.find((c:any) => c.value === key);
+        // Find spreadsheet and sheet titles from tree data
+        const spreadsheet = googleFormTreeData.find(s => s.value === spreadsheet_id);
+        const sheet = spreadsheet?.children?.find((c: any) => c.value === key);
 
-  return {
-    spreadsheet_id,
-    spreadsheet_title: spreadsheet?.title || "",
-    sheet_id,
-    sheet_title: sheet?.title || "",
-  };
-});
-
+        return {
+          spreadsheet_id,
+          spreadsheet_title: spreadsheet?.title || "",
+          sheet_id,
+          sheet_title: sheet?.title || "",
+        };
+      });
 
       // 5️⃣ Send to API
-      const response = await fetch(
-        `${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            connection_id: connection?.id,
-            selected_sheets: newSheetsPayload, // send objects not strings
-          }),
-        }
-      );
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          connection_id: connection?.id,
+          selected_sheets: newSheetsPayload, // send objects not strings
+        }),
+      });
 
       if (!response.ok) throw new Error(await response.text());
 
       const result = await response.json();
-      SuccessToast(
-        `✅ Successfully synced ${result.sync_result.leads_created} leads from Google Lead Form!`
-      );
-              setShowModal(false);
-
+      SuccessToast(`✅ Successfully synced ${result.sync_result.leads_created} leads from Google Lead Form!`);
+      setShowModal(false);
     } catch (error) {
       console.error("Failed to sync leads:", error);
       ErrorToast("Failed to sync leads");
@@ -216,11 +194,7 @@ export default function IntegrationsPage() {
   return (
     <DashboardLayout
       header={
-        <Header
-          title="Dashboard Overview"
-          description="Welcome back! Here's what's happening with your clinic today."
-          showHamburgerMenu
-        />
+        <Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." showHamburgerMenu />
       }
     >
       <div className="p-6">
@@ -228,7 +202,7 @@ export default function IntegrationsPage() {
 
         <div>
           {loading ? (
-            <Skeleton active avatar paragraph={{ rows: 2 }} />
+            <LoadingSpinner message="Loading integrations..." size="md" />
           ) : status === "connected" ? (
             <Card
               className="bg-gray-50 hover:bg-gray-100 cursor-pointer transition border border-purple-200 rounded-lg"
@@ -240,13 +214,9 @@ export default function IntegrationsPage() {
                 </div>
                 <div className="flex-1">
                   <h3 className=" text-lg font-medium">Google Forms</h3>
-                  <p className="text-gray-400 text-sm">
-                    Sync leads from Google Forms automatically
-                  </p>
+                  <p className="text-gray-400 text-sm">Sync leads from Google Forms automatically</p>
                 </div>
-                <Tag color={status === "connected" ? "green" : "default"}>
-                  {status === "connected" ? "Connected" : "Not Connected"}
-                </Tag>
+                <Tag color={status === "connected" ? "green" : "default"}>{status === "connected" ? "Connected" : "Not Connected"}</Tag>
               </div>
             </Card>
           ) : (
@@ -272,24 +242,14 @@ export default function IntegrationsPage() {
           centered
         >
           <div className="py-6">
-            <Alert
-              message="Connected to Google Forms"
-              description={`Account: Google Account`}
-              type="success"
-              showIcon
-              className="mb-4"
-            />
+            <Alert message="Connected to Google Forms" description={`Account: Google Account`} type="success" showIcon className="mb-4" />
             <div className="mb-4">
               <Text strong>Last Sync:</Text>{" "}
-              {connection?.last_sync_at
-                ? dayjs(connection.last_sync_at).format("MMM D, YYYY h:mm A")
-                : "Never"}
+              {connection?.last_sync_at ? dayjs(connection.last_sync_at).format("MMM D, YYYY h:mm A") : "Never"}
             </div>
 
             <div className="mb-4">
-              <Text className="block mb-2">
-                Select worksheets to sync leads from:
-              </Text>
+              <Text className="block mb-2">Select worksheets to sync leads from:</Text>
               <TreeSelect
                 style={{ width: "100%" }}
                 dropdownStyle={{ maxHeight: 400, overflow: "auto" }}
@@ -307,7 +267,8 @@ export default function IntegrationsPage() {
                 type="primary"
                 onClick={syncGoogleFormLeads}
                 className="bg-yellow-600 border-yellow-600 hover:bg-yellow-700"
-                disabled={selectedSheets.length === 0}>
+                disabled={selectedSheets.length === 0}
+              >
                 Sync Leads
               </Button>
               {/* <Button danger type="link" onClick={disconnectGoogleForm}>

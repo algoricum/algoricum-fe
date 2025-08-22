@@ -19,7 +19,7 @@ import {
 
 // Restored loaders
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { LeadsTableSkeleton, StatsCardsSkeleton } from "@/components/common/Loaders/skeleton-loader";
+// import { LeadsTableSkeleton, StatsCar} from "@/components/common/Loaders/skeleton-loader";
 
 interface Lead {
   id: string;
@@ -265,14 +265,7 @@ export default function LeadsPage() {
           <Header title="Lead Management" description="Manage and track your leads through the conversion process." showHamburgerMenu />
         }
       >
-        <div className="space-y-6">
-          {/* Stats skeleton */}
-          <StatsCardsSkeleton />
-          {/* Table skeleton within a card */}
-          <div className="rounded-lg bg-white p-4 shadow sm:p-6">
-            <LeadsTableSkeleton />
-          </div>
-        </div>
+
         {/* Subtle centered spinner to indicate background work */}
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
           <div className="rounded-lg bg-white/60 p-3">
@@ -455,7 +448,7 @@ export default function LeadsPage() {
       </div>
 
       {/* Lead Generation Modal */}
-      <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} title="Generate New Lead" width={600}>
+      <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null}  width={800}>
         {clinicId && <LeadGenerationForm clinicId={clinicId} onSuccess={handleClose} />}
       </Modal>
     </DashboardLayout>

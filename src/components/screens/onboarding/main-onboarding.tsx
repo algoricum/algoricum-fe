@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button, Typography } from "antd";
 import { useRouter } from "next/navigation";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import ClinicInfoStep from "./clinic-info-step";
 import StaffHoursStep from "./staff-hours-step";
 // import ToneIdentityStep from "./tone-identity-step";
@@ -12,6 +13,7 @@ import IntegrationsStep from "./integrations-step";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
+import Image from "next/image";
 
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 // import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
@@ -33,6 +35,7 @@ import {
 } from "@/constants/localStorageKeys";
 // import { log } from "console";
 import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
+import generateClinicInstructions from "@/utils/generateClinicInstructions";
 
 const { Text } = Typography;
 const supabase = createClient();
@@ -114,6 +117,7 @@ export default function MainOnboarding() {
       localStorage.removeItem(ONBOARDING_STEP_KEY);
       localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
       localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
+      localStorage.removeItem("oauth_form_data"); // Clear any OAuth form data
     } catch (error) {
       ErrorToast("Error clearing localStorage");
     }
@@ -164,13 +168,12 @@ export default function MainOnboarding() {
     }
   };
 
-
+  // Map new flow data to old flow structure for Supabase
   // Map new flow data to old flow structure for Supabase
   const mapDataForSubmission = (data: Record<string, any>) => {
     const clinicInfo = data["clinic-info"] || {};
     const staffHours = data["staff-hours"] || {};
     const toneIdentity = data["tone-identity"] || {};
-    // const aiAssistant = data["ai-assistant"] || {};
     const bookingSetup = data["booking-setup"] || {};
     const integrations = data["integrations"] || {};
 
@@ -200,44 +203,48 @@ export default function MainOnboarding() {
       phoneNumber: clinicInfo.clinicPhone || "",
       calendlyLink: bookingSetup.hasBookingLink === "Yes, I have a booking link" ? bookingSetup.bookingLinkUrl : "",
 
-      // // Step 3 - Brand Config
-      // logo: aiAssistant.logoUpload?.[0]?.originFileObj || null,
-      tone_selector: toneIdentity.toneSelector || "friendly",
-      // sentence_length: toneIdentity.sentenceLength || "",
-      // formality_level: toneIdentity.formalityLevel || "",
-      // clinic_document: aiAssistant.clinicDetailsUpload?.[0]?.originFileObj || null,
+      // AI Assistant Configuration
+      toneSelector: toneIdentity.toneSelector || "friendly",
+      sentenceLength: clinicInfo.sentenceLength || "medium",
+      formalityLevel: clinicInfo.formalityLevel || "formal",
 
       // Additional data from new flow
       clinicType: clinicInfo.clinicType || "",
       integrations: integrations,
-      servicesDocument: null,
-      DocumnetPath: clinicInfo.servicesDocument?.[0].path || null,
+
+      // Three document types with their paths
+      servicesDocumentPath: clinicInfo.servicesDocument?.[0]?.path || null,
+      pricingDocumentPath: clinicInfo.pricingDocument?.[0]?.path || null,
+      testimonialsDocumentPath: clinicInfo.testimonialsDocument?.[0]?.path || null,
+
+      // Business hours for generateClinicInstructions
+      businessHoursText: clinicInfo.businessHours || "",
     };
   };
-  console.log("📋 Mapping data for submission:", mapDataForSubmission(allData));
-    async function getFile(bucket: any, path: any) {
-    const { data, error } = await supabase.storage.from(bucket).download(path);
 
-    if (error) {
-      console.error("Error downloading file:", error);
+  // Helper function to convert file path to File object
+  async function getFileAsFile(bucket: any, path: any) {
+    if (!path) return null;
+
+    try {
+      const { data, error } = await supabase.storage.from(bucket).download(path);
+
+      if (error) {
+        console.error("Error downloading file:", error);
+        return null;
+      }
+
+      // Convert blob to File
+      const fileName = path.split("/").pop() || "file";
+      const file = new File([data], fileName, { type: data.type });
+      return file;
+    } catch (error) {
+      console.error("Error converting file:", error);
       return null;
     }
-
-    return data; // This is a Blob
-  }
-  async function getFileAsFile(bucket: any, path: any) {
-    const blob = await getFile(bucket, path);
-    if (!blob) return null;
-
-    // Convert blob to File
-    const fileName = path.split("/").pop() || "file";
-    const file = new File([blob], fileName, { type: blob.type });
-
-    return file;
   }
 
-  
-  // Main submission function (updated to use updateClinic)
+  // Main submission function (updated to handle three document types)
   const handleCompleteOnboarding = async () => {
     try {
       setIsSubmitting(true);
@@ -283,11 +290,10 @@ export default function MainOnboarding() {
         email: mappedData.emailAddress || user.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink || `https://algoricum.hashlogics.com/schedule-meeting?clinic_id=${clinic.id}`,
-        // logo: logoUrl,
-        tone_selector: "friendly",
-        // sentence_length: mappedData.sentence_length,
-        // formality_level: mappedData.formality_level,
+        calendly_link: mappedData.calendlyLink || `${process.env.NEXT_PUBLIC_URL}/schedule-meeting?clinic_id=${clinic.id}`,
+        tone_selector: mappedData.toneSelector,
+        sentence_length: mappedData.sentenceLength,
+        formality_level: mappedData.formalityLevel,
         clinic_type: mappedData.clinicType,
         uses_hubspot: mappedData.integrations.usesHubspot === "Yes",
         uses_ads: mappedData.integrations.usesAds === "Yes",
@@ -330,21 +336,58 @@ export default function MainOnboarding() {
       } else {
         console.warn("Mailgun setup response missing or unsuccessful, skipping email settings save");
       }
-      // Handle services document upload to edge function
 
-      if (mappedData.DocumnetPath) {
-        let file= await getFileAsFile("Assistant-File", mappedData.DocumnetPath);
+      // Handle multiple document uploads to enhanced edge function
+      const hasDocuments = mappedData.servicesDocumentPath || mappedData.pricingDocumentPath || mappedData.testimonialsDocumentPath;
+
+      if (hasDocuments) {
         try {
           const formDataToSend = new FormData();
           const session = await getSupabaseSession();
-if (file !== null) {
 
-          formDataToSend.append("clinic_document", file,file.name);
-}
+          // Add basic fields
           formDataToSend.append("clinic_id", updatedClinic.id);
           formDataToSend.append("name", mappedData.legalBusinessName || "Assistant");
-          formDataToSend.append("instructions", "AI Assistant for handling clinic inquiries");
 
+          // Generate clinic instructions with all collected data
+          const clinicInstructions = generateClinicInstructions({
+            name: mappedData.legalBusinessName || "",
+            address: mappedData.clinicAddress || "",
+            phone: mappedData.phoneNumber || "",
+            email: mappedData.emailAddress || user.email || "",
+            business_hours: mappedData.businessHoursText || "",
+            calendly_link: mappedData.calendlyLink || "",
+            tone_selector: mappedData.toneSelector || "professional",
+            sentence_length: mappedData.sentenceLength || "medium",
+            formality_level: mappedData.formalityLevel || "formal",
+            has_uploaded_document: true,
+          });
+
+          formDataToSend.append("instructions", clinicInstructions);
+
+          // Download and append files based on their document type
+          if (mappedData.servicesDocumentPath) {
+            const serviceFile = await getFileAsFile("Assistant-File", mappedData.servicesDocumentPath);
+            if (serviceFile) {
+              formDataToSend.append("service_document", serviceFile);
+            }
+          }
+
+          if (mappedData.pricingDocumentPath) {
+            const pricingFile = await getFileAsFile("Assistant-File", mappedData.pricingDocumentPath);
+            if (pricingFile) {
+              formDataToSend.append("pricing_document", pricingFile);
+            }
+          }
+
+          if (mappedData.testimonialsDocumentPath) {
+            const testimonialsFile = await getFileAsFile("Assistant-File", mappedData.testimonialsDocumentPath);
+            if (testimonialsFile) {
+              formDataToSend.append("testimonials_document", testimonialsFile);
+            }
+          }
+
+          // Call the enhanced edge function
           const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
             method: "POST",
             headers: {
@@ -353,12 +396,18 @@ if (file !== null) {
             body: formDataToSend,
           });
 
-          if (!response?.ok) {
-            console.error("Document upload failed, continuing onboarding");
+          const result = await response.json();
+
+          if (!response.ok) {
+            console.error("Assistant creation failed:", result.error);
+            // Continue onboarding even if assistant creation fails
+          } else {
+            console.log("Assistant created successfully:", result);
+            console.log(`✅ Assistant created with ${result.filesUploaded} documents: ${result.updatedDocumentTypes?.join(", ")}`);
           }
         } catch (error) {
-          console.error("Failed to upload document:", error);
-          // Continue onboarding even if document upload fails
+          console.error("Failed to create assistant with documents:", error);
+          // Continue onboarding even if assistant creation fails
         }
       }
 
@@ -367,66 +416,9 @@ if (file !== null) {
       await apiKeyService.create({
         name: apiKeyName,
         clinicId: updatedClinic.id,
-      }); // Handle document upload and assistant creation if we have a clinic ID
-      // if (updatedClinic.id && mappedData.clinic_document) {
-      //   const hasDocument = !!mappedData.clinic_document;
+      });
 
-      //   if (hasDocument) {
-      //     // Prepare form data for the edge function
-      //     const formDataToSend = new FormData();
-      //     formDataToSend.append("clinic_document", mappedData.clinic_document);
-      //     formDataToSend.append("clinic_id", updatedClinic.id);
-      //     formDataToSend.append("name", mappedData.legalBusinessName);
-      //     formDataToSend.append("description", `AI Assistant for ${mappedData.legalBusinessName}`);
-
-      //     // Generate customized instructions based on clinic settings
-      //     const clinicInstructions = generateClinicInstructions({
-      //       name: mappedData.legalBusinessName,
-      //       address: mappedData.clinicAddress,
-      //       phone: mappedData.phoneNumber,
-      //       email: mappedData.emailAddress || user.email,
-      //       business_hours: mappedData.businessHours,
-      //       calendly_link: mappedData.calendlyLink,
-      //       tone_selector: mappedData.tone_selector,
-      //       sentence_length: mappedData.sentence_length,
-      //       formality_level: mappedData.formality_level,
-      //       has_uploaded_document: true,
-      //     });
-
-      //     formDataToSend.append("instructions", clinicInstructions);
-      //     formDataToSend.append("model", "gpt-4o");
-      //     formDataToSend.append("tools", JSON.stringify([{ type: "file_search" }]));
-
-      //     // Get the token for authorization
-      //     const session = await getSupabaseSession();
-
-      //     if (!session.access_token) {
-      //       throw new Error("Not authenticated");
-      //     }
-
-      //     try {
-      //       // Call the combined edge function
-      //       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
-      //         method: "POST",
-      //         headers: {
-      //           Authorization: `Bearer ${session.access_token}`,
-      //         },
-      //         body: formDataToSend,
-      //       });
-
-      //       await response.json();
-
-      //       if (!response.ok) {
-      //         ErrorToast("Assistant creation error");
-      //         // Continue with onboarding even if assistant creation fails
-      //       }
-      //     } catch (assistantError) {
-      //       ErrorToast("Failed to create assistant");
-      //       // Continue with onboarding even if assistant creation fails
-      //     }
-      //   }
-      // }
-
+      // Setup Twilio
       try {
         const session = await getSupabaseSession();
         if (!session.access_token) {
@@ -458,7 +450,6 @@ if (file !== null) {
       await handleCsvLeadsUpload(clinic.id);
       clearStoredProgress();
 
-      // router.push("/dashboard?onboarding=success");
       SuccessToast("You're all set!");
       await fetch("/api/sendConfiramtionMail", {
         method: "POST",
@@ -466,11 +457,11 @@ if (file !== null) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: clinicData.dba_name || clinicData.legal_business_name,
+          name: clinicData.legal_business_name,
           email: clinicData.email || user.email || "",
         }),
       });
-      setIsOnboardingComplete(true); // new state you'll add below
+      setIsOnboardingComplete(true);
     } catch (error: any) {
       ErrorToast(error.message || "Failed to update clinic");
     } finally {
@@ -525,6 +516,7 @@ if (file !== null) {
     try {
       const success = await logout();
       if (success) {
+        localStorage.clear();
         localStorage.removeItem(ONBOARDING_STORAGE_KEY);
         localStorage.removeItem(ONBOARDING_STEP_KEY);
         localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
@@ -579,7 +571,9 @@ if (file !== null) {
         {/* Logo */}
         <div className="flex items-center mb-5">
           <div className="w-7 h-7 bg-white rounded-md flex items-center justify-center mr-2">
-            <Text className="text-purple-500 text-sm font-bold">A</Text>
+            <Text className="text-purple-500 text-sm font-bold">
+              <Image src="logo.svg" alt="Logo" width={50} height={50} />
+            </Text>
           </div>
           <Text className="text-white text-lg font-semibold">Algoricum</Text>
         </div>
@@ -643,10 +637,7 @@ if (file !== null) {
         {/* Loading overlay when submitting */}
         {isSubmitting && (
           <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Setting up your clinic...</p>
-            </div>
+            <LoadingSpinner message="Setting up your clinic..." size="lg" />
           </div>
         )}
 

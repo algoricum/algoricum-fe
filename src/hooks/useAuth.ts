@@ -125,6 +125,7 @@ const logout = useCallback(async () => {
     // First ensure the Supabase signOut succeeds
     await signOut();    
     // Then clear local storage data
+    localStorage.clear();
     clearAll();    
     return true;
   } catch (error) {

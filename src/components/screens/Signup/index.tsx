@@ -41,25 +41,6 @@ const SignupPage = () => {
     mutate(values);
   };
 
-  // const handleSocialLogin = async (provider: 'google' | 'apple') => {
-  //   try {
-  //     // Implement social login with Supabase
-  //     const supabase = createClient();
-
-  //     let { error } = await supabase.auth.signInWithOAuth({
-  //       provider,
-  //       options: {
-  //         redirectTo: `${window.location.origin}/auth/oauth-redirect`
-  //       }
-  //     });
-
-  //     if (error) throw error;
-
-  //   } catch (error: any) {
-  //     ErrorToast(error?.message || `Failed to sign in with ${provider}`);
-  //   }
-  // };
-
   return (
     <Flex vertical gap={36} className="w-full">
       <div>
@@ -131,12 +112,26 @@ const SignupPage = () => {
                 }),
               ]}
             >
-              <PasswordInput prefix={<PasswordIcon />} className="w-full" placeholder="Confirm Password" />
+              <PasswordInput
+                prefix={<PasswordIcon />}
+                className="w-full"
+                placeholder="Confirm Password"
+                onPaste={e => e.preventDefault()}
+                onCopy={e => e.preventDefault()}
+                onCut={e => e.preventDefault()}
+                onDrop={e => e.preventDefault()}
+                onDragOver={e => e.preventDefault()}
+              />
             </Form.Item>
           </Flex>
 
           <Form.Item>
-            <Button loading={isLoading} className="w-full  bg-brand-primary hover:!bg-brand-secondary text-white" type="primary" htmlType="submit">
+            <Button
+              loading={isLoading}
+              className="w-full  bg-brand-primary hover:!bg-brand-secondary text-white"
+              type="primary"
+              htmlType="submit"
+            >
               Sign Up
             </Button>
           </Form.Item>

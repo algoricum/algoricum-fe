@@ -1,0 +1,304 @@
+"use client";
+
+import { useState } from "react";
+import { X } from "lucide-react";
+import { Form, Input, DatePicker, TimePicker } from "antd";
+import { CalendarOutlined, ClockCircleOutlined, UserOutlined, MailOutlined, PhoneOutlined } from "@ant-design/icons";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
+import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import dayjs from "dayjs";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+
+const { TextArea } = Input;
+
+interface AddAppointmentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  // eslint-disable-next-line no-unused-vars
+  onSubmit: (values: any) => Promise<void>;
+  isSubmitting: boolean;
+  clinicId: string | null;
+}
+
+export function AddAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting }: AddAppointmentModalProps) {
+  const [form] = Form.useForm();
+  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [phoneError, setPhoneError] = useState<string>("");
+
+  if (!isOpen) return null;
+
+  const validatePhoneNumber = (phone: string | undefined): boolean => {
+    if (!phone) {
+      setPhoneError("Phone number is required");
+      return false;
+    }
+
+    try {
+      if (!isValidPhoneNumber(phone)) {
+        setPhoneError("Please enter a valid phone number");
+        return false;
+      }
+
+      const phoneNumberObj = parsePhoneNumber(phone);
+      if (!phoneNumberObj || !phoneNumberObj.isValid()) {
+        setPhoneError("Invalid phone number for the selected country");
+        return false;
+      }
+
+      setPhoneError("");
+      return true;
+    } catch (error) {
+      setPhoneError("Invalid phone number format");
+      return false;
+    }
+  };
+
+  const handlePhoneChange = (value: string | undefined) => {
+    setPhoneNumber(value || "");
+    if (value) {
+      validatePhoneNumber(value);
+    } else {
+      setPhoneError("");
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    validatePhoneNumber(phoneNumber);
+  };
+
+  const handleSubmit = async (values: any) => {
+    if (!validatePhoneNumber(phoneNumber)) {
+      return;
+    }
+
+    // Combine date and time into a full datetime
+    let fullDateTime = null;
+    if (values.preferred_meeting_date && values.preferred_meeting_time) {
+      const date = dayjs(values.preferred_meeting_date).format("YYYY-MM-DD");
+      const time = dayjs(values.preferred_meeting_time).format("HH:mm:ss");
+      fullDateTime = `${date} ${time}`;
+    }
+
+    const formData = {
+      ...values,
+      phone_number: phoneNumber,
+      preferred_meeting_time: fullDateTime,
+    };
+
+    await onSubmit(formData);
+  };
+
+  const handleClose = () => {
+    form.resetFields();
+    setPhoneNumber("");
+    setPhoneError("");
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarOutlined className="h-5 w-5 text-purple-600" />
+            <h3 className="text-lg font-semibold">Schedule a Meeting</h3>
+          </div>
+          <button onClick={handleClose} className="text-gray-400 hover:text-gray-600" disabled={isSubmitting}>
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        <p className="mb-6 text-gray-600">Fill out the form below to schedule your meeting with us</p>
+
+        {isSubmitting && (
+          <div className="mb-4">
+            <LoadingSpinner message="Scheduling meeting..." size="sm" />
+          </div>
+        )}
+
+        <Form form={form} layout="vertical" onFinish={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Form.Item
+              label={
+                <span className="flex items-center gap-2">
+                  <UserOutlined />
+                  First Name
+                </span>
+              }
+              name="first_name"
+              rules={[
+                { required: true, message: "First name is required" },
+                { max: 25, message: "First name cannot exceed 25 characters" },
+              ]}
+            >
+              <Input
+                placeholder="Enter your first name"
+                maxLength={25}
+                disabled={isSubmitting}
+                onBlur={() => {
+                  form.validateFields(["first_name"]);
+                }}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label={
+                <span className="flex items-center gap-2">
+                  <UserOutlined />
+                  Last Name
+                </span>
+              }
+              name="last_name"
+              rules={[
+                { required: true, message: "Last name is required" },
+                { max: 25, message: "Last name cannot exceed 25 characters" },
+              ]}
+            >
+              <Input
+                placeholder="Enter your last name"
+                maxLength={25}
+                disabled={isSubmitting}
+                onBlur={() => {
+                  form.validateFields(["last_name"]);
+                }}
+              />
+            </Form.Item>
+          </div>
+
+          <Form.Item
+            label={
+              <span className="flex items-center gap-2">
+                <MailOutlined />
+                Email
+              </span>
+            }
+            name="email"
+            rules={[
+              { required: true, message: "Email is required" },
+              { type: "email", message: "Please enter a valid email address" },
+              { max: 100, message: "Email cannot exceed 100 characters" },
+            ]}
+          >
+            <Input
+              placeholder="Enter your email"
+              maxLength={100}
+              disabled={isSubmitting}
+              onBlur={() => {
+                form.validateFields(["email"]);
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label={
+              <span className="flex items-center gap-2">
+                <PhoneOutlined />
+                Contact Number
+              </span>
+            }
+            required
+            validateStatus={phoneError ? "error" : ""}
+            help={phoneError}
+          >
+            <PhoneInput
+              international
+              countryCallingCodeEditable={false}
+              defaultCountry="US"
+              value={phoneNumber}
+              onChange={handlePhoneChange}
+              onBlur={handlePhoneBlur}
+              placeholder="Enter your phone number"
+              disabled={isSubmitting}
+              className="ant-input"
+              style={{
+                padding: "4px 11px",
+                border: phoneError ? "1px solid #ff4d4f" : "1px solid #d9d9d9",
+                borderRadius: "6px",
+                fontSize: "14px",
+                lineHeight: "1.5714285714285714",
+                color: "rgba(0, 0, 0, 0.88)",
+                backgroundColor: "#ffffff",
+                transition: "all 0.2s",
+              }}
+            />
+          </Form.Item>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Form.Item
+              label={
+                <span className="flex items-center gap-2">
+                  <CalendarOutlined />
+                  Preferred Meeting Date
+                </span>
+              }
+              name="preferred_meeting_date"
+              rules={[{ required: true, message: "Please select a meeting date" }]}
+            >
+              <DatePicker
+                format="YYYY-MM-DD"
+                placeholder="Select date"
+                className="w-full"
+                disabled={isSubmitting}
+                disabledDate={current => current && current < dayjs().startOf("day")}
+                onBlur={() => {
+                  form.validateFields(["preferred_meeting_date"]);
+                }}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label={
+                <span className="flex items-center gap-2">
+                  <ClockCircleOutlined />
+                  Preferred Meeting Time
+                </span>
+              }
+              name="preferred_meeting_time"
+              rules={[{ required: true, message: "Please select a meeting time" }]}
+            >
+              <TimePicker
+                format="HH:mm"
+                placeholder="Select time (e.g., 16:30)"
+                className="w-full"
+                disabled={isSubmitting}
+                minuteStep={15}
+                showNow={false}
+                onBlur={() => {
+                  form.validateFields(["preferred_meeting_time"]);
+                }}
+              />
+            </Form.Item>
+          </div>
+
+          <Form.Item label="Meeting Notes" name="meeting_notes">
+            <TextArea
+              placeholder="Add any additional notes or topics you'd like to discuss..."
+              rows={4}
+              disabled={isSubmitting}
+              showCount
+            />
+          </Form.Item>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex-1 rounded-lg bg-gray-300 px-4 py-2 text-gray-700 transition-colors duration-200 hover:bg-gray-400"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors duration-200 hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Scheduling..." : "Schedule Meeting"}
+            </button>
+          </div>
+        </Form>
+      </div>
+    </div>
+  );
+}

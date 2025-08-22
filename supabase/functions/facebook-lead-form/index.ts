@@ -180,14 +180,10 @@ async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: any) {
   const accountsJson = await accountsRes.json();
   const pages = Array.isArray(accountsJson.data) ? accountsJson.data : [];
   console.log("Fetched pages:", accountsRes);
-      const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
-
-  let redirectUrl = new URL(`${APP_URL}/onboarding`);
   if (!pages.length) {
-    return new Response(null, {
+    return new Response(JSON.stringify({ message: "No pages found for the user" }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json", Location: redirectUrl.toString(),
-      },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -291,8 +287,9 @@ async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: any) {
   } catch (error) {
     console.error("❌ Failed to fetch past leads after auth:", error);
   }
+      const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
 
-    redirectUrl = new URL(`${APP_URL}/onboarding`);
+   const redirectUrl = new URL(`${APP_URL}/onboarding`);
     redirectUrl.searchParams.set("facebook_lead_form_status", "success");
     return new Response(null, {
       status: 302,

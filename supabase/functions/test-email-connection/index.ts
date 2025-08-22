@@ -247,7 +247,8 @@ async function processEmailReply(
       
       // Find or create default source for email leads
       let defaultSourceId: string;
-      
+
+      //This will not work as there will be no email column in lead_source
       const { data: existingSource } = await supabaseClient
         .from('lead_source')
         .select('id')
@@ -258,6 +259,7 @@ async function processEmailReply(
       if (existingSource) {
         defaultSourceId = existingSource.id;
       } else {
+        // Client requirement don't put name = Email Inbound
         const { data: newSource, error: createSourceError } = await supabaseClient
           .from('lead_source')
           .insert({
