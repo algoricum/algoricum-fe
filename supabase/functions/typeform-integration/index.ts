@@ -118,11 +118,16 @@ serve(async (req) => {
     if (!clinic_id || !Array.isArray(forms)) {
       return new Response("Missing clinic_id or forms[]", { status: 400 });
     }
-
+const { data: integration } = await supabase
+      .from("integrations")
+      .select("id")
+      .eq("name", "Typeform")
+      .single();
     const { data: connection } = await supabase
       .from("integration_connections")
       .select("id, auth_data, clinic_id")
       .eq("clinic_id", clinic_id)
+      .eq("integration_id", integration.id) // Typeform integration ID
       .single();
 
     if (!connection) {
@@ -280,10 +285,16 @@ if(webhok.error) {
   if (req.method === "POST" && path.endsWith("/getSheets")) {
     try {
       const { clinic_id } = await req.json();
+      const {data:integration}=await supabase
+        .from("integrations")
+        .select("id")
+        .eq("name", "Typeform")
+        .single();
       const { data: connection } = await supabase
         .from("integration_connections")
         .select("auth_data")
         .eq("clinic_id", clinic_id)
+        .eq("integration_id", integration.id) // Typeform integration ID
         .single();
 
       if (!connection?.auth_data?.access_token) {
