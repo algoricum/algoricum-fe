@@ -2,13 +2,14 @@
 import { useState, useEffect } from "react";
 import { Flex, Form, Input, Select, Tooltip, Upload } from "antd";
 import { Button } from "@/components/elements";
-import {  MessageOutlined, UserOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { MessageOutlined, UserOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { SuccessToast, ErrorToast } from "@/helpers/toast";
 import { ColorConfigurator } from "@/components/common";
 import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx";
 import { getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { getUserData } from "@/utils/supabase/user-helper";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 // import generateClinicInstructions from "@/utils/generateClinicInstructions";
 // import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getPreviewText } from "@/utils/getPreviewChatbot";
@@ -161,7 +162,7 @@ const ChatbotSettings = () => {
         formality_level: values.formalityLevel,
       });
 
-      // Below comment code is for assistant file upload. 
+      // Below comment code is for assistant file upload.
 
       // const clinicInstructions = generateClinicInstructions({
       //   name: clinic.legal_business_name || "",
@@ -257,101 +258,103 @@ const ChatbotSettings = () => {
   };
 
   if (loading && !dataLoaded) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading chatbot settings...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading Ai Assistant settings..." size="lg" />;
   }
 
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex justify-center flex-col md:flex-row gap-6 w-full">
         <div className="flex-1 rounded-[20px] border border-gray-200 p-4 bg-Gray100 gap-4">
-        <Form form={form} layout="vertical" onFinish={handleSave} name="themeForm">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-semibold">Chatbot Settings</h2>
-              <Tooltip title="Configure how your chatbot looks, behaves, and communicates with your website visitors.">
-                <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
-              </Tooltip>
-            </div>
-            <Tooltip title="This will let you connect the chatbot to your website">
-              <Button
-                type="primary"
-                onClick={() => setIsConnectModalOpen(true)}
-                className="bg-brand-primary hover:!bg-brand-secondary !hover:text-white text-white py-2 rounded-md"
-              >
-                Add Chatbot to Website
-              </Button>
-            </Tooltip>
-          </div>
-
-          <Form.Item label={
-            <div className="flex items-center gap-2">
-              <span>Chatbot Name</span>
-              <Tooltip title="This is the name that will appear in your chatbot widget. Choose something friendly and professional that represents your practice.">
-                <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
-              </Tooltip>
-            </div>
-          } name="chatbotName" rules={[{ required: true, message: "Please enter a chatbot name" }]}>
-            <Input
-              placeholder="Enter your chatbot's name (e.g., Dr. Smith Assistant, MedBot)"
-              prefix={<UserOutlined className="text-gray-400" />}
-            />
-          </Form.Item>
-
-          <Form.Item label={
-            <div className="flex items-center gap-2">
-              <span>Chatbot Avatar</span>
-              <Tooltip title="Upload an image that will represent your chatbot. This could be your clinic logo, a professional avatar, or a friendly icon. Square images work best.">
-                <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
-              </Tooltip>
-            </div>
-          } name="chatbotAvatar" valuePropName="fileList" getValueFromEvent={normFile}>
-            <Upload.Dragger
-              name="chatbotAvatar"
-              accept=".jpg,.jpeg,.png,.svg"
-              beforeUpload={file => {
-                const isJpgOrPngOrSvg = file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/svg+xml";
-                if (!isJpgOrPngOrSvg) {
-                  ErrorToast("You can only upload JPG, PNG, or SVG files!");
-                }
-                return false; // Prevent automatic upload
-              }}
-              maxCount={1}
-              className="bg-white rounded-md"
-              fileList={form.getFieldValue("chatbotAvatar") || []}
-            >
-              <p className="flex justify-center mb-2">
-                <UserOutlined className="text-gray-400" />
-              </p>
-              <p className="text-center mb-1">
-                Upload chatbot avatar or <span className="text-brand-primary">Browse Files</span>
-              </p>
-              <p className="text-center text-xs text-gray-500">JPG, PNG, SVG (recommended: square image)</p>
-            </Upload.Dragger>
-          </Form.Item>
-
-          <Form.Item
-            label={
+          <Form form={form} layout="vertical" onFinish={handleSave} name="themeForm">
+            <div className="flex justify-between items-center mb-6">
               <div className="flex items-center gap-2">
-                <span>Greeting Message For Visitors</span>
-                <Tooltip title="This is the first message visitors will see when they open your chatbot. Make it welcoming and explain how you can help them.">
+                <h2 className="text-xl font-semibold">Chatbot Settings</h2>
+                <Tooltip title="Configure how your chatbot looks, behaves, and communicates with your website visitors.">
                   <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
                 </Tooltip>
               </div>
-            }
-            name="greeting"
-            rules={[{ required: true, message: "Please enter a greeting message" }]}
-          >
-            <TextArea rows={4} placeholder="Enter a friendly greeting message" />
-          </Form.Item>
+              <Tooltip title="This will let you connect the chatbot to your website">
+                <Button
+                  type="primary"
+                  onClick={() => setIsConnectModalOpen(true)}
+                  className="bg-brand-primary hover:!bg-brand-secondary !hover:text-white text-white py-2 rounded-md"
+                >
+                  Add Chatbot to Website
+                </Button>
+              </Tooltip>
+            </div>
 
-          {/* <Form.Item
+            <Form.Item
+              label={
+                <div className="flex items-center gap-2">
+                  <span>Chatbot Name</span>
+                  <Tooltip title="This is the name that will appear in your chatbot widget. Choose something friendly and professional that represents your practice.">
+                    <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
+                  </Tooltip>
+                </div>
+              }
+              name="chatbotName"
+              rules={[{ required: true, message: "Please enter a chatbot name" }]}
+            >
+              <Input
+                placeholder="Enter your chatbot's name (e.g., Dr. Smith Assistant, MedBot)"
+                prefix={<UserOutlined className="text-gray-400" />}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label={
+                <div className="flex items-center gap-2">
+                  <span>Chatbot Avatar</span>
+                  <Tooltip title="Upload an image that will represent your chatbot. This could be your clinic logo, a professional avatar, or a friendly icon. Square images work best.">
+                    <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
+                  </Tooltip>
+                </div>
+              }
+              name="chatbotAvatar"
+              valuePropName="fileList"
+              getValueFromEvent={normFile}
+            >
+              <Upload.Dragger
+                name="chatbotAvatar"
+                accept=".jpg,.jpeg,.png,.svg"
+                beforeUpload={file => {
+                  const isJpgOrPngOrSvg = file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/svg+xml";
+                  if (!isJpgOrPngOrSvg) {
+                    ErrorToast("You can only upload JPG, PNG, or SVG files!");
+                  }
+                  return false; // Prevent automatic upload
+                }}
+                maxCount={1}
+                className="bg-white rounded-md"
+                fileList={form.getFieldValue("chatbotAvatar") || []}
+              >
+                <p className="flex justify-center mb-2">
+                  <UserOutlined className="text-gray-400" />
+                </p>
+                <p className="text-center mb-1">
+                  Upload chatbot avatar or <span className="text-brand-primary">Browse Files</span>
+                </p>
+                <p className="text-center text-xs text-gray-500">JPG, PNG, SVG (recommended: square image)</p>
+              </Upload.Dragger>
+            </Form.Item>
+
+            <Form.Item
+              label={
+                <div className="flex items-center gap-2">
+                  <span>Greeting Message For Visitors</span>
+                  <Tooltip title="This is the first message visitors will see when they open your chatbot. Make it welcoming and explain how you can help them.">
+                    <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
+                  </Tooltip>
+                </div>
+              }
+              name="greeting"
+              rules={[{ required: true, message: "Please enter a greeting message" }]}
+            >
+              <TextArea rows={4} placeholder="Enter a friendly greeting message" />
+            </Form.Item>
+
+            {/* <Form.Item
             name="servicesDocument"
             label={
               <div className="flex items-center gap-2">
@@ -397,171 +400,185 @@ const ChatbotSettings = () => {
             </Upload.Dragger>
           </Form.Item> */}
 
-          <Form.Item label={
-            <div className="flex items-center gap-2">
-              <span>Chatbot Appearance</span>
-              <Tooltip title="Customize the colors of your chatbot to match your brand. Choose colors that provide good contrast for readability.">
-                <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
-              </Tooltip>
-            </div>
-          }>
-            <Flex wrap="wrap" gap="middle">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium">Primary Color</span>
-                  <Tooltip title="Choose the primary color for your chatbot. This will be used for buttons, headers, and accent elements.">
-                    <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help text-xs" />
+            <Form.Item
+              label={
+                <div className="flex items-center gap-2">
+                  <span>Chatbot Appearance</span>
+                  <Tooltip title="Customize the colors of your chatbot to match your brand. Choose colors that provide good contrast for readability.">
+                    <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
                   </Tooltip>
                 </div>
-                <ColorConfigurator
-                  fieldName="primary_color"
-                  heading=""
-                  value={primaryColor || "#2563EB"}
-                  onChange={value => {
-                    form.setFieldValue("primary_color", value);
-                    form.validateFields(["primary_color"]); // Trigger form update
-                  }}
-                />
-              </div>
+              }
+            >
+              <Flex wrap="wrap" gap="middle">
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-medium">Primary Color</span>
+                    <Tooltip title="Choose the primary color for your chatbot. This will be used for buttons, headers, and accent elements.">
+                      <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help text-xs" />
+                    </Tooltip>
+                  </div>
+                  <ColorConfigurator
+                    fieldName="primary_color"
+                    heading=""
+                    value={primaryColor || "#2563EB"}
+                    onChange={value => {
+                      form.setFieldValue("primary_color", value);
+                      form.validateFields(["primary_color"]); // Trigger form update
+                    }}
+                  />
+                </div>
 
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium">Font Color</span>
-                  <Tooltip title="Select the color for text in your chatbot. Make sure it contrasts well with your primary color for readability.">
-                    <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help text-xs" />
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-medium">Font Color</span>
+                    <Tooltip title="Select the color for text in your chatbot. Make sure it contrasts well with your primary color for readability.">
+                      <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help text-xs" />
+                    </Tooltip>
+                  </div>
+                  <ColorConfigurator
+                    fieldName="font_color"
+                    heading=""
+                    value={fontColor || "#000000"}
+                    onChange={value => {
+                      form.setFieldValue("font_color", value);
+                      form.validateFields(["font_color"]); // Trigger form update
+                    }}
+                  />
+                </div>
+              </Flex>
+            </Form.Item>
+
+            {/* Hidden form fields to capture color values */}
+            <Form.Item name="primary_color" hidden>
+              <Input />
+            </Form.Item>
+
+            <Form.Item name="font_color" hidden>
+              <Input />
+            </Form.Item>
+
+            <Form.Item
+              label={
+                <div className="flex items-center gap-2">
+                  <span>Tone Selector</span>
+                  <Tooltip title="The tone affects how your chatbot communicates. Friendly is warm and welcoming, Professional is competent and reliable, Casual is relaxed, and Formal is respectful and structured.">
+                    <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
                   </Tooltip>
                 </div>
-                <ColorConfigurator
-                  fieldName="font_color"
-                  heading=""
-                  value={fontColor || "#000000"}
-                  onChange={value => {
-                    form.setFieldValue("font_color", value);
-                    form.validateFields(["font_color"]); // Trigger form update
-                  }}
-                />
+              }
+              name="toneSelector"
+              rules={[{ required: true, message: "Please select a tone" }]}
+            >
+              <div className="mb-2">
+                <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
               </div>
-            </Flex>
-          </Form.Item>
+              <Select
+                placeholder="Select Tone"
+                className="w-full"
+                onChange={handleToneChange}
+                value={toneSelector} // Explicitly set value
+                options={[
+                  { value: "friendly", label: "Friendly - Warm and welcoming" },
+                  { value: "professional", label: "Professional - Competent and reliable" },
+                  { value: "casual", label: "Casual - Relaxed and conversational" },
+                  { value: "formal", label: "Formal - Respectful and structured" },
+                ]}
+              />
+            </Form.Item>
 
-          {/* Hidden form fields to capture color values */}
-          <Form.Item name="primary_color" hidden>
-            <Input />
-          </Form.Item>
+            <Form.Item
+              label={
+                <div className="flex items-center gap-2">
+                  <span>Sentence Length</span>
+                  <Tooltip title="Control how detailed your chatbot's responses are. Short for quick answers, Medium for balanced responses, Long for comprehensive explanations.">
+                    <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
+                  </Tooltip>
+                </div>
+              }
+              name="sentenceLength"
+              rules={[{ required: true, message: "Please select a sentence length" }]}
+            >
+              <div className="mb-2">
+                <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
+              </div>
+              <Select
+                placeholder="Select Sentence Length"
+                className="w-full"
+                onChange={handleSentenceLengthChange}
+                value={sentenceLength} // Explicitly set value
+                options={[
+                  { value: "short", label: "Short - Quick and concise" },
+                  { value: "medium", label: "Medium - Balanced detail" },
+                  { value: "long", label: "Long - Comprehensive explanations" },
+                ]}
+              />
+            </Form.Item>
 
-          <Form.Item name="font_color" hidden>
-            <Input />
-          </Form.Item>
+            <Form.Item
+              label={
+                <div className="flex items-center gap-2">
+                  <span>Formality Level</span>
+                  <Tooltip title="Adjust how formal the language should be, from very casual (like talking to a friend) to very formal (traditional business style).">
+                    <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
+                  </Tooltip>
+                </div>
+              }
+              name="formalityLevel"
+              rules={[{ required: true, message: "Please select a formality level" }]}
+            >
+              <div className="mb-2">
+                <p className="text-xs text-gray-500 mb-2">How formal should the language be?</p>
+              </div>
+              <Select
+                placeholder="Select Formality Level"
+                className="w-full"
+                onChange={handleFormalityLevelChange}
+                value={formalityLevel} // Explicitly set value
+                options={[
+                  { value: "very_casual", label: "Very Casual - Like talking to a friend" },
+                  { value: "casual", label: "Casual - Relaxed but respectful" },
+                  { value: "neutral", label: "Neutral - Balanced approach" },
+                  { value: "formal", label: "Formal - Professional courtesy" },
+                  { value: "very_formal", label: "Very Formal - Traditional business style" },
+                ]}
+              />
+            </Form.Item>
 
-          <Form.Item label={
-            <div className="flex items-center gap-2">
-              <span>Tone Selector</span>
-              <Tooltip title="The tone affects how your chatbot communicates. Friendly is warm and welcoming, Professional is competent and reliable, Casual is relaxed, and Formal is respectful and structured.">
-                <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
-              </Tooltip>
-            </div>
-          } name="toneSelector" rules={[{ required: true, message: "Please select a tone" }]}>
-            <div className="mb-2">
-              <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
-            </div>
-            <Select
-              placeholder="Select Tone"
-              className="w-full"
-              onChange={handleToneChange}
-              value={toneSelector} // Explicitly set value
-              options={[
-                { value: "friendly", label: "Friendly - Warm and welcoming" },
-                { value: "professional", label: "Professional - Competent and reliable" },
-                { value: "casual", label: "Casual - Relaxed and conversational" },
-                { value: "formal", label: "Formal - Respectful and structured" },
-              ]}
-            />
-          </Form.Item>
-
-          <Form.Item label={
-            <div className="flex items-center gap-2">
-              <span>Sentence Length</span>
-              <Tooltip title="Control how detailed your chatbot's responses are. Short for quick answers, Medium for balanced responses, Long for comprehensive explanations.">
-                <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
-              </Tooltip>
-            </div>
-          } name="sentenceLength" rules={[{ required: true, message: "Please select a sentence length" }]}>
-            <div className="mb-2">
-              <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
-            </div>
-            <Select
-              placeholder="Select Sentence Length"
-              className="w-full"
-              onChange={handleSentenceLengthChange}
-              value={sentenceLength} // Explicitly set value
-              options={[
-                { value: "short", label: "Short - Quick and concise" },
-                { value: "medium", label: "Medium - Balanced detail" },
-                { value: "long", label: "Long - Comprehensive explanations" },
-              ]}
-            />
-          </Form.Item>
-
-          <Form.Item label={
-            <div className="flex items-center gap-2">
-              <span>Formality Level</span>
-              <Tooltip title="Adjust how formal the language should be, from very casual (like talking to a friend) to very formal (traditional business style).">
-                <InfoCircleOutlined className="text-gray-400 hover:text-gray-600 cursor-help" />
-              </Tooltip>
-            </div>
-          } name="formalityLevel" rules={[{ required: true, message: "Please select a formality level" }]}>
-            <div className="mb-2">
-              <p className="text-xs text-gray-500 mb-2">How formal should the language be?</p>
-            </div>
-            <Select
-              placeholder="Select Formality Level"
-              className="w-full"
-              onChange={handleFormalityLevelChange}
-              value={formalityLevel} // Explicitly set value
-              options={[
-                { value: "very_casual", label: "Very Casual - Like talking to a friend" },
-                { value: "casual", label: "Casual - Relaxed but respectful" },
-                { value: "neutral", label: "Neutral - Balanced approach" },
-                { value: "formal", label: "Formal - Professional courtesy" },
-                { value: "very_formal", label: "Very Formal - Traditional business style" },
-              ]}
-            />
-          </Form.Item>
-
-          {/* Live Preview Section */}
-          {(toneSelector || sentenceLength || formalityLevel) && (
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-start gap-3">
-                <MessageOutlined className="text-blue-600 mt-1 flex-shrink-0" />
-                <div className="flex-1">
-                  <h3 className="text-sm font-medium text-blue-900 mb-2">Preview: How your assistant will greet patients</h3>
-                  <div className="bg-white p-3 rounded border border-blue-200">
-                    <p className="text-gray-800 italic">
-                      &quot;
-                      {getPreviewText({
-                        tone: toneSelector,
-                        formality: formalityLevel,
-                        length: sentenceLength,
-                      })}
-                      &quot;
-                    </p>
+            {/* Live Preview Section */}
+            {(toneSelector || sentenceLength || formalityLevel) && (
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <MessageOutlined className="text-blue-600 mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="text-sm font-medium text-blue-900 mb-2">Preview: How your assistant will greet patients</h3>
+                    <div className="bg-white p-3 rounded border border-blue-200">
+                      <p className="text-gray-800 italic">
+                        &quot;
+                        {getPreviewText({
+                          tone: toneSelector,
+                          formality: formalityLevel,
+                          length: sentenceLength,
+                        })}
+                        &quot;
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <Form.Item>
-            <Button
-              type="primary"
-              className="bg-brand-primary hover:!bg-brand-secondary !hover:text-white text-white py-2 mt-3 rounded-md"
-              htmlType="submit"
-              loading={loading}
-            >
-              Save Changes
-            </Button>
-          </Form.Item>
-        </Form>
+            <Form.Item>
+              <Button
+                type="primary"
+                className="bg-brand-primary hover:!bg-brand-secondary !hover:text-white text-white py-2 mt-3 rounded-md"
+                htmlType="submit"
+                loading={loading}
+              >
+                Save Changes
+              </Button>
+            </Form.Item>
+          </Form>
         </div>
 
         <ChatbotConnectModal apiKey={apiKey} isOpen={isConnectModalOpen} onClose={() => setIsConnectModalOpen(false)} />
