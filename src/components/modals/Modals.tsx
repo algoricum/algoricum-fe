@@ -57,7 +57,7 @@ export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, 
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={()=>onConnect}
+              onClick={()=>onConnect?.()}
               className="bg-orange-500 border-orange-500 hover:bg-orange-600 h-12 px-8 text-lg font-medium"
             >
               Connect to HubSpot
@@ -131,7 +131,7 @@ export const PipedriveModal: React.FC<ModalProps> = ({ open, status, accountInfo
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={()=>onConnect}
+              onClick={()=>onConnect?.()}
               className="bg-green-600 border-green-600 hover:bg-green-700 h-12 px-8 text-lg font-medium"
             >
               Connect to Pipedrive
@@ -278,7 +278,7 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
               type="primary"
               size="large"
               icon={<LinkOutlined />}
-              onClick={()=>onConnect}
+              onClick={()=>onConnect?.()}
               className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 h-12 px-8 text-lg font-medium"
             >
               Connect to Google Forms
