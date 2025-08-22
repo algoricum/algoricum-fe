@@ -1,16 +1,17 @@
 "use client";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Input, Button, Typography, Upload} from "antd";
+import { Input, Button, Typography, Upload } from "antd";
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
-import { FileTextOutlined } from "@ant-design/icons";
+import { FileTextOutlined, DollarCircleOutlined, StarOutlined } from "@ant-design/icons";
 import { ErrorToast, WarningToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 const supabase = createClient();
+
 interface ClinicInfoStepProps {
   // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
@@ -55,7 +56,6 @@ const validatePhoneNumber = (phoneNumber: string) => {
   }
 };
 
-
 export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showAllQuestions = false }: ClinicInfoStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [formData, setFormData] = useState({
@@ -65,8 +65,10 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     primaryContactEmail: initialData.primaryContactEmail || "",
     clinicPhone: initialData.clinicPhone || "",
     businessAddress: initialData.businessAddress || "",
-    // servicesDocument will be antd fileList style array
+    // Three separate document arrays
     servicesDocument: initialData.servicesDocument || [],
+    pricingDocument: initialData.pricingDocument || [],
+    testimonialsDocument: initialData.testimonialsDocument || [],
   });
 
   const [consentData, setConsentData] = useState({
@@ -78,7 +80,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     setConsentData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Insert servicesDocument question right after businessAddress
+  // Updated questions array with three separate file upload questions
   const questions = [
     {
       id: "clinicName",
@@ -108,13 +110,33 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       placeholder: "Enter your complete business address",
       required: true,
     },
-    // <-- NEW required file question immediately after businessAddress
+    // Three separate file upload questions
     {
       id: "servicesDocument",
       type: "file",
       question: "Upload services document for AI processing",
-      placeholder: "PDF, DOC, DOCX (Max 50MB)",
+      placeholder: "Service information, procedures, FAQs (PDF, DOC, DOCX - Max 50MB)",
       required: true,
+      icon: FileTextOutlined,
+      documentType: "services",
+    },
+    {
+      id: "pricingDocument",
+      type: "file",
+      question: "Upload pricing information",
+      placeholder: "Service costs, insurance details, payment options (PDF, DOC, DOCX - Max 50MB)",
+      required: false,
+      icon: DollarCircleOutlined,
+      documentType: "pricing",
+    },
+    {
+      id: "testimonialsDocument",
+      type: "file",
+      question: "Upload testimonials and reviews",
+      placeholder: "Patient reviews, success stories, case studies (PDF, DOC, DOCX - Max 50MB)",
+      required: false,
+      icon: StarOutlined,
+      documentType: "testimonials",
     },
     {
       id: "primaryContactName",
@@ -152,80 +174,75 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     return fileList;
   };
 
-  const handleFileChange = async (info: any) => {
-  const fileList = normFile(info);
+  // Enhanced handleFileChange to handle different document types
+  const handleFileChange = async (info: any, documentType: string) => {
+    const fileList = normFile(info);
 
-  // Filter & validate
-  const validatedList = fileList.filter((file: any) => {
-    const fileObj = file.originFileObj || file;
-    const sizeOk =
-      typeof fileObj.size === "number"
-        ? fileObj.size / 1024 / 1024 < 50
-        : true; // <60MB
-    const type = fileObj.type || "";
-    const isValidType =
-      type === "application/pdf" ||
-      type === "application/msword" ||
-      type ===
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      (file.name && /\.(pdf|docx?|DOCX?|PDF)$/.test(file.name));
+    // Filter & validate
+    const validatedList = fileList.filter((file: any) => {
+      const fileObj = file.originFileObj || file;
+      const sizeOk = typeof fileObj.size === "number" ? fileObj.size / 1024 / 1024 < 50 : true; // <50MB
+      const type = fileObj.type || "";
+      const isValidType =
+        type === "application/pdf" ||
+        type === "application/msword" ||
+        type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        (file.name && /\.(pdf|docx?|DOCX?|PDF)$/.test(file.name));
 
-    if (!isValidType) {
-      ErrorToast(`Rejected file type: ${file.name}`);
-      console.warn("Rejected file type:", file.name);
-      return false;
-    }
-    if (!sizeOk) {
-      console.warn("Rejected file size:", file.name);
-      ErrorToast(`Rejected file size: ${file.name}`);
-      return false;
-    }
-    return true;
-  });
-
-  const uploadedFiles: { name: any; path: string; signedUrl: string; }[] = [];
-
-  for (const file of validatedList) {
-    const fileObj = file.originFileObj || file;
-
-    const path = `services/${Date.now()}-${fileObj.name}`;
-
-    // Upload to Supabase (private bucket)
-    const { error: uploadError } = await supabase.storage
-      .from('Assistant-File')
-      .upload(path, fileObj);
-
-    if (uploadError) {
-      console.error("Upload failed:", uploadError);
-      ErrorToast(`Failed to upload: ${fileObj.name}`);
-      continue;
-    }
-
-    // Generate a signed URL (1 hour expiry)
-    const { data: signedUrlData, error: signedUrlError } =
-      await supabase.storage
-        .from('Assistant-File')
-        .createSignedUrl(path, 60 * 60);
-
-    if (signedUrlError) {
-      console.error("Signed URL failed:", signedUrlError);
-      ErrorToast(`Failed to get URL for: ${fileObj.name}`);
-      continue;
-    }
-
-    uploadedFiles.push({
-      name: fileObj.name,
-      path,
-      signedUrl: signedUrlData.signedUrl,
+      if (!isValidType) {
+        ErrorToast(`Rejected file type: ${file.name}`);
+        console.warn("Rejected file type:", file.name);
+        return false;
+      }
+      if (!sizeOk) {
+        console.warn("Rejected file size:", file.name);
+        ErrorToast(`Rejected file size: ${file.name}`);
+        return false;
+      }
+      return true;
     });
-  }
 
-  // Store in state — no raw binary, just path + URL
-  setFormData((prev) => ({
-    ...prev,
-    servicesDocument: uploadedFiles,
-  }));
-};
+    const uploadedFiles: { name: any; path: string; signedUrl: string; documentType: string }[] = [];
+
+    for (const file of validatedList) {
+      const fileObj = file.originFileObj || file;
+
+      // Use different storage paths for different document types
+      const path = `${documentType}/${Date.now()}-${fileObj.name}`;
+
+      // Upload to Supabase (private bucket)
+      const { error: uploadError } = await supabase.storage.from("Assistant-File").upload(path, fileObj);
+
+      if (uploadError) {
+        console.error("Upload failed:", uploadError);
+        ErrorToast(`Failed to upload: ${fileObj.name}`);
+        continue;
+      }
+
+      // Generate a signed URL (1 hour expiry)
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage.from("Assistant-File").createSignedUrl(path, 60 * 60);
+
+      if (signedUrlError) {
+        console.error("Signed URL failed:", signedUrlError);
+        ErrorToast(`Failed to get URL for: ${fileObj.name}`);
+        continue;
+      }
+
+      uploadedFiles.push({
+        name: fileObj.name,
+        path,
+        signedUrl: signedUrlData.signedUrl,
+        documentType: documentType,
+      });
+    }
+
+    // Store in the appropriate state field based on document type
+    const fieldName = `${documentType}Document` as keyof typeof formData;
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: uploadedFiles,
+    }));
+  };
 
   const handleInputChange = (value: string) => {
     setFormData(prev => ({
@@ -241,7 +258,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     }));
   };
 
-  // FIXED getFieldError FUNCTION
+  // Enhanced getFieldError function to handle multiple file types
   const getFieldError = () => {
     const value = formData[currentQuestion.id as keyof typeof formData];
 
@@ -257,7 +274,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
         const fileObj = file.originFileObj || file;
         if (fileObj) {
           const sizeMB = typeof fileObj.size === "number" ? fileObj.size / 1024 / 1024 : 0;
-          if (sizeMB >= 60) {
+          if (sizeMB >= 50) {
             return "File must be smaller than 50MB";
           }
           const type = fileObj.type || "";
@@ -323,7 +340,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     }
   };
 
-
+  // Enhanced renderPreviousQuestions to handle all three file types
   const renderPreviousQuestions = () => {
     return questions.slice(0, currentQuestionIndex).map(q => {
       const value = formData[q.id as keyof typeof formData];
@@ -350,16 +367,21 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
               {Array.isArray(value) && value.length > 0 ? (
                 value.map((file: any, idx: number) => {
                   const name = file.name || (file.originFileObj && file.originFileObj.name) || `File ${idx + 1}`;
-                  // if there's a url, show link; otherwise just show name
-                  const url = file.url || file.response?.url;
+                  const url = file.signedUrl || file.url || file.response?.url;
                   return url ? (
-                    <div key={idx}>
+                    <div key={idx} className="flex items-center gap-2 mb-1">
+                      <span className="text-green-600">✓</span>
                       <a href={url} target="_blank" rel="noreferrer" className="text-purple-600 underline">
                         {name}
                       </a>
+                      <span className="text-xs text-gray-500">({file.documentType || "document"})</span>
                     </div>
                   ) : (
-                    <div key={idx}>{name}</div>
+                    <div key={idx} className="flex items-center gap-2 mb-1">
+                      <span className="text-green-600">✓</span>
+                      <span>{name}</span>
+                      <span className="text-xs text-gray-500">({file.documentType || "document"})</span>
+                    </div>
                   );
                 })
               ) : (
@@ -437,6 +459,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     return !getFieldError();
   };
 
+  // Enhanced renderCurrentInput to handle different file types with appropriate icons
   const renderCurrentInput = () => {
     const error = getFieldError();
     const hasError = !!error;
@@ -458,13 +481,16 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     }
 
     if (currentQuestion.type === "file") {
+      const Icon = currentQuestion.icon || FileTextOutlined;
+      const documentType = currentQuestion.documentType || "services";
+
       return (
         <div className="mb-8">
           <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">
             {currentQuestion.placeholder || "PDF, DOC, DOCX (Max 50MB)"}
           </Text>
           <Upload.Dragger
-            name="servicesDocument"
+            name={currentQuestion.id}
             accept=".pdf,.doc,.docx"
             beforeUpload={file => {
               const isValidDocument =
@@ -476,7 +502,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
                 alert("You can only upload PDF, DOC, or DOCX files!");
                 return Upload.LIST_IGNORE;
               }
-              const isValidSize = file.size / 1024 / 1024 < 50; // < 60MB
+              const isValidSize = file.size / 1024 / 1024 < 50; // < 50MB
               if (!isValidSize) {
                 alert("File must be smaller than 50MB!");
                 return Upload.LIST_IGNORE;
@@ -486,11 +512,11 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             }}
             maxCount={1}
             className="bg-white rounded-md"
-            fileList={formData.servicesDocument as any}
-            onChange={handleFileChange}
+            fileList={formData[currentQuestion.id as keyof typeof formData] as any}
+            onChange={info => handleFileChange(info, documentType)}
           >
             <p className="flex justify-center mb-2">
-              <FileTextOutlined className="text-gray-400" />
+              <Icon className="text-gray-400" />
             </p>
             <p className="text-center mb-1">
               Drag and drop files here or click to upload <span className="text-purple-600">Browse Files</span>
