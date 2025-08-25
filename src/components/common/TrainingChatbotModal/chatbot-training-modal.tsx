@@ -100,8 +100,9 @@ const ChatbotTrainingModal: React.FC<ChatbotTrainingModalProps> = ({ open, onClo
   };
 
   const handleSubmit = async () => {
-    if (!uploadedFiles.training) {
-      ErrorToast("Please upload a service document to train the chatbot.");
+    // Check if at least one file is uploaded
+    if (!uploadedFiles.training && !uploadedFiles.pricing && !uploadedFiles.testimonial) {
+      ErrorToast("Please upload at least one document to train the chatbot.");
       return;
     }
 
@@ -136,16 +137,25 @@ const ChatbotTrainingModal: React.FC<ChatbotTrainingModalProps> = ({ open, onClo
 
       const formDataToSend = new FormData();
       const session = await getSupabaseSession();
+
       formDataToSend.append("clinic_id", clinicData.id);
       formDataToSend.append("name", clinicData.legal_business_name || "");
       formDataToSend.append("instructions", clinicInstructions);
       formDataToSend.append("assistant_id", assistantData.id);
 
-      // Add the uploaded file to form data
-      formDataToSend.append("clinic_document", uploadedFiles.training);
+      // Add files with the correct field names that match your backend
+      if (uploadedFiles.training) {
+        formDataToSend.append("service_document", uploadedFiles.training);
+      }
+      if (uploadedFiles.pricing) {
+        formDataToSend.append("pricing_document", uploadedFiles.pricing);
+      }
+      if (uploadedFiles.testimonial) {
+        formDataToSend.append("testimonials_document", uploadedFiles.testimonial);
+      }
 
       try {
-        // Call the combined edge function
+        // Call the enhanced edge function
         const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
           method: "POST",
           headers: {
@@ -157,16 +167,36 @@ const ChatbotTrainingModal: React.FC<ChatbotTrainingModalProps> = ({ open, onClo
         const result = await response.json();
 
         if (!response.ok) {
-          console.error("Assistant creation error:", result.error);
-          ErrorToast(result.error || "Failed to create assistant");
+          console.error("Assistant update error:", result.error);
+          ErrorToast(result.error || "Failed to update assistant");
           return;
         }
 
-        SuccessToast("Chatbot assistant file saved successfully");
+        // Enhanced success message with details
+        const uploadedCount = result.filesUploaded || 0;
+        const documentTypes = result.updatedDocumentTypes || [];
+
+        let successMessage = `Chatbot updated successfully! `;
+        if (uploadedCount > 0) {
+          successMessage += `${uploadedCount} document${uploadedCount > 1 ? "s" : ""} uploaded`;
+          if (documentTypes.length > 0) {
+            successMessage += ` (${documentTypes.join(", ")})`;
+          }
+        }
+
+        SuccessToast(successMessage);
+
+        // Clear uploaded files after successful submission
+        setUploadedFiles({
+          training: null,
+          pricing: null,
+          testimonial: null,
+        });
+
         onClose(); // Close modal on success
       } catch (assistantError) {
-        console.error("Failed to create assistant:", assistantError);
-        ErrorToast("Failed to create assistant. Please try again.");
+        console.error("Failed to update assistant:", assistantError);
+        ErrorToast("Failed to update assistant. Please try again.");
       }
     } catch (error: any) {
       ErrorToast(error.message || "Failed to save chatbot settings");
@@ -333,7 +363,7 @@ const ChatbotTrainingModal: React.FC<ChatbotTrainingModalProps> = ({ open, onClo
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!uploadedFiles.training || loading}
+            disabled={(!uploadedFiles.training && !uploadedFiles.pricing && !uploadedFiles.testimonial) || loading} // ✅ CORRECT - checks any file
             className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             {loading ? "Training..." : "Start Training"}

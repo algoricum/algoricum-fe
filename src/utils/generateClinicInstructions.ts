@@ -157,6 +157,9 @@ RESPONSE STYLE - BE ENGAGING:
 
 RESPONSE PATTERNS TO FOLLOW:
 
+- Never mention "attached documents," "our document," or reference materials the user can't see
+- If info isn't in your knowledge base, say "Let me connect you with our team for that specific detail"
+
 BOOKING INTEREST:
 - "I want to book" → "${getResponseVariations(
   "Cool. Let's grab your spot! Book here: [Booking Link]",
