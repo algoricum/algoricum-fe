@@ -22,13 +22,13 @@ export const handleCsvUpload = async (leads: any) => {
 export const syncPipedriveLeads = async () => {
   try {
     const clinicId = await getClinicId();
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive-integration/sync-leads`, {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive/sync-leads`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        apikey: SUPABASE_ANON_KEY,
-      },
+      // headers: {
+      //   "Content-Type": "application/json",
+      //   Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      //   apikey: SUPABASE_ANON_KEY,
+      // },
       body: JSON.stringify({ clinic_id: clinicId }),
     });
 
