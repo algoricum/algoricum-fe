@@ -80,7 +80,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     setConsentData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Updated questions array with three separate file upload questions
+  // Updated questions array - file uploads are now handled as one step
   const questions = [
     {
       id: "clinicName",
@@ -110,33 +110,13 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       placeholder: "Enter your complete business address",
       required: true,
     },
-    // Three separate file upload questions
+    // Combined file upload step
     {
-      id: "servicesDocument",
-      type: "file",
-      question: "Upload services document for AI processing",
-      placeholder: "Service information, procedures, FAQs (PDF, DOC, DOCX - Max 50MB)",
-      required: true,
-      icon: FileTextOutlined,
-      documentType: "services",
-    },
-    {
-      id: "pricingDocument",
-      type: "file",
-      question: "Upload pricing information",
-      placeholder: "Service costs, insurance details, payment options (PDF, DOC, DOCX - Max 50MB)",
-      required: false,
-      icon: DollarCircleOutlined,
-      documentType: "pricing",
-    },
-    {
-      id: "testimonialsDocument",
-      type: "file",
-      question: "Upload testimonials and reviews",
-      placeholder: "Patient reviews, success stories, case studies (PDF, DOC, DOCX - Max 50MB)",
-      required: false,
-      icon: StarOutlined,
-      documentType: "testimonials",
+      id: "documents",
+      type: "files",
+      question: "Upload your clinic documents for AI processing",
+      placeholder: "Upload services, pricing, and testimonials documents",
+      required: true, // At least services document is required
     },
     {
       id: "primaryContactName",
@@ -151,6 +131,34 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       question: "What's your email address?",
       placeholder: "Enter your email",
       required: true,
+    },
+  ];
+
+  // File upload configurations
+  const fileUploadConfigs = [
+    {
+      id: "servicesDocument",
+      question: "Services Document",
+      placeholder: "Service information, procedures, FAQs",
+      required: true,
+      icon: FileTextOutlined,
+      documentType: "services",
+    },
+    {
+      id: "pricingDocument",
+      question: "Pricing Information",
+      placeholder: "Service costs, insurance details, payment options",
+      required: false,
+      icon: DollarCircleOutlined,
+      documentType: "pricing",
+    },
+    {
+      id: "testimonialsDocument",
+      question: "Testimonials & Reviews",
+      placeholder: "Patient reviews, success stories, case studies",
+      required: false,
+      icon: StarOutlined,
+      documentType: "testimonials",
     },
   ];
 
@@ -260,36 +268,16 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
 
   // Enhanced getFieldError function to handle multiple file types
   const getFieldError = () => {
-    const value = formData[currentQuestion.id as keyof typeof formData];
-
-    // File type handling
-    if (currentQuestion.type === "file") {
-      const fileList = (value as any[]) || [];
-      if (currentQuestion.required && (!fileList || fileList.length === 0)) {
-        return "This document is required";
-      }
-
-      // Validate each file's type/size defensively
-      for (const file of fileList) {
-        const fileObj = file.originFileObj || file;
-        if (fileObj) {
-          const sizeMB = typeof fileObj.size === "number" ? fileObj.size / 1024 / 1024 : 0;
-          if (sizeMB >= 50) {
-            return "File must be smaller than 50MB";
-          }
-          const type = fileObj.type || "";
-          const isValidType =
-            type === "application/pdf" ||
-            type === "application/msword" ||
-            type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-            (file.name && /\.(pdf|docx?|DOCX?|PDF)$/.test(file.name));
-          if (!isValidType) {
-            return "You can only upload PDF, DOC, or DOCX files!";
-          }
-        }
+    if (currentQuestion.type === "files") {
+      // Check if at least services document is uploaded (required)
+      const servicesFiles = formData.servicesDocument || [];
+      if (servicesFiles.length === 0) {
+        return "Services document is required";
       }
       return null;
     }
+
+    const value = formData[currentQuestion.id as keyof typeof formData];
 
     // Required field check for all types
     if (currentQuestion.required && !value?.toString().trim()) {
@@ -340,10 +328,53 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     }
   };
 
-  // Enhanced renderPreviousQuestions to handle all three file types
+  // Enhanced renderPreviousQuestions to handle file uploads
   const renderPreviousQuestions = () => {
     return questions.slice(0, currentQuestionIndex).map(q => {
       const value = formData[q.id as keyof typeof formData];
+
+      if (q.type === "files") {
+        return (
+          <div key={q.id} className="mb-8">
+            <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">
+              {q.question}
+              <span className="text-red-500 ml-1">*</span>
+            </Text>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {fileUploadConfigs.map(config => {
+                const files = formData[config.id as keyof typeof formData] as any[];
+                return (
+                  <div key={config.id} className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 text-gray-700 text-xs">
+                    <div className="font-medium mb-1">{config.question}</div>
+                    {Array.isArray(files) && files.length > 0 ? (
+                      files.map((file: any, idx: number) => {
+                        const name = file.name || (file.originFileObj && file.originFileObj.name) || `File ${idx + 1}`;
+                        const url = file.signedUrl || file.url || file.response?.url;
+                        return url ? (
+                          <div key={idx} className="flex items-center gap-2 mb-1">
+                            <span className="text-green-600">✓</span>
+                            <a href={url} target="_blank" rel="noreferrer" className="text-purple-600 underline">
+                              {name}
+                            </a>
+                          </div>
+                        ) : (
+                          <div key={idx} className="flex items-center gap-2 mb-1">
+                            <span className="text-green-600">✓</span>
+                            <span>{name}</span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-gray-400">No document uploaded</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div key={q.id} className="mb-8">
           <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">
@@ -361,32 +392,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
           ) : q.type === "phone" ? (
             <div className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700 text-xs">
               {value || "No phone number entered"}
-            </div>
-          ) : q.type === "file" ? (
-            <div className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700 text-xs">
-              {Array.isArray(value) && value.length > 0 ? (
-                value.map((file: any, idx: number) => {
-                  const name = file.name || (file.originFileObj && file.originFileObj.name) || `File ${idx + 1}`;
-                  const url = file.signedUrl || file.url || file.response?.url;
-                  return url ? (
-                    <div key={idx} className="flex items-center gap-2 mb-1">
-                      <span className="text-green-600">✓</span>
-                      <a href={url} target="_blank" rel="noreferrer" className="text-purple-600 underline">
-                        {name}
-                      </a>
-                      <span className="text-xs text-gray-500">({file.documentType || "document"})</span>
-                    </div>
-                  ) : (
-                    <div key={idx} className="flex items-center gap-2 mb-1">
-                      <span className="text-green-600">✓</span>
-                      <span>{name}</span>
-                      <span className="text-xs text-gray-500">({file.documentType || "document"})</span>
-                    </div>
-                  );
-                })
-              ) : (
-                <div>No document uploaded</div>
-              )}
             </div>
           ) : (
             <Input
@@ -459,10 +464,107 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     return !getFieldError();
   };
 
-  // Enhanced renderCurrentInput to handle different file types with appropriate icons
+  // New function to render all three file uploads side by side
+  const renderFileUploads = () => {
+    const error = getFieldError();
+    const hasError = !!error;
+
+    return (
+      <div className="mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {fileUploadConfigs.map(config => {
+            const Icon = config.icon;
+            const files = formData[config.id as keyof typeof formData] as any[];
+
+            return (
+              <div key={config.id} className="flex flex-col">
+                <div className="mb-3">
+                  <Text className="text-gray-800 font-medium text-sm block mb-1">
+                    {config.question}
+                    {config.required && <span className="text-red-500 ml-1">*</span>}
+                  </Text>
+                  <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">
+                    {config.placeholder} (PDF, DOC, DOCX - Max 50MB)
+                  </Text>
+                </div>
+
+                <Upload.Dragger
+                  name={config.id}
+                  accept=".pdf,.doc,.docx"
+                  beforeUpload={file => {
+                    const isValidDocument =
+                      file.type === "application/pdf" ||
+                      file.type === "application/msword" ||
+                      file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+                      /\.(pdf|docx?|PDF|DOCX?)$/.test(file.name || "");
+                    if (!isValidDocument) {
+                      alert("You can only upload PDF, DOC, or DOCX files!");
+                      return Upload.LIST_IGNORE;
+                    }
+                    const isValidSize = file.size / 1024 / 1024 < 50; // < 50MB
+                    if (!isValidSize) {
+                      alert("File must be smaller than 50MB!");
+                      return Upload.LIST_IGNORE;
+                    }
+                    // prevent automatic upload; we'll manage fileList in state
+                    return false;
+                  }}
+                  maxCount={1}
+                  className="bg-white rounded-md"
+                  fileList={files || []}
+                  onChange={info => handleFileChange(info, config.documentType)}
+                  showUploadList={false}
+                >
+                  <p className="flex justify-center mb-2">
+                    <Icon className="text-gray-400" />
+                  </p>
+                  <p className="text-center mb-1">
+                    Drag and drop files here or click to upload <span className="text-purple-600">Browse Files</span>
+                  </p>
+                  <p className="text-center text-xs text-gray-500">PDF, DOC, DOCX (Max 50MB)</p>
+                </Upload.Dragger>
+
+                {Array.isArray(files) && files.length > 0 && (
+                  <div className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700 text-xs mt-2">
+                    {files.map((file: any, idx: number) => {
+                      const name = file.name || (file.originFileObj && file.originFileObj.name) || `File ${idx + 1}`;
+                      const url = file.signedUrl || file.url || file.response?.url;
+                      return url ? (
+                        <div key={idx} className="flex items-center gap-2 mb-1">
+                          <span className="text-green-600">✓</span>
+                          <a href={url} target="_blank" rel="noreferrer" className="text-purple-600 underline">
+                            {name}
+                          </a>
+                          <span className="text-xs text-gray-500">({file.documentType || "document"})</span>
+                        </div>
+                      ) : (
+                        <div key={idx} className="flex items-center gap-2 mb-1">
+                          <span className="text-green-600">✓</span>
+                          <span>{name}</span>
+                          <span className="text-xs text-gray-500">({file.documentType || "document"})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
+      </div>
+    );
+  };
+
+  // Enhanced renderCurrentInput to handle the new files type
   const renderCurrentInput = () => {
     const error = getFieldError();
     const hasError = !!error;
+
+    if (currentQuestion.type === "files") {
+      return renderFileUploads();
+    }
 
     if (currentQuestion.type === "textarea") {
       return (
@@ -477,54 +579,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
           />
           {hasError && <p className="text-red-500 text-sm mb-4">{error}</p>}
         </>
-      );
-    }
-
-    if (currentQuestion.type === "file") {
-      const Icon = currentQuestion.icon || FileTextOutlined;
-      const documentType = currentQuestion.documentType || "services";
-
-      return (
-        <div className="mb-8">
-          <Text className="text-gray-500 text-sm font-normal block mb-2 leading-relaxed">
-            {currentQuestion.placeholder || "PDF, DOC, DOCX (Max 50MB)"}
-          </Text>
-          <Upload.Dragger
-            name={currentQuestion.id}
-            accept=".pdf,.doc,.docx"
-            beforeUpload={file => {
-              const isValidDocument =
-                file.type === "application/pdf" ||
-                file.type === "application/msword" ||
-                file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-                /\.(pdf|docx?|PDF|DOCX?)$/.test(file.name || "");
-              if (!isValidDocument) {
-                alert("You can only upload PDF, DOC, or DOCX files!");
-                return Upload.LIST_IGNORE;
-              }
-              const isValidSize = file.size / 1024 / 1024 < 50; // < 50MB
-              if (!isValidSize) {
-                alert("File must be smaller than 50MB!");
-                return Upload.LIST_IGNORE;
-              }
-              // prevent automatic upload; we'll manage fileList in state
-              return false;
-            }}
-            maxCount={1}
-            className="bg-white rounded-md"
-            fileList={formData[currentQuestion.id as keyof typeof formData] as any}
-            onChange={info => handleFileChange(info, documentType)}
-          >
-            <p className="flex justify-center mb-2">
-              <Icon className="text-gray-400" />
-            </p>
-            <p className="text-center mb-1">
-              Drag and drop files here or click to upload <span className="text-purple-600">Browse Files</span>
-            </p>
-            <p className="text-center text-xs text-gray-500">PDF, DOC, DOCX (Max 50MB)</p>
-          </Upload.Dragger>
-          {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
-        </div>
       );
     }
 

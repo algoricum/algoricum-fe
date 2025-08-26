@@ -3,7 +3,7 @@ import { Button } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { ResendOtpProps, VerifyOtpProps } from "@/interfaces/services_type";
 import { Flex, Typography } from "antd";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useMutation } from "react-query";
 import OtpInput from "react-otp-input";
@@ -16,9 +16,15 @@ const { Title, Text } = Typography;
 
 const VerifyOTPPage = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirectUrl") || "/dashboard";
+  const emailParam = searchParams.get("email");
+  const fromLogin = searchParams.get("fromLogin") === "true";
+
   const [otp, setOtp] = useState("");
   const [resendTimer, setResendTimer] = useState(60);
   const [user, setUser] = useState<any>(null);
+  const [userEmail, setUserEmail] = useState<string>("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -30,15 +36,38 @@ const VerifyOTPPage = () => {
   }, [resendTimer]);
 
   useEffect(() => {
-    (async () => {
-      const currentUser = await getUserData();
-      setUser(currentUser);
-    })();
-  }, []);
+    const initializeUser = async () => {
+      // Get email from multiple sources
+      let email = emailParam || localStorage.getItem("pendingVerificationEmail") || "";
+
+      try {
+        const currentUser = await getUserData();
+        setUser(currentUser);
+
+        if (currentUser?.email) {
+          email = currentUser.email;
+        }
+      } catch (error) {
+        console.error("Failed to get user data:", error);
+      }
+
+      if (email) {
+        setUserEmail(email);
+      } else if (fromLogin) {
+        ErrorToast("Email not found. Please login again.");
+        router.push("/login");
+      }
+    };
+
+    initializeUser();
+  }, [emailParam, fromLogin, router]);
 
   const { mutate: verifyOTP, isLoading: verifyLoading } = useMutation((data: VerifyOtpProps) => verifyOtp(data.email, data.otp), {
     onSuccess: async () => {
       SuccessToast("Email verified successfully");
+
+      // Clear stored email
+      localStorage.removeItem("pendingVerificationEmail");
 
       if (!user?.id) {
         ErrorToast("User not found. Please try logging in again.");
@@ -61,7 +90,7 @@ const VerifyOTPPage = () => {
         if (clinicData) {
           setClinicData(clinicData);
           SuccessToast("Login successful!");
-          router.push("/dashboard");
+          router.push(redirectUrl);
           return;
         }
       }
@@ -103,7 +132,6 @@ const VerifyOTPPage = () => {
       try {
         const clinic = await createClinic(clinicData);
         setClinicData(clinic);
-        // SuccessToast("Clinic created successfully!");
         router.push("/onboarding");
       } catch (error: any) {
         ErrorToast(error.message || "Failed to create clinic");
@@ -111,6 +139,23 @@ const VerifyOTPPage = () => {
       }
     },
     onError: (error: any) => {
+      console.error("OTP verification error:", error);
+
+      // Handle expired or invalid OTP
+      if (error?.message?.includes("expired") || error?.message?.includes("invalid")) {
+        ErrorToast("OTP has expired. Sending you a new one...");
+        // Auto-resend when expired
+        if (userEmail) {
+          resendOTP({ email: userEmail });
+        }
+        return;
+      }
+
+      if (error?.message?.includes("too_many_requests")) {
+        ErrorToast("Too many attempts. Please wait before trying again.");
+        return;
+      }
+
       ErrorToast(error?.message || "Invalid OTP");
     },
   });
@@ -119,6 +164,7 @@ const VerifyOTPPage = () => {
     onSuccess: () => {
       SuccessToast("OTP resent successfully");
       setResendTimer(60);
+      setOtp(""); // Clear current OTP when new one is sent
     },
     onError: (error: any) => {
       ErrorToast(error?.message || "Failed to resend OTP");
@@ -131,21 +177,23 @@ const VerifyOTPPage = () => {
       return;
     }
 
-    if (!user?.email) {
+    const email = userEmail || user?.email;
+    if (!email) {
       ErrorToast("User email not found. Please try logging in again.");
       return;
     }
 
-    verifyOTP({ email: user.email, otp });
+    verifyOTP({ email, otp });
   };
 
   const handleResend = () => {
-    if (!user?.email) {
+    const email = userEmail || user?.email;
+    if (!email) {
       ErrorToast("User email not found. Please try logging in again.");
       return;
     }
 
-    resendOTP({ email: user.email });
+    resendOTP({ email });
   };
 
   return (
