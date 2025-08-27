@@ -361,7 +361,42 @@ export const connectToTypeform = async () => {
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Typeform. Please try again"}`);
   }
 };
+export const connectToNextHealth = async (apiKey:string) => {
+  const clinicId = await getClinicId();
+   try {
+    const res = await fetch(
+      "https://eypitkzntyiyvwrndkgy.supabase.co/functions/v1/NextHealth-integration",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // same as your curl
+          Authorization: apiKey,
+        },
+        body: JSON.stringify({
+          clinic_id: clinicId,
+          api_key: apiKey,
+        }),
+      }
+    );
 
+    if (!res.ok) {
+      throw new Error(`Request failed: ${res.status}`);
+    }
+
+    const data = await res.json();
+    console.log("NextHealth response:", data);
+    //redirect
+    SuccessToast("NextHealth connected successfully");
+    window.location.href = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000" + "/onboarding?next_health_status=success";
+
+    return data;
+  } catch (err) {
+    console.error("Error connecting NextHealth:", err);
+    throw err;
+  }
+
+}
 export const findSheetDetails = (treeData: any, sheetValue: any) => {
   const [spreadsheetId, sheetId] = sheetValue.split(":");
 

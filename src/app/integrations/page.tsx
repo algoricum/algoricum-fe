@@ -1,6 +1,17 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Card, Modal, Tag, Button, Alert, TreeSelect, Typography } from "antd";
+import { JSX, useEffect, useState } from "react";
+import { Card, Modal, Button, Alert, TreeSelect, Typography, Row, Col, Divider } from "antd";
+import {
+  GoogleOutlined,
+  FacebookOutlined,
+  FormOutlined,
+  DatabaseOutlined,
+  CloudOutlined,
+  ApiOutlined,
+  BranchesOutlined,
+  FileTextOutlined,
+  MedicineBoxOutlined,
+} from "@ant-design/icons";
 import { createClient } from "@/utils/supabase/config/client";
 import dayjs from "dayjs";
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -13,114 +24,165 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const { Text } = Typography;
 
+// Interface for integration data from RPC
+interface IntegrationWithStatus {
+  integration_id: string;
+  integration_name: string;
+  integration_type: string;
+  auth_type: string;
+  connected: boolean;
+  connection_id?: string;
+  connection_status?: string;
+  auth_data?: any;
+  expires_at?: string;
+  last_sync_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Icon mapping for different integrations based on your database
+const getIntegrationIcon = (name: string) => {
+  const iconMap: { [key: string]: JSX.Element } = {
+    // Form integrations
+    Jotform: <FormOutlined style={{ fontSize: "24px", color: "#FF6C2C" }} />,
+    "Facebook Lead Forms": <FacebookOutlined style={{ fontSize: "24px", color: "#1877F2" }} />,
+    "Google Lead Forms": <GoogleOutlined style={{ fontSize: "24px", color: "#4285f4" }} />,
+    Typeform: <FileTextOutlined style={{ fontSize: "24px", color: "#262627" }} />,
+    "Gravity Form": <FormOutlined style={{ fontSize: "24px", color: "#99CC33" }} />,
+    "Google Forms": <GoogleOutlined style={{ fontSize: "24px", color: "#4285f4" }} />,
+
+    // CRM integrations
+    Hubspot: <DatabaseOutlined style={{ fontSize: "24px", color: "#FF7A59" }} />,
+    GoHighLevel: <BranchesOutlined style={{ fontSize: "24px", color: "#6366F1" }} />,
+    Pipedrive: <CloudOutlined style={{ fontSize: "24px", color: "#28A745" }} />,
+    NextHealth: <MedicineBoxOutlined style={{ fontSize: "24px", color: "#00D4AA" }} />,
+  };
+  return iconMap[name] || <ApiOutlined style={{ fontSize: "24px", color: "#666666" }} />;
+};
+
 export default function IntegrationsPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
-  const [connection, setConnection] = useState<any>(null);
+  const [integrations, setIntegrations] = useState<IntegrationWithStatus[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [status, setStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+  const [selectedIntegration, setSelectedIntegration] = useState<IntegrationWithStatus | null>(null);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const [googleFormTreeData, setGoogleFormTreeData] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchIntegration = async () => {
+    const fetchIntegrations = async () => {
       setLoading(true);
       try {
         const clinicData = await getClinicData();
         if (!clinicData?.id) {
-          setStatus("disconnected");
           setLoading(false);
           return;
         }
 
-        // 1️⃣ Get latest connection
-        const { data: connData, error: connError } = await supabase
-          .from("google_form_connections")
-          .select("*")
-          .eq("clinic_id", clinicData.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (connError || !connData) {
-          setStatus("disconnected");
-          setLoading(false);
-          return;
-        }
-
-        setConnection(connData);
-        setStatus("connected");
-
-        // 2️⃣ Fetch saved sheets from DB
-        const { data: savedSheets, error: savedError } = await supabase
-          .from("google_form_sheets")
-          .select("spreadsheet_id, sheet_id")
-          .eq("connection_id", connData.id);
-
-        if (savedError) throw savedError;
-
-        const savedSheetKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
-
-        // 3️⃣ Fetch spreadsheets from Edge Function
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            connection_id: connData.id,
-            clinic_id: clinicData.id,
-          }),
+        // Call the RPC function to get all integrations with connection status
+        const { data, error } = await supabase.rpc("get_clinic_integrations_with_status", {
+          clinic_uuid: clinicData.id,
         });
 
-        if (!res.ok) throw new Error(await res.text());
+        if (error) {
+          console.error("Error fetching integrations:", error);
+          ErrorToast("Failed to fetch integrations");
+          return;
+        }
 
-        const { spreadsheets } = await res.json();
-
-        // 4️⃣ Build tree with saved sheets preselected
-        const treeData = (spreadsheets || []).map((spreadsheet: any) => ({
-          title: spreadsheet.spreadsheet_title,
-          value: spreadsheet.spreadsheet_id,
-          selectable: false,
-          children: (spreadsheet.sheets || []).map((sheet: any) => ({
-            title: sheet.sheet_title,
-            value: `${spreadsheet.spreadsheet_id}:${sheet.sheet_id}`,
-            isLeaf: true,
-          })),
-        }));
-        setGoogleFormTreeData(treeData);
-
-        // 5️⃣ Preselect in state
-        setSelectedSheets(savedSheetKeys);
+        setIntegrations(data || []);
       } catch (error) {
-        console.error("Failed to fetch sheets:", error);
-        ErrorToast("Failed to fetch Google Sheets");
+        console.error("Failed to fetch integrations:", error);
+        ErrorToast("Failed to fetch integrations");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchIntegration();
+    fetchIntegrations();
   }, []);
 
-  const syncGoogleFormLeads = async () => {
+  const handleIntegrationClick = async (integration: IntegrationWithStatus) => {
+    if (!integration.connected) {
+      handleConnect(integration);
+      return;
+    }
+
+    // Handle connected integration clicks (e.g., Google Forms, Google Lead Forms)
+    if (integration.integration_name === "Google Forms" || integration.integration_name === "Google Lead Forms") {
+      setSelectedIntegration(integration);
+      await fetchGoogleFormData(integration);
+      setShowModal(true);
+    }
+  };
+
+  const fetchGoogleFormData = async (integration: IntegrationWithStatus) => {
     try {
-      // 1️⃣ Get saved sheets from DB
+      // Fetch saved sheets from DB
       const { data: savedSheets, error: savedError } = await supabase
         .from("google_form_sheets")
         .select("spreadsheet_id, sheet_id")
-        .eq("connection_id", connection?.id);
+        .eq("connection_id", integration.connection_id);
+
+      if (savedError) throw savedError;
+
+      const savedSheetKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
+
+      // Fetch spreadsheets from Edge Function
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          connection_id: integration.connection_id,
+        }),
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      const { spreadsheets } = await res.json();
+
+      // Build tree with saved sheets preselected
+      const treeData = (spreadsheets || []).map((spreadsheet: any) => ({
+        title: spreadsheet.spreadsheet_title,
+        value: spreadsheet.spreadsheet_id,
+        selectable: false,
+        children: (spreadsheet.sheets || []).map((sheet: any) => ({
+          title: sheet.sheet_title,
+          value: `${spreadsheet.spreadsheet_id}:${sheet.sheet_id}`,
+          isLeaf: true,
+        })),
+      }));
+
+      setGoogleFormTreeData(treeData);
+      setSelectedSheets(savedSheetKeys);
+    } catch (error) {
+      console.error("Failed to fetch Google Forms data:", error);
+      ErrorToast("Failed to fetch Google Forms data");
+    }
+  };
+
+  const syncGoogleFormLeads = async () => {
+    if (!selectedIntegration) return;
+
+    try {
+      // Get saved sheets from DB
+      const { data: savedSheets, error: savedError } = await supabase
+        .from("google_form_sheets")
+        .select("spreadsheet_id, sheet_id")
+        .eq("connection_id", selectedIntegration.connection_id);
 
       if (savedError) throw savedError;
 
       const savedKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
-      // 2️⃣ Filter only new sheets
+      // Filter only new sheets
       const newSheets = selectedSheets.filter(key => !savedKeys.includes(key));
 
-      // 3️⃣ Remove deselected sheets directly from DB
+      // Remove deselected sheets directly from DB
       const removedSheets = savedKeys.filter(key => !selectedSheets.includes(key));
       if (removedSheets.length > 0) {
         await Promise.all(
@@ -129,25 +191,23 @@ export default function IntegrationsPage() {
             await supabase
               .from("google_form_sheets")
               .delete()
-              .eq("connection_id", connection?.id)
+              .eq("connection_id", selectedIntegration.connection_id)
               .eq("spreadsheet_id", spreadsheet_id)
               .eq("sheet_id", sheet_id);
           }),
         );
       }
 
-      // 4️⃣ Skip API if nothing new
+      // Skip API if nothing new
       if (newSheets.length === 0) {
         SuccessToast("✅ Sheets are already synced!");
         setShowModal(false);
         return;
       }
 
-      // ✅ FIX: Map strings into objects before sending
+      // Map strings into objects before sending
       const newSheetsPayload = newSheets.map(key => {
         const [spreadsheet_id, sheet_id] = key.split(":");
-
-        // Find spreadsheet and sheet titles from tree data
         const spreadsheet = googleFormTreeData.find(s => s.value === spreadsheet_id);
         const sheet = spreadsheet?.children?.find((c: any) => c.value === key);
 
@@ -159,7 +219,7 @@ export default function IntegrationsPage() {
         };
       });
 
-      // 5️⃣ Send to API
+      // Send to API
       const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
         method: "POST",
         headers: {
@@ -168,8 +228,8 @@ export default function IntegrationsPage() {
           apikey: SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          connection_id: connection?.id,
-          selected_sheets: newSheetsPayload, // send objects not strings
+          connection_id: selectedIntegration.connection_id,
+          selected_sheets: newSheetsPayload,
         }),
       });
 
@@ -184,55 +244,125 @@ export default function IntegrationsPage() {
     }
   };
 
-  // const disconnectGoogleForm = async () => {
-  //   if (!connection) return;
-  //   await supabase.from("google_form_connections").delete().eq("id", connection.id);
-  //   setConnection(null);
-  //   setStatus("disconnected");
-  // };
+  const handleConnect = (integration: IntegrationWithStatus) => {
+    console.log(`Connecting to ${integration.integration_name}`);
+    // Add connection logic here
+    // You can implement OAuth flows or API key connections based on auth_type
+  };
+
+  // Split integrations into connected and available
+  const connectedIntegrations = integrations.filter(i => i.connected);
+  const availableIntegrations = integrations.filter(i => !i.connected);
 
   return (
     <DashboardLayout
       header={
-        <Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." showHamburgerMenu />
+        <Header title="Integrations" description="Connect and manage your third-party services and integrations." showHamburgerMenu />
       }
     >
       <div className="p-6">
-        <h1 className="text-white text-2xl font-semibold mb-6">Integrations</h1>
-
-        <div>
-          {loading ? (
-            <LoadingSpinner message="Loading integrations..." size="md" />
-          ) : status === "connected" ? (
-            <Card
-              className="bg-gray-50 hover:bg-gray-100 cursor-pointer transition border border-purple-200 rounded-lg"
-              onClick={() => setShowModal(true)}
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center">
-                  <Text className="text-white font-bold text-lg">G</Text>
+        {loading ? (
+          <LoadingSpinner message="Loading integrations..." size="md" />
+        ) : (
+          <div>
+            {/* Connected Services */}
+            {connectedIntegrations.length > 0 && (
+              <div className="mb-8">
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold mb-2">Connected Services</h2>
+                  <p className="text-gray-400 text-sm">Services that are currently integrated and active</p>
                 </div>
-                <div className="flex-1">
-                  <h3 className=" text-lg font-medium">Google Forms</h3>
-                  <p className="text-gray-400 text-sm">Sync leads from Google Forms automatically</p>
-                </div>
-                <Tag color={status === "connected" ? "green" : "default"}>{status === "connected" ? "Connected" : "Not Connected"}</Tag>
+                <Row gutter={[16, 16]}>
+                  {connectedIntegrations.map(integration => (
+                    <Col xs={24} sm={12} lg={8} key={integration.integration_id}>
+                      <Card
+                        className="bg-gray-50 hover:bg-gray-100 cursor-pointer transition border border-green-200 rounded-lg h-full"
+                        onClick={() => handleIntegrationClick(integration)}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                            {getIntegrationIcon(integration.integration_name)}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-medium text-gray-900">{integration.integration_name}</h3>
+                            <p className="text-gray-500 text-sm">
+                              {integration.last_sync_at
+                                ? `Last sync: ${dayjs(integration.last_sync_at).format("MMM D, h:mm A")}`
+                                : "Click to configure"}
+                            </p>
+                          </div>
+                          <Button
+                            type="primary"
+                            size="small"
+                            style={{
+                              backgroundColor: "#10B981",
+                              borderColor: "#10B981",
+                              cursor: "default",
+                            }}
+                            disabled
+                          >
+                            Connected
+                          </Button>
+                        </div>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
               </div>
-            </Card>
-          ) : (
-            <div className="p-6 flex flex-col items-center justify-center space-y-4 font-semibold text-gray-500 text-xl">
-              <h1>No integrations connected</h1>
-            </div>
-          )}
-        </div>
+            )}
 
+            {connectedIntegrations.length > 0 && availableIntegrations.length > 0 && <Divider style={{ borderColor: "#374151" }} />}
+
+            {/* Available Integrations */}
+            {availableIntegrations.length > 0 && (
+              <div>
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold mb-2">Available Integrations</h2>
+                  <p className="text-gray-400 text-sm">Services ready to connect to enhance your workflow</p>
+                </div>
+                <Row gutter={[16, 16]}>
+                  {availableIntegrations.map(integration => (
+                    <Col xs={24} sm={12} lg={8} key={integration.integration_id}>
+                      <Card
+                        className="bg-gray-50 hover:bg-gray-100 transition border border-gray-200 rounded-lg h-full cursor-pointer"
+                        onClick={() => handleIntegrationClick(integration)}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                            {getIntegrationIcon(integration.integration_name)}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-medium text-gray-900">{integration.integration_name}</h3>
+                            <p className="text-gray-500 text-sm">Click to connect this service</p>
+                          </div>
+                          <Button
+                            type="primary"
+                            size="small"
+                            style={{
+                              backgroundColor: "#A200E6",
+                              borderColor: "#A200E6",
+                            }}
+                          >
+                            Connect
+                          </Button>
+                        </div>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Google Forms/Lead Forms Modal */}
         <Modal
           title={
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center mr-3">
-                <Text className="text-white font-bold text-sm">G</Text>
+              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+                <GoogleOutlined className="text-white text-lg" />
               </div>
-              <span className="text-xl font-semibold">Google Forms Integration</span>
+              <span className="text-xl font-semibold">{selectedIntegration?.integration_name} Integration</span>
             </div>
           }
           open={showModal}
@@ -242,10 +372,17 @@ export default function IntegrationsPage() {
           centered
         >
           <div className="py-6">
-            <Alert message="Connected to Google Forms" description={`Account: Google Account`} type="success" showIcon className="mb-4" />
+            <Alert
+              message={`Connected to ${selectedIntegration?.integration_name}`}
+              description="Integration is active and ready to sync"
+              type="success"
+              showIcon
+              className="mb-4"
+            />
+
             <div className="mb-4">
               <Text strong>Last Sync:</Text>{" "}
-              {connection?.last_sync_at ? dayjs(connection.last_sync_at).format("MMM D, YYYY h:mm A") : "Never"}
+              {selectedIntegration?.last_sync_at ? dayjs(selectedIntegration.last_sync_at).format("MMM D, YYYY h:mm A") : "Never"}
             </div>
 
             <div className="mb-4">
@@ -271,9 +408,6 @@ export default function IntegrationsPage() {
               >
                 Sync Leads
               </Button>
-              {/* <Button danger type="link" onClick={disconnectGoogleForm}>
-                Disconnect
-              </Button> */}
             </div>
           </div>
         </Modal>

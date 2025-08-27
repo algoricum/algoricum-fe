@@ -23,6 +23,7 @@ import {
   createJotformConnection,
   syncJotformLeads,
   connectToGHL,
+  connectToNextHealth,
 } from "../../../utils/integration-utils";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ONBOARDING_LEADS_FILE_NAME } from "../../../constants/integration-constants";
 import {
@@ -36,6 +37,7 @@ import {
   CsvUploadModal,
   JotformModal,
   GoHighLevelLeadFormModal,
+  NexHealthLeadFormModal
 } from "../../modals/Modals";
 import { createClient } from "@/utils/supabase/config/client";
 // import { set } from "lodash";
@@ -46,6 +48,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [showGoHighLevelModal, setShowGoHighLevelModal] = useState(false);
+  const [showNexHealthModal, setShowNexHealthModal] = useState(false);
   const [showPipedriveModal, setShowPipedriveModal] = useState(false);
   const [showGoogleFormModal, setShowGoogleFormModal] = useState(false);
   const [showGoogleLeadFormModal, setShowGoogleLeadFormModal] = useState(false);
@@ -56,6 +59,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [showJotformModal, setShowJotformModal] = useState(false);
   const [hubspotStatus, setHubspotStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [goHighLevelStatus, setGoHighLevelStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+  const [nextHealthStatus, setNextHealthStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [googleFormStatus, setGoogleFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [googleLeadFormStatus, setGoogleLeadFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
   const [facebookLeadFormStatus, setFacebookLeadFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
@@ -92,7 +96,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       id: "selectedCrm",
       type: "select",
       question: "Do you use a CRM to manage your leads?",
-      options: ["HubSpot", "Pipedrive", "GoHighLevel", "None of these"],
+      options: ["HubSpot", "Pipedrive", "GoHighLevel","NextHealth", "None of these"],
     },
     {
       id: "adsConnections",
@@ -116,7 +120,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   ];
 
   const filteredQuestions =
-    formData.selectedCrm === "HubSpot" || formData.selectedCrm === "Pipedrive" || formData.selectedCrm === "GoHighLevel"
+    formData.selectedCrm === "HubSpot" || formData.selectedCrm === "Pipedrive" || formData.selectedCrm === "GoHighLevel"|| formData.selectedCrm === "NextHealth"
       ? [questions[0], questions[3]]
       : questions;
 
@@ -127,6 +131,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     return () => {
       const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
       const savedGoHighLevelStatus = localStorage.getItem("go_high_level_oauth_status");
+      const savedNextHealthStatus = localStorage.getItem("next_health_oauth_status");
       const savedPipedriveStatus = localStorage.getItem("pipedrive_oauth_status");
       const savedGoogleFormStatus = localStorage.getItem("google_form_oauth_status");
       const savedGoogleLeadFormStatus = localStorage.getItem("google_lead_form_oauth_status");
@@ -134,6 +139,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       if (
         savedHubspotStatus !== "connecting" &&
         savedGoHighLevelStatus !== "connecting" &&
+        savedNextHealthStatus !== "connecting" &&
         savedPipedriveStatus !== "connecting" &&
         savedGoogleFormStatus !== "connecting" &&
         savedGoogleLeadFormStatus !== "connecting" &&
@@ -275,6 +281,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setCurrentQuestionIndex(prev => prev + 1);
         setShowHubspotModal(false);
         setShowGoHighLevelModal(false);
+        setShowNexHealthModal(false);
         setShowPipedriveModal(false);
         setShowGoogleFormModal(false);
         setShowGoogleLeadFormModal(false);
@@ -284,6 +291,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           ...formData,
           hubspotConnected: hubspotStatus === "connected",
           goHighLevelConnected: goHighLevelStatus === "connected",
+          nextHealthConnected: nextHealthStatus === "connected",
           pipedriveConnected: pipedriveStatus === "connected",
           googleFormConnected: googleFormStatus === "connected",
           googleLeadFormConnected: googleLeadFormStatus === "connected",
@@ -307,6 +315,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     formData,
     hubspotStatus,
     goHighLevelStatus,
+    nextHealthStatus,
     pipedriveStatus,
     googleFormStatus,
     googleLeadFormStatus,
@@ -322,6 +331,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   useEffect(() => {
     const savedHubspotStatus = localStorage.getItem("hubspot_oauth_status");
     const savedGoHighLevelStatus = localStorage.getItem("go_high_level_oauth_status");
+    const savedNextHealthStatus = localStorage.getItem("next_health_oauth_status");
     const savedPipedriveStatus = localStorage.getItem("pipedrive_oauth_status");
     const savedGoogleFormStatus = localStorage.getItem("google_form_oauth_status");
     const savedGoogleLeadFormStatus = localStorage.getItem("google_lead_form_oauth_status");
@@ -336,6 +346,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
     if (savedHubspotStatus) setHubspotStatus(savedHubspotStatus as "disconnected" | "connecting" | "connected");
     if (savedGoHighLevelStatus) setGoHighLevelStatus(savedGoHighLevelStatus as "disconnected" | "connecting" | "connected");
+    if(savedNextHealthStatus) setNextHealthStatus(savedNextHealthStatus as "disconnected" | "connecting" | "connected");
     if (savedPipedriveStatus) setPipedriveStatus(savedPipedriveStatus as "disconnected" | "connecting" | "connected");
     if (savedGoogleFormStatus) setGoogleFormStatus(savedGoogleFormStatus as "disconnected" | "connecting" | "connected");
     if (savedGoogleLeadFormStatus) setGoogleLeadFormStatus(savedGoogleLeadFormStatus as "disconnected" | "connecting" | "connected");
@@ -453,6 +464,21 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         clearOAuthState();
         autoProgressToNext();
       }
+      else if (event.data.type === "goHighLevel_error") {
+        setGoHighLevelStatus("disconnected");
+        ErrorToast(`Connection Failed: ${event.data.error || "Unable to connect to GO High Level. Please try again."}`);
+        clearOAuthState();
+      }
+      else if (event.data.type === "nextHealth_success") {
+        setNextHealthStatus("connected");
+        localStorage.setItem("oauth_form_data", JSON.stringify(formData));
+        clearOAuthState();
+        autoProgressToNext();
+      } else if (event.data.type === "nextHealth_error") {
+        setNextHealthStatus("disconnected");
+        ErrorToast(`Connection Failed: ${event.data.error || "Unable to connect to NextHealth. Please try again."}`);
+        clearOAuthState();
+      }
     };
 
     window.addEventListener("message", handleMessage);
@@ -474,6 +500,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       const urlParams = new URLSearchParams(window.location.search);
       const hubspotStatus = urlParams.get("hubspot_status");
       const goHighLevelStatus = urlParams.get("go_high_level_status");
+      const nextHealthStatus = urlParams.get("next_health_status");
       const pipedriveStatus = urlParams.get("pipedrive_status");
       const googleFormStatus = urlParams.get("google_form_status");
       const googleLeadFormStatus = urlParams.get("google_lead_form_status");
@@ -598,7 +625,20 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setTypeformStatus("disconnected");
         clearOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
-      } else {
+      } else if(nextHealthStatus==="success"){
+        console.log("✅ NextHealth OAuth success detected from URL");
+        setNextHealthStatus("connected");
+        setFormData(prev => ({ ...prev, selectedCrm: "NextHealth" }));
+        clearOAuthState();
+        window.history.replaceState({}, document.title, window.location.pathname);
+        autoProgressToNext();
+      } else if(nextHealthStatus==="error"){
+        console.log("❌ NextHealth OAuth error detected from URL:", errorMessage);
+        setNextHealthStatus("disconnected");
+        clearOAuthState();
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+       else {
         console.log("No OAuth status detected in URL");
       }
     };
@@ -625,11 +665,17 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setGoHighLevelStatus("disconnected");
         setShowGoHighLevelModal(true);
         setShowCompletionButtons(true);
-      } else if (value === "No CRM") {
+      }else if (value === "NextHealth") {
+        setNextHealthStatus("disconnected");
+        setShowNexHealthModal(true);
+        setShowCompletionButtons(true);
+      }
+       else if (value === "No CRM") {
         setShowCompletionButtons(true);
         setHubspotStatus("disconnected");
         setPipedriveStatus("disconnected");
         setGoHighLevelStatus("disconnected");
+        setNextHealthStatus("disconnected");
       }
     }
 
@@ -693,6 +739,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setShowGoHighLevelModal(true);
         return;
       }
+      else if(currentValue==="NextHealth"&& nextHealthStatus!=="connected"){
+        setShowNexHealthModal(true);
+        return;
+      }
       else if (currentValue === "No CRM") {
         localStorage.setItem("oauth_form_data", JSON.stringify(formData));
       }
@@ -728,6 +778,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         hubspotConnected: hubspotStatus === "connected",
         pipedriveConnected: pipedriveStatus === "connected",
         goHighLevelConnected: goHighLevelStatus === "connected",
+        nextHealthConnected: nextHealthStatus === "connected",
         googleFormConnected: googleFormStatus === "connected",
         googleLeadFormConnected: googleLeadFormStatus === "connected",
         facebookLeadFormConnected: facebookLeadFormStatus === "connected",
@@ -785,6 +836,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                   Connected to Go High 
                   </Text>
                   </div>
+            )}
+            {q.id === "selectedCrm"  && value === "NextHealth" && nextHealthStatus === "connected" && (
+              <div className="mt-2 p-2 bg-green-100 rounded-lg">
+                <Text className="text-green-700 text-sm">
+                  <CheckCircleOutlined className="mr-1" />
+                  Connected to NextHealth
+                </Text>
+              </div>
             )}
             {q.id === "leadCaptureForms" && value === "Google Forms" && googleFormStatus === "connected" && (
               <div className="mt-2 p-2 bg-yellow-100 rounded-lg">
@@ -1315,7 +1374,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           }
         }}
         onCancel={() => {
-          setShowTypeformModal(false);
+          setShowJotformModal(false);
           setShowCompletionButtons(false);
           setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
           localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
@@ -1355,6 +1414,31 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           setShowCompletionButtons(false);
           setFormData(prev => ({ ...prev, selectedCrm: "" }));
         }}
+      />
+      <NexHealthLeadFormModal
+        open={showNexHealthModal}
+        status={nextHealthStatus}
+        onOk={() => {
+          if (nextHealthStatus === "connected") {
+            setShowNexHealthModal(false);
+            autoProgressToNext();
+          } else {
+            setShowNexHealthModal(false);
+            setShowCompletionButtons(false);
+            setNextHealthStatus("disconnected");
+            setFormData(prev => ({ ...prev, selectedCrm: "" }));
+            localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "" }));
+          }
+        }
+      }
+        onCancel={() => {
+          setShowNexHealthModal(false);
+          setShowCompletionButtons(false);
+          setNextHealthStatus("disconnected");
+          setFormData(prev => ({ ...prev, selectedCrm: "" }));
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "" }));
+        }}
+        onConnect={(token:any)=>connectToNextHealth(token)}
       />
     </div>
   );
