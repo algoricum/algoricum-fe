@@ -23,6 +23,7 @@
     "antd": "^5.22.2",
     "axios": "^1.11.0",
     "cookies-next": "^5.1.0",
+    "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
     "form-data": "^4.0.4",
@@ -54,6 +55,7 @@
   },
   "devDependencies": {
     "@babel/eslint-parser": "^7.25.9",
+    "@types/crypto-js": "^4.2.2",
     "@types/lodash": "^4.17.13",
     "@types/node": "^20",
     "@types/papaparse": "^5.3.16",

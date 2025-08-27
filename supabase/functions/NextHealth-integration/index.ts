@@ -1,5 +1,6 @@
 // supabase/functions/sync-nexhealth/index.ts
 import { serve } from "https://deno.land/std@0.179.0/http/server.ts";
+<<<<<<< Updated upstream
 import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,6 +8,17 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS, PUT, DELETE",
 };
+=======
+import {  corsHeaders, handleOptions } from "../_shared/cors.ts";
+import {
+  authenticate,
+  fetchInstitution,
+  upsertIntegrationConnection,
+  fetchPatients,
+  insertPatientsAsLeads,
+} from "../_shared/nextHealth-service.ts";
+
+>>>>>>> Stashed changes
 serve(async (req) => {
 
   if (req.method === "OPTIONS") {
