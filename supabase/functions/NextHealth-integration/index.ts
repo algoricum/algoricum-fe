@@ -7,7 +7,7 @@ import {
   upsertIntegrationConnection,
   fetchPatients,
   insertPatientsAsLeads,
-} from "../_shared/service.ts";
+} from "../_shared/nextHealth-service.ts";
 
 serve(async (req) => {
   const optionsResponse = handleOptions(req);
