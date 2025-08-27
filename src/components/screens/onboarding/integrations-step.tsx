@@ -1374,7 +1374,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           }
         }}
         onCancel={() => {
-          setShowTypeformModal(false);
+          setShowJotformModal(false);
           setShowCompletionButtons(false);
           setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
           localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));

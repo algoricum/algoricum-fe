@@ -1,9 +1,13 @@
-import { Modal, Alert, Button, TreeSelect, Typography, Spin, Upload, Input } from "antd";
-import { LinkOutlined, CalendarOutlined, UploadOutlined } from "@ant-design/icons";
-import React, { useEffect, useState } from "react";
+"use client";
+
+import { Modal, Alert, Button, TreeSelect, Typography,Input, Spin, Upload } from "antd";
+import { CalendarOutlined ,LinkOutlined } from "@ant-design/icons";
+import type React from "react";
+import { useEffect ,useState} from "react";
+import Image from "next/image";
 
 const { Text } = Typography;
-
+           
 interface ModalProps {
   open: boolean;
   status: "disconnected" | "connecting" | "connected";
@@ -27,8 +31,8 @@ export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, 
   <Modal
     title={
       <div className="flex items-center">
-        <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center mr-3">
-          <Text className="text-white font-bold text-sm">H</Text>
+        <div className="w-8 h-8 bg-orange-200 rounded-lg flex items-center justify-center mr-3">
+          <Image src="/hubspot.svg" alt="HubSpot" width={25} height={25} />
         </div>
         <span className="text-xl font-semibold">Connect to HubSpot</span>
       </div>
@@ -38,7 +42,7 @@ export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, 
     onCancel={onCancel}
     okText={status === "connected" ? "Continue" : "Skip for Now"}
     cancelText="Cancel"
-    okButtonProps={{ className: "bg-purple-500 border-purple-500" }}
+    okButtonProps={{ className: "!bg-orange-400 !border-orange-400 hover:!bg-orange-600 " }}
     width={500}
     centered
   >
@@ -49,16 +53,22 @@ export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, 
             message="Connect your HubSpot account"
             description="We'll automatically sync your contacts and deals. This takes just one click!"
             type="info"
-            showIcon
-            className="mb-6"
+            className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+            style={
+              {
+                "--antd-info-color": "#374151",
+                "--antd-info-bg": "#f3f4f6",
+                "--antd-info-border": "#d1d5db",
+              } as React.CSSProperties
+            }
           />
           <div className="text-center">
             <Button
               type="primary"
               size="large"
-              icon={<LinkOutlined />}
+              icon={<Image src="/hubspot.svg" alt="HubSpot" width={25} height={25} />}
               onClick={() => onConnect?.()}
-              className="bg-orange-500 border-orange-500 hover:bg-orange-600 h-12 px-8 text-lg font-medium"
+              className="bg-orange-400 border-orange-400 hover:!bg-orange-600 h-12 px-8 text-lg font-medium"
             >
               Connect to HubSpot
             </Button>
@@ -82,6 +92,7 @@ export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, 
             <br />
             <Text className="text-gray-500">Please complete the authorization process</Text>
           </div>
+          <span className="text-xl font-semibold text-gray-800">Connect to HubSpot</span>
         </div>
       )}
       {status === "connected" && accountInfo && (
@@ -106,140 +117,147 @@ export const PipedriveModal: React.FC<ModalProps> = ({
   onConnect,
   onSyncLeads,
   onDisconnect,
-}) => (
-  <Modal
-    title={
-      <div className="flex items-center">
-        <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
-          <Text className="text-white font-bold text-sm">P</Text>
+}) => {
+  return (
+    <Modal
+      title={
+        <div className="flex items-center">
+          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
+            <Image src="/pipedrive.jpeg" alt="Pipedrive" width={25} height={25} />
+          </div>
+          <span className="text-xl font-semibold">Connect to Pipedrive</span>
         </div>
-        <span className="text-xl font-semibold">Connect to Pipedrive</span>
+      }
+      open={open}
+      onOk={onOk}
+      onCancel={onCancel}
+      okText={status === "connected" ? "Continue" : status === "connecting" ? "Connecting..." : "Skip for Now"}
+      cancelText="Cancel"
+      okButtonProps={{
+        className: "bg-green-700 border-green-700 hover:!bg-green-900",
+        loading: status === "connecting",
+      }}
+      width={600}
+      centered
+    >
+      <div className="py-6">
+        {/* If disconnected */}
+        {status === "disconnected" && (
+          <>
+            <Alert
+              message="Connect Pipedrive for CRM Integration"
+              description="Connect your Pipedrive CRM to automatically sync your leads, contacts, and deals with our platform."
+              type="info"
+              className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+              style={
+                {
+                  "--antd-info-color": "#374151",
+                  "--antd-info-bg": "#f3f4f6",
+                  "--antd-info-border": "#d1d5db",
+                } as React.CSSProperties
+              }
+            />
+            <div className="text-center">
+              <Button
+                type="primary"
+                size="large"
+                icon={<Image src="/pipedrive.jpeg" alt="Pipedrive" width={25} height={25} />}
+                onClick={() => onConnect?.()}
+                className="bg-green-700 border-green-700 hover:!bg-green-900 h-12 px-8 text-lg font-medium"
+              >
+                Connect to Pipedrive
+              </Button>
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <Text className="text-sm text-gray-600">
+                  <strong>What happens next:</strong>
+                  <br />• You&apos;ll be redirected to Pipedrive to sign in
+                  <br />• Grant permission to access your CRM data
+                  <br />• We&apos;ll automatically sync your leads and deals
+                  <br />• Takes less than 30 seconds!
+                </Text>
+              </div>
+            </div>
+            <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200 mt-6">
+              <div className="flex items-start">
+                <CalendarOutlined className="text-green-500 mt-1 mr-3" />
+                <div className="flex-1">
+                  <Text className="text-green-800 text-sm font-medium block mb-2">Need Help?</Text>
+                  <Text className="text-green-700 text-sm mb-3">
+                    Our team can help you set up the integration and configure your workflows.
+                    <br />
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CalendarOutlined />}
+                      onClick={() => window.open("https://calendly.com/your-team/google-form-setup", "_blank")}
+                      className="mt-2 !bg-green-700 !border-green-700 hover:!bg-green-900"
+                    >
+                      Book a Support Meeting
+                    </Button>
+                  </Text>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* If connecting */}
+        {status === "connecting" && (
+          <div className="text-center py-8">
+            <Spin size="large" />
+            <div className="mt-4">
+              <Text className="text-lg">Connecting to Pipedrive...</Text>
+              <br />
+              <Text className="text-gray-500">Please complete the authorization process</Text>
+            </div>
+          </div>
+        )}
+
+        {/* If connected */}
+        {status === "connected" && accountInfo && (
+          <>
+            <Alert
+              message="Successfully Connected!"
+              description={`Connected to ${accountInfo.accountName}. Moving to next step...`}
+              type="success"
+              showIcon
+              className="mb-4"
+            />
+
+            {/* Actions after connecting */}
+            <div className="bg-green-50 rounded-lg p-4 mb-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <Text strong className="text-green-800">
+                    Pipedrive Integration Active
+                  </Text>
+                  <br />
+                  <Text className="text-green-600 text-sm">{accountInfo.responseCount || 0} leads synced</Text>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={() => onSyncLeads?.()}
+                    className="bg-green-600 border-green-600 hover:bg-green-700"
+                  >
+                    Sync Leads
+                  </Button>
+                  <Button type="link" danger onClick={() => onDisconnect?.()} className="text-red-500">
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
-    }
-    open={open}
-    onOk={onOk}
-    onCancel={onCancel}
-    okText={status === "connected" ? "Continue" : status === "connecting" ? "Connecting..." : "Skip for Now"}
-    cancelText="Cancel"
-    okButtonProps={{ className: "bg-purple-500 border-purple-500", loading: status === "connecting" }}
-    width={600}
-    centered
-  >
-    <div className="py-6">
-      {status === "disconnected" && (
-        <>
-          <Alert
-            message="Connect Pipedrive for CRM Integration"
-            description="Connect your Pipedrive CRM to automatically sync your leads, contacts, and deals with our platform."
-            type="info"
-            showIcon
-            className="mb-6"
-          />
-          <div className="text-center">
-            <Button
-              type="primary"
-              size="large"
-              icon={<LinkOutlined />}
-              onClick={() => onConnect?.()}
-              className="bg-green-600 border-green-600 hover:bg-green-700 h-12 px-8 text-lg font-medium"
-            >
-              Connect to Pipedrive
-            </Button>
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <Text className="text-sm text-gray-600">
-                <strong>What happens next:</strong>
-                <br />• You&apos;ll be redirected to Pipedrive to sign in
-                <br />• Grant permission to access your CRM data
-                <br />• We&apos;ll automatically sync your leads and deals
-                <br />• Takes less than 30 seconds!
-              </Text>
-            </div>
-          </div>
-          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 mt-6">
-            <div className="flex items-start">
-              <CalendarOutlined className="text-blue-500 mt-1 mr-3" />
-              <div className="flex-1">
-                <Text className="text-blue-800 text-sm font-medium block mb-2">Need Help?</Text>
-                <Text className="text-blue-700 text-sm mb-3">
-                  Our team can help you set up the integration and configure your workflows.
-                </Text>
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<CalendarOutlined />}
-                  onClick={() => window.open("https://calendly.com/your-team/pipedrive-setup", "_blank")}
-                  className="bg-purple-600 border-purple-600 hover:bg-purple-700"
-                >
-                  Book a Support Meeting
-                </Button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-      {status === "connecting" && (
-        <div className="text-center py-8">
-          <Spin size="large" />
-          <div className="mt-4">
-            <Text className="text-lg">Connecting to Pipedrive...</Text>
-            <br />
-            <Text className="text-gray-500">Please complete the authorization process</Text>
-          </div>
-        </div>
-      )}
-      {status === "connected" && accountInfo && (
-        <>
-          <Alert
-            message="Successfully Connected!"
-            description={`Connected to ${accountInfo.accountName}. Your CRM integration is ready!`}
-            type="success"
-            showIcon
-            className="mb-4"
-          />
-          <div className="bg-green-50 rounded-lg p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <Text strong className="text-green-800">
-                  Pipedrive Integration Active
-                </Text>
-                <br />
-                <Text className="text-green-600 text-sm">
-                  {accountInfo.contactCount} contacts • {accountInfo.dealCount} deals
-                </Text>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  type="primary"
-                  size="small"
-                  onClick={() => onSyncLeads?.()}
-                  className="bg-green-600 border-green-600 hover:bg-green-700"
-                >
-                  Sync Leads
-                </Button>
-                <Button type="link" danger onClick={onDisconnect} className="text-red-500">
-                  Disconnect
-                </Button>
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 text-center">
-            <Text className="text-gray-600">⚡ Your CRM integration is ready! Need further help? Book a support meeting.</Text>
-            <br />
-            <Button
-              type="primary"
-              size="small"
-              icon={<CalendarOutlined />}
-              onClick={() => window.open("https://calendly.com/your-team/pipedrive-setup", "_blank")}
-              className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
-            >
-              Book a Support Meeting
-            </Button>
-          </div>
-        </>
-      )}
-    </div>
-  </Modal>
-);
+    </Modal>
+  );
+};
+
+
+
 
 export const GoogleFormModal: React.FC<ModalProps> = ({
   open,
@@ -253,132 +271,130 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
   treeData,
   selectedWorksheets,
   onSelectWorksheets,
-}) => (
-  <Modal
-    title={
-      <div className="flex items-center">
-        <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center mr-3">
-          <Text className="text-white font-bold text-sm">G</Text>
-        </div>
-        <span className="text-xl font-semibold">Connect to Google Forms</span>
-      </div>
-    }
-    open={open}
-    onOk={onOk}
-    onCancel={onCancel}
-    okText={status === "connected" ? "Continue" : "Skip for Now"}
-    cancelText="Cancel"
-    okButtonProps={{ className: "bg-purple-500 border-purple-500" }}
-    width={500}
-    centered
-  >
-    <div className="py-6">
-      {status === "disconnected" && (
-        <>
-          <Alert
-            message="Connect your Google Forms"
-            description="We can automatically sync leads from your Google Forms to our platform."
-            type="info"
-            showIcon
-            className="mb-6"
-          />
-          <div className="text-center">
-            <Button
-              type="primary"
-              size="large"
-              icon={<LinkOutlined />}
-              onClick={() => onConnect?.()}
-              className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 h-12 px-8 text-lg font-medium"
-            >
-              Connect to Google Forms
-            </Button>
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <Text className="text-sm text-gray-600">
-                <strong>What happens next:</strong>
-                <br />• You&apos;ll be redirected to Google to sign in
-                <br />• Grant permission to access your form responses
-                <br />• We&apos;ll automatically sync your leads
-                <br />• Takes less than 30 seconds!
-              </Text>
-            </div>
+}) => {
+  return (
+    <Modal
+      title={
+        <div className="flex items-center">
+          <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mr-3">
+            <Image src="/google.svg" alt="Google" width={25} height={25} />
           </div>
-        </>
-      )}
-      {status === "connecting" && (
-        <div className="text-center py-8">
-          <Spin size="large" />
-          <div className="mt-4">
-            <Text className="text-lg">Connecting to Google Forms...</Text>
-            <br />
-            <Text className="text-gray-500">Please complete the authorization process</Text>
-          </div>
+          <span className="text-xl font-semibold text-gray-500">Connect to Google Forms</span>
         </div>
-      )}
-      {status === "connected" && accountInfo && (
-        <>
-          <Alert
-            message="Successfully Connected!"
-            description={`Connected to ${accountInfo.accountName}. Your form integration is ready!`}
-            type="success"
-            showIcon
-            className="mb-4"
-          />
-          <div className="mt-4">
-            <Text className="block mb-2">Select worksheets to sync leads from:</Text>
-            <TreeSelect
-              style={{ width: "100%" }}
-              dropdownStyle={{ maxHeight: 400, overflow: "auto" }}
-              placeholder="Select worksheets"
-              treeData={treeData}
-              multiple
-              treeCheckable
-              showCheckedStrategy={TreeSelect.SHOW_CHILD}
-              value={selectedWorksheets}
-              onChange={onSelectWorksheets}
+      }
+      open={open}
+      onOk={onOk}
+      onCancel={onCancel}
+      okText={status === "connected" ? "Continue" : "Skip for Now"}
+      cancelText="Cancel"
+      okButtonProps={{ className: "!bg-gray-500 !border-gray-500 hover:!bg-gray-600" }}
+      width={500}
+      centered
+    >
+      <div className="py-6">
+        {status === "disconnected" && (
+          <>
+            <Alert
+              message="Connect your Google Forms"
+              description="We can automatically sync leads from your Google Forms to our platform."
+              type="info"
+              className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+              style={
+                {
+                  "--antd-info-color": "#374151",
+                  "--antd-info-bg": "#f3f4f6",
+                  "--antd-info-border": "#d1d5db",
+                } as React.CSSProperties
+              }
             />
-          </div>
-          <div className="bg-yellow-50 rounded-lg p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <Text strong className="text-yellow-800">
-                  Google Forms Integration Active
+            <div className="text-center">
+              <Button
+                type="primary"
+                size="large"
+                icon={<Image src="/google.svg" alt="Google" width={25} height={25} />}
+                onClick={() => onConnect?.()}
+                className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600 h-12 px-8 text-lg font-medium"
+              >
+                Connect to Google 
+              </Button>
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <Text className="text-sm text-gray-600">
+                  <strong>What happens next:</strong>
+                  <br />• You&apos;ll be redirected to Google to sign in
+                  <br />• Grant permission to access your form responses
+                  <br />• We&apos;ll automatically sync your leads
+                  <br />• Takes less than 30 seconds!
                 </Text>
-                <br />
-                <Text className="text-yellow-600 text-sm">{accountInfo.responseCount || 0} responses synced</Text>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  type="primary"
-                  size="small"
-                  onClick={() => onSyncLeads?.()}
-                  className="bg-yellow-600 border-yellow-600 hover:bg-yellow-700"
-                >
-                  Sync Leads
-                </Button>
-                <Button type="link" danger onClick={onDisconnect} className="text-red-500">
-                  Disconnect
-                </Button>
               </div>
             </div>
-          </div>
-          <div className="mt-4 text-center">
-            <Text className="text-gray-600">⚡ Your Google Forms integration is ready! Need further help? Book a support meeting.</Text>
-            <br />
-            <Button
-              type="primary"
-              size="small"
-              icon={<CalendarOutlined />}
-              onClick={() => window.open("https://calendly.com/your-team/google-form-setup", "_blank")}
-              className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
-            >
-              Book a Support Meeting
-            </Button>
-          </div>
-        </>
-      )}
-    </div>
-  </Modal>
-);
+          </>
+        )}
+        {status === "connected" && accountInfo && (
+          <>
+            <Alert
+              message="Successfully Connected!"
+              description={`Connected to ${accountInfo.accountName}. Your form integration is ready!`}
+              type="success"
+              showIcon
+              className="mb-4"
+            />
+            <div className="mt-4">
+              <Text className="block mb-2">Select worksheets to sync leads from:</Text>
+              <TreeSelect
+                style={{ width: "100%" }}
+                dropdownStyle={{ maxHeight: 400, overflow: "auto" }}
+                placeholder="Select worksheets"
+                treeData={treeData}
+                multiple
+                treeCheckable
+                showCheckedStrategy={TreeSelect.SHOW_CHILD}
+                value={selectedWorksheets}
+                onChange={onSelectWorksheets}
+              />
+            </div>
+            <div className="bg-yellow-50 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <Text strong className="text-yellow-800">
+                    Google Forms Integration Active
+                  </Text>
+                  <br />
+                  <Text className="text-yellow-600 text-sm">{accountInfo.responseCount || 0} responses synced</Text>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={() => onSyncLeads?.()}
+                    className="bg-yellow-600 border-yellow-600 hover:bg-yellow-700"
+                  >
+                    Sync Leads
+                  </Button>
+                  <Button type="link" danger onClick={onDisconnect} className="text-red-500">
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 text-center">
+              <Text className="text-gray-600">⚡ Your Google Forms integration is ready! Need further help? Book a support meeting.</Text>
+              <br />
+              <Button
+                type="primary"
+                size="small"
+                icon={<CalendarOutlined />}
+                onClick={() => window.open("https://calendly.com/your-team/google-form-setup", "_blank")}
+                className="mt-2 !bg-gray-500 !border-gray-500 hover:!bg-gray-600"
+              >
+                Book a Support Meeting
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+};
 
 export const GoogleLeadFormModal: React.FC<ModalProps> = ({
   open,
@@ -389,211 +405,231 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
   onConnect,
   onSyncLeads,
   onDisconnect,
-}) => (
-  <Modal
-    title={
-      <div className="flex items-center">
-        <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center mr-3">
-          <Text className="text-white font-bold text-sm">G</Text>
-        </div>
-        <span className="text-xl font-semibold">Connect to Google Ads Lead Forms</span>
-      </div>
-    }
-    open={open}
-    onOk={onOk}
-    onCancel={onCancel}
-    okText={status === "connected" ? "Continue" : "Skip for Now"}
-    cancelText="Cancel"
-    okButtonProps={{ className: "bg-purple-500 border-purple-500" }}
-    width={500}
-    centered
-  >
-    <div className="py-6">
-      {status === "disconnected" && (
-        <>
-          <Alert
-            message="Connect your Google Ads Lead Forms"
-            description="We can automatically sync leads from your Google Ads Lead Forms to our platform."
-            type="info"
-            showIcon
-            className="mb-6"
-          />
-          <div className="text-center">
-            <Button
-              type="primary"
-              size="large"
-              icon={<LinkOutlined />}
-              onClick={() => onConnect?.()}
-              className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 h-12 px-8 text-lg font-medium"
-            >
-              Connect to Google Ads Lead Forms
-            </Button>
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <Text className="text-sm text-gray-600">
-                <strong>What happens next:</strong>
-                <br />• You&apos;ll be redirected to Google to sign in
-                <br />• Grant permission to access your lead form responses
-                <br />• We&apos;ll automatically sync your leads
-                <br />• Takes less than 30 seconds!
-              </Text>
-            </div>
+}) => {
+  return (
+    <Modal
+      title={
+        <div className="flex items-center">
+          <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mr-3">
+            <Image src="/google.svg" alt="Google" width={25} height={25} />
           </div>
-        </>
-      )}
-      {status === "connecting" && (
-        <div className="text-center py-8">
-          <Spin size="large" />
-          <div className="mt-4">
-            <Text className="text-lg">Connecting to Google Ads Lead Forms...</Text>
-            <br />
-            <Text className="text-gray-500">Please complete the authorization process</Text>
-          </div>
+          <span className="text-xl font-semibold text-gray-800">Connect to Google</span>
         </div>
-      )}
-      {status === "connected" && accountInfo && (
-        <>
-          <Alert
-            message="Successfully Connected!"
-            description={`Connected to ${accountInfo.accountName}. Your lead form integration is ready!`}
-            type="success"
-            showIcon
-            className="mb-4"
-          />
-          <div className="bg-yellow-50 rounded-lg p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <Text strong className="text-yellow-800">
-                  Google Ads Lead Forms Integration Active
+      }
+      open={open}
+      onOk={onOk}
+      onCancel={onCancel}
+      okText={status === "connected" ? "Continue" : "Skip for Now"}
+      cancelText="Cancel"
+      okButtonProps={{
+        className: "!bg-gray-500 !border-gray-500 hover:!bg-gray-600 !text-white text-bold",
+        style: { backgroundColor: "#6b7280", borderColor: "#6b7280" },
+      }}
+      width={500}
+      centered
+    >
+      <div className="py-6">
+        {status === "disconnected" && (
+          <>
+            <Alert
+              message="Connect Google Ads Lead Forms"
+              description="Automatically sync leads from your Google Ads Lead Forms to our platform."
+              type="info"
+              className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+              style={
+                {
+                  "--antd-info-color": "#374151",
+                  "--antd-info-bg": "#f3f4f6",
+                  "--antd-info-border": "#d1d5db",
+                } as React.CSSProperties
+              }
+            />
+            <div className="text-center">
+              <Button
+                type="primary"
+                size="large"
+                icon={<Image src="/google.svg" alt="Google" width={25} height={25} />}
+                onClick={() => onConnect?.()}
+                className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600 h-12 px-8 text-lg font-medium"
+              >
+                Connect to Google
+              </Button>
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <Text className="text-sm text-gray-600">
+                  <strong>What happens next:</strong>
+                  <br />• You&apos;ll be redirected to Google to sign in
+                  <br />• Grant permission to access your lead form responses
+                  <br />• We&apos;ll automatically sync your leads
+                  <br />• Takes less than 30 seconds!
                 </Text>
-                <br />
-                <Text className="text-yellow-600 text-sm">{accountInfo.responseCount} responses synced</Text>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  type="primary"
-                  size="small"
-                  onClick={() => onSyncLeads}
-                  className="bg-yellow-600 border-yellow-600 hover:bg-yellow-700"
-                >
-                  Sync Leads
-                </Button>
-                <Button type="link" danger onClick={onDisconnect} className="text-red-500">
-                  Disconnect
-                </Button>
               </div>
             </div>
+          </>
+        )}
+        
+        {status === "connecting" && (
+          <div className="text-center py-8">
+            <Spin size="large" />
+            <div className="mt-4">
+              <Text className="text-lg">Connecting to Google Ads Lead Forms...</Text>
+              <br />
+              <Text className="text-gray-500">Please complete the authorization process</Text>
+            </div>
           </div>
-          <div className="mt-4 text-center">
-            <Text className="text-gray-600">
-              ⚡ Your Google Ads Lead Forms integration is ready! Need further help? Book a support meeting.
-            </Text>
-            <br />
-            <Button
-              type="primary"
-              size="small"
-              icon={<CalendarOutlined />}
-              onClick={() => window.open("https://calendly.com/your-team/google-lead-form-setup", "_blank")}
-              className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
-            >
-              Book a Support Meeting
-            </Button>
-          </div>
-        </>
-      )}
-    </div>
-  </Modal>
-);
-
-export const FacebookLeadFormModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect }) => (
-  <Modal
-    title={
-      <div className="flex items-center">
-        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-          <Text className="text-white font-bold text-sm">F</Text>
-        </div>
-        <span className="text-xl font-semibold">Connect to Facebook Lead Ads</span>
-      </div>
-    }
-    open={open}
-    onOk={onOk}
-    onCancel={onCancel}
-    okText={status === "connected" ? "Continue" : "Skip for Now"}
-    cancelText="Cancel"
-    okButtonProps={{ className: "bg-purple-500 border-purple-500" }}
-    width={500}
-    centered
-  >
-    <div className="py-6">
-      {status === "disconnected" && (
-        <>
-          <Alert
-            message="Connect your Facebook Lead Ads"
-            description="We can automatically sync leads from your Facebook Lead Ads to our platform."
-            type="info"
-            showIcon
-            className="mb-6"
-          />
-          <div className="text-center">
-            <Button
-              type="primary"
-              size="large"
-              icon={<LinkOutlined />}
-              onClick={() => onConnect?.()}
-              className="bg-blue-600 border-blue-600 hover:bg-blue-700 h-12 px-8 text-lg font-medium"
-            >
-              Connect to Facebook Lead Ads
-            </Button>
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <Text className="text-sm text-gray-600">
-                <strong>What happens next:</strong>
-                <br />• You&apos;ll be redirected to Facebook to sign in
-                <br />• Grant permission to access your lead form responses
-                <br />• We&apos;ll automatically sync your leads
-                <br />• Takes less than 30 seconds!
+        )}
+        
+        {status === "connected" && accountInfo && (
+          <>
+            <Alert
+              message="Successfully Connected!"
+              description={`Connected to ${accountInfo.accountName}. Your lead form integration is ready!`}
+              type="success"
+              showIcon
+              className="mb-4"
+            />
+            <div className="bg-gray-50 rounded-lg p-4 mt-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <Text strong className="text-gray-800">
+                    Google Ads Lead Forms Integration Active
+                  </Text>
+                  <br />
+                  <Text className="text-gray-600 text-sm">
+                    {accountInfo.responseCount || 0} responses synced
+                  </Text>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={() => onSyncLeads?.()}
+                    className="bg-gray-600 border-gray-600 hover:bg-gray-700"
+                  >
+                    Sync Leads
+                  </Button>
+                  <Button type="link" danger onClick={onDisconnect} className="text-red-500">
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 text-center">
+              <Text className="text-gray-600">
+                ⚡ Your Google Ads Lead Forms integration is ready! Need further help? Book a support meeting.
               </Text>
+              <br />
+              <Button
+                type="primary"
+                size="small"
+                icon={<CalendarOutlined />}
+                onClick={() => window.open("https://calendly.com/your-team/google-ads-lead-form-setup", "_blank")}
+                className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
+              >
+                Book a Support Meeting
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+};
+
+export const FacebookLeadFormModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect }) => {
+  return (
+    <Modal
+      title={
+        <div className="flex items-center">
+          <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mr-3">
+            <Image src="/facebook2.svg" alt="Facebook" width={25} height={25} />
+          </div>
+          <span className="text-xl font-semibold text-gray-800">Connect to Facebook</span>
+        </div>
+      }
+      open={open}
+      onOk={onOk}
+      onCancel={onCancel}
+      okText={status === "connected" ? "Continue" : "Skip for Now"}
+      cancelText="Cancel"
+      okButtonProps={{
+        className: "!bg-[#3D5DCF] !border-[#3D5DCF] hover:!bg-blue-800 !text-white",
+        style: { backgroundColor: "#6b7280", borderColor: "#6b7280" },
+      }}
+      width={500}
+      centered
+    >
+      <div className="py-6">
+        {status === "disconnected" && (
+          <>
+            <Alert
+              message="Connect your Facebook Lead Ads"
+              description="We can automatically sync leads from your Facebook Lead Ads to our platform."
+              type="info"
+              showIcon
+              className="mb-6 !bg-blue-50 !border-blue-300 !text-gray-800"
+            />
+            <div className="text-center">
+              <Button
+                type="primary"
+                size="large"
+                icon={<Image src="/facebook2.svg" alt="Facebook" width={25} height={25} />}
+                onClick={() => onConnect?.()}
+                className="!bg-[#3D5DCF] !border-[#3D5DCF] hover:!bg-blue-800 h-12 px-8 text-lg font-medium"
+              >
+                Connect to Facebook
+              </Button>
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <Text className="text-sm text-gray-600">
+                  <strong>What happens next:</strong>
+                  <br />• You&apos;ll be redirected to Facebook to sign in
+                  <br />• Grant permission to access your lead form responses
+                  <br />• We&apos;ll automatically sync your leads
+                  <br />• Takes less than 30 seconds!
+                </Text>
+              </div>
+            </div>
+          </>
+        )}
+        {status === "connecting" && (
+          <div className="text-center py-8">
+            <Spin size="large" />
+            <div className="mt-4">
+              <Text className="text-lg">Connecting to Facebook...</Text>
+              <br />
+              <Text className="text-gray-500">Please complete the authorization process</Text>
             </div>
           </div>
-        </>
-      )}
-      {status === "connecting" && (
-        <div className="text-center py-8">
-          <Spin size="large" />
-          <div className="mt-4">
-            <Text className="text-lg">Connecting to Facebook Lead Ads...</Text>
-            <br />
-            <Text className="text-gray-500">Please complete the authorization process</Text>
-          </div>
-        </div>
-      )}
-      {status === "connected" && accountInfo && (
-        <>
-          <Alert
-            message="Successfully Connected!"
-            description={`Connected to ${accountInfo.accountName}. Your lead form integration is ready!`}
-            type="success"
-            showIcon
-            className="mb-4"
-          />
-          <div className="mt-4 text-center">
-            <Text className="text-gray-600">
-              ⚡ Your Facebook Lead Ads integration is ready! Need further help? Book a support meeting.
-            </Text>
-            <br />
-            <Button
-              type="primary"
-              size="small"
-              icon={<CalendarOutlined />}
-              onClick={() => window.open("https://calendly.com/your-team/facebook-lead-form-setup", "_blank")}
-              className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
-            >
-              Book a Support Meeting
-            </Button>
-          </div>
-        </>
-      )}
-    </div>
-  </Modal>
-);
+        )}
+        {status === "connected" && accountInfo && (
+          <>
+            <Alert
+              message="Successfully Connected!"
+              description={`Connected to ${accountInfo.accountName}. Your lead form integration is ready!`}
+              type="success"
+              showIcon
+              className="mb-4"
+            />
+            <div className="mt-4 text-center">
+              <Text className="text-gray-600">
+                ⚡ Your Facebook Lead Ads integration is ready! Need further help? Book a support meeting.
+              </Text>
+              <br />
+              <Button
+                type="primary"
+                size="small"
+                icon={<CalendarOutlined />}
+                onClick={() => window.open("https://calendly.com/your-team/facebook-lead-form-setup", "_blank")}
+                className="mt-2 !bg-gray-500 !border-gray-500 hover:!bg-purple-700"
+              >
+                Book a Support Meeting
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+};
 
 export const TypeformModal: React.FC<ModalProps> = ({
   open,
@@ -607,132 +643,146 @@ export const TypeformModal: React.FC<ModalProps> = ({
   treeData,
   selectedForms,
   onSelectForms,
-}) => (
-  <Modal
-    title={
-      <div className="flex items-center">
-        <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mr-3">
-          <Text className="text-white font-bold text-sm">T</Text>
-        </div>
-        <span className="text-xl font-semibold">Connect to Typeform</span>
-      </div>
-    }
-    open={open}
-    onOk={onOk}
-    onCancel={onCancel}
-    okText={status === "connected" ? "Continue" : "Skip for Now"}
-    cancelText="Cancel"
-    okButtonProps={{ className: "bg-purple-500 border-purple-500" }}
-    width={500}
-    centered
-  >
-    <div className="py-6">
-      {status === "disconnected" && (
-        <>
-          <Alert
-            message="Connect your Typeform"
-            description="We can automatically sync leads from your Typeform forms to our platform."
-            type="info"
-            showIcon
-            className="mb-6"
-          />
-          <div className="text-center">
-            <Button
-              type="primary"
-              size="large"
-              icon={<LinkOutlined />}
-              onClick={() => onConnect?.()}
-              className="bg-black border-black hover:bg-gray-800 h-12 px-8 text-lg font-medium"
-            >
-              Connect to Typeform
-            </Button>
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <Text className="text-sm text-gray-600">
-                <strong>What happens next:</strong>
-                <br />• You&apos;ll be redirected to Typeform to sign in
-                <br />• Grant permission to access your form responses
-                <br />• We&apos;ll automatically sync your leads
-                <br />• Takes less than 30 seconds!
-              </Text>
-            </div>
+}) => {
+  return (
+    <Modal
+      title={
+        <div className="flex items-center">
+          <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mr-3">
+            <Image src="/typeform.jpeg" alt="TypeForm" width={25} height={25} />
           </div>
-        </>
-      )}
-      {status === "connecting" && (
-        <div className="text-center py-8">
-          <Spin size="large" />
-          <div className="mt-4">
-            <Text className="text-lg">Connecting to Typeform...</Text>
-            <br />
-            <Text className="text-gray-500">Please complete the authorization process</Text>
-          </div>
+          <span className="text-xl font-semibold text-gray-800">Connect to Typeform</span>
         </div>
-      )}
-      {status === "connected" && (
-        <>
-          <Alert
-            message="Successfully Connected!"
-            description={`Connected to ${accountInfo.accountName}. Your form integration is ready!`}
-            type="success"
-            showIcon
-            className="mb-4"
-          />
-          <div className="mt-4">
-            <Text className="block mb-2">Select forms to sync leads from:</Text>
-            <TreeSelect
-              style={{ width: "100%" }}
-              dropdownStyle={{ maxHeight: 400, overflow: "auto" }}
-              placeholder="Select forms"
-              treeData={treeData}
-              multiple
-              treeCheckable
-              showCheckedStrategy={TreeSelect.SHOW_CHILD}
-              value={selectedForms}
-              onChange={onSelectForms}
+      }
+      open={open}
+      onOk={onOk}
+      onCancel={onCancel}
+      okText={status === "connected" ? "Continue" : "Skip for Now"}
+      cancelText="Cancel"
+      okButtonProps={{
+        className: "!bg-gray-500 !border-gray-500 hover:!bg-gray-600 !text-white",
+        style: { backgroundColor: "#6b7280", borderColor: "#6b7280" },
+      }}
+      width={500}
+      centered
+    >
+      <div className="py-6">
+        {status === "disconnected" && (
+          <>
+            <Alert
+              message="Connect your Typeform"
+              description="We can automatically sync leads from your Typeform forms to our platform."
+              type="info"
+              className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+              style={
+                {
+                  backgroundColor: "#f9fafb",
+                  borderColor: "#d1d5db",
+                  color: "#1f2937",
+                  "--antd-info-color": "#374151",
+                  "--antd-info-bg": "#f3f4f6",
+                  "--antd-info-border": "#d1d5db",
+                } as React.CSSProperties
+              }
             />
-          </div>
-          <div className="bg-black rounded-lg p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <Text strong className="text-white">
-                  Typeform Integration Active
+            <div className="text-center">
+              <Button
+                type="primary"
+                size="large"
+                icon={<Image src="/typeform.jpeg" alt="Typeform" width={25} height={25} />}
+                onClick={() => onConnect?.()}
+                className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600 h-12 px-8 text-lg font-medium"
+              >
+                Connect to Typeform
+              </Button>
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <Text className="text-sm text-gray-600">
+                  <strong>What happens next:</strong>
+                  <br />• You&apos;ll be redirected to Typeform to sign in
+                  <br />• Grant permission to access your form responses
+                  <br />• We&apos;ll automatically sync your leads
+                  <br />• Takes less than 30 seconds!
                 </Text>
-                <br />
-                <Text className="text-gray-300 text-sm">{accountInfo.responseCount || 0} responses synced</Text>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  type="primary"
-                  size="small"
-                  onClick={() => onSyncLeads?.()}
-                  className="bg-gray-800 border-gray-800 hover:bg-gray-900"
-                >
-                  Sync Leads
-                </Button>
-                <Button type="link" danger onClick={onDisconnect} className="text-red-500">
-                  Disconnect
-                </Button>
               </div>
             </div>
+          </>
+        )}
+        {status === "connecting" && (
+          <div className="text-center py-8">
+            <Spin size="large" />
+            <div className="mt-4">
+              <Text className="text-lg">Connecting to Typeform...</Text>
+              <br />
+              <Text className="text-gray-500">Please complete the authorization process</Text>
+            </div>
           </div>
-          <div className="mt-4 text-center">
-            <Text className="text-gray-600">⚡ Your Typeform integration is ready! Need further help? Book a support meeting.</Text>
-            <br />
-            <Button
-              type="primary"
-              size="small"
-              icon={<CalendarOutlined />}
-              onClick={() => window.open("https://calendly.com/your-team/typeform-setup", "_blank")}
-              className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
-            >
-              Book a Support Meeting
-            </Button>
-          </div>
-        </>
-      )}
-    </div>
-  </Modal>
-);
+        )}
+        {status === "connected" && (
+          <>
+            <Alert
+              message="Successfully Connected!"
+              description={`Connected to ${accountInfo.accountName}. Your form integration is ready!`}
+              type="success"
+              showIcon
+              className="mb-4"
+            />
+            <div className="mt-4">
+              <Text className="block mb-2">Select forms to sync leads from:</Text>
+              <TreeSelect
+                style={{ width: "100%" }}
+                dropdownStyle={{ maxHeight: 400, overflow: "auto" }}
+                placeholder="Select forms"
+                treeData={treeData}
+                multiple
+                treeCheckable
+                showCheckedStrategy={TreeSelect.SHOW_CHILD}
+                value={selectedForms}
+                onChange={onSelectForms}
+              />
+            </div>
+            <div className="bg-black rounded-lg p-4 mt-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <Text strong className="text-white">
+                    Typeform Integration Active
+                  </Text>
+                  <br />
+                  <Text className="text-gray-300 text-sm">0 responses synced</Text>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={() => onSyncLeads?.()}
+                    className="bg-gray-800 border-gray-800 hover:bg-gray-900"
+                  >
+                    Sync Leads
+                  </Button>
+                  <Button type="link" danger onClick={onDisconnect} className="text-red-500">
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 text-center">
+              <Text className="text-gray-600">⚡ Your Typeform integration is ready! Need help?</Text>
+              <br />
+              <Button
+                type="primary"
+                size="small"
+                icon={<CalendarOutlined />}
+                onClick={() => window.open("https://calendly.com/your-team/typeform-setup", "_blank")}
+                className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
+              >
+                Book a Support Meeting
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+};
 
 export const JotformModal: React.FC<ModalProps> = ({
   open,
@@ -782,10 +832,10 @@ export const JotformModal: React.FC<ModalProps> = ({
     <Modal
       title={
         <div className="flex items-center">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-            <Text className="text-white font-bold text-sm">J</Text>
+          <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mr-3">
+            <Image src="/jotform.svg" alt="Jotform" width={25} height={25} />
           </div>
-          <span className="text-xl font-semibold">Connect to Jotform</span>
+          <span className="text-xl font-semibold text-gray-800">Connect to Jotform</span>
         </div>
       }
       open={open}
@@ -793,7 +843,10 @@ export const JotformModal: React.FC<ModalProps> = ({
       onCancel={onCancel}
       okText={status === "connected" ? "Continue" : "Skip for Now"}
       cancelText="Cancel"
-      okButtonProps={{ className: "bg-blue-600 border-blue-600" }}
+      okButtonProps={{
+        className: "!bg-gray-500 !border-gray-500 hover:!bg-gray-600 !text-white",
+        style: { backgroundColor: "#6b7280", borderColor: "#6b7280" },
+      }}
       width={500}
       centered
     >
@@ -802,18 +855,27 @@ export const JotformModal: React.FC<ModalProps> = ({
           <>
             <Alert
               message="Connect your Jotform"
-              description="We can automatically sync leads from your Jotform forms to our platform."
+              description="We can automatically sync form responses from your Jotform to our platform."
+              className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
               type="info"
-              showIcon
-              className="mb-6"
+              style={
+                {
+                  backgroundColor: "#f9fafb",
+                  borderColor: "#d1d5db",
+                  color: "#1f2937",
+                  "--antd-info-color": "#374151",
+                  "--antd-info-bg": "#f3f4f6",
+                  "--antd-info-border": "#d1d5db",
+                } as React.CSSProperties
+              }
             />
             <div className="text-center">
               <Button
                 type="primary"
                 size="large"
-                icon={<LinkOutlined />}
+                icon={<Image src="/jotform.svg" alt="Jotform" width={25} height={25} />}
                 onClick={handleConnect}
-                className="bg-blue-600 border-blue-600 hover:bg-blue-700 h-12 px-8 text-lg font-medium"
+                className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600 h-12 px-8 text-lg font-medium"
               >
                 Connect to Jotform
               </Button>
@@ -822,14 +884,13 @@ export const JotformModal: React.FC<ModalProps> = ({
                   <strong>What happens next:</strong>
                   <br />• A Jotform login popup opens
                   <br />• Grant access to your forms
-                  <br />• We’ll sync your leads automatically
+                  <br />• We&apos;ll sync your leads automatically
                   <br />• Takes less than 30 seconds
                 </Text>
               </div>
             </div>
           </>
         )}
-
         {status === "connecting" && (
           <div className="text-center py-8">
             <Spin size="large" />
@@ -840,7 +901,6 @@ export const JotformModal: React.FC<ModalProps> = ({
             </div>
           </div>
         )}
-
         {status === "connected" && (
           <>
             <Alert
@@ -917,8 +977,8 @@ export const CsvUploadModal: React.FC<{
   <Modal
     title={
       <div className="flex items-center">
-        <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
-          <Text className="text-white font-bold text-sm">CSV</Text>
+        <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center mr-3">
+          <Image src="/csv.png" alt="CSV" width={25} height={25} />
         </div>
         <span className="text-xl font-semibold">Upload Leads via CSV</span>
       </div>
@@ -928,7 +988,7 @@ export const CsvUploadModal: React.FC<{
     onCancel={onCancel}
     okText="Upload"
     cancelText="Cancel"
-    okButtonProps={{ className: "bg-purple-500 border-purple-500" }}
+    okButtonProps={{ className: "!bg-gray-500 !border-gray-500 hover:!bg-gray-600" }}
     width={500}
     centered
   >
@@ -937,8 +997,17 @@ export const CsvUploadModal: React.FC<{
         message="Upload your leads"
         description="Upload a CSV file containing your leads to import them into the platform."
         type="info"
-        showIcon
-        className="mb-6"
+        className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+        style={
+          {
+            backgroundColor: "#f9fafb",
+            borderColor: "#d1d5db",
+            color: "#1f2937",
+            "--antd-info-color": "#374151",
+            "--antd-info-bg": "#f3f4f6",
+            "--antd-info-border": "#d1d5db",
+          } as React.CSSProperties
+        }
       />
       <div className="text-center">
         <Upload
@@ -952,8 +1021,8 @@ export const CsvUploadModal: React.FC<{
           <Button
             type="primary"
             size="large"
-            icon={<UploadOutlined />}
-            className="bg-purple-500 border-purple-500 hover:bg-purple-600 h-12 px-8 text-lg font-medium"
+            icon={<Image src="/csv.png" alt="csv" width={25} height={25} />}
+            className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600 h-12 px-8 text-lg font-medium"
           >
             Select CSV File
           </Button>
@@ -1000,8 +1069,17 @@ export const CustomCrmModal: React.FC<{
         message="Custom CRM Integration"
         description="Let us know about your CRM, and our team will assist with the integration."
         type="info"
-        showIcon
-        className="mb-6"
+        className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+        style={
+          {
+            backgroundColor: "#f9fafb",
+            borderColor: "#d1d5db",
+            color: "#1f2937",
+            "--antd-info-color": "#374151",
+            "--antd-info-bg": "#f3f4f6",
+            "--antd-info-border": "#d1d5db",
+          } as React.CSSProperties
+        }
       />
       <div className="text-center">
         <Text className="text-sm text-gray-600">Please contact our support team to set up your custom CRM integration.</Text>
@@ -1011,7 +1089,7 @@ export const CustomCrmModal: React.FC<{
           size="large"
           icon={<CalendarOutlined />}
           onClick={() => window.open("https://calendly.com/your-team/custom-crm-setup", "_blank")}
-          className="mt-4 bg-purple-600 border-purple-600 hover:bg-purple-700 h-12 px-8 text-lg font-medium"
+          className="!mt-4 !bg-gray-600 !border-gray-600 hover:!bg-purple-600 h-12 px-8 text-lg font-medium"
         >
           Book a Support Meeting
         </Button>
@@ -1025,8 +1103,8 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, a
   <Modal
     title={
       <div className="flex items-center">
-        <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
-          <Text className="text-white font-bold text-sm">G</Text>
+        <div className="w-8 h-8 bg-[#100D4D] rounded-lg flex items-center justify-center mr-3">
+          <Image src="/gohighlevel.jpeg" width={32} height={32} alt="GoHighLevel" />
         </div>
         <span className="text-xl font-semibold">Connect to GoHighLevel</span>
       </div>
@@ -1036,7 +1114,7 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, a
     onCancel={onCancel}
     okText={status === "connected" ? "Continue" : "Skip for Now"}
     cancelText="Cancel"
-    okButtonProps={{ className: "bg-purple-500 border-purple-500" }}
+    okButtonProps={{ className: "bg-[#100D4D] border-[#100D4D]" }}
     width={500}
     centered
   >
@@ -1047,16 +1125,25 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, a
             message="Connect your GoHighLevel Account"
             description="We can automatically sync leads from your GoHighLevel contacts to our platform."
             type="info"
-            showIcon
-            className="mb-6"
+            className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+            style={
+              {
+                backgroundColor: "#f9fafb",
+                borderColor: "#d1d5db",
+                color: "#1f2937",
+                "--antd-info-color": "#374151",
+                "--antd-info-bg": "#f3f4f6",
+                "--antd-info-border": "#d1d5db",
+              } as React.CSSProperties
+            }
           />
           <div className="text-center">
             <Button
               type="primary"
               size="large"
-              icon={<LinkOutlined />}
+              icon={<Image src="/gohighlevel.jpeg" width={30} height={30} alt="GoHighLevel" />}
               onClick={() => onConnect?.()}
-              className="bg-green-600 border-green-600 hover:bg-green-700 h-12 px-8 text-lg font-medium"
+              className="bg-[#100D4D] border-[#100D4D] h-12 px-8 text-lg font-medium"
             >
               Connect to GoHighLevel
             </Button>
@@ -1092,9 +1179,7 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, a
             className="mb-4"
           />
           <div className="mt-4 text-center">
-            <Text className="text-gray-600">
-              ⚡ Your GoHighLevel integration is ready! Need further help? Book a support meeting.
-            </Text>
+            <Text className="text-gray-600">⚡ Your GoHighLevel integration is ready! Need further help? Book a support meeting.</Text>
             <br />
             <Button
               type="primary"
@@ -1126,8 +1211,8 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({
     <Modal
       title={
         <div className="flex items-center">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-            <Text className="text-white font-bold text-sm">N</Text>
+          <div className="w-8 h-8 bg-black-400 rounded-lg flex items-center justify-center mr-3">
+            <Image src="/nexHealth.png" alt="NexHealth" width={25} height={25} />
           </div>
           <span className="text-xl font-semibold">Connect to NexHealth</span>
         </div>
@@ -1137,7 +1222,7 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({
       onCancel={onCancel}
       okText={status === "connected" ? "Continue" : "Skip for Now"}
       cancelText="Cancel"
-      okButtonProps={{ className: "bg-blue-500 border-blue-500" }}
+      okButtonProps={{ className: "bg-gray-500 border-gray-500  hover:!bg-gray-600" }}
       width={500}
       centered
     >
@@ -1148,15 +1233,24 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({
               message="Connect your NexHealth Account"
               description="Enter your API key to sync patients and appointments from NexHealth."
               type="info"
-              showIcon
-              className="mb-6"
+              className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+              style={
+                {
+                  backgroundColor: "#f9fafb",
+                  borderColor: "#d1d5db",
+                  color: "#1f2937",
+                  "--antd-info-color": "#374151",
+                  "--antd-info-bg": "#f3f4f6",
+                  "--antd-info-border": "#d1d5db",
+                } as React.CSSProperties
+              }
             />
 
             <div className="text-center">
               <Input.Password
                 placeholder="Enter NexHealth API Key"
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={e => setApiKey(e.target.value)}
                 className="mb-4 h-12 text-lg"
               />
               <Button
@@ -1165,7 +1259,9 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({
                 icon={<LinkOutlined />}
                 onClick={() => apiKey && onConnect?.(apiKey)}
                 disabled={!apiKey}
-                className="bg-blue-600 border-blue-600 hover:bg-blue-700 h-12 px-8 text-lg font-medium"
+                className={`h-12 px-8 text-lg font-medium ${
+                  apiKey ? "bg-gray-500 border-gray-500  hover:!bg-gray-600" : "bg-gray-600 border-gray-500"
+                }`}
               >
                 Connect to NexHealth
               </Button>
@@ -1189,9 +1285,7 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({
             <div className="mt-4">
               <Text className="text-lg">Connecting to NexHealth...</Text>
               <br />
-              <Text className="text-gray-500">
-                Please complete the authorization process
-              </Text>
+              <Text className="text-gray-500">Please complete the authorization process</Text>
             </div>
           </div>
         )}
@@ -1206,21 +1300,13 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({
               className="mb-4"
             />
             <div className="mt-4 text-center">
-              <Text className="text-gray-600">
-                ⚡ Your NexHealth integration is ready! Need further help? Book
-                a support meeting.
-              </Text>
+              <Text className="text-gray-600">⚡ Your NexHealth integration is ready! Need further help? Book a support meeting.</Text>
               <br />
               <Button
                 type="primary"
                 size="small"
                 icon={<CalendarOutlined />}
-                onClick={() =>
-                  window.open(
-                    "https://calendly.com/your-team/nexhealth-setup",
-                    "_blank"
-                  )
-                }
+                onClick={() => window.open("https://calendly.com/your-team/nexhealth-setup", "_blank")}
                 className="mt-2 bg-blue-600 border-blue-600 hover:bg-blue-700"
               >
                 Book a Support Meeting
