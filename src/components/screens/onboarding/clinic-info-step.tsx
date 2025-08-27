@@ -62,7 +62,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     clinicName: initialData.clinicName || "",
     clinicType: initialData.clinicType || "",
     primaryContactName: initialData.primaryContactName || "",
-    primaryContactEmail: initialData.primaryContactEmail || "",
+    // primaryContactEmail: initialData.primaryContactEmail || "",
     clinicPhone: initialData.clinicPhone || "",
     businessAddress: initialData.businessAddress || "",
     // Three separate document arrays
@@ -125,13 +125,13 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       placeholder: "Enter your name",
       required: true,
     },
-    {
-      id: "primaryContactEmail",
-      type: "email",
-      question: "What's your email address?",
-      placeholder: "Enter your email",
-      required: true,
-    },
+    // {
+    //   id: "primaryContactEmail",
+    //   type: "email",
+    //   question: "What's your email address?",
+    //   placeholder: "Enter your email",
+    //   required: true,
+    // },
   ];
 
   // File upload configurations
