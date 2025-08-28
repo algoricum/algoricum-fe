@@ -467,3 +467,341 @@ export const createJotformConnection = async (clinicId: string, jotformToken: st
   }
   return true;
 };
+
+export const connectToGoogleLeadForm = async () => {
+ try {
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/start-auth`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ clinic_id: await getClinicId() }),
+            });
+
+            if (!res.ok) throw new Error("Failed to start Google auth");
+
+            const data = await res.json();
+            if (!data.auth_url) throw new Error("No auth URL returned");
+
+            window.location.href = data.auth_url;
+          } catch (err) {
+            console.error("Error starting Google auth:", err);
+            ErrorToast("Failed to start Google OAuth flow");
+          }
+
+}
+
+export const fetchGoogleFormSheets = async (setGoogleFormTreeData:any) => {
+    try {
+      const clinicId = await getClinicId();
+      const { data: connection } = await supabase
+        .from("google_form_connections")
+        .select("id")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          clinic_id: clinicId,
+          connection_id: connection?.id || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch Google Sheets");
+      }
+
+      const data = await response.json();
+      setGoogleFormTreeData(
+        (data.spreadsheets || []).map((spreadsheet: any) => ({
+          title: spreadsheet.spreadsheet_title,
+          value: spreadsheet.spreadsheet_id,
+          selectable: false,
+          children: (spreadsheet.sheets || []).map((sheet: any) => ({
+            title: sheet.sheet_title,
+            value: `${spreadsheet.spreadsheet_id}:${sheet.sheet_id}`,
+            isLeaf: true,
+          })),
+        })),
+      );
+    } catch (error) {
+      ErrorToast("Failed to fetch Google Sheets");
+      console.error(error);
+    }
+  };
+
+
+  export const fetchTypeformForms = async (setTypeFormTreeData: any) => {
+     try {
+       const clinicId = await getClinicId();
+       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/typeform-integration/getSheets`, {
+         method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+           apikey: SUPABASE_ANON_KEY,
+         },
+         body: JSON.stringify({
+           clinic_id: clinicId,
+         }),
+       });
+
+       if (!response.ok) throw new Error("Failed to fetch Typeform forms");
+
+       const data = await response.json();
+       setTypeFormTreeData(
+         (data.forms || []).map((form: any) => ({
+           title: form.title,
+           value: form.id,
+           isLeaf: true,
+         })),
+       );
+     } catch (error) {
+       ErrorToast("Failed to fetch Typeform forms");
+       console.error(error);
+     }
+   };
+   export const fetchJotformForms = async (setJotformTreeData: any) => {
+      try {
+        const clinicId = await getClinicId();
+        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/jotform-integration`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // apikey: SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            action: "get_forms",
+            clinic_id: clinicId,
+          }),
+        });
+  
+        if (!response.ok) throw new Error("Failed to fetch Jotform forms");
+  
+        const data = await response.json();
+        setJotformTreeData(
+          (data.content || []).map((form: any) => ({
+            title: form.title,
+            value: form.id,
+            isLeaf: true,
+          })),
+        );
+      } catch (error) {
+        ErrorToast("Failed to fetch Typeform forms");
+        console.error(error);
+      }
+    };
+
+
+    //
+type FormDataType = Record<string, any>;
+
+export const handleInput = ({
+  value,
+  currentQuestion,
+  formData,
+  setFormData,
+  clearOAuthState,
+  setHubspotStatus,
+  setPipedriveStatus,
+  setGoHighLevelStatus,
+  setNextHealthStatus,
+  setShowHubspotModal,
+  setShowPipedriveModal,
+  setShowGoHighLevelModal,
+  setShowNexHealthModal,
+  setShowFacebookLeadFormModal,
+  setShowGoogleLeadFormModal,
+  setShowGoogleFormModal,
+  setShowTypeformModal,
+  setShowJotformModal,
+  setShowGravityFormModal,
+  setShowManualLeadsModal,
+  setShowCompletionButtons,
+}: any) => {
+  setFormData((prev: FormDataType) => ({ ...prev, [currentQuestion.id]: value }));
+  const updatedFormData = { ...formData, [currentQuestion.id]: value };
+  localStorage.setItem("oauth_form_data", JSON.stringify(updatedFormData));
+
+  if (currentQuestion.id === "selectedCrm") {
+    clearOAuthState();
+    if (value === "HubSpot") {
+      setHubspotStatus("disconnected");
+      setShowHubspotModal(true);
+      setShowCompletionButtons(true);
+    } else if (value === "Pipedrive") {
+      setPipedriveStatus("disconnected");
+      setShowPipedriveModal(true);
+      setShowCompletionButtons(true);
+    } else if (value === "GoHighLevel") {
+      setGoHighLevelStatus("disconnected");
+      setShowGoHighLevelModal(true);
+      setShowCompletionButtons(true);
+    } else if (value === "NextHealth") {
+      setNextHealthStatus("disconnected");
+      setShowNexHealthModal(true);
+      setShowCompletionButtons(true);
+    } else if (value === "No CRM") {
+      setShowCompletionButtons(true);
+      setHubspotStatus("disconnected");
+      setPipedriveStatus("disconnected");
+      setGoHighLevelStatus("disconnected");
+      setNextHealthStatus("disconnected");
+    }
+  }
+
+  if (currentQuestion.id === "adsConnections") {
+    if (value === "Facebook Lead Ads") {
+      setShowFacebookLeadFormModal(true);
+      setShowCompletionButtons(true);
+    } else if (value === "Google Ads Lead Forms") {
+      setShowGoogleLeadFormModal(true);
+      setShowCompletionButtons(true);
+    } else {
+      setShowCompletionButtons(true);
+    }
+  }
+
+  if (currentQuestion.id === "leadCaptureForms") {
+    if (value === "Google Forms") {
+      setShowGoogleFormModal(true);
+      setShowCompletionButtons(true);
+    } else if (value === "Typeform") {
+      setShowTypeformModal(true);
+      setShowCompletionButtons(true);
+    } else if (value === "Jotform") {
+      setShowJotformModal(true);
+      setShowCompletionButtons(true);
+    } else if (value === "Gravity Forms") {
+      setShowGravityFormModal(true);
+      setShowCompletionButtons(true);
+    } else {
+      setShowCompletionButtons(true);
+    }
+  }
+
+  if (currentQuestion.id === "uploadLeads") {
+    if (value === "Yes") {
+      setTimeout(() => setShowManualLeadsModal(true), 500);
+    }
+    setShowCompletionButtons(true);
+  }
+};
+
+export const handle_Next = ({
+  currentQuestion,
+  currentValue,
+  currentQuestionIndex,
+  filteredQuestions,
+  formData,
+  setFormData,
+  hubspotStatus,
+  pipedriveStatus,
+  goHighLevelStatus,
+  nextHealthStatus,
+  gravityFormStatus,
+  googleFormStatus,
+  googleLeadFormStatus,
+  facebookLeadFormStatus,
+  setShowHubspotModal,
+  setShowPipedriveModal,
+  setShowGoHighLevelModal,
+  setShowNexHealthModal,
+  setShowFacebookLeadFormModal,
+  setShowGoogleLeadFormModal,
+  setShowGoogleFormModal,
+  setShowTypeformModal,
+  setShowJotformModal,
+  setShowGravityFormModal,
+  setShowCompletionButtons,
+  setCurrentQuestionIndex,
+  hubspotAccountInfo,
+  pipedriveAccountInfo,
+  googleFormAccountInfo,
+  googleLeadFormAccountInfo,
+  facebookLeadFormAccountInfo,
+  onNext,
+}: any) => {
+  const savedFormData = localStorage.getItem("oauth_form_data");
+  if (savedFormData) {
+    try {
+      const parsedFormData = JSON.parse(savedFormData);
+      if (parsedFormData.selectedCrm !== formData.selectedCrm) {
+        setFormData(parsedFormData);
+      }
+    } catch (error) {
+      console.error("Error parsing saved form data in handleNext:", error);
+    }
+  }
+
+  if (currentQuestion.id === "selectedCrm") {
+    if (currentValue === "HubSpot" && hubspotStatus !== "connected") {
+      setShowHubspotModal(true);
+      return;
+    } else if (currentValue === "Pipedrive" && pipedriveStatus !== "connected") {
+      setShowPipedriveModal(true);
+      return;
+    } else if (currentValue === "GoHighLevel" && goHighLevelStatus !== "connected") {
+      setShowGoHighLevelModal(true);
+      return;
+    } else if (currentValue === "NextHealth" && nextHealthStatus !== "connected") {
+      setShowNexHealthModal(true);
+      return;
+    } else if (currentValue === "No CRM") {
+      localStorage.setItem("oauth_form_data", JSON.stringify(formData));
+    }
+  } else if (currentQuestion.id === "adsConnections") {
+    if (currentValue === "Facebook Lead Ads" && facebookLeadFormStatus !== "connected") {
+      setShowFacebookLeadFormModal(true);
+      return;
+    } else if (currentValue === "Google Ads Lead Forms" && googleLeadFormStatus !== "connected") {
+      setShowGoogleLeadFormModal(true);
+      return;
+    }
+  } else if (currentQuestion.id === "leadCaptureForms") {
+    if (currentValue === "Google Forms") {
+      setShowGoogleFormModal(true);
+      setShowCompletionButtons(true);
+    } else if (currentValue === "Typeform") {
+      setShowTypeformModal(true);
+      setShowCompletionButtons(true);
+    } else if (currentValue === "Jotform") {
+      setShowJotformModal(true);
+      setShowCompletionButtons(true);
+    } else if (currentValue === "Gravity Forms" && gravityFormStatus !== "connected") {
+      setShowGravityFormModal(true);
+      setShowCompletionButtons(true);
+    } else {
+      setShowCompletionButtons(true);
+    }
+  }
+
+  if (currentQuestionIndex < filteredQuestions.length - 1) {
+    setCurrentQuestionIndex(currentQuestionIndex + 1);
+    localStorage.setItem("oauth_question_index", (currentQuestionIndex + 1).toString());
+  } else {
+    const finalData = {
+      ...formData,
+      hubspotConnected: hubspotStatus === "connected",
+      pipedriveConnected: pipedriveStatus === "connected",
+      goHighLevelConnected: goHighLevelStatus === "connected",
+      nextHealthConnected: nextHealthStatus === "connected",
+      gravityFormConnected: gravityFormStatus === "connected",
+      googleFormConnected: googleFormStatus === "connected",
+      googleLeadFormConnected: googleLeadFormStatus === "connected",
+      facebookLeadFormConnected: facebookLeadFormStatus === "connected",
+      hubspotAccountInfo,
+      pipedriveAccountInfo,
+      googleFormAccountInfo,
+      googleLeadFormAccountInfo,
+      facebookLeadFormAccountInfo,
+      csvUploaded: localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) !== null,
+    };
+    localStorage.setItem("oauth_form_data", JSON.stringify(formData));
+    onNext(finalData);
+  }
+};
