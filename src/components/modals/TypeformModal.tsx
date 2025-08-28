@@ -21,6 +21,7 @@ export const TypeformModal: React.FC<ModalProps> = ({
   treeData,
   selectedForms,
   onSelectForms,
+  buttonLoading,
 }) => {
   return (
     <Modal
@@ -61,6 +62,8 @@ export const TypeformModal: React.FC<ModalProps> = ({
             />
             <div className="text-center">
               <Button
+                loading={buttonLoading}
+                disabled={buttonLoading}
                 type="primary"
                 size="large"
                 icon={<Image src="/typeform.jpeg" alt="Typeform" width={25} height={25} />}
@@ -73,7 +76,10 @@ export const TypeformModal: React.FC<ModalProps> = ({
                 <Text className="text-sm text-gray-600">
                   <strong>What happens next:</strong>
                   <br />
-                  • You&apos;ll be redirected to Typeform to sign in<br />• Grant permission to access your form responses<br />• We&apos;ll automatically sync your leads<br />• Takes less than 30 seconds!
+                  • You&apos;ll be redirected to Typeform to sign in
+                  <br />• Grant permission to access your form responses
+                  <br />• We&apos;ll automatically sync your leads
+                  <br />• Takes less than 30 seconds!
                 </Text>
               </div>
             </div>

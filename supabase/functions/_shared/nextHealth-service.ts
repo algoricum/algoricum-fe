@@ -99,7 +99,7 @@ export async function insertPatientsAsLeads(clinic_id: string, patients: any[]) 
     form_data: p,
   }));
 
-  const { error } = await supabase.from("lead").insert(rows);
+  const { error } = await supabase.from("lead").upsert(rows, { onConflict: ["email", "clinic_id"] });
   if (error) throw new Error(`Insert failed: ${error.message}`);
 
   return rows.length;

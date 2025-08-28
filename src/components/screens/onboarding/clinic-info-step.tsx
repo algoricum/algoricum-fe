@@ -592,7 +592,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             defaultCountry="US"
             international={true}
             countryCallingCodeEditable={false}
-            className={`phone-input-custom ${hasError ? "phone-input-error" : ""}`}
+            className={`phone-input-custom ${hasError ? "phone-input-error" : ""} p-2 rounded-xl border-2 bg-white`}
           />
           {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
           {currentValue && !hasError && <p className="text-green-600 text-sm mt-2">✓ Valid phone number</p>}

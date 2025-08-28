@@ -21,6 +21,7 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
   treeData,
   selectedWorksheets,
   onSelectWorksheets,
+  buttonLoading,
 }) => {
   return (
     <Modal
@@ -53,13 +54,15 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
             />
             <div className="text-center">
               <Button
+                loading={buttonLoading}
+                disabled={buttonLoading}
                 type="primary"
                 size="large"
                 icon={<Image src="/google.svg" alt="Google" width={25} height={25} />}
                 onClick={() => onConnect?.()}
                 className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600 h-12 px-8 text-lg font-medium"
               >
-                Connect to Google 
+                Connect to Google
               </Button>
               <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                 <Text className="text-sm text-gray-600">

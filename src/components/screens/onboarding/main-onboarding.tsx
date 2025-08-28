@@ -9,7 +9,7 @@ import StaffHoursStep from "./staff-hours-step";
 // import ToneIdentityStep from "./tone-identity-step";
 // import AiAssistantStep from "./ai-assistant-step";
 import BookingSetupStep from "./booking-setup-step";
-import IntegrationsStep from "./integrations-step";
+import IntegrationsStep from "./Integration";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
