@@ -1,74 +1,135 @@
-"use client"
-import { Button, Input } from "@/components/elements"
-import PasswordInput from "@/components/elements/PasswordInput"
-import { ErrorToast } from "@/helpers/toast"
-import { MailIcon, PasswordIcon } from "@/icons"
-import type { LoginProps } from "@/interfaces/services_type"
-import { Flex, Form, Typography } from "antd"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { useMutation } from "react-query"
-import { createClient } from "@/utils/supabase/config/client"
-import { AuthSeparator } from "@/components/common"
-import { signInWithPassword } from "@/utils/supabase/auth-helper"
-import { useClinicCheck } from "@/hooks/useClinicCheck"
-import { setClinicData } from "@/utils/supabase/clinic-helper"
-import { setUserData } from "@/utils/supabase/user-helper"
+"use client";
+import { Button, Input } from "@/components/elements";
+import PasswordInput from "@/components/elements/PasswordInput";
+import { ErrorToast, WarningToast } from "@/helpers/toast";
+import { MailIcon, PasswordIcon } from "@/icons";
+import type { LoginProps } from "@/interfaces/services_type";
+import { Flex, Form, Typography } from "antd";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMutation } from "react-query";
+import { createClient } from "@/utils/supabase/config/client";
+import { AuthSeparator } from "@/components/common";
+import { signInWithPassword } from "@/utils/supabase/auth-helper";
+import { useClinicCheck } from "@/hooks/useClinicCheck";
+import { setClinicData } from "@/utils/supabase/clinic-helper";
+import { setUserData } from "@/utils/supabase/user-helper";
 
-const { Text } = Typography
+const { Text } = Typography;
 
 const LoginPage = () => {
-  const { push } = useRouter()
-  const searchParams = useSearchParams()
-  const redirectUrl = searchParams.get("redirectUrl") || "/dashboard"
-  const [form] = Form.useForm()
+  const { push } = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirectUrl") || "/dashboard";
+  const [form] = Form.useForm();
   const { checkAndRedirectIfNoClinic } = useClinicCheck();
-  const { mutate, isLoading } = useMutation((data: LoginProps) => signInWithPassword(data.email, data.password), {
-    onSuccess: (data: any) => {
-      setUserData(data?.user)
 
-      // Check if email is verified
-      if (!data?.user?.is_email_verified) {
-        push(`/verify-otp?redirectUrl=${redirectUrl}`)
-        return
+  const { mutate, isLoading } = useMutation((data: LoginProps) => signInWithPassword(data.email, data.password), {
+    onSuccess: async (data: any) => {
+      console.log("Login success data:", data); // Debug log
+
+      setUserData(data?.user);
+
+      // More robust email verification check
+      const user = data?.user;
+      if (!user) {
+        ErrorToast("Login failed. User data not found.");
+        return;
       }
 
-      const supabase = createClient()
+      // Check multiple possible fields for email verification
+      const isEmailVerified = user.email_confirmed_at !== null && user.email_confirmed_at !== undefined;
 
-      // Step 1: Get clinic_id from user_clinic
-      checkAndRedirectIfNoClinic(
-        supabase, 
-        data.user.id, 
-        { push }, // Pass router.push
-        redirectUrl, 
-        setClinicData // Pass your clinic data setter
-      );
+      console.log("Email verification status:", {
+        email_confirmed_at: user.email_confirmed_at,
+        isEmailVerified,
+      }); // Debug log
+
+      if (!isEmailVerified) {
+        console.log("Email not verified, redirecting to OTP page"); // Debug log
+
+        WarningToast("Please verify your email before continuing.");
+
+        // Auto-resend verification email
+        const supabase = createClient();
+        try {
+          const { error } = await supabase.auth.resend({
+            type: "signup",
+            email: user.email,
+          });
+
+          if (error) {
+            console.error("Resend error:", error);
+            ErrorToast("Failed to send verification code. Please try manually.");
+          } else {
+            WarningToast("A new verification code has been sent to your email.");
+          }
+        } catch (error) {
+          console.error("Failed to resend verification email:", error);
+        }
+
+        // Store user email in localStorage for OTP page
+        localStorage.setItem("pendingVerificationEmail", user.email);
+
+        push(`/verify-otp?redirectUrl=${redirectUrl}&email=${encodeURIComponent(user.email)}&fromLogin=true`);
+        return;
+      }
+
+      const supabase = createClient();
+
+      // Proceed with clinic check for verified users
+      checkAndRedirectIfNoClinic(supabase, user.id, { push }, redirectUrl, setClinicData);
     },
     onError: (error: any) => {
-      ErrorToast(error?.message || error?.error_description || "Invalid email or password")
+      console.error("Login error:", error); // Debug log
+
+      // Handle specific error cases
+      if (error?.message?.includes("Email not confirmed") || error?.message?.includes("email_confirmed_at")) {
+        // Extract email from form values for redirect
+        const email = form.getFieldValue("email");
+
+        if (email) {
+          localStorage.setItem("pendingVerificationEmail", email);
+
+          // Auto-resend verification
+          const supabase = createClient();
+          supabase.auth
+            .resend({
+              type: "signup",
+              email: email,
+            })
+            .then(({ error }) => {
+              if (!error) {
+                WarningToast("Verification code sent to your email.");
+              }
+            });
+
+          push(`/verify-otp?redirectUrl=${redirectUrl}&email=${encodeURIComponent(email)}&fromLogin=true`);
+          return;
+        } else {
+          ErrorToast("Please verify your email. Check your inbox for verification code.");
+        }
+        return;
+      }
+
+      if (error?.message?.includes("Invalid login credentials")) {
+        ErrorToast("Invalid email or password. Please check your credentials.");
+        return;
+      }
+
+      if (error?.message?.includes("Too many requests")) {
+        ErrorToast("Too many login attempts. Please wait a moment and try again.");
+        return;
+      }
+
+      // Generic error handling
+      ErrorToast(error?.message || error?.error_description || "Login failed. Please try again.");
     },
-  })
+  });
 
   const onFinish = (values: any) => {
-    mutate(values)
-  }
-
-  // const handleSocialLogin = async (provider: "google" | "apple") => {
-  //   try {
-  //     const supabase = createClient()
-
-  //     const { error } = await supabase.auth.signInWithOAuth({
-  //       provider,
-  //       options: {
-  //         redirectTo: `${window.location.origin}/auth/callback?redirectUrl=${redirectUrl}`,
-  //       },
-  //     })
-
-  //     if (error) throw error
-  //   } catch (error: any) {
-  //     ErrorToast(error?.message || `Failed to sign in with ${provider}`)
-  //   }
-  // }
+    mutate(values);
+  };
 
   return (
     <Flex vertical gap={24} className="w-full justify-center">
@@ -77,16 +138,7 @@ const LoginPage = () => {
         <p className="text-sm text-gray-600">AI-powered lead optimization for healthcare clinics</p>
       </div>
 
-
-
-      <Form
-        form={form}
-        name="login"
-        layout="vertical"
-        className="w-full"
-        initialValues={{ remember: true }}
-        onFinish={onFinish}
-      >
+      <Form form={form} name="login" layout="vertical" className="w-full" initialValues={{ remember: true }} onFinish={onFinish}>
         <Flex vertical>
           <Form.Item
             name="email"
@@ -105,11 +157,7 @@ const LoginPage = () => {
             <Input prefix={<MailIcon />} className="w-full rounded-md py-2" placeholder="Type here" />
           </Form.Item>
 
-          <Form.Item
-            name="password"
-            label="Password"
-            rules={[{ required: true, message: "Please input your password" }]}
-          >
+          <Form.Item name="password" label="Password" rules={[{ required: true, message: "Please input your password" }]}>
             <PasswordInput prefix={<PasswordIcon />} className="w-full rounded-md py-2" placeholder="Type here" />
           </Form.Item>
 
@@ -131,15 +179,8 @@ const LoginPage = () => {
           </Form.Item>
         </Flex>
       </Form>
-      <AuthSeparator />
-      {/* <Flex gap={12} className="flex-col justify-center items-center sm:flex-row w-full">
-        <SocialButton
-        isGoogle={true}
-        label="Continue With Google"
-        onClick={() => handleSocialLogin("google")}
-        />
-      </Flex> */}
 
+      <AuthSeparator />
 
       <div className="text-center mt-2">
         <Text className="text-sm text-gray-600">
@@ -149,9 +190,8 @@ const LoginPage = () => {
           </Link>
         </Text>
       </div>
-      
     </Flex>
-  )
-}
+  );
+};
 
-export default LoginPage
+export default LoginPage;

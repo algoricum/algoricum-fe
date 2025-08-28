@@ -1,11 +1,112 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-};
+// Property mapping configuration
+function getHubSpotPropertiesToFetch() {
+  return [
+    // Standard HubSpot properties
+    "email", "firstname", "lastname", "phone", 
+    "createdate", "lastmodifieddate",
+    // Common alternative property names
+    "first_name", "last_name", "phone_number", "mobilephone",
+    "email_address", "primary_email", "work_email",
+    // Custom property variations (add your custom fields here)
+    "custom_first_name", "custom_last_name", "custom_email", "custom_phone"
+  ];
+}
+
+async function discoverHubSpotProperties(accessToken: string, requestId: string) {
+  try {
+    const response = await fetch("https://api.hubapi.com/crm/v3/properties/contacts", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const properties = data.results.map((prop: any) => ({
+        name: prop.name,
+        label: prop.label,
+        type: prop.type,
+        fieldType: prop.fieldType
+      }));
+      
+      console.log(`[${requestId}] Available HubSpot properties:`, properties);
+      return properties;
+    }
+  } catch (error) {
+    console.warn(`[${requestId}] Could not fetch HubSpot properties:`, error.message);
+  }
+  return [];
+}
+
+function mapHubSpotContactToLead(contact: any, clinic_id: string, source_id: string) {
+  const props = contact.properties || {};
+  
+  // Property mapping with fallbacks
+  const propertyMappings = {
+    first_name: [
+      props.firstname,
+      props.first_name,
+      props.custom_first_name,
+      // Add more fallbacks as needed
+    ],
+    last_name: [
+      props.lastname,
+      props.last_name,
+      props.custom_last_name,
+      // Add more fallbacks as needed
+    ],
+    email: [
+      props.email,
+      props.email_address,
+      props.primary_email,
+      props.work_email,
+      props.custom_email,
+      // Add more fallbacks as needed
+    ],
+    phone: [
+      props.phone,
+      props.phone_number,
+      props.mobilephone,
+      props.custom_phone,
+      // Add more fallbacks as needed
+    ]
+  };
+
+  // Helper function to get first non-null/non-empty value
+  const getFirstValidValue = (values: any[]) => {
+    for (const value of values) {
+      if (value && typeof value === 'string' && value.trim() !== '') {
+        return value.trim();
+      }
+    }
+    return null;
+  };
+
+  const mappedLead = {
+    clinic_id: clinic_id,
+    first_name: getFirstValidValue(propertyMappings.first_name),
+    last_name: getFirstValidValue(propertyMappings.last_name),
+    email: getFirstValidValue(propertyMappings.email),
+    phone: getFirstValidValue(propertyMappings.phone),
+    status: 'New',
+    source_id,
+    created_at: props.createdate ? new Date(props.createdate).toISOString() : null,
+    updated_at: props.lastmodifieddate ? new Date(props.lastmodifieddate).toISOString() : null,
+  };
+
+  // Validate that we have at least an email or phone
+  if (!mappedLead.email && !mappedLead.phone) {
+    console.warn(`Contact ${contact.id} has no valid email or phone`, { 
+      availableProps: Object.keys(props),
+      contactId: contact.id 
+    });
+    return null;
+  }
+
+  return mappedLead;
+}
 
 serve(async (req) => {
   const requestId = crypto.randomUUID();
@@ -324,6 +425,9 @@ async function processOAuthCallback(req: Request, requestId: string) {
     const tokens = await tokenResponse.json();
     console.log(`[${requestId}] Tokens received`, { hasAccessToken: !!tokens.access_token });
 
+    // Discover available properties (for debugging and mapping)
+    await discoverHubSpotProperties(tokens.access_token, requestId);
+
     // Get account info
     const accountResponse = await fetch("https://api.hubapi.com/integrations/v1/me", {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -334,23 +438,54 @@ async function processOAuthCallback(req: Request, requestId: string) {
       accountData = await accountResponse.json();
     }
 
-    // Initial full contacts sync
+    // **UPDATED: Initial contacts sync with 120-day filter**
     let totalContacts = 0;
     const contacts = [];
     let after = null;
 
-    console.log(`[${requestId}] Starting initial full contacts sync`);
+    // Filter for contacts created or modified in the last 120 days
+    const afterDate = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString();
+    console.log(`[${requestId}] Starting initial contacts sync for contacts newer than ${afterDate} (120 days)`);
+
+    // Define all possible property names to fetch
+    const propertiesToFetch = getHubSpotPropertiesToFetch();
+
     do {
-      const contactsResponse = await fetch(
-        `https://api.hubapi.com/crm/v3/objects/contacts?limit=100${after ? `&after=${after}` : ''}&properties=email,firstname,lastname,createdate,lastmodifieddate,phone`,
-        {
-          headers: { Authorization: `Bearer ${tokens.access_token}` },
-        }
-      );
+      const searchBody = {
+        filterGroups: [{
+          filters: [
+            {
+              propertyName: "createdate",
+              operator: "GTE",
+              value: afterDate,
+            }
+          ],
+        }, {
+          filters: [
+            {
+              propertyName: "lastmodifieddate", 
+              operator: "GTE",
+              value: afterDate,
+            }
+          ],
+        }],
+        properties: propertiesToFetch,
+        limit: 100,
+        after: after || undefined,
+      };
+
+      const contactsResponse = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/search", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokens.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(searchBody),
+      });
 
       if (!contactsResponse.ok) {
-        console.error(`[${requestId}] Contacts fetch failed`, { status: contactsResponse.status });
-        throw new Error(`Contacts fetch failed: ${contactsResponse.status}`);
+        console.error(`[${requestId}] Contacts search failed`, { status: contactsResponse.status });
+        throw new Error(`Contacts search failed: ${contactsResponse.status}`);
       }
 
       const contactsData = await contactsResponse.json();
@@ -359,7 +494,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
       after = contactsData.paging?.next?.after || null;
     } while (after);
 
-    console.log(`[${requestId}] Fetched ${contacts.length} contacts`);
+    console.log(`[${requestId}] Fetched ${contacts.length} contacts from last 120 days`);
 
     // Save contacts to lead table
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -381,22 +516,12 @@ async function processOAuthCallback(req: Request, requestId: string) {
       console.log(`[${requestId}] Using clinic_id from state: ${clinic_id}`);
 
       const leadsToInsert = contacts.map((contact) => {
-        if (!contact.id || !stateData.userId) {
-          console.warn(`[${requestId}] Invalid contact data`, { contactId: contact.id, userId: stateData.userId });
+        if (!contact.id) {
+          console.warn(`[${requestId}] Contact missing ID`, { contact });
           return null;
         }
 
-        return {
-          clinic_id: clinic_id,
-          first_name: contact.properties.firstname || null,
-          last_name: contact.properties.lastname || null,
-          email: contact.properties.email || null,
-          phone: contact.properties.phone || null,
-          status: 'New',
-          source_id,
-          created_at: contact.properties.createdate ? new Date(contact.properties.createdate).toISOString() : null,
-          updated_at: contact.properties.lastmodifieddate ? new Date(contact.properties.lastmodifieddate).toISOString() : null,
-        };
+        return mapHubSpotContactToLead(contact, clinic_id, source_id);
       }).filter(lead => lead !== null);
 
       if (leadsToInsert.length === 0) {
@@ -454,7 +579,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
       throw new Error(`Connection save failed: ${JSON.stringify(dbError)}`);
     }
 
-    console.log(`[${requestId}] ✅ Success - Connection saved and initial sync completed`);
+    console.log(`[${requestId}] ✅ Success - Connection saved and initial sync completed (120-day filter)`);
 
     const accountInfo = {
       accountName: accountData.companyName || `Hub ${accountData.portalId}`,
@@ -590,12 +715,16 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
   // Check token expiration and refresh if needed (placeholder)
   let accessToken = connection.access_token;
 
-  // Fetch contacts from last 24 hours
+  // **CONFIRMED: Fetch contacts from last 1 day (24 hours)**
   const afterDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const contacts = [];
   let after = null;
 
-  console.log(`[${requestId}] Fetching contacts modified since ${afterDate}`);
+  console.log(`[${requestId}] Fetching contacts modified since ${afterDate} (1 day ago)`);
+  
+  // Define all possible property names to fetch
+  const propertiesToFetch = getHubSpotPropertiesToFetch();
+  
   do {
     const searchBody = {
       filterGroups: [{
@@ -605,7 +734,7 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
           value: afterDate,
         }],
       }],
-      properties: ["email", "firstname", "lastname", "createdate", "lastmodifieddate", "phone"],
+      properties: propertiesToFetch,
       limit: 100,
       after: after || undefined,
     };
@@ -653,24 +782,12 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
     const source_id = sourceData.id;
 
     const leadsToInsert = contacts.map((contact) => {
-      if (!contact.id || !userId) {
-        console.warn(`[${requestId}] Invalid contact data`, { contactId: contact.id, userId });
+      if (!contact.id) {
+        console.warn(`[${requestId}] Contact missing ID`, { contact });
         return null;
       }
 
-      console.log("clinic id is sdfsdafsdfsd", clinic_id)
-
-      return {
-        first_name: contact.properties.firstname || null,
-        last_name: contact.properties.lastname || null,
-        email: contact.properties.email || null,
-        phone: contact.properties.phone || null,
-        status: 'New',
-        clinic_id: clinic_id,
-        source_id,
-        created_at: contact.properties.createdate ? new Date(contact.properties.createdate).toISOString() : null,
-        updated_at: contact.properties.lastmodifieddate ? new Date(contact.properties.lastmodifieddate).toISOString() : null,
-      };
+      return mapHubSpotContactToLead(contact, clinic_id, source_id);
     }).filter(lead => lead !== null);
 
     if (leadsToInsert.length === 0) {

@@ -140,6 +140,7 @@ serve(async req => {
         },
         trial_period_days: 14,
       },
+       payment_method_collection: 'if_required',
       success_url: `${APP_URL}/billing`,
       cancel_url: `${APP_URL}/billing`,
     });
