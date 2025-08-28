@@ -1,11 +1,12 @@
 "use client";
 
 import { Modal, Alert, Button, Typography, Spin, Input, Select } from "antd";
-import { CalendarOutlined, LinkOutlined, DatabaseOutlined } from "@ant-design/icons";
+import { CalendarOutlined, LinkOutlined } from "@ant-design/icons";
 import type React from "react";
 import { useState } from "react";
 import CryptoJS from "crypto-js";
 import { ModalProps } from "./types";
+import Image from "next/image";
 
 const { Text } = Typography;
 
@@ -95,9 +96,8 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
     <Modal
       title={
         <div className="flex items-center">
-          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
-            <DatabaseOutlined className="text-white" />
-          </div>
+          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3">
+ <Image src="/GravityForm.png" alt="Google" width={50} height={50} />          </div>
           <span className="text-xl font-semibold">Connect to Gravity Forms</span>
         </div>
       }

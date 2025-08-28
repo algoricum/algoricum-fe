@@ -9,7 +9,7 @@ import StaffHoursStep from "./staff-hours-step";
 // import ToneIdentityStep from "./tone-identity-step";
 // import AiAssistantStep from "./ai-assistant-step";
 import BookingSetupStep from "./booking-setup-step";
-import IntegrationsStep from "./integrations-step";
+import IntegrationsStep from "./Integration";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
@@ -42,7 +42,7 @@ const supabase = createClient();
 const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
-  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
+  // { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
   // { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
   // { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
   // { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
