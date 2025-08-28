@@ -8,14 +8,7 @@ import { commonAlertStyles } from "./utils";
 
 const { Text } = Typography;
 
-export const HubspotModal: React.FC<ModalProps> = ({ 
-  open, 
-  status, 
-  accountInfo, 
-  onOk, 
-  onCancel, 
-  onConnect 
-}) => (
+export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect, buttonLoading }) => (
   <Modal
     title={
       <div className="flex items-center">
@@ -46,6 +39,8 @@ export const HubspotModal: React.FC<ModalProps> = ({
           />
           <div className="text-center">
             <Button
+              loading={buttonLoading}
+              disabled={buttonLoading}
               type="primary"
               size="large"
               icon={<Image src="/hubspot.svg" alt="HubSpot" width={25} height={25} />}

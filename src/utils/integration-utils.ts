@@ -183,7 +183,8 @@ const getCurrentUserId = async () => {
   const user = await getUserData();
   return user?.id;
 };
-export const connectToHubSpot = async () => {
+export const connectToHubSpot = async (setButtonLoading:any) => {
+  setButtonLoading(true);
   try {
     const clinicId = await getClinicId();
     if (!clinicId) {
@@ -204,6 +205,7 @@ export const connectToHubSpot = async () => {
     });
 
     if (!response.ok) {
+      setButtonLoading(false);
       const errorText = await response.text();
       console.error("Response error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
@@ -217,12 +219,14 @@ export const connectToHubSpot = async () => {
     console.log("🚀 Redirecting to HubSpot OAuth:", data.authUrl);
     window.location.href = data.authUrl;
   } catch (error) {
+    setButtonLoading(false)
     console.error("Connection failed:", error);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"}`);
   }
 };
 const supabase = createClient();
-export const connectToGHL = async () => {
+export const connectToGHL = async (setButtonLoading:any) => {
+  setButtonLoading(true);
   try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/GHL-integration/auth/start?clinic_id=${await getClinicId()}`, {
       method: "GET",
@@ -236,6 +240,9 @@ export const connectToGHL = async () => {
     console.log("Response body:", responseText);
 
     if (!response.ok) {
+      setButtonLoading(false)
+      const errorText = await response.text();
+      console.error("Response error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`);
     }
 
@@ -247,11 +254,13 @@ export const connectToGHL = async () => {
     console.log("🚀 Redirecting to Go High Level OAuth:", data.authUrl);
     window.location.href = data.url;
   } catch (error) {
+    setButtonLoading(false);
     console.error("Connection failed:", error);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Go High Level. Please try again"}`);
   }
 };
-export const connectToPipedrive = async () => {
+export const connectToPipedrive = async (setButtonLoading:any) => {
+  setButtonLoading(true);
   try {
     const {
       data: { session },
@@ -265,6 +274,8 @@ export const connectToPipedrive = async () => {
     });
 
     if (!session?.access_token) {
+      setButtonLoading(false)
+      ErrorToast("Please log in to connect to Pipedrive.")
       throw new Error("No valid session found. Please log in again.");
     }
 
@@ -289,6 +300,7 @@ export const connectToPipedrive = async () => {
     console.log("Response body:", responseText);
 
     if (!response.ok) {
+      setButtonLoading(false);
       throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`);
     }
 
@@ -300,12 +312,14 @@ export const connectToPipedrive = async () => {
     console.log("🚀 Redirecting to Pipedrive OAuth:", data.authUrl);
     window.location.href = data.authUrl;
   } catch (error) {
+    setButtonLoading(false)
     console.error("Connection failed:", error);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Pipedrive. Please try again"}`);
   }
 };
 
-export const connectToGoogleForm = async () => {
+export const connectToGoogleForm = async (setButtonLoading:any) => {
+  setButtonLoading(true)
   try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/initiate-oauth`, {
       method: "POST",
@@ -322,6 +336,7 @@ export const connectToGoogleForm = async () => {
 
     if (!response.ok) {
       const errorText = await response.text();
+      setButtonLoading(false);
       console.error("Response error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
@@ -329,18 +344,21 @@ export const connectToGoogleForm = async () => {
     const data = await response.json();
     console.log("Response data:", data);
     if (data.error) {
+      setButtonLoading(false);
       throw new Error(data.error);
     }
 
     console.log("🚀 Redirecting to Google Form OAuth:", data.auth_url);
     window.location.href = data.auth_url;
   } catch (error) {
+    setButtonLoading(false);
     console.error("Connection failed:", error);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Google Form. Please try again"}`);
   }
 };
 
-export const connectToTypeform = async () => {
+export const connectToTypeform = async (setButtonLoading:any) => {
+  setButtonLoading(true);
   const clinicId = await getClinicId();
   try {
     // Replace with your backend endpoint for Typeform OAuth
@@ -349,6 +367,7 @@ export const connectToTypeform = async () => {
     );
 
     if (!res.ok) {
+      setButtonLoading(false);
       const errorText = await res.text();
       throw new Error(`HTTP error! status: ${res.status}, message: ${errorText}`);
     }
@@ -357,10 +376,12 @@ export const connectToTypeform = async () => {
 
     window.location.href = url;
   } catch (error) {
+    setButtonLoading(false);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Typeform. Please try again"}`);
   }
 };
-export const connectToNextHealth = async (apiKey: string) => {
+export const connectToNextHealth = async (apiKey: string,setButtonLoading:any) => {
+  setButtonLoading(true);
   const clinicId = await getClinicId();
   try {
     const res = await fetch("https://eypitkzntyiyvwrndkgy.supabase.co/functions/v1/NextHealth-integration", {
@@ -377,6 +398,7 @@ export const connectToNextHealth = async (apiKey: string) => {
     });
 
     if (!res.ok) {
+      setButtonLoading(false);
       throw new Error(`Request failed: ${res.status}`);
     }
 
@@ -388,11 +410,14 @@ export const connectToNextHealth = async (apiKey: string) => {
 
     return data;
   } catch (err) {
+    setButtonLoading(false);
+    ErrorToast("Connection Failed: " + err)
     console.error("Error connecting NextHealth:", err);
     throw err;
   }
 };
-export const connnectToGravityForm = async (token: any) => {
+export const connnectToGravityForm = async (token: any,setButtonLoading:any) => {
+  setButtonLoading(true);
   try {
     const clinic_id = await getClinicId();
     console.log("Connecting to Gravity Form with token:", token);
@@ -412,6 +437,7 @@ export const connnectToGravityForm = async (token: any) => {
     });
 
     if (!response.ok) {
+      setButtonLoading(false)
       const errorText = await response.text();
       console.error("Response error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
@@ -420,12 +446,14 @@ export const connnectToGravityForm = async (token: any) => {
     const data = await response.json();
     console.log("Response data:", data);
     if (data.error) {
+      setButtonLoading(false);
       throw new Error(data.error);
     }
 
     console.log("🚀 Redirecting to Gravity Form OAuth:", data.auth_url);
     window.location.href = window.location.origin+ "/onboarding?gravity_form_status=success";
   } catch (error) {
+    setButtonLoading(false)
     console.error("Connection failed:", error);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Gravity Form. Please try again"}`);
   }
@@ -468,7 +496,8 @@ export const createJotformConnection = async (clinicId: string, jotformToken: st
   return true;
 };
 
-export const connectToGoogleLeadForm = async () => {
+export const connectToGoogleLeadForm = async (setButtonLoading:any) => {
+  setButtonLoading(true);
  try {
             const res = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/start-auth`, {
               method: "POST",
@@ -483,6 +512,7 @@ export const connectToGoogleLeadForm = async () => {
 
             window.location.href = data.auth_url;
           } catch (err) {
+            setButtonLoading(false)
             console.error("Error starting Google auth:", err);
             ErrorToast("Failed to start Google OAuth flow");
           }
@@ -679,6 +709,7 @@ export const handleInput = ({
     } else if (value === "Gravity Forms") {
       setShowGravityFormModal(true);
       setShowCompletionButtons(true);
+      return
     } else {
       setShowCompletionButtons(true);
     }
@@ -775,6 +806,7 @@ export const handle_Next = ({
     } else if (currentValue === "Gravity Forms" && gravityFormStatus !== "connected") {
       setShowGravityFormModal(true);
       setShowCompletionButtons(true);
+      return
     } else {
       setShowCompletionButtons(true);
     }

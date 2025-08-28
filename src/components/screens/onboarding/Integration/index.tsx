@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Button,  Typography } from "antd";
-import { IntegrationsStepProps, FormData } from "../../../../app/types/types";
+import { Button, Typography } from "antd";
+import { IntegrationsStepProps, FormData, ConnectionStatus } from "../../../../app/types/types";
 import {
   getClinicId,
   handleCsvUpload,
@@ -35,16 +35,14 @@ import {
 import { SUPABASE_URL, ONBOARDING_LEADS_FILE_NAME } from "../../../../constants/integration-constants";
 import { questions } from "@/constants";
 const { Title } = Typography;
-import {PreviousQuestions} from './PreviousQuestions';
+import { PreviousQuestions } from "./PreviousQuestions";
 import CurrentInput from "./CurrentInput";
 import IntegrationsModals from "./IntegrationModals";
-
-
-
 
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
+  const [buttonsLoading, setButtonsLoading] = useState(false);
   const [showGoHighLevelModal, setShowGoHighLevelModal] = useState(false);
   const [showNexHealthModal, setShowNexHealthModal] = useState(false);
   const [showGravityFormModal, setShowGravityFormModal] = useState(false);
@@ -56,16 +54,16 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [showCustomCrmModal, setShowCustomCrmModal] = useState(false);
   const [showTypeformModal, setShowTypeformModal] = useState(false);
   const [showJotformModal, setShowJotformModal] = useState(false);
-  const [hubspotStatus, setHubspotStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [goHighLevelStatus, setGoHighLevelStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [nextHealthStatus, setNextHealthStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [gravityFormStatus, setGravityFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [googleFormStatus, setGoogleFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [googleLeadFormStatus, setGoogleLeadFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [facebookLeadFormStatus, setFacebookLeadFormStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [pipedriveStatus, setPipedriveStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [typeformStatus, setTypeformStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
-  const [jotformStatus, setJotformStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+  const [hubspotStatus, setHubspotStatus] = useState<ConnectionStatus>("disconnected");
+  const [goHighLevelStatus, setGoHighLevelStatus] = useState<ConnectionStatus>("disconnected");
+  const [nextHealthStatus, setNextHealthStatus] = useState<ConnectionStatus>("disconnected");
+  const [gravityFormStatus, setGravityFormStatus] = useState<ConnectionStatus>("disconnected");
+  const [googleFormStatus, setGoogleFormStatus] = useState<ConnectionStatus>("disconnected");
+  const [googleLeadFormStatus, setGoogleLeadFormStatus] = useState<ConnectionStatus>("disconnected");
+  const [facebookLeadFormStatus, setFacebookLeadFormStatus] = useState<ConnectionStatus>("disconnected");
+  const [pipedriveStatus, setPipedriveStatus] = useState<ConnectionStatus>("disconnected");
+  const [typeformStatus, setTypeformStatus] = useState<ConnectionStatus>("disconnected");
+  const [jotformStatus, setJotformStatus] = useState<ConnectionStatus>("disconnected");
   const [hubspotAccountInfo, setHubspotAccountInfo] = useState<any>(null);
   const [googleFormAccountInfo, setGoogleFormAccountInfo] = useState<any>(null);
   const [googleLeadFormAccountInfo, setGoogleLeadFormAccountInfo] = useState<any>(null);
@@ -89,7 +87,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     leadCaptureForms: initialData.leadCaptureForms || "",
     uploadLeads: initialData.uploadLeads || "",
   });
-
 
   const filteredQuestions =
     formData.selectedCrm === "HubSpot" ||
@@ -428,11 +425,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         clearOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
         autoProgressToNext();
-      } else if (gravityFormStatus === "error") {
-        console.log("❌ Gravity Form OAuth error detected from URL:", errorMessage);
-        setGravityFormStatus("disconnected");
-        clearOAuthState();
-        window.history.replaceState({}, document.title, window.location.pathname);
       } else {
         console.log("No OAuth status detected in URL");
       }
@@ -442,66 +434,66 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   }, [autoProgressToNext, currentQuestionIndex, filteredQuestions.length, formData]);
 
   const handleInputChange = (value: any) => {
- handleInput({
-    value,
-    currentQuestion,
-    formData,
-    setFormData,
-    clearOAuthState,
-    setHubspotStatus,
-    setPipedriveStatus,
-    setGoHighLevelStatus,
-    setNextHealthStatus,
-    setShowHubspotModal,
-    setShowPipedriveModal,
-    setShowGoHighLevelModal,
-    setShowNexHealthModal,
-    setShowFacebookLeadFormModal,
-    setShowGoogleLeadFormModal,
-    setShowGoogleFormModal,
-    setShowTypeformModal,
-    setShowJotformModal,
-    setShowGravityFormModal,
-    setShowManualLeadsModal,
-    setShowCompletionButtons,
-  })
+    handleInput({
+      value,
+      currentQuestion,
+      formData,
+      setFormData,
+      clearOAuthState,
+      setHubspotStatus,
+      setPipedriveStatus,
+      setGoHighLevelStatus,
+      setNextHealthStatus,
+      setShowHubspotModal,
+      setShowPipedriveModal,
+      setShowGoHighLevelModal,
+      setShowNexHealthModal,
+      setShowFacebookLeadFormModal,
+      setShowGoogleLeadFormModal,
+      setShowGoogleFormModal,
+      setShowTypeformModal,
+      setShowJotformModal,
+      setShowGravityFormModal,
+      setShowManualLeadsModal,
+      setShowCompletionButtons,
+    });
   };
 
   const handleNext = () => {
     handle_Next({
-    currentQuestion,
-    currentValue,
-    currentQuestionIndex,
-    filteredQuestions,
-    formData,
-    setFormData,
-    hubspotStatus,
-    pipedriveStatus,
-    goHighLevelStatus,
-    nextHealthStatus,
-    gravityFormStatus,
-    googleFormStatus,
-    googleLeadFormStatus,
-    facebookLeadFormStatus,
-    setShowHubspotModal,
-    setShowPipedriveModal,
-    setShowGoHighLevelModal,
-    setShowNexHealthModal,
-    setShowFacebookLeadFormModal,
-    setShowGoogleLeadFormModal,
-    setShowGoogleFormModal,
-    setShowTypeformModal,
-    setShowJotformModal,
-    setShowGravityFormModal,
-    setShowCompletionButtons,
-    setCurrentQuestionIndex,
-    hubspotAccountInfo,
-    pipedriveAccountInfo,
-    googleFormAccountInfo,
-    googleLeadFormAccountInfo,
-    facebookLeadFormAccountInfo,
-    onNext,
-  })
+      currentQuestion,
+      currentValue,
+      currentQuestionIndex,
+      filteredQuestions,
+      formData,
+      setFormData,
+      hubspotStatus,
+      pipedriveStatus,
+      goHighLevelStatus,
+      nextHealthStatus,
+      gravityFormStatus,
+      googleFormStatus,
+      googleLeadFormStatus,
+      facebookLeadFormStatus,
+      setShowHubspotModal,
+      setShowPipedriveModal,
+      setShowGoHighLevelModal,
+      setShowNexHealthModal,
+      setShowFacebookLeadFormModal,
+      setShowGoogleLeadFormModal,
+      setShowGoogleFormModal,
+      setShowTypeformModal,
+      setShowJotformModal,
+      setShowGravityFormModal,
+      setShowCompletionButtons,
+      setCurrentQuestionIndex,
+      hubspotAccountInfo,
+      pipedriveAccountInfo,
+      googleFormAccountInfo,
+      googleLeadFormAccountInfo,
+      facebookLeadFormAccountInfo,
+      onNext,
+    });
   };
 
   const handlePrevious = () => {
@@ -513,9 +505,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       onPrev();
     }
   };
-
- 
- 
 
   return (
     <div className="max-w-4xl">
@@ -606,11 +595,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         )}
       </div>
       <IntegrationsModals
+        buttonLoading={buttonsLoading}
         //hubspot
         showHubspotModal={showHubspotModal}
         hubspotStatus={hubspotStatus}
         hubspotAccountInfo={hubspotAccountInfo}
-        onHubspotConnect={connectToHubSpot}
+        onHubspotConnect={() => connectToHubSpot(setButtonsLoading)}
         onHubspotOk={() => {
           if (hubspotStatus === "connected") {
             setShowHubspotModal(false);
@@ -633,7 +623,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         //goHighLevel
         showGoHighLevelModal={showGoHighLevelModal}
         goHighLevelStatus={goHighLevelStatus}
-        onGoHighLevelConnect={connectToGHL}
+        onGoHighLevelConnect={() => connectToGHL(setButtonsLoading)}
         onGoHighLevelOk={() => {
           if (goHighLevelStatus === "connected") {
             setShowGoHighLevelModal(false);
@@ -657,7 +647,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         showPipedriveModal={showPipedriveModal}
         pipedriveStatus={pipedriveStatus}
         pipedriveAccountInfo={pipedriveAccountInfo}
-        onPipedriveConnect={connectToPipedrive}
+        onPipedriveConnect={() => connectToPipedrive(setButtonsLoading)}
         onPipedriveSyncLeads={syncPipedriveLeads}
         onPipedriveDisconnect={() => {
           setPipedriveStatus("disconnected");
@@ -682,208 +672,189 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           setFormData(prev => ({ ...prev, selectedCrm: "" }));
           localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "" }));
         }}
-       
- // Google Forms
-  showGoogleFormModal={showGoogleFormModal}
-  googleFormStatus={googleFormStatus}
-  googleFormAccountInfo={googleFormAccountInfo}
-  googleFormTreeData={googleFormTreeData}
-  selectedGoogleFormWorksheets={selectedGoogleFormWorksheets}
-  onSelectGoogleFormWorksheets={setSelectedGoogleFormWorksheets}
-  onGoogleFormConnect={connectToGoogleForm}
-  onGoogleFormOk={() => {
-    if (googleFormStatus === "connected" && selectedGoogleFormWorksheets.length > 0 && googleFormLeadsSynced) {
-      setShowGoogleFormModal(false);
-      autoProgressToNext();
-    } else {
-      setShowGoogleFormModal(false);
-      setShowCompletionButtons(false);
-      setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
-    }
-  }}
-  onGoogleFormCancel={() => {
-    setShowGoogleFormModal(false);
-    setShowCompletionButtons(false);
-    setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
-    localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
-  }}
-  onGoogleFormSyncLeads={async () => {
-    const selectedSheetsObjects = await selectedGoogleFormWorksheets
-      .map(value => findSheetDetails(googleFormTreeData, value))
-      .filter(Boolean);
-    syncGoogleFormLeads(selectedSheetsObjects);
-    setGoogleFormLeadsSynced(true);
-    localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Google Forms" }));
-    setShowGoogleFormModal(false);
-    autoProgressToNext();
-  }}
-  onGoogleFormDisconnect={() => {
-    setGoogleFormStatus("disconnected");
-    setGoogleFormAccountInfo(null);
-  }}
-
-
-  
-  // Google Lead Form
-  showGoogleLeadFormModal={showGoogleLeadFormModal}
-  googleLeadFormStatus={googleLeadFormStatus}
-  googleLeadFormAccountInfo={googleLeadFormAccountInfo}
-  onGoogleLeadFormConnect={connectToGoogleLeadForm}
-  onGoogleLeadFormOk={() => {
-    if (googleLeadFormStatus === "connected") {
-      setShowGoogleLeadFormModal(false);
-      autoProgressToNext();
-    } else {
-      setShowGoogleLeadFormModal(false);
-      setShowCompletionButtons(false);
-      setFormData(prev => ({ ...prev, adsConnections: "" }));
-      localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
-    }
-  }}
-  onGoogleLeadFormCancel={() => {
-    setShowGoogleLeadFormModal(false);
-    setShowCompletionButtons(false);
-    setFormData(prev => ({ ...prev, adsConnections: "" }));
-    localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
-  }}
-  onGoogleLeadFormSyncLeads={syncGoogleLeadFormLeads}
-  onGoogleLeadFormDisconnect={() => {
-    setGoogleLeadFormStatus("disconnected");
-    setGoogleLeadFormAccountInfo(null);
-  }}
-
-  // Facebook Lead Form
-  showFacebookLeadFormModal={showFacebookLeadFormModal}
-  facebookLeadFormStatus={facebookLeadFormStatus}
-  facebookLeadFormAccountInfo={facebookLeadFormAccountInfo}
-  onFacebookLeadFormConnect={async () => {
-    localStorage.setItem("oauth_form_data", JSON.stringify(formData));
-    window.location.href = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/start?clinic_id=${await getClinicId()}`;
-  }}
-  onFacebookLeadFormOk={() => {
-    if (facebookLeadFormStatus === "connected") {
-      setShowFacebookLeadFormModal(false);
-      autoProgressToNext();
-    } else {
-      setShowFacebookLeadFormModal(false);
-      setShowCompletionButtons(false);
-      setFormData(prev => ({ ...prev, adsConnections: "" }));
-      localStorage.setItem(
-        "oauth_form_data",
-        JSON.stringify({ ...formData, adsConnections: "" })
-      );
-    }
-  }}
-  onFacebookLeadFormCancel={() => {
-    setShowFacebookLeadFormModal(false);
-    setShowCompletionButtons(false);
-    setFormData(prev => ({ ...prev, adsConnections: "" }));
-    localStorage.setItem(
-      "oauth_form_data",
-      JSON.stringify({ ...formData, adsConnections: "" })
-    );
-  }}
-
-  // Typeform
-  showTypeformModal={showTypeformModal}
-  typeformStatus={typeformStatus}
-  typeformAccountInfo={typeformAccountInfo}
-  typeformTreeData={TypeformTreeData}
-  selectedTypeformForms={selectedTypeformForms}
-  onSelectTypeformForms={setSelectedTypeformForms}
-  onTypeformConnect={connectToTypeform}
-  onTypeformOk={() => {
-    if (typeformStatus === "connected" && typeformLeadsSynced) {
-      setShowTypeformModal(false);
-      autoProgressToNext();
-    } else {
-      setShowTypeformModal(false);
-      setShowCompletionButtons(false);
-      setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
-    }
-  }}
-  onTypeformCancel={() => {
-    setShowTypeformModal(false);
-    setShowCompletionButtons(false);
-    setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
-    localStorage.setItem(
-      "oauth_form_data",
-      JSON.stringify({ ...formData, leadCaptureForms: "" })
-    );
-  }}
-  onTypeformSyncLeads={() => {
-    syncTypeformLeads(selectedTypeformForms);
-    setTypeformLeadsSynced(true);
-    localStorage.setItem(
-      "oauth_form_data",
-      JSON.stringify({ ...formData, leadCaptureForms: "Typeform" })
-    );
-    setShowTypeformModal(false);
-    autoProgressToNext();
-  }}
-  onTypeformDisconnect={() => {
-    setTypeformStatus("disconnected");
-    setTypeformAccountInfo(null);
-  }}
-
-  // Jotform
-showJotformModal={showJotformModal}
-jotformStatus={jotformStatus}
-jotformTreeData={jotformTreeData}
-selectedJotformForms={selectedJotformForms}
-onSelectJotformForms={setSelectedJotformForms}
-onJotformConnect={async (token: any) => {
-  localStorage.setItem(
-    "oauth_form_data",
-    JSON.stringify({ ...formData, leadCaptureForms: "Jotform" })
-  );
-  const res = await createJotformConnection(await getClinicId(), token);
-  console.log(res);
-  if (!res) {
-    ErrorToast("Failed to connect to Jotform. Please try again.");
-    return;
-  }
-  SuccessToast("Jotform connected successfully");
-  setJotformStatus("connected");
-}}
-onJotformSyncLeads={() => {
-  syncJotformLeads(selectedJotformForms);
-  setJotformLeadsSynced(true);
-  localStorage.setItem(
-    "oauth_form_data",
-    JSON.stringify({ ...formData, leadCaptureForms: "Jotform" })
-  );
-  setShowJotformModal(false);
-  autoProgressToNext();
-}}
-onJotformOk={() => {
-  if (jotformStatus === "connected" && jotformLeadsSynced) {
-    setShowJotformModal(false);
-    autoProgressToNext();
-  } else {
-    setShowJotformModal(false);
-    setShowCompletionButtons(false);
-    setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
-    localStorage.setItem(
-      "oauth_form_data",
-      JSON.stringify({ ...formData, leadCaptureForms: "" })
-    );
-  }
-}}
-onJotformCancel={() => {
-  setShowJotformModal(false);
-  setShowCompletionButtons(false);
-  setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
-  localStorage.setItem(
-    "oauth_form_data",
-    JSON.stringify({ ...formData, leadCaptureForms: "" })
-  );
-}}
-onJotformDisconnect={() => {
-  setJotformStatus("disconnected");
-}}
-
-// Csv Upload
+        // Google Forms
+        showGoogleFormModal={showGoogleFormModal}
+        googleFormStatus={googleFormStatus}
+        googleFormAccountInfo={googleFormAccountInfo}
+        googleFormTreeData={googleFormTreeData}
+        selectedGoogleFormWorksheets={selectedGoogleFormWorksheets}
+        onSelectGoogleFormWorksheets={setSelectedGoogleFormWorksheets}
+        onGoogleFormConnect={() => connectToGoogleForm(setButtonsLoading)}
+        onGoogleFormOk={() => {
+          if (googleFormStatus === "connected" && selectedGoogleFormWorksheets.length > 0 && googleFormLeadsSynced) {
+            setShowGoogleFormModal(false);
+            autoProgressToNext();
+          } else {
+            setShowGoogleFormModal(false);
+            setShowCompletionButtons(false);
+            setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+          }
+        }}
+        onGoogleFormCancel={() => {
+          setShowGoogleFormModal(false);
+          setShowCompletionButtons(false);
+          setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
+        }}
+        onGoogleFormSyncLeads={async () => {
+          const selectedSheetsObjects = await selectedGoogleFormWorksheets
+            .map(value => findSheetDetails(googleFormTreeData, value))
+            .filter(Boolean);
+          syncGoogleFormLeads(selectedSheetsObjects);
+          setGoogleFormLeadsSynced(true);
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Google Forms" }));
+          setShowGoogleFormModal(false);
+          autoProgressToNext();
+        }}
+        onGoogleFormDisconnect={() => {
+          setGoogleFormStatus("disconnected");
+          setGoogleFormAccountInfo(null);
+        }}
+        // Google Lead Form
+        showGoogleLeadFormModal={showGoogleLeadFormModal}
+        googleLeadFormStatus={googleLeadFormStatus}
+        googleLeadFormAccountInfo={googleLeadFormAccountInfo}
+        onGoogleLeadFormConnect={() => connectToGoogleLeadForm(setButtonsLoading)}
+        onGoogleLeadFormOk={() => {
+          if (googleLeadFormStatus === "connected") {
+            setShowGoogleLeadFormModal(false);
+            autoProgressToNext();
+          } else {
+            setShowGoogleLeadFormModal(false);
+            setShowCompletionButtons(false);
+            setFormData(prev => ({ ...prev, adsConnections: "" }));
+            localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
+          }
+        }}
+        onGoogleLeadFormCancel={() => {
+          setShowGoogleLeadFormModal(false);
+          setShowCompletionButtons(false);
+          setFormData(prev => ({ ...prev, adsConnections: "" }));
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
+        }}
+        onGoogleLeadFormSyncLeads={syncGoogleLeadFormLeads}
+        onGoogleLeadFormDisconnect={() => {
+          setGoogleLeadFormStatus("disconnected");
+          setGoogleLeadFormAccountInfo(null);
+        }}
+        // Facebook Lead Form
+        showFacebookLeadFormModal={showFacebookLeadFormModal}
+        facebookLeadFormStatus={facebookLeadFormStatus}
+        facebookLeadFormAccountInfo={facebookLeadFormAccountInfo}
+        onFacebookLeadFormConnect={async () => {
+          setButtonsLoading(true);
+          try {
+            localStorage.setItem("oauth_form_data", JSON.stringify(formData));
+            window.location.href = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/start?clinic_id=${await getClinicId()}`;
+          } catch (error) {
+            console.error("Error:", error);
+            setButtonsLoading(false);
+            ErrorToast("Error: "+ error)
+            setShowCompletionButtons(false);
+            setFormData(prev => ({ ...prev, adsConnections: "" }));
+            localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
+          }
+        }}
+        onFacebookLeadFormOk={() => {
+          if (facebookLeadFormStatus === "connected") {
+            setShowFacebookLeadFormModal(false);
+            autoProgressToNext();
+          } else {
+            setShowFacebookLeadFormModal(false);
+            setShowCompletionButtons(false);
+            setFormData(prev => ({ ...prev, adsConnections: "" }));
+            localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
+          }
+        }}
+        onFacebookLeadFormCancel={() => {
+          setShowFacebookLeadFormModal(false);
+          setShowCompletionButtons(false);
+          setFormData(prev => ({ ...prev, adsConnections: "" }));
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
+        }}
+        // Typeform
+        showTypeformModal={showTypeformModal}
+        typeformStatus={typeformStatus}
+        typeformAccountInfo={typeformAccountInfo}
+        typeformTreeData={TypeformTreeData}
+        selectedTypeformForms={selectedTypeformForms}
+        onSelectTypeformForms={setSelectedTypeformForms}
+        onTypeformConnect={()=>connectToTypeform(setButtonsLoading)}
+        onTypeformOk={() => {
+          if (typeformStatus === "connected" && typeformLeadsSynced) {
+            setShowTypeformModal(false);
+            autoProgressToNext();
+          } else {
+            setShowTypeformModal(false);
+            setShowCompletionButtons(false);
+            setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+          }
+        }}
+        onTypeformCancel={() => {
+          setShowTypeformModal(false);
+          setShowCompletionButtons(false);
+          setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
+        }}
+        onTypeformSyncLeads={() => {
+          syncTypeformLeads(selectedTypeformForms);
+          setTypeformLeadsSynced(true);
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Typeform" }));
+          setShowTypeformModal(false);
+          autoProgressToNext();
+        }}
+        onTypeformDisconnect={() => {
+          setTypeformStatus("disconnected");
+          setTypeformAccountInfo(null);
+        }}
+        // Jotform
+        showJotformModal={showJotformModal}
+        jotformStatus={jotformStatus}
+        jotformTreeData={jotformTreeData}
+        selectedJotformForms={selectedJotformForms}
+        onSelectJotformForms={setSelectedJotformForms}
+        onJotformConnect={async (token: any) => {
+          setButtonsLoading(true);
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Jotform" }));
+          const res = await createJotformConnection(await getClinicId(), token);
+          console.log(res);
+          if (!res) {
+            setButtonsLoading(false);
+            ErrorToast("Failed to connect to Jotform. Please try again.");
+            return;
+          }
+          SuccessToast("Jotform connected successfully");
+          setJotformStatus("connected");
+          setButtonsLoading(false)
+        }}
+        onJotformSyncLeads={() => {
+          syncJotformLeads(selectedJotformForms);
+          setJotformLeadsSynced(true);
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Jotform" }));
+          setShowJotformModal(false);
+          autoProgressToNext();
+        }}
+        onJotformOk={() => {
+          if (jotformStatus === "connected" && jotformLeadsSynced) {
+            setShowJotformModal(false);
+            autoProgressToNext();
+          } else {
+            setShowJotformModal(false);
+            setShowCompletionButtons(false);
+            setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+            localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
+          }
+        }}
+        onJotformCancel={() => {
+          setShowJotformModal(false);
+          setShowCompletionButtons(false);
+          setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
+        }}
+        onJotformDisconnect={() => {
+          setJotformStatus("disconnected");
+        }}
+        // Csv Upload
         showManualLeadsModal={showManualLeadsModal}
         onCsvUploadOk={leads => {
           setShowManualLeadsModal(false);
@@ -897,7 +868,6 @@ onJotformDisconnect={() => {
           }, 5000);
         }}
         onCsvUploadCancel={() => setShowManualLeadsModal(false)}
-
         // Custom CRM
         showCustomCrmModal={showCustomCrmModal}
         onCustomCrmOk={() => setShowCustomCrmModal(false)}
@@ -906,71 +876,55 @@ onJotformDisconnect={() => {
           setShowCompletionButtons(false);
           setFormData(prev => ({ ...prev, selectedCrm: "" }));
         }}
-
-        
-  // NexHealth
-  showNexHealthModal={showNexHealthModal}
-  nextHealthStatus={nextHealthStatus}
-  onNexHealthConnect={(token:any)=>connectToNextHealth(token)}
-  onNexHealthOk={() => {
-    if (nextHealthStatus === "connected") {
-      setShowNexHealthModal(false);
-      autoProgressToNext();
-    } else {
-      setShowNexHealthModal(false);
-      setShowCompletionButtons(false);
-      setNextHealthStatus("disconnected");
-      setFormData(prev => ({ ...prev, selectedCrm: "" }));
-      localStorage.setItem(
-        "oauth_form_data",
-        JSON.stringify({ ...formData, selectedCrm: "" })
-      );
-    }
-  }}
-  onNexHealthCancel={() => {
-    setShowNexHealthModal(false);
-    setShowCompletionButtons(false);
-    setNextHealthStatus("disconnected");
-    setFormData(prev => ({ ...prev, selectedCrm: "" }));
-    localStorage.setItem(
-      "oauth_form_data",
-      JSON.stringify({ ...formData, selectedCrm: "" })
-    );
-  }}
-
-  // Gravity Form
-  showGravityFormModal={showGravityFormModal}
-  gravityFormStatus={gravityFormStatus}
-  onGravityFormConnect={(token:any)=>connnectToGravityForm(token)}
-  onGravityFormOk={() => {
-    if (gravityFormStatus === "connected") {
-      setShowGravityFormModal(false);
-      autoProgressToNext();
-    } else {
-      setShowGravityFormModal(false);
-      setShowCompletionButtons(false);
-      setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
-      localStorage.setItem(
-        "oauth_form_data",
-        JSON.stringify({ ...formData, leadCaptureForms: "" })
-      );
-    }
-  }}
-  onGravityFormCancel={() => {
-    setShowGravityFormModal(false);
-    setShowCompletionButtons(false);
-    setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
-    localStorage.setItem(
-      "oauth_form_data",
-      JSON.stringify({ ...formData, leadCaptureForms: "" })
-    );
-  }}
-  onGravityFormDisconnect={() => {
-    setGravityFormStatus("disconnected");
-  }}
+        // NexHealth
+        showNexHealthModal={showNexHealthModal}
+        nextHealthStatus={nextHealthStatus}
+        onNexHealthConnect={(token: any) => connectToNextHealth(token,setButtonsLoading)}
+        onNexHealthOk={() => {
+          if (nextHealthStatus === "connected") {
+            setShowNexHealthModal(false);
+            autoProgressToNext();
+          } else {
+            setShowNexHealthModal(false);
+            setShowCompletionButtons(false);
+            setNextHealthStatus("disconnected");
+            setFormData(prev => ({ ...prev, selectedCrm: "" }));
+            localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "" }));
+          }
+        }}
+        onNexHealthCancel={() => {
+          setShowNexHealthModal(false);
+          setShowCompletionButtons(false);
+          setNextHealthStatus("disconnected");
+          setFormData(prev => ({ ...prev, selectedCrm: "" }));
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, selectedCrm: "" }));
+        }}
+        // Gravity Form
+        showGravityFormModal={showGravityFormModal}
+        gravityFormStatus={gravityFormStatus}
+        onGravityFormConnect={(token: any) => connnectToGravityForm(token,setButtonsLoading)}
+        onGravityFormOk={() => {
+          if (gravityFormStatus === "connected" ) {
+            setShowGravityFormModal(false);
+            autoProgressToNext();
+          } else {
+            setShowGravityFormModal(false);
+            setShowCompletionButtons(false);
+            setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+            localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
+          }
+        }}
+        onGravityFormCancel={() => {
+          setShowGravityFormModal(false);
+          setShowCompletionButtons(false);
+          setFormData(prev => ({ ...prev, leadCaptureForms: "" }));
+          localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
+        }}
+        onGravityFormDisconnect={() => {
+          setGravityFormStatus("disconnected");
+        }}
         // ... pass the rest for other modals
       />
-     
     </div>
   );
 }

@@ -1,5 +1,6 @@
 export interface ModalProps {
   open: boolean;
+  buttonLoading: boolean;
   status: "disconnected" | "connecting" | "connected";
   accountInfo?: any;
   onOk: () => void;

@@ -7,10 +7,11 @@ import { useState } from "react";
 import CryptoJS from "crypto-js";
 import { ModalProps } from "./types";
 import Image from "next/image";
+import { ErrorToast } from "@/helpers/toast";
 
 const { Text } = Typography;
 
-export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel, onConnect }) => {
+export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel, onConnect, buttonLoading }) => {
   const [consumerKey, setConsumerKey] = useState("");
   const [consumerSecret, setConsumerSecret] = useState("");
   const [baseURL, setBaseURL] = useState("");
@@ -63,6 +64,10 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       const finalUrl = `${endpoint}?${paramString}&oauth_signature=${encodeURIComponent(signature)}`;
 
       const res = await fetch(finalUrl);
+      if(!res.ok){
+        ErrorToast("Error fetching forms");
+        return;
+      }
       const data = await res.json();
       console.log("Fetched forms:", data);
       const formsArray = Object.values(data);
@@ -97,7 +102,8 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       title={
         <div className="flex items-center">
           <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3">
- <Image src="/GravityForm.png" alt="Google" width={50} height={50} />          </div>
+            <Image src="/GravityForm.png" alt="Google" width={50} height={50} />{" "}
+          </div>
           <span className="text-xl font-semibold">Connect to Gravity Forms</span>
         </div>
       }
@@ -162,6 +168,7 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
             }
 
             <Button
+              loading={buttonLoading}
               type="primary"
               size="large"
               icon={<LinkOutlined />}
