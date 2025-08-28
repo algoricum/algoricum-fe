@@ -9,14 +9,7 @@ import { ModalProps } from "./types";
 
 const { Text } = Typography;
 
-export const FacebookLeadFormModal: React.FC<ModalProps> = ({ 
-  open, 
-  status, 
-  accountInfo, 
-  onOk, 
-  onCancel, 
-  onConnect 
-}) => {
+export const FacebookLeadFormModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect, buttonLoading }) => {
   return (
     <Modal
       title={
@@ -51,6 +44,8 @@ export const FacebookLeadFormModal: React.FC<ModalProps> = ({
             />
             <div className="text-center">
               <Button
+                loading={buttonLoading}
+                disabled={buttonLoading}
                 type="primary"
                 size="large"
                 icon={<Image src="/facebook2.svg" alt="Facebook" width={25} height={25} />}
@@ -63,7 +58,10 @@ export const FacebookLeadFormModal: React.FC<ModalProps> = ({
                 <Text className="text-sm text-gray-600">
                   <strong>What happens next:</strong>
                   <br />
-                  • You&apos;ll be redirected to Facebook to sign in<br />• Grant permission to access your lead form responses<br />• We&apos;ll automatically sync your leads<br />• Takes less than 30 seconds!
+                  • You&apos;ll be redirected to Facebook to sign in
+                  <br />• Grant permission to access your lead form responses
+                  <br />• We&apos;ll automatically sync your leads
+                  <br />• Takes less than 30 seconds!
                 </Text>
               </div>
             </div>

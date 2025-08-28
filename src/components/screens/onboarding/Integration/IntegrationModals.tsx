@@ -1,147 +1,36 @@
 import React from "react";
-import {CsvUploadModal, CustomCrmModal, FacebookLeadFormModal, GoHighLevelLeadFormModal, GoogleFormModal, GoogleLeadFormModal, GravityFormModal, HubspotModal, JotformModal, NexHealthLeadFormModal, PipedriveModal, TypeformModal} from "../../../modals/Modals";
-import { ConnectionStatus } from "@/app/types/types";
-// import GoHighLevelLeadFormModal from "./GoHighLevelLeadFormModal";
-// import PipedriveModal from "./PipedriveModal";
-// import GoogleFormModal from "./GoogleFormModal";
-// import GoogleLeadFormModal from "./GoogleLeadFormModal";
-// import FacebookLeadFormModal from "./FacebookLeadFormModal";
-// import TypeformModal from "./TypeformModal";
-// import JotformModal from "./JotformModal";
-// import CsvUploadModal from "./CsvUploadModal";
-// import CustomCrmModal from "./CustomCrmModal";
-// import NexHealthLeadFormModal from "./NexHealthLeadFormModal";
-// import GravityFormModal from "./GravityFormModal";
-
-type Props = {
-  // Hubspot
-  showHubspotModal: boolean;
-  hubspotStatus: ConnectionStatus;
-  hubspotAccountInfo: any;
-  onHubspotOk: () => void;
-  onHubspotCancel: () => void;
-  onHubspotConnect: () => void;
-
-  // GoHighLevel
-  showGoHighLevelModal: boolean;
-  goHighLevelStatus: ConnectionStatus;
-  onGoHighLevelOk: () => void;
-  onGoHighLevelCancel: () => void;
-  onGoHighLevelConnect: () => void;
-
-  //PipeDrive
-  showPipedriveModal: boolean;
-  pipedriveStatus: ConnectionStatus;
-  pipedriveAccountInfo: any;
-  onPipedriveOk: () => void;
-  onPipedriveCancel: () => void;
-  onPipedriveConnect: () => void;
-  onPipedriveSyncLeads: () => void;
-  onPipedriveDisconnect: () => void;
-
-  // Google Forms
-  showGoogleFormModal: boolean;
-  googleFormStatus: ConnectionStatus;
-  googleFormAccountInfo: any;
-  googleFormTreeData: any[];
-  selectedGoogleFormWorksheets: string[];
-  // eslint-disable-next-line no-unused-vars
-  onSelectGoogleFormWorksheets: (values: string[]) => void;
-  onGoogleFormOk: () => void;
-  onGoogleFormCancel: () => void;
-  onGoogleFormConnect: () => void;
-  onGoogleFormSyncLeads: () => void;
-  onGoogleFormDisconnect: () => void;
-
-    // Google Lead Form
-  showGoogleLeadFormModal: boolean;
-  googleLeadFormStatus: ConnectionStatus;
-  googleLeadFormAccountInfo: any;
-  onGoogleLeadFormOk: () => void;
-  onGoogleLeadFormCancel: () => void;
-  onGoogleLeadFormConnect: () => void;
-  onGoogleLeadFormSyncLeads: () => void;
-  onGoogleLeadFormDisconnect: () => void;
-
-   // Facebook Lead Form
-  showFacebookLeadFormModal: boolean;
-  facebookLeadFormStatus: ConnectionStatus;
-  facebookLeadFormAccountInfo: any;
-  onFacebookLeadFormOk: () => void;
-  onFacebookLeadFormCancel: () => void;
-  onFacebookLeadFormConnect: () => void;
-
-  // Typeform
-  showTypeformModal: boolean;
-  typeformStatus: ConnectionStatus;
-  typeformAccountInfo: any;
-  typeformTreeData: any[];
-  selectedTypeformForms: string[];
-  // eslint-disable-next-line no-unused-vars
-  onSelectTypeformForms: (values: string[]) => void;
-  onTypeformOk: () => void;
-  onTypeformCancel: () => void;
-  onTypeformConnect: () => void;
-  onTypeformSyncLeads: () => void;
-  onTypeformDisconnect: () => void;
-
-   // Jotform 
-  showJotformModal: boolean;
-  jotformStatus: ConnectionStatus;
-  jotformTreeData: any[];
-  selectedJotformForms: string[];
-  // eslint-disable-next-line no-unused-vars
-  onSelectJotformForms: (values: string[]) => void;
-  onJotformOk: () => void;
-  onJotformCancel: () => void;
-  // eslint-disable-next-line no-unused-vars
-  onJotformConnect: (token: any) => void;
-  onJotformSyncLeads: () => void;
-  onJotformDisconnect: () => void;
-
-    // CSV Upload
-  showManualLeadsModal: boolean;
-  // eslint-disable-next-line no-unused-vars
-  onCsvUploadOk: (leads: any[]) => void;
-  onCsvUploadCancel: () => void;
-
-  // Custom CRM
-  showCustomCrmModal: boolean;
-  onCustomCrmOk: () => void;
-  onCustomCrmCancel: () => void;
-
-   // NexHealth
-  showNexHealthModal: boolean;
-  nextHealthStatus: ConnectionStatus;
-  onNexHealthOk: () => void;
-  onNexHealthCancel: () => void;
-  // eslint-disable-next-line no-unused-vars
-  onNexHealthConnect: (token:string) => void;
-
-  // Gravity Form
-  showGravityFormModal: boolean;
-  gravityFormStatus: ConnectionStatus;
-  onGravityFormOk: () => void;
-  onGravityFormCancel: () => void;
-  // eslint-disable-next-line no-unused-vars
-  onGravityFormConnect: (token:any) => void;
-  onGravityFormDisconnect: () => void;
-};
+import {
+  CsvUploadModal,
+  CustomCrmModal,
+  FacebookLeadFormModal,
+  GoHighLevelLeadFormModal,
+  GoogleFormModal,
+  GoogleLeadFormModal,
+  GravityFormModal,
+  HubspotModal,
+  JotformModal,
+  NexHealthLeadFormModal,
+  PipedriveModal,
+  TypeformModal,
+} from "../../../modals/Modals";
+import { Props } from "@/app/types/types";
 
 const IntegrationsModals: React.FC<Props> = ({
+  buttonLoading,
+  //hubspotModal
   showHubspotModal,
   hubspotStatus,
   hubspotAccountInfo,
   onHubspotOk,
   onHubspotCancel,
   onHubspotConnect,
-
+  //GoHighLevel
   showGoHighLevelModal,
   goHighLevelStatus,
   onGoHighLevelOk,
   onGoHighLevelCancel,
   onGoHighLevelConnect,
-
+  //PipeDrive
   showPipedriveModal,
   pipedriveStatus,
   pipedriveAccountInfo,
@@ -230,7 +119,6 @@ const IntegrationsModals: React.FC<Props> = ({
   onGravityFormCancel,
   onGravityFormConnect,
   onGravityFormDisconnect,
-
 }) => {
   return (
     <>
@@ -239,6 +127,7 @@ const IntegrationsModals: React.FC<Props> = ({
         open={showHubspotModal}
         status={hubspotStatus}
         accountInfo={hubspotAccountInfo}
+        buttonLoading={buttonLoading}
         onOk={onHubspotOk}
         onCancel={onHubspotCancel}
         onConnect={onHubspotConnect}
@@ -246,6 +135,7 @@ const IntegrationsModals: React.FC<Props> = ({
 
       {/* Go High Level Modal */}
       <GoHighLevelLeadFormModal
+        buttonLoading={buttonLoading}
         open={showGoHighLevelModal}
         status={goHighLevelStatus}
         onOk={onGoHighLevelOk}
@@ -255,6 +145,7 @@ const IntegrationsModals: React.FC<Props> = ({
 
       {/* Pipedrive Modal */}
       <PipedriveModal
+        buttonLoading={buttonLoading}
         open={showPipedriveModal}
         status={pipedriveStatus}
         accountInfo={pipedriveAccountInfo}
@@ -266,6 +157,7 @@ const IntegrationsModals: React.FC<Props> = ({
       />
       {/* Google Form Modal */}
       <GoogleFormModal
+        buttonLoading={buttonLoading}
         open={showGoogleFormModal}
         status={googleFormStatus}
         accountInfo={googleFormAccountInfo}
@@ -281,6 +173,7 @@ const IntegrationsModals: React.FC<Props> = ({
 
       {/* Google Lead Form Modal */}
       <GoogleLeadFormModal
+        buttonLoading={buttonLoading}
         open={showGoogleLeadFormModal}
         status={googleLeadFormStatus}
         accountInfo={googleLeadFormAccountInfo}
@@ -293,6 +186,7 @@ const IntegrationsModals: React.FC<Props> = ({
 
       {/* Facebook Lead Form */}
       <FacebookLeadFormModal
+        buttonLoading={buttonLoading}
         open={showFacebookLeadFormModal}
         status={facebookLeadFormStatus}
         accountInfo={facebookLeadFormAccountInfo}
@@ -303,6 +197,7 @@ const IntegrationsModals: React.FC<Props> = ({
 
       {/* Typeform */}
       <TypeformModal
+        buttonLoading={buttonLoading}
         open={showTypeformModal}
         status={typeformStatus}
         accountInfo={typeformAccountInfo}
@@ -316,8 +211,9 @@ const IntegrationsModals: React.FC<Props> = ({
         onDisconnect={onTypeformDisconnect}
       />
 
-      {/* Jotform ✅ */}
+      {/* Jotform  */}
       <JotformModal
+        buttonLoading={buttonLoading}
         open={showJotformModal}
         status={jotformStatus}
         treeData={jotformTreeData}
@@ -325,19 +221,20 @@ const IntegrationsModals: React.FC<Props> = ({
         onSelectForms={onSelectJotformForms}
         onOk={onJotformOk}
         onCancel={onJotformCancel}
-        onConnect={(token:any)=>onJotformConnect(token)}
+        onConnect={(token: any) => onJotformConnect(token)}
         onSyncLeads={onJotformSyncLeads}
         onDisconnect={onJotformDisconnect}
       />
 
       {/* CSV Upload Modal */}
-      <CsvUploadModal open={showManualLeadsModal} onOk={leads=>onCsvUploadOk(leads)} onCancel={onCsvUploadCancel} />
+      <CsvUploadModal open={showManualLeadsModal} onOk={leads => onCsvUploadOk(leads)} onCancel={onCsvUploadCancel} />
 
       {/* Custom CRM Modal */}
       <CustomCrmModal open={showCustomCrmModal} onOk={onCustomCrmOk} onCancel={onCustomCrmCancel} />
 
       {/* NexHealth Modal */}
       <NexHealthLeadFormModal
+        buttonLoading={buttonLoading}
         open={showNexHealthModal}
         status={nextHealthStatus}
         onOk={onNexHealthOk}
@@ -347,6 +244,7 @@ const IntegrationsModals: React.FC<Props> = ({
 
       {/* Gravity Form Modal */}
       <GravityFormModal
+        buttonLoading={buttonLoading}
         open={showGravityFormModal}
         status={gravityFormStatus}
         onOk={onGravityFormOk}

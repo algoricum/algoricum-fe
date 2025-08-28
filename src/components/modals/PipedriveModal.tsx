@@ -18,6 +18,7 @@ export const PipedriveModal: React.FC<ModalProps> = ({
   onConnect,
   onSyncLeads,
   onDisconnect,
+  buttonLoading,
 }) => {
   return (
     <Modal
@@ -53,6 +54,8 @@ export const PipedriveModal: React.FC<ModalProps> = ({
             />
             <div className="text-center">
               <Button
+                loading={buttonLoading}
+                disabled={buttonLoading}
                 type="primary"
                 size="large"
                 icon={<Image src="/pipedrive.jpeg" alt="Pipedrive" width={25} height={25} />}

@@ -18,6 +18,7 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
   onConnect,
   onSyncLeads,
   onDisconnect,
+  buttonLoading,
 }) => {
   return (
     <Modal
@@ -53,6 +54,8 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
             />
             <div className="text-center">
               <Button
+                loading={buttonLoading}
+                disabled={buttonLoading}
                 type="primary"
                 size="large"
                 icon={<Image src="/google.svg" alt="Google" width={25} height={25} />}
@@ -65,13 +68,16 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                 <Text className="text-sm text-gray-600">
                   <strong>What happens next:</strong>
                   <br />
-                  • You&apos;ll be redirected to Google to sign in<br />• Grant permission to access your lead form responses<br />• We&apos;ll automatically sync your leads<br />• Takes less than 30 seconds!
+                  • You&apos;ll be redirected to Google to sign in
+                  <br />• Grant permission to access your lead form responses
+                  <br />• We&apos;ll automatically sync your leads
+                  <br />• Takes less than 30 seconds!
                 </Text>
               </div>
             </div>
           </>
         )}
-        
+
         {status === "connecting" && (
           <div className="text-center py-8">
             <Spin size="large" />
@@ -82,7 +88,7 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
             </div>
           </div>
         )}
-        
+
         {status === "connected" && accountInfo && (
           <>
             <Alert
@@ -99,9 +105,7 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                     Google Ads Lead Forms Integration Active
                   </Text>
                   <br />
-                  <Text className="text-gray-600 text-sm">
-                    {accountInfo.responseCount || 0} responses synced
-                  </Text>
+                  <Text className="text-gray-600 text-sm">{accountInfo.responseCount || 0} responses synced</Text>
                 </div>
                 <div className="flex space-x-2">
                   <Button
