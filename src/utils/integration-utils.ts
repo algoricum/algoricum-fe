@@ -22,13 +22,13 @@ export const handleCsvUpload = async (leads: any) => {
 export const syncPipedriveLeads = async () => {
   try {
     const clinicId = await getClinicId();
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive-integration/sync-leads`, {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/pipedrive/sync-leads`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        apikey: SUPABASE_ANON_KEY,
-      },
+      // headers: {
+      //   "Content-Type": "application/json",
+      //   Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      //   apikey: SUPABASE_ANON_KEY,
+      // },
       body: JSON.stringify({ clinic_id: clinicId }),
     });
 
@@ -142,7 +142,7 @@ export const syncJotformLeads = async (forms: string[]) => {
         // apikey: SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({
-         action: "save_forms",
+        action: "save_forms",
         clinic_id: clinicId,
         forms: forms,
       }),
@@ -222,9 +222,8 @@ export const connectToHubSpot = async () => {
   }
 };
 const supabase = createClient();
-export const connectToGHL = async()=>{
- try {
-    
+export const connectToGHL = async () => {
+  try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/GHL-integration/auth/start?clinic_id=${await getClinicId()}`, {
       method: "GET",
       headers: {
@@ -250,8 +249,8 @@ export const connectToGHL = async()=>{
   } catch (error) {
     console.error("Connection failed:", error);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Go High Level. Please try again"}`);
-  }  
-}
+  }
+};
 export const connectToPipedrive = async () => {
   try {
     const {
@@ -361,24 +360,21 @@ export const connectToTypeform = async () => {
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Typeform. Please try again"}`);
   }
 };
-export const connectToNextHealth = async (apiKey:string) => {
+export const connectToNextHealth = async (apiKey: string) => {
   const clinicId = await getClinicId();
-   try {
-    const res = await fetch(
-      "https://eypitkzntyiyvwrndkgy.supabase.co/functions/v1/NextHealth-integration",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // same as your curl
-          Authorization: apiKey,
-        },
-        body: JSON.stringify({
-          clinic_id: clinicId,
-          api_key: apiKey,
-        }),
-      }
-    );
+  try {
+    const res = await fetch("https://eypitkzntyiyvwrndkgy.supabase.co/functions/v1/NextHealth-integration", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // same as your curl
+        Authorization: apiKey,
+      },
+      body: JSON.stringify({
+        clinic_id: clinicId,
+        api_key: apiKey,
+      }),
+    });
 
     if (!res.ok) {
       throw new Error(`Request failed: ${res.status}`);
@@ -395,8 +391,45 @@ export const connectToNextHealth = async (apiKey:string) => {
     console.error("Error connecting NextHealth:", err);
     throw err;
   }
+};
+export const connnectToGravityForm = async (token: any) => {
+  try {
+    const clinic_id = await getClinicId();
+    console.log("Connecting to Gravity Form with token:", token);
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/GravityForm-integration`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        form_ids: token.form_ids || [],
+        consumerKey: token.consumerKey,
+        consmerSecret: token.consumerSecret,
+        baseURL: token.baseURL,
+        clinic_id:clinic_id
+      }),
+    });
 
-}
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Response error:", response.status, errorText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("Response data:", data);
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    console.log("🚀 Redirecting to Gravity Form OAuth:", data.auth_url);
+    window.location.href = window.location.origin+ "/onboarding?gravity_form_status=success";
+  } catch (error) {
+    console.error("Connection failed:", error);
+    ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Gravity Form. Please try again"}`);
+  }
+};
 export const findSheetDetails = (treeData: any, sheetValue: any) => {
   const [spreadsheetId, sheetId] = sheetValue.split(":");
 
@@ -416,23 +449,21 @@ export const findSheetDetails = (treeData: any, sheetValue: any) => {
 
 export const createJotformConnection = async (clinicId: string, jotformToken: string) => {
   const { data: integration } = await supabase.from("integrations").select("id").eq("name", "Jotform").single();
-  const res = await supabase
-    .from("integration_connections")
-    .upsert(
-      {
-        clinic_id: clinicId,
-        integration_id: integration?.id,
-        status: "active",
-        created_at: "now()",
-        updated_at: "now()",
-        auth_data: { forms: [], access_token: jotformToken },
-      },
-      { onConflict: "clinic_id,integration_id" },
-    )
-    
-    if (res.error) {
-      console.error("Error creating Jotform connection:", res.error);
-      throw new Error("Failed to create Jotform connection");
-    }
-    return true
+  const res = await supabase.from("integration_connections").upsert(
+    {
+      clinic_id: clinicId,
+      integration_id: integration?.id,
+      status: "active",
+      created_at: "now()",
+      updated_at: "now()",
+      auth_data: { forms: [], access_token: jotformToken },
+    },
+    { onConflict: "clinic_id,integration_id" },
+  );
+
+  if (res.error) {
+    console.error("Error creating Jotform connection:", res.error);
+    throw new Error("Failed to create Jotform connection");
+  }
+  return true;
 };
