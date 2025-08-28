@@ -31,7 +31,7 @@ interface StaffTableProps {
 export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus, onEdit, onDelete, onClearFilters }: StaffTableProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
-  const dropdownRef = useRef<HTMLTableCellElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -42,7 +42,6 @@ export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus
 
   const toggleDropdown = (e: React.MouseEvent, staffId: string) => {
     e.stopPropagation();
-
     if (activeDropdown === staffId) {
       setActiveDropdown(null);
     } else {
@@ -56,7 +55,6 @@ export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus
     }
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -64,11 +62,13 @@ export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    if (activeDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [activeDropdown]);
 
   const getRoleBadgeClass = (role: string) => {
     switch (role.toLowerCase()) {
@@ -205,7 +205,7 @@ export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus
                   </td>
 
                   {/* Actions */}
-                  <td className="px-6 py-4 static" ref={activeDropdown === staff.id ? dropdownRef : undefined}>
+                  <td className="px-6 py-4 static">
                     <div className="dropdown-container relative">
                       <button
                         onClick={e => toggleDropdown(e, staff.id)}
@@ -223,21 +223,20 @@ export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus
         </table>
       </div>
 
-      {/* Dropdown Menu Portal - Outside table container */}
       {activeDropdown && (
-        <div className="fixed inset-0 z-[9999]" onClick={() => setActiveDropdown(null)}>
+        <div className="fixed inset-0 z-[9999]">
           {staffData.map(staff => {
             if (staff.id !== activeDropdown) return null;
 
             return (
               <div
                 key={staff.id}
+                ref={dropdownRef}
                 className="absolute w-48 rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5"
                 style={{
                   top: dropdownPosition.top,
                   left: dropdownPosition.left,
                 }}
-                onClick={e => e.stopPropagation()}
               >
                 <div className="py-2">
                   <button

@@ -266,7 +266,7 @@ export default function DashboardPage() {
           )}
 
           {/* ChatBot Training Banner */}
-          <div className="rounded-xl border-2 p-6 bg-purple-50 border-purple-200 shadow-sm transition-all hover:shadow-md md:col-span-2">
+          <div className="max-w-[800px]  rounded-xl border-2 p-6 bg-purple-50 border-purple-200 shadow-sm transition-all hover:shadow-md md:col-span-2">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               {/* Left: icon + title + desc */}
               <div className="flex items-start gap-4">
@@ -296,8 +296,9 @@ export default function DashboardPage() {
                     height: "44px",
                     paddingLeft: "24px",
                     paddingRight: "24px",
-                    fontWeight: "500",
+                    fontWeight: "900",
                     borderRadius: "8px",
+
                   }}
                   aria-label="Open ChatBot training modal"
                 >

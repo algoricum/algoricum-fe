@@ -39,10 +39,8 @@ export default function AppointmentsPage() {
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [, setPhoneError] = useState<string>("");
   const [form] = Form.useForm();
-  const dropdownRef = useRef<HTMLTableCellElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
-
-
 
   const supabase = createClient();
 
@@ -54,6 +52,7 @@ export default function AppointmentsPage() {
       try {
         const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
         setAppointmentsData(meetings);
+        console.log("🔍 DEBUG - Loaded appointments:", meetings.length);
       } catch (error) {
         console.error("Error loading appointments:", error);
         setMessage({
@@ -80,6 +79,7 @@ export default function AppointmentsPage() {
           return;
         }
         setClinicId(clinic_id);
+        console.log("🔍 DEBUG - Clinic ID set:", clinic_id);
       } catch (error) {
         console.error("Error fetching clinic ID:", error);
         setMessage({
@@ -98,11 +98,13 @@ export default function AppointmentsPage() {
         setActiveDropdown(null);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    if (activeDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [activeDropdown]);
 
   // Clear message after 5 seconds
   useEffect(() => {
@@ -218,7 +220,11 @@ export default function AppointmentsPage() {
 
   const handleEditStatus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedAppointment) return;
+    console.log("🔍 DEBUG - handleEditStatus called");
+    if (!selectedAppointment) {
+      console.log("🚨 DEBUG - No selected appointment in handleEditStatus");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const updatedMeeting = await appointmentHelper.updateMeetingStatus(selectedAppointment.id, selectedAppointment.status);
@@ -239,7 +245,11 @@ export default function AppointmentsPage() {
   };
 
   const handleDeleteAppointment = async () => {
-    if (!selectedAppointment) return;
+    console.log("🔍 DEBUG - handleDeleteAppointment called");
+    if (!selectedAppointment) {
+      console.log("🚨 DEBUG - No selected appointment in handleDeleteAppointment");
+      return;
+    }
     setIsSubmitting(true);
     try {
       await appointmentHelper.deleteMeeting(selectedAppointment.id);
@@ -259,32 +269,42 @@ export default function AppointmentsPage() {
     }
   };
 
-  const toggleDropdown = (e, appointmentId) => {
-  e.stopPropagation();
-  
-  if (activeDropdown === appointmentId) {
-    setActiveDropdown(null);
-  } else {
-    // Calculate position relative to viewport
-    const rect = e.currentTarget.getBoundingClientRect();
-    setDropdownPosition({
-      top: rect.bottom + 8, // 8px gap below the button
-      left: rect.right - 192, // 192px is the width of dropdown (w-48)
-    });
-    setActiveDropdown(appointmentId);
-  }
-};
+  const toggleDropdown = (e: React.MouseEvent, appointmentId: string) => {
+    e.stopPropagation();
+    if (activeDropdown === appointmentId) {
+      setActiveDropdown(null);
+    } else {
+      // Calculate position relative to viewport
+      const rect = e.currentTarget.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8, // 8px gap below the button
+        left: rect.right - 192, // 192px is the width of dropdown (w-48)
+      });
+      setActiveDropdown(appointmentId);
+    }
+  };
 
   const openEditModal = (appointment: MeetingSchedule) => {
+    
     setSelectedAppointment(appointment);
+    console.log("🚀 DEBUG - Setting showEditStatusModal to true");
     setShowEditStatusModal(true);
     setActiveDropdown(null);
+
+    console.log("🚀 DEBUG - openEditModal completed");
   };
 
   const openDeleteConfirmation = (appointment: MeetingSchedule) => {
+    console.log("🚀 DEBUG - openDeleteConfirmation called with appointment:", appointment);
+    console.log("🚀 DEBUG - Current showDeleteConfirmation state:", showDeleteConfirmation);
+    console.log("🚀 DEBUG - Setting selectedAppointment to:", appointment);
+
     setSelectedAppointment(appointment);
+    console.log("🚀 DEBUG - Setting showDeleteConfirmation to true");
     setShowDeleteConfirmation(true);
     setActiveDropdown(null);
+
+    console.log("🚀 DEBUG - openDeleteConfirmation completed");
   };
 
   // Filter appointments based on search and status
@@ -330,21 +350,7 @@ export default function AppointmentsPage() {
   return (
     <DashboardLayout header={<Header title="Appointments" description="Manage patient appointments and scheduling." showHamburgerMenu />}>
       <div className="space-y-6 px-4">
-        {/* Message */}
-        {message && (
-          <div
-            className={`rounded-lg border p-4 ${
-              message.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-green-200 bg-green-50 text-green-800"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">{message.text}</p>
-              <button onClick={() => setMessage(null)} className="text-gray-400 hover:text-gray-600">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
+    
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -405,6 +411,7 @@ export default function AppointmentsPage() {
             </button>
           </div>
         </div>
+
         {/* Enhanced Table */}
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto overflow-y-visible">
@@ -538,7 +545,7 @@ export default function AppointmentsPage() {
                         </td>
 
                         {/* Actions */}
-                        <td className="px-6 py-4 static" ref={activeDropdown === appointment.id ? dropdownRef : undefined}>
+                        <td className="px-6 py-4 static">
                           <div className="dropdown-container relative">
                             <button
                               onClick={e => toggleDropdown(e, appointment.id)}
@@ -559,25 +566,27 @@ export default function AppointmentsPage() {
 
           {/* Dropdown Menu Portal - Outside table container */}
           {activeDropdown && (
-            <div className="fixed inset-0 z-[9999]" onClick={() => setActiveDropdown(null)}>
+            <div
+              className="fixed inset-0 z-[9999]">
               {filteredAppointments.map(appointment => {
                 if (appointment.id !== activeDropdown) return null;
 
                 return (
                   <div
                     key={appointment.id}
+                    ref={dropdownRef}
                     className="absolute w-48 rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5"
                     style={{
                       top: dropdownPosition.top,
                       left: dropdownPosition.left,
                     }}
-                    onClick={e => e.stopPropagation()}
                   >
                     <div className="py-2">
                       <button
                         onClick={e => {
                           e.stopPropagation();
                           openEditModal(appointment);
+                          setActiveDropdown(null);
                         }}
                         className="flex w-full items-center px-4 py-3 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-blue-50 hover:text-blue-700"
                         type="button"
@@ -626,6 +635,7 @@ export default function AppointmentsPage() {
         <EditStatusModal
           isOpen={showEditStatusModal}
           onClose={() => {
+            console.log("🔍 DEBUG - EditStatusModal onClose called");
             setShowEditStatusModal(false);
             setSelectedAppointment(null);
           }}
@@ -638,6 +648,7 @@ export default function AppointmentsPage() {
         <DeleteConfirmationModal
           isOpen={showDeleteConfirmation}
           onClose={() => {
+            console.log("🔍 DEBUG - DeleteConfirmationModal onClose called");
             setShowDeleteConfirmation(false);
             setSelectedAppointment(null);
           }}

@@ -269,9 +269,10 @@ export default function StaffPageRefactored(): JSX.Element {
   };
 
   const handleEditStaff = (staff: Staff) => {
+    setShowEditStaffModal(true);
+
     setSelectedStaffForEdit(staff);
     setEditStaff({ id: staff.id, name: staff.name, status: staff.status || "active" });
-    setShowEditStaffModal(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -352,7 +353,7 @@ export default function StaffPageRefactored(): JSX.Element {
         header={<Header title="Staff Management" description="Manage your healthcare team and staff information." showHamburgerMenu />}
       >
         <div className="flex min-h-[400px] items-center justify-center">
-          <LoadingSpinner message="Loading staff data..." size="md" />
+          <LoadingSpinner message="Loading staff data..." size="lg" />
         </div>
       </DashboardLayout>
     );
