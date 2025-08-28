@@ -100,7 +100,7 @@ export default function IntegrationsPage() {
     };
 
     fetchIntegrations();
-  }, []);
+  }, [supabase]);
 
   const handleIntegrationClick = async (integration: IntegrationWithStatus) => {
     if (!integration.connected) {
