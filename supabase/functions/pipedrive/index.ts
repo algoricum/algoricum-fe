@@ -374,7 +374,7 @@ async function handleOAuthInit(req: Request) {
       const requestBody = await req.json()
       console.log('Request body:', requestBody)
       
-      const { clinic_id } = requestBody
+      const { clinic_id,redirectUrl} = requestBody
       if (!clinic_id) {
         console.error('Missing clinic_id in request body')
         throw new Error('Missing clinic_id')
@@ -410,7 +410,7 @@ async function handleOAuthInit(req: Request) {
 
       // Build OAuth URL with user_id in state to help identify the clinic later
       console.log('Building OAuth URL...')
-      const stateData = `${clinic_id}:${user.id}` // Include both clinic_id and user_id
+      const stateData = `${clinic_id}|${user.id}|${redirectUrl}` // Include both clinic_id and user_id
       const oauthUrl = new URL('https://oauth.pipedrive.com/oauth/authorize')
       oauthUrl.searchParams.set('client_id', clientId)
       oauthUrl.searchParams.set('redirect_uri', redirectUri)
@@ -476,7 +476,8 @@ async function handleOAuthInit(req: Request) {
 async function handleOAuthCallback(req: Request) {
   const requestId = crypto.randomUUID()
   console.log(`[${requestId}] Starting OAuth callback handling`)
-  
+      let redirectUrl = null;
+
   try {
     const url = new URL(req.url)
     const code = url.searchParams.get('code')
@@ -498,9 +499,10 @@ async function handleOAuthCallback(req: Request) {
     let userId = null
     
     if (state && state.includes(':')) {
-      const [parsedClinicId, parsedUserId] = state.split(':')
+      const [parsedClinicId, parsedUserId,parsedRedirectUrl] = state.split('|')
       clinicId = parsedClinicId
       userId = parsedUserId
+      redirectUrl=parsedRedirectUrl
       console.log(`[${requestId}] Parsed state:`, { clinicId, userId })
     } else {
       console.log(`[${requestId}] State parameter missing or malformed, will use fallback method`)
@@ -702,7 +704,7 @@ async function handleOAuthCallback(req: Request) {
     // Get account info and redirect with success
     const accountInfo = await getAccountInfo(tokenData.access_token, tokenData.api_domain)
     
-    const successUrl = `${frontendUrl || 'http://localhost:3000'}?pipedrive_status=success&account_name=${encodeURIComponent(accountInfo.accountName)}&contact_count=${accountInfo.contactCount}&deal_count=${accountInfo.dealCount}`
+    const successUrl = `${redirectUrl || 'http://localhost:3000'}?pipedrive_status=success&account_name=${encodeURIComponent(accountInfo.accountName)}&contact_count=${accountInfo.contactCount}&deal_count=${accountInfo.dealCount}`
     console.log(`[${requestId}] Redirecting to:`, successUrl)
     
     return Response.redirect(successUrl)
@@ -712,7 +714,7 @@ async function handleOAuthCallback(req: Request) {
       stack: error.stack
     })
     
-    const frontendUrl = Deno.env.get('FRONTEND_URL') || 'http://localhost:3000'
+    const frontendUrl =redirectUrl || 'http://localhost:3000'
     const errorUrl = `${frontendUrl}?pipedrive_status=error&error_message=${encodeURIComponent(error.message)}`
     console.log(`[${requestId}] Redirecting to error page:`, errorUrl)
     

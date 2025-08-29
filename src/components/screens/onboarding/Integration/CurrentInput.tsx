@@ -44,7 +44,7 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
 
         {currentQuestion.id === "selectedCrm" && currentValue === "HubSpot" && (
           <ConnectionCard
-            color="orange"
+            color="red"
             letter="H"
             title="Connect your HubSpot CRM!"
             description="Great! We can connect your HubSpot CRM directly to automatically sync your leads, contacts, and deals with our platform for seamless workflows."
@@ -53,19 +53,10 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
 
         {currentQuestion.id === "selectedCrm" && currentValue === "GoHighLevel" && (
           <ConnectionCard
-            color="orange"
+            color="blue"
             letter="H"
             title="Connect your Go High Level CRM!"
             description="Great! We can connect your Go High Level CRM directly to automatically sync your leads, contacts, and deals with our platform for seamless workflows."
-          />
-        )}
-
-        {currentQuestion.id === "selectedCrm" && currentValue === "No CRM" && (
-          <ConnectionCard
-            color="gray"
-            letter="N"
-            title="No CRM Selected"
-            description="You’ve chosen not to connect a CRM. You can still sync leads via Google Forms, ad platforms, or CSV upload in the next steps."
           />
         )}
 
