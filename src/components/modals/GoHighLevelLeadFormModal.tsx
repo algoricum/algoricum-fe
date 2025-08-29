@@ -9,14 +9,7 @@ import { commonAlertStyles } from "./utils";
 
 const { Text } = Typography;
 
-export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ 
-  open, 
-  status, 
-  accountInfo, 
-  onOk, 
-  onCancel, 
-  onConnect 
-}) => (
+export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect, buttonLoading }) => (
   <Modal
     title={
       <div className="flex items-center">
@@ -52,6 +45,8 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({
           />
           <div className="text-center">
             <Button
+              loading={buttonLoading}
+              disabled={buttonLoading}
               type="primary"
               size="large"
               icon={<Image src="/gohighlevel.jpeg" width={30} height={30} alt="GoHighLevel" />}
@@ -64,7 +59,10 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({
               <Text className="text-sm text-gray-600">
                 <strong>What happens next:</strong>
                 <br />
-                • You&apos;ll be redirected to GoHighLevel to sign in<br />• Grant permission to access your contacts<br />• We&apos;ll automatically sync your leads<br />• Takes less than 30 seconds!
+                • You&apos;ll be redirected to GoHighLevel to sign in
+                <br />• Grant permission to access your contacts
+                <br />• We&apos;ll automatically sync your leads
+                <br />• Takes less than 30 seconds!
               </Text>
             </div>
           </div>

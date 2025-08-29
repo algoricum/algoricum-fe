@@ -21,6 +21,7 @@ export const JotformModal: React.FC<ModalProps> = ({
   treeData,
   selectedForms,
   onSelectForms,
+  buttonLoading,
 }) => {
   useEffect(() => {
     if (!window.JF) {
@@ -93,6 +94,8 @@ export const JotformModal: React.FC<ModalProps> = ({
             />
             <div className="text-center">
               <Button
+                loading={buttonLoading}
+                disabled={buttonLoading}
                 type="primary"
                 size="large"
                 icon={<Image src="/jotform.svg" alt="Jotform" width={25} height={25} />}
@@ -125,12 +128,7 @@ export const JotformModal: React.FC<ModalProps> = ({
         )}
         {status === "connected" && (
           <>
-            <Alert
-              message="Successfully Connected!"
-              type="success"
-              showIcon
-              className="mb-4"
-            />
+            <Alert message="Successfully Connected!" type="success" showIcon className="mb-4" />
             <div className="mt-4">
               <Text className="block mb-2">Select forms to sync leads from:</Text>
               <TreeSelect

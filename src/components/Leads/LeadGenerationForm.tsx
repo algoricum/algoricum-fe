@@ -7,6 +7,7 @@ import "react-phone-number-input/style.css";
 import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
 import getLeadSourceId from "@/utils/lead_source";
 import { User, Mail, Phone, Stethoscope, Users, Calendar } from "lucide-react";
+import { ErrorToast } from "@/helpers/toast";
 
 type FormField = {
   id: string;
@@ -176,8 +177,9 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       onSuccess?.(data);
       setSubmitted(true);
     } catch (err) {
+      const error = err as Error;
+      ErrorToast(error.message);
       console.error("Submit error:", err);
-      alert("Error submitting form. Try again.");
     } finally {
       setSubmitting(false);
     }

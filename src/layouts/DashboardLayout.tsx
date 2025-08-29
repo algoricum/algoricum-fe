@@ -22,14 +22,14 @@ const DashboardLayout = ({ children, header }: DashboardLayoutProps) => {
         <Layout className="flex min-w-0 flex-1 flex-col">
           {header && (
             <div className="sticky top-0 z-40 w-full bg-white">
-              <Flex className="w-full border-b border-Gray300" style={{ height: 64, flexShrink: 0 }} align="center" justify="space-between">
+              <Flex className="w-full border-b-8 border-gray-300" style={{ height: 64, flexShrink: 0 }} align="center" justify="space-between">
                 {header}
               </Flex>
             </div>
           )}
 
           {/* Content should scroll, header stays fixed */}
-          <Content className="min-h-0 flex-1 overflow-y-auto bg-white p-4">{children}</Content>
+          <Content className="min-h-0 flex-1 overflow-y-auto bg-white ">{children}</Content>
         </Layout>
       </Layout>
     </div>

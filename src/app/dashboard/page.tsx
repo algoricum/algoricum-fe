@@ -180,33 +180,38 @@ export default function DashboardPage() {
         <Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." showHamburgerMenu />
       }
     >
-      <div className="space-y-8 p-4 sm:p-6">
+      <div className="space-y-8 p-0 sm:p-4">
         {/* Integration Banners */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* HubSpot */}
           {showHubspotBanner && (
-            <div className={`rounded-lg border p-4 ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div
+              className={`rounded-xl border-2 p-6 shadow-sm transition-all hover:shadow-md ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}
+            >
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
-                  <div className="flex items-center font-semibold text-gray-900">
+                  <div className="flex items-center font-semibold text-gray-900 mb-2">
                     <span>HubSpot Integration</span>
                     {hubspotConnected && <CheckCircle className="ml-2 h-4 w-4 text-green-600" />}
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 leading-relaxed">
                     {hubspotConnected
                       ? "HubSpot is connected and syncing data successfully."
                       : "Connect your HubSpot account to sync leads and contacts automatically."}
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
+                <div className="grid grid-cols-2 gap-3 md:flex md:items-center md:gap-3 md:self-center md:shrink-0">
                   {!hubspotConnected && (
-                    <button onClick={() => setHubspotConnected(true)} className="btn btn-primary btn-sm w-full md:w-auto">
+                    <button
+                      onClick={() => setHubspotConnected(true)}
+                      className="btn btn-primary btn-sm w-full md:w-auto px-4 py-2 rounded-lg"
+                    >
                       Connect HubSpot
                     </button>
                   )}
                   <button
                     onClick={() => setShowHubspotBanner(false)}
-                    className="inline-flex w-full items-center justify-center rounded-md px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 md:w-auto"
+                    className="inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors md:w-auto"
                     aria-label="Dismiss HubSpot banner"
                   >
                     <X className="mr-1 h-4 w-4" />
@@ -219,19 +224,19 @@ export default function DashboardPage() {
 
           {/* Pipedrive */}
           {showPipedriveBanner && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="rounded-xl border-2 border-green-200 bg-green-50 p-6 shadow-sm transition-all hover:shadow-md">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
-                  <div className="flex items-center font-semibold text-gray-900">
+                  <div className="flex items-center font-semibold text-gray-900 mb-2">
                     <span>Pipedrive Integration</span>
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 leading-relaxed">
                     {pipedriveActive
                       ? "Pipedrive integration is active and working properly."
                       : "Pipedrive integration is currently inactive."}
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
+                <div className="grid grid-cols-2 gap-3 md:flex md:items-center md:gap-3 md:self-center md:shrink-0">
                   <button
                     onClick={() => setPipedriveActive(p => !p)}
                     className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
@@ -249,7 +254,7 @@ export default function DashboardPage() {
                   </button>
                   <button
                     onClick={() => setShowPipedriveBanner(false)}
-                    className="inline-flex w-full items-center justify-center rounded-md px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 md:w-auto"
+                    className="inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors md:w-auto"
                     aria-label="Dismiss Pipedrive banner"
                   >
                     <X className="mr-1 h-4 w-4" />
@@ -261,25 +266,25 @@ export default function DashboardPage() {
           )}
 
           {/* ChatBot Training Banner */}
-          <div className="rounded-lg border p-4 bg-purple-50 border-purple-200">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="max-w-[800px]  rounded-xl border-2 p-6 bg-purple-50 border-purple-200 shadow-sm transition-all hover:shadow-md md:col-span-2">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               {/* Left: icon + title + desc */}
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-md p-1.5 bg-purple-100">
-                  <Bot className="h-4 w-4 text-purple-600" />
+              <div className="flex items-start gap-4">
+                <div className="mt-1 rounded-lg p-3 bg-purple-100 border border-purple-200">
+                  <Bot className="h-5 w-5 text-purple-600" />
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center font-semibold text-gray-900">
+                  <div className="flex items-center font-semibold text-gray-900 mb-2">
                     <span>Train Your ChatBot Now</span>
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 leading-relaxed">
                     Upload training documents to enhance your ChatBot&apos;s knowledge and improve patient interactions.
                   </p>
                 </div>
               </div>
 
               {/* Right: actions – stacked on mobile, inline on md+ */}
-              <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
+              <div className="grid grid-cols-1 gap-3 md:flex md:items-center md:gap-3 md:self-center md:shrink-0">
                 <Button
                   type="primary"
                   onClick={() => setShowTrainingModal(true)}
@@ -288,10 +293,12 @@ export default function DashboardPage() {
                   style={{
                     backgroundColor: "#9D5EE3",
                     borderColor: "#9D5EE3",
-                    height: "40px",
-                    paddingLeft: "20px",
-                    paddingRight: "20px",
-                    fontWeight: "500",
+                    height: "44px",
+                    paddingLeft: "24px",
+                    paddingRight: "24px",
+                    fontWeight: "900",
+                    borderRadius: "8px",
+
                   }}
                   aria-label="Open ChatBot training modal"
                 >
@@ -303,15 +310,17 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Grid - Pass leadsData directly for real-time updates */}
-        <StatsGrid clinicId={clinicId} leadsData={leadsData} />
+        <div className="mt-8">
+          <StatsGrid clinicId={clinicId} leadsData={leadsData} />
+        </div>
 
         {/* Charts Grid */}
-        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="card lg:col-span-2">
-            <div className="mb-6 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Appointment Trends</h3>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 mt-8">
+          <div className="lg:col-span-2 bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
+            <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Appointment Trends</h3>
               <select
-                className="rounded-lg border border-gray-300 px-3 py-1 text-sm"
+                className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
                 value={appointmentFilter}
                 onChange={e => setAppointmentFilter(e.target.value as typeof appointmentFilter)}
               >
@@ -321,23 +330,29 @@ export default function DashboardPage() {
                 <option value="year">This Year</option>
               </select>
             </div>
-            <SimpleBarChart appointmentsData={filteredLeadsForChart} filter={appointmentFilter} />
+            <div className="mt-4">
+              <SimpleBarChart appointmentsData={filteredLeadsForChart} filter={appointmentFilter} />
+            </div>
           </div>
 
-          <TodayTasks clinicId={clinicId} />
+          <div className="bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
+            <TodayTasks clinicId={clinicId} />
+          </div>
         </div>
 
         {/* Conversion Funnel and AI Activity Log - Horizontal Layout */}
         {clinicId && (
-          <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 mt-8">
             {/* Left Side - Conversion Funnel */}
-            <div className="card">
-              <h3 className="mb-6 text-lg font-semibold">Conversion Funnel</h3>
-              <ConversionFunnel clinicId={clinicId} />
+            <div className="bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
+              <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-4 mb-6">Conversion Funnel</h3>
+              <div className="mt-4">
+                <ConversionFunnel clinicId={clinicId} />
+              </div>
             </div>
 
             {/* Right Side - AI Activity Log */}
-            <div className="card">
+            <div className="bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
               <AiActivityLog clinicId={clinicId} />
             </div>
           </div>
@@ -346,20 +361,24 @@ export default function DashboardPage() {
 
       {/* Add Task Modal (kept for parity; closed by default) */}
       {showAddTaskModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Add New Task</h3>
-              <button
-                onClick={() => setShowAddTaskModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label="Close add task modal"
-              >
-                <X className="h-6 w-6" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white border-2 border-gray-200 shadow-xl">
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Add New Task</h3>
+                <button
+                  onClick={() => setShowAddTaskModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  aria-label="Close add task modal"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
             </div>
-            {/* Your form implementation can go here */}
-            <p className="text-sm text-gray-600">Add Task form placeholder…</p>
+            <div className="p-6">
+              {/* Your form implementation can go here */}
+              <p className="text-sm text-gray-600">Add Task form placeholder…</p>
+            </div>
           </div>
         </div>
       )}

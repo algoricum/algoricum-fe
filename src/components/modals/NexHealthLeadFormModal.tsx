@@ -10,14 +10,7 @@ import { commonAlertStyles } from "./utils";
 
 const { Text } = Typography;
 
-export const NexHealthLeadFormModal: React.FC<ModalProps> = ({
-  open,
-  status,
-  accountInfo,
-  onOk,
-  onCancel,
-  onConnect,
-}) => {
+export const NexHealthLeadFormModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect, buttonLoading }) => {
   const [apiKey, setApiKey] = useState("");
 
   return (
@@ -63,6 +56,7 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({
                 className="mb-4 h-12 text-lg"
               />
               <Button
+                loading={buttonLoading}
                 type="primary"
                 size="large"
                 icon={<LinkOutlined />}

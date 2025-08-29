@@ -1,17 +1,7 @@
 "use client";
 import { JSX, useEffect, useState } from "react";
 import { Card, Modal, Button, Alert, TreeSelect, Typography, Row, Col, Divider } from "antd";
-import {
-  GoogleOutlined,
-  FacebookOutlined,
-  FormOutlined,
-  DatabaseOutlined,
-  CloudOutlined,
-  ApiOutlined,
-  BranchesOutlined,
-  FileTextOutlined,
-  MedicineBoxOutlined,
-} from "@ant-design/icons";
+import { GoogleOutlined } from "@ant-design/icons";
 import { createClient } from "@/utils/supabase/config/client";
 import dayjs from "dayjs";
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -38,26 +28,13 @@ interface IntegrationWithStatus {
   last_sync_at?: string;
   created_at: string;
   updated_at: string;
+  integration_logo: string;
+  description: string; // ✅ new
 }
 
-// Icon mapping for different integrations based on your database
-const getIntegrationIcon = (name: string) => {
-  const iconMap: { [key: string]: JSX.Element } = {
-    // Form integrations
-    Jotform: <FormOutlined style={{ fontSize: "24px", color: "#FF6C2C" }} />,
-    "Facebook Lead Forms": <FacebookOutlined style={{ fontSize: "24px", color: "#1877F2" }} />,
-    "Google Lead Forms": <GoogleOutlined style={{ fontSize: "24px", color: "#4285f4" }} />,
-    Typeform: <FileTextOutlined style={{ fontSize: "24px", color: "#262627" }} />,
-    "Gravity Form": <FormOutlined style={{ fontSize: "24px", color: "#99CC33" }} />,
-    "Google Forms": <GoogleOutlined style={{ fontSize: "24px", color: "#4285f4" }} />,
-
-    // CRM integrations
-    Hubspot: <DatabaseOutlined style={{ fontSize: "24px", color: "#FF7A59" }} />,
-    GoHighLevel: <BranchesOutlined style={{ fontSize: "24px", color: "#6366F1" }} />,
-    Pipedrive: <CloudOutlined style={{ fontSize: "24px", color: "#28A745" }} />,
-    NextHealth: <MedicineBoxOutlined style={{ fontSize: "24px", color: "#00D4AA" }} />,
-  };
-  return iconMap[name] || <ApiOutlined style={{ fontSize: "24px", color: "#666666" }} />;
+// Icon mapping for different integrations
+const getIntegrationIcon = (logo: string): JSX.Element => {
+  return <img src={logo} alt="Integration Logo" style={{ width: "24px", height: "24px" }} />;
 };
 
 export default function IntegrationsPage() {
@@ -100,7 +77,7 @@ export default function IntegrationsPage() {
     };
 
     fetchIntegrations();
-  }, []);
+  }, [supabase]);
 
   const handleIntegrationClick = async (integration: IntegrationWithStatus) => {
     if (!integration.connected) {
@@ -108,7 +85,6 @@ export default function IntegrationsPage() {
       return;
     }
 
-    // Handle connected integration clicks (e.g., Google Forms, Google Lead Forms)
     if (integration.integration_name === "Google Forms" || integration.integration_name === "Google Lead Forms") {
       setSelectedIntegration(integration);
       await fetchGoogleFormData(integration);
@@ -118,7 +94,6 @@ export default function IntegrationsPage() {
 
   const fetchGoogleFormData = async (integration: IntegrationWithStatus) => {
     try {
-      // Fetch saved sheets from DB
       const { data: savedSheets, error: savedError } = await supabase
         .from("google_form_sheets")
         .select("spreadsheet_id, sheet_id")
@@ -128,7 +103,6 @@ export default function IntegrationsPage() {
 
       const savedSheetKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
-      // Fetch spreadsheets from Edge Function
       const res = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
         method: "POST",
         headers: {
@@ -145,7 +119,6 @@ export default function IntegrationsPage() {
 
       const { spreadsheets } = await res.json();
 
-      // Build tree with saved sheets preselected
       const treeData = (spreadsheets || []).map((spreadsheet: any) => ({
         title: spreadsheet.spreadsheet_title,
         value: spreadsheet.spreadsheet_id,
@@ -169,7 +142,6 @@ export default function IntegrationsPage() {
     if (!selectedIntegration) return;
 
     try {
-      // Get saved sheets from DB
       const { data: savedSheets, error: savedError } = await supabase
         .from("google_form_sheets")
         .select("spreadsheet_id, sheet_id")
@@ -179,10 +151,8 @@ export default function IntegrationsPage() {
 
       const savedKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
-      // Filter only new sheets
       const newSheets = selectedSheets.filter(key => !savedKeys.includes(key));
 
-      // Remove deselected sheets directly from DB
       const removedSheets = savedKeys.filter(key => !selectedSheets.includes(key));
       if (removedSheets.length > 0) {
         await Promise.all(
@@ -198,14 +168,12 @@ export default function IntegrationsPage() {
         );
       }
 
-      // Skip API if nothing new
       if (newSheets.length === 0) {
         SuccessToast("✅ Sheets are already synced!");
         setShowModal(false);
         return;
       }
 
-      // Map strings into objects before sending
       const newSheetsPayload = newSheets.map(key => {
         const [spreadsheet_id, sheet_id] = key.split(":");
         const spreadsheet = googleFormTreeData.find(s => s.value === spreadsheet_id);
@@ -219,7 +187,6 @@ export default function IntegrationsPage() {
         };
       });
 
-      // Send to API
       const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
         method: "POST",
         headers: {
@@ -247,10 +214,8 @@ export default function IntegrationsPage() {
   const handleConnect = (integration: IntegrationWithStatus) => {
     console.log(`Connecting to ${integration.integration_name}`);
     // Add connection logic here
-    // You can implement OAuth flows or API key connections based on auth_type
   };
 
-  // Split integrations into connected and available
   const connectedIntegrations = integrations.filter(i => i.connected);
   const availableIntegrations = integrations.filter(i => !i.connected);
 
@@ -262,7 +227,7 @@ export default function IntegrationsPage() {
     >
       <div className="p-6">
         {loading ? (
-          <LoadingSpinner message="Loading integrations..." size="md" />
+          <LoadingSpinner message="Loading integrations..." size="lg" />
         ) : (
           <div>
             {/* Connected Services */}
@@ -281,14 +246,16 @@ export default function IntegrationsPage() {
                       >
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                            {getIntegrationIcon(integration.integration_name)}
+                            {getIntegrationIcon(integration.integration_logo)}
                           </div>
                           <div className="flex-1">
                             <h3 className="text-lg font-medium text-gray-900">{integration.integration_name}</h3>
-                            <p className="text-gray-500 text-sm">
+                            {/* ✅ show description if available */}
+                            <p className="text-gray-500 text-sm">{integration.description || "No description available"}</p>
+                            <p className="text-gray-400 text-xs mt-1">
                               {integration.last_sync_at
                                 ? `Last sync: ${dayjs(integration.last_sync_at).format("MMM D, h:mm A")}`
-                                : "Click to configure"}
+                                : "Not synced yet"}
                             </p>
                           </div>
                           <Button
@@ -329,11 +296,12 @@ export default function IntegrationsPage() {
                       >
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                            {getIntegrationIcon(integration.integration_name)}
+                            {getIntegrationIcon(integration.integration_logo)}
                           </div>
                           <div className="flex-1">
                             <h3 className="text-lg font-medium text-gray-900">{integration.integration_name}</h3>
-                            <p className="text-gray-500 text-sm">Click to connect this service</p>
+                            {/* ✅ show description */}
+                            <p className="text-gray-500 text-sm">{integration.description || "Click to connect this service"}</p>
                           </div>
                           <Button
                             type="primary"
@@ -374,7 +342,7 @@ export default function IntegrationsPage() {
           <div className="py-6">
             <Alert
               message={`Connected to ${selectedIntegration?.integration_name}`}
-              description="Integration is active and ready to sync"
+              description={selectedIntegration?.description || "Integration is active and ready to sync"} // ✅ show description here too
               type="success"
               showIcon
               className="mb-4"

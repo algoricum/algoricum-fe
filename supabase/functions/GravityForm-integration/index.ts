@@ -77,7 +77,7 @@ const { data: integration } = await supabase
       allRows.push(...rows);
     }
   if (allRows.length > 0) {
-      const { error } = await supabase.from("lead").insert(allRows);
+      const { error } = await supabase.from("lead").upsert(allRows, { onConflict: ["clinic_id", "email"] });
       if (error) throw new Error(`Insert failed: ${error.message}`);
     }
     return new Response(JSON.stringify(results), { headers: { ...corsHeaders() } });
