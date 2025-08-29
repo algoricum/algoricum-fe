@@ -114,3 +114,5 @@ If you have run out of energy or time for your project, put a note at the top of
 - npx supabase functions download
 - npx supabase functions serve
 - npx supabase functions deploy foldername
+- npx supabase migration repair --status applied
+- npx supabase db push

@@ -12,7 +12,8 @@ const publicRoutes = [
   '/auth/callback',
   '/auth/oauth-redirect',
   '/schedule-meeting',
-  '/api/namecheap-dns'
+  '/api/namecheap-dns',
+  'unsubscribe-lead',
 ];
 
 // Paths that should redirect to dashboard if already authenticated
