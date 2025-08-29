@@ -1,7 +1,7 @@
 // supabase/functions/fetch-gravity-forms/index.ts
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import {  corsHeaders, handleOptions } from "../_shared/cors.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { supabase } from "../_shared/supabaseClient.ts";
 
 import {
   fetchFormStructure,
@@ -9,10 +9,7 @@ import {
   mapFields,
   normalizeEntries,
 } from "../_shared/gravityForm-service.ts";
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
+
 serve(async (req) => {
   const optionsResponse = handleOptions(req);
   if (optionsResponse) return optionsResponse;
