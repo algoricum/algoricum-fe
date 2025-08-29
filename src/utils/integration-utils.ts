@@ -104,7 +104,7 @@ export const syncTypeformLeads = async (forms: string[]) => {
   }
   try {
     const clinicId = await getClinicId();
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/typeform-integration//update-forms`, {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/typeform-integration/update-forms`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -228,12 +228,15 @@ const supabase = createClient();
 export const connectToGHL = async (setButtonLoading:any) => {
   setButtonLoading(true);
   try {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/GHL-integration/auth/start?clinic_id=${await getClinicId()}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await fetch(
+      `${SUPABASE_URL}/functions/v1/GHL-integration/auth/start?clinic_id=${await getClinicId()}&redirectTo=${window.location.href}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
       },
-    });
+    );
 
     console.log("Response status:", response.status);
     const responseText = await response.text();
@@ -330,7 +333,7 @@ export const connectToGoogleForm = async (setButtonLoading:any) => {
       body: JSON.stringify({
         userId: await getCurrentUserId(),
         clinic_id: await getClinicId(),
-        redirectUrl: window.location.href,
+        redirectTo: window.location.href,
       }),
     });
 
@@ -363,7 +366,7 @@ export const connectToTypeform = async (setButtonLoading:any) => {
   try {
     // Replace with your backend endpoint for Typeform OAuth
     const res = await fetch(
-      `${SUPABASE_URL}/functions/v1/typeform-integration/auth/start?clinic_id=${clinicId}&redirect_to=${window.location.origin}/onboarding`,
+      `${SUPABASE_URL}/functions/v1/typeform-integration/auth/start?clinic_id=${clinicId}&redirectTo=${window.location.href}`,
     );
 
     if (!res.ok) {
@@ -502,7 +505,7 @@ export const connectToGoogleLeadForm = async (setButtonLoading:any) => {
             const res = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/start-auth`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ clinic_id: await getClinicId() }),
+              body: JSON.stringify({ clinic_id: await getClinicId(),redirectTo:window.location.href }),
             });
 
             if (!res.ok) throw new Error("Failed to start Google auth");
