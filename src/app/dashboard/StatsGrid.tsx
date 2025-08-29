@@ -1,13 +1,12 @@
 "use client";
 
-import { JSX, useEffect, useState } from "react";
+import { type JSX, useEffect, useState } from "react";
 import { UserPlus, Calendar, TrendingUp, Users } from "lucide-react";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
-
+import { Skeleton } from "antd";
 
 dayjs.extend(isBetween);
-import { Skeleton } from "antd";
 
 type LeadRow = {
   id: string;
@@ -112,9 +111,12 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
 
   if (loading || !stats) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
         {Array.from({ length: 4 }).map((_, idx) => (
-          <div key={idx} className="card">
+          <div
+            key={idx}
+            className="border-2 border-gray-100 rounded-xl p-6 bg-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200"
+          >
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-gray-100">
                 <Skeleton.Avatar active size="large" shape="circle" />
@@ -134,7 +136,7 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
       <StatCard
         icon={<UserPlus className="w-6 h-6 text-purple-600" />}
         title="Total Leads"
@@ -181,17 +183,17 @@ function StatCard({
   bg: string;
 }) {
   return (
-    <div className="card">
-      <div className="flex items-center">
+    <div className="border-2 border-gray-200 rounded-xl p-6 bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200 hover:border-gray-300">
+      <div className="flex items-center gap-4">
         <div className={`p-3 rounded-full ${bg}`}>{icon}</div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <div className="flex items-center">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+          <div className="flex items-center mb-2">
             <p className="text-2xl font-semibold text-gray-900">{value}</p>
           </div>
-          <div className="text-sm text-gray-500 mt-1">
+          <div className="text-sm text-gray-500">
             This month{" "}
-            <span className={`text-${change >= 0 ? "green" : "red"}-600`}>
+            <span className={`font-medium ${change >= 0 ? "text-green-600" : "text-red-600"}`}>
               {change >= 0 ? "+" : ""}
               {change}%
             </span>
