@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import type React from "react";
+import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { UserPlus, CheckCircle, Clock, SearchIcon, ChevronDown } from "lucide-react";
 import { Header } from "@/components/common";
@@ -133,10 +134,27 @@ export default function LeadsPage() {
       setOpenDropdownId(null);
     } else {
       const rect = e.currentTarget.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + window.scrollY + 8,
-        left: rect.left + window.scrollX - 192,
-      });
+      const dropdownHeight = 200; // Approximate dropdown height
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+
+      let top = rect.bottom + 8;
+      let left = rect.right - 192;
+
+      // Check if dropdown would go below viewport
+      if (rect.bottom + dropdownHeight > viewportHeight) {
+        // Position above the button instead
+        top = rect.top - dropdownHeight - 8;
+      }
+
+      // Check if dropdown would go off-screen horizontally
+      if (left < 8) {
+        left = 8;
+      } else if (left + 192 > viewportWidth - 8) {
+        left = viewportWidth - 200;
+      }
+
+      setDropdownPosition({ top, left });
       setOpenDropdownId(leadId);
     }
   };
@@ -157,6 +175,8 @@ export default function LeadsPage() {
 
   const totalLeads = leadsData.length;
   const bookedLeads = leadsData.filter(l => l.status.toLowerCase() === "booked").length;
+  const coldLeads = leadsData.filter(l => l.status.toLowerCase() === "cold").length;
+  const engagedLeads = leadsData.filter(l => l.status.toLowerCase() === "engaged").length;
   const newLeads = leadsData.filter(l => l.status.toLowerCase() === "new").length;
   const convertedLeads = leadsData.filter(l => l.status.toLowerCase() === "converted").length;
 
@@ -272,36 +292,50 @@ export default function LeadsPage() {
       }
     >
       <div>
-        <div className="my-6 px-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            icon={<UserPlus className="h-6 w-6 text-blue-600 md:h-7 md:w-7" />}
-            iconBg="bg-blue-100"
-            title="Total Leads"
-            value={totalLeads}
-          />
-          <StatCard
-            icon={<CheckCircle className="h-6 w-6 text-green-600 md:h-7 md:w-7" />}
-            iconBg="bg-green-100"
-            title="Booked"
-            value={bookedLeads}
-          />
-          <StatCard
-            icon={<Clock className="h-6 w-6 text-yellow-600 md:h-7 md:w-7" />}
-            iconBg="bg-yellow-100"
-            title="New"
-            value={newLeads}
-          />
-          <StatCard
-            icon={<CheckCircle className="h-6 w-6 text-purple-600 md:h-7 md:w-7" />}
-            iconBg="bg-purple-100"
-            title="Converted"
-            value={convertedLeads}
-          />
+        <div className="my-6 px-4 w-full">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full">
+            <StatCard
+              icon={<UserPlus className="h-6 w-6 text-blue-600 md:h-7 md:w-7" />}
+              iconBg="bg-blue-100"
+              title="Total Leads"
+              value={totalLeads}
+            />
+            <StatCard
+              icon={<CheckCircle className="h-6 w-6 text-green-600 md:h-7 md:w-7" />}
+              iconBg="bg-green-100"
+              title="Booked"
+              value={bookedLeads}
+            />
+            <StatCard
+              icon={<Clock className="h-6 w-6 text-yellow-600 md:h-7 md:w-7" />}
+              iconBg="bg-yellow-100"
+              title="New"
+              value={newLeads}
+            />
+            <StatCard
+              icon={<CheckCircle className="h-6 w-6 text-purple-600 md:h-7 md:w-7" />}
+              iconBg="bg-purple-100"
+              title="Converted"
+              value={convertedLeads}
+            />
+            <StatCard
+              icon={<SearchIcon className="h-6 w-6 text-gray-600 md:h-7 md:w-7" />}
+              iconBg="bg-gray-100"
+              title="Cold"
+              value={coldLeads}
+            />
+            <StatCard
+              icon={<ChevronDown className="h-6 w-6 text-orange-600 md:h-7 md:w-7" />}
+              iconBg="bg-orange-100"
+              title="Engaged"
+              value={engagedLeads}
+            />
+          </div>
         </div>
 
         <FiltersBar />
 
-        <div className="mx-3 rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="mx-4 rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="w-full overflow-x-auto overflow-y-visible">
             <table className="w-full min-w-[900px]">
               <thead>
@@ -383,12 +417,13 @@ export default function LeadsPage() {
         </div>
 
         {openDropdownId && (
-          <div className="fixed inset-0 z-[9999]" onClick={() => setOpenDropdownId(null)} ref={dropdownRef}>
+          <div className="fixed inset-0 z-[9999]" onClick={() => setOpenDropdownId(null)}>
             {filteredLeads.map(lead => {
               if (lead.id !== openDropdownId) return null;
               return (
                 <div
                   key={lead.id}
+                  ref={dropdownRef}
                   className="absolute w-48 rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5"
                   style={{
                     top: dropdownPosition.top,

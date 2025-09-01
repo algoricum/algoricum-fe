@@ -5,6 +5,7 @@ import type React from "react";
 import { X } from "lucide-react";
 import { Button } from "antd";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { ErrorToast} from "@/helpers/toast";
 
 interface Staff {
   id: string;
@@ -31,13 +32,27 @@ interface EditStaffModalProps {
   editStaff: EditStaff;
   onClose: () => void;
   // eslint-disable-next-line no-unused-vars
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>; // Changed to async
   // eslint-disable-next-line no-unused-vars
   onInputChange: (field: keyof EditStaff, value: string) => void;
 }
 
 export function EditStaffModal({ isOpen, isSubmitting, selectedStaff, editStaff, onClose, onSubmit, onInputChange }: EditStaffModalProps) {
   if (!isOpen || !selectedStaff) return null;
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    try {
+      await onSubmit(e);
+      // Show success toast
+      // Close modal on success
+      onClose();
+    } catch (error) {
+      // Show error toast
+      ErrorToast("Failed to update staff member. Please try again.");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -55,7 +70,7 @@ export function EditStaffModal({ isOpen, isSubmitting, selectedStaff, editStaff,
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Full Name</label>
             <input

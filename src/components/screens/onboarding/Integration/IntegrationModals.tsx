@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  CsvUploadModal,
   CustomCrmModal,
   FacebookLeadFormModal,
   GoHighLevelLeadFormModal,
@@ -13,6 +12,7 @@ import {
   PipedriveModal,
   TypeformModal,
 } from "../../../modals/Modals";
+import CsvUploadModal  from "@/components/common/CSV/CsvUploadModal";
 import { Props } from "@/app/types/types";
 
 const IntegrationsModals: React.FC<Props> = ({

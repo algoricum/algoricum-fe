@@ -2,7 +2,8 @@
 
 import { AlertTriangle } from "lucide-react";
 import { Button } from "antd";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { ErrorToast} from "@/helpers/toast";
 
 interface Staff {
   id: string;
@@ -21,11 +22,21 @@ interface DeleteConfirmModalProps {
   isDeleting: boolean;
   selectedStaff: Staff | null;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<void>; // Changed to async function
 }
 
 export function DeleteConfirmModal({ isOpen, isDeleting, selectedStaff, onClose, onConfirm }: DeleteConfirmModalProps) {
   if (!isOpen || !selectedStaff) return null;
+
+  const handleConfirm = async () => {
+    try {
+      await onConfirm();
+      
+      onClose();
+    } catch (error) {
+      ErrorToast("Failed to delete staff member. Please try again.");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -62,7 +73,7 @@ export function DeleteConfirmModal({ isOpen, isDeleting, selectedStaff, onClose,
             No, Cancel
           </button>
           <Button
-            onClick={onConfirm}
+            onClick={handleConfirm}
             loading={isDeleting}
             disabled={isDeleting}
             style={{

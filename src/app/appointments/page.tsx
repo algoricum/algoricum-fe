@@ -3,11 +3,12 @@
 import type React from "react";
 import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { Calendar, CheckCircle, Clock, X, SearchIcon, Plus, MoreVertical, Edit, Trash2, Mail, PhoneIcon } from "lucide-react";
+import { Calendar, CheckCircle, Clock, SearchIcon, Plus, MoreVertical, Edit, Trash2, Mail, PhoneIcon } from "lucide-react";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
 import { appointmentHelper, type MeetingSchedule } from "@/utils/appointment-helper";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { Form } from "antd";
 import { createClient } from "@/utils/supabase/config/client";
 import dayjs from "dayjs";
@@ -16,11 +17,6 @@ import { StatCard } from "@/components/appointments/stat-card";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
 import { EditStatusModal } from "@/components/appointments/edit-status-modal";
 import { DeleteConfirmationModal } from "@/components/appointments/delete-confirmation-modal";
-
-interface Message {
-  type: "error" | "success";
-  text: string;
-}
 
 export default function AppointmentsPage() {
   const [appointmentsData, setAppointmentsData] = useState<MeetingSchedule[]>([]);
@@ -33,7 +29,6 @@ export default function AppointmentsPage() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [message, setMessage] = useState<Message | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>("");
@@ -52,13 +47,10 @@ export default function AppointmentsPage() {
       try {
         const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
         setAppointmentsData(meetings);
-        console.log("🔍 DEBUG - Loaded appointments:", meetings.length);
+        
       } catch (error) {
         console.error("Error loading appointments:", error);
-        setMessage({
-          type: "error",
-          text: "Failed to load appointments. Please try again.",
-        });
+        ErrorToast("Failed to load appointments. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -72,20 +64,14 @@ export default function AppointmentsPage() {
       try {
         const clinic_id = await getCurrentUserClinic();
         if (!clinic_id) {
-          setMessage({
-            type: "error",
-            text: "No clinic found. Please make sure you have a clinic set up.",
-          });
+          ErrorToast("No clinic found. Please make sure you have a clinic set up.");
           return;
         }
         setClinicId(clinic_id);
-        console.log("🔍 DEBUG - Clinic ID set:", clinic_id);
+        
       } catch (error) {
         console.error("Error fetching clinic ID:", error);
-        setMessage({
-          type: "error",
-          text: "Failed to fetch clinic information.",
-        });
+        ErrorToast("Failed to fetch clinic information.");
       }
     };
     fetchClinicId();
@@ -106,16 +92,6 @@ export default function AppointmentsPage() {
     }
   }, [activeDropdown]);
 
-  // Clear message after 5 seconds
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => {
-        setMessage(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
-
   // Clear copied link indicator after 2 seconds
   useEffect(() => {
     if (copiedLink) {
@@ -128,10 +104,7 @@ export default function AppointmentsPage() {
 
   const handleAddAppointment = async () => {
     if (!clinicId) {
-      setMessage({
-        type: "error",
-        text: "No clinic found. Please make sure you have a clinic set up.",
-      });
+      ErrorToast("No clinic found. Please make sure you have a clinic set up.");
       return;
     }
     setShowAddAppointmentModal(true);
@@ -185,10 +158,7 @@ export default function AppointmentsPage() {
 
       if (error || leadError || leadSourceError) {
         if (error?.code === "23505") {
-          setMessage({
-            type: "error",
-            text: "This email is already registered for a meeting",
-          });
+          ErrorToast("This email is already registered for a meeting");
         } else {
           throw error;
         }
@@ -199,20 +169,14 @@ export default function AppointmentsPage() {
       const meetings = await appointmentHelper.getMeetingsByClinic(clinicId!);
       setAppointmentsData(meetings);
 
-      setMessage({
-        type: "success",
-        text: "Meeting schedule saved successfully!",
-      });
+      SuccessToast("Meeting schedule saved successfully!");
       form.resetFields();
       setPhoneNumber("");
       setPhoneError("");
       setShowAddAppointmentModal(false);
     } catch (error: any) {
       console.error("Error saving meeting schedule:", error);
-      setMessage({
-        type: "error",
-        text: error.message || "Failed to save meeting schedule",
-      });
+      ErrorToast(error.message || "Failed to save meeting schedule");
     } finally {
       setIsSubmitting(false);
     }
@@ -220,9 +184,8 @@ export default function AppointmentsPage() {
 
   const handleEditStatus = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("🔍 DEBUG - handleEditStatus called");
+    
     if (!selectedAppointment) {
-      console.log("🚨 DEBUG - No selected appointment in handleEditStatus");
       return;
     }
     setIsSubmitting(true);
@@ -232,22 +195,18 @@ export default function AppointmentsPage() {
       setAppointmentsData(prev => prev.map(apt => (apt.id === selectedAppointment.id ? updatedMeeting : apt)));
       setShowEditStatusModal(false);
       setSelectedAppointment(null);
-      setMessage({ type: "success", text: "Appointment status updated successfully!" });
+      SuccessToast("Appointment status updated successfully!");
     } catch (error: any) {
       console.error("Error updating appointment:", error);
-      setMessage({
-        type: "error",
-        text: error.message || "Failed to update appointment status. Please try again.",
-      });
+      ErrorToast(error.message || "Failed to update appointment status. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDeleteAppointment = async () => {
-    console.log("🔍 DEBUG - handleDeleteAppointment called");
+    
     if (!selectedAppointment) {
-      console.log("🚨 DEBUG - No selected appointment in handleDeleteAppointment");
       return;
     }
     setIsSubmitting(true);
@@ -257,13 +216,10 @@ export default function AppointmentsPage() {
       setAppointmentsData(prev => prev.filter(apt => apt.id !== selectedAppointment.id));
       setShowDeleteConfirmation(false);
       setSelectedAppointment(null);
-      setMessage({ type: "success", text: "Appointment deleted successfully!" });
+      SuccessToast("Appointment deleted successfully!");
     } catch (error: any) {
       console.error("Error deleting appointment:", error);
-      setMessage({
-        type: "error",
-        text: error.message || "Failed to delete appointment. Please try again.",
-      });
+      ErrorToast(error.message || "Failed to delete appointment. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -285,26 +241,17 @@ export default function AppointmentsPage() {
   };
 
   const openEditModal = (appointment: MeetingSchedule) => {
-    
     setSelectedAppointment(appointment);
-    console.log("🚀 DEBUG - Setting showEditStatusModal to true");
     setShowEditStatusModal(true);
     setActiveDropdown(null);
-
-    console.log("🚀 DEBUG - openEditModal completed");
+    
   };
 
   const openDeleteConfirmation = (appointment: MeetingSchedule) => {
-    console.log("🚀 DEBUG - openDeleteConfirmation called with appointment:", appointment);
-    console.log("🚀 DEBUG - Current showDeleteConfirmation state:", showDeleteConfirmation);
-    console.log("🚀 DEBUG - Setting selectedAppointment to:", appointment);
-
+    
     setSelectedAppointment(appointment);
-    console.log("🚀 DEBUG - Setting showDeleteConfirmation to true");
     setShowDeleteConfirmation(true);
     setActiveDropdown(null);
-
-    console.log("🚀 DEBUG - openDeleteConfirmation completed");
   };
 
   // Filter appointments based on search and status
@@ -350,8 +297,6 @@ export default function AppointmentsPage() {
   return (
     <DashboardLayout header={<Header title="Appointments" description="Manage patient appointments and scheduling." showHamburgerMenu />}>
       <div className="space-y-6 px-4">
-    
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <StatCard
@@ -566,8 +511,7 @@ export default function AppointmentsPage() {
 
           {/* Dropdown Menu Portal - Outside table container */}
           {activeDropdown && (
-            <div
-              className="fixed inset-0 z-[9999]">
+            <div className="fixed inset-0 z-[9999]">
               {filteredAppointments.map(appointment => {
                 if (appointment.id !== activeDropdown) return null;
 
@@ -635,7 +579,6 @@ export default function AppointmentsPage() {
         <EditStatusModal
           isOpen={showEditStatusModal}
           onClose={() => {
-            console.log("🔍 DEBUG - EditStatusModal onClose called");
             setShowEditStatusModal(false);
             setSelectedAppointment(null);
           }}
@@ -648,7 +591,6 @@ export default function AppointmentsPage() {
         <DeleteConfirmationModal
           isOpen={showDeleteConfirmation}
           onClose={() => {
-            console.log("🔍 DEBUG - DeleteConfirmationModal onClose called");
             setShowDeleteConfirmation(false);
             setSelectedAppointment(null);
           }}

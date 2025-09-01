@@ -5,7 +5,6 @@ import { Button, Typography } from "antd";
 import { IntegrationsStepProps, FormData, ConnectionStatus } from "../../../../app/types/types";
 import {
   getClinicId,
-  handleCsvUpload,
   syncPipedriveLeads,
   syncGoogleFormLeads,
   syncGoogleLeadFormLeads,
@@ -18,7 +17,6 @@ import {
   findSheetDetails,
   ErrorToast,
   SuccessToast,
-  InfoToast,
   createJotformConnection,
   syncJotformLeads,
   connectToGHL,
@@ -31,6 +29,8 @@ import {
   handleInput,
   handle_Next,
 } from "../../../../utils/integration-utils";
+
+import {handleCsvUpload} from "@/utils/csvUtils";
 
 import { SUPABASE_URL, ONBOARDING_LEADS_FILE_NAME } from "../../../../constants/integration-constants";
 import { questions } from "@/constants";
@@ -859,14 +859,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         showManualLeadsModal={showManualLeadsModal}
         onCsvUploadOk={leads => {
           setShowManualLeadsModal(false);
-          handleCsvUpload(leads);
+          handleCsvUpload(leads,false);
           if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
             SuccessToast("Leads saved successfully");
           }
           setShowCompletionButtons(true);
-          setTimeout(() => {
-            InfoToast("Want to add or remove manual leads upload? Click previous button");
-          }, 5000);
         }}
         onCsvUploadCancel={() => setShowManualLeadsModal(false)}
         // Custom CRM
