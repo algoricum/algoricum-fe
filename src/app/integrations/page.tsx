@@ -9,6 +9,51 @@ import { Header } from "@/components/common";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import {
+        FacebookLeadFormModal,
+        CsvUploadModal, 
+        CustomCrmModal,
+        GoHighLevelLeadFormModal,
+        GoogleFormModal,
+        HubspotModal,
+        JotformModal,
+        GravityFormModal,
+        GoogleLeadFormModal,
+        PipedriveModal,
+        TypeformModal,
+        NexHealthLeadFormModal,
+        // CsvUploadModalProps,
+        // CustomCrmModalProps,
+        // ModalProps 
+        } from "@/components/modals/Modals"
+import {ConnectionStatus} from "@/app/types/types"
+import { updateIntegrationConnectionStatus } from "./integrationUtils";
+import {
+  getClinicId,
+  // handleCsvUpload,
+  syncPipedriveLeads,
+  syncGoogleFormLeads,
+  syncGoogleLeadFormLeads,
+  syncTypeformLeads,
+  // clearOAuthState,
+  connectToHubSpot,
+  connectToPipedrive,
+  connectToGoogleForm,
+  connectToTypeform,
+  findSheetDetails,
+  // InfoToast,
+  createJotformConnection,
+  syncJotformLeads,
+  connectToGHL,
+  connectToNextHealth,
+  connnectToGravityForm,
+  connectToGoogleLeadForm,
+  // fetchGoogleFormSheets,
+  // fetchTypeformForms,
+  // fetchJotformForms,
+  // handleInput,
+  // handle_Next,
+} from "@/utils/integration-utils";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -29,7 +74,7 @@ interface IntegrationWithStatus {
   created_at: string;
   updated_at: string;
   integration_logo: string;
-  description: string; // ✅ new
+  description: string; 
 }
 
 // Icon mapping for different integrations
@@ -45,6 +90,59 @@ export default function IntegrationsPage() {
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationWithStatus | null>(null);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const [googleFormTreeData, setGoogleFormTreeData] = useState<any[]>([]);
+  const [buttonLoading,setButtonLoading]=useState(false)
+  
+  // hubspot 
+  const [hubspotAccountInfo, ] = useState<any>(null);
+  
+  // TypeForm 
+  const [TypeformTreeData, ] = useState([]);
+  const [selectedTypeformForms, setSelectedTypeformForms] = useState<any[]>([]);
+  const [typeformAccountInfo, setTypeformAccountInfo] = useState<any>(null);
+  const [, setTypeformLeadsSynced] = useState(false);
+ 
+  //jotform
+  const [jotformTreeData, ] = useState([]);
+  const [selectedJotformForms, setSelectedJotformForms] = useState<any[]>([]);
+  const [, setJotformLeadsSynced] = useState(false);
+
+  // Google Lead Form
+  const [googleLeadFormAccountInfo, setGoogleLeadFormAccountInfo] = useState<any>(null);
+
+  // Google Form
+  const [googleFormAccountInfo, setGoogleFormAccountInfo] = useState<any>(null);
+  const [selectedGoogleFormWorksheets, setSelectedGoogleFormWorksheets] = useState<any[]>([]);
+  const [, setGoogleFormLeadsSynced] = useState(false);
+
+  //  pipedrive
+  const [pipedriveAccountInfo, setPipedriveAccountInfo] = useState<any>(null);
+
+  // Integration status states
+  const [facebookLeadFormStatus, setFacebookLeadFormStatus] = useState<ConnectionStatus>("disconnected");
+  const [jotformStatus, setJotformStatus] = useState<ConnectionStatus>("disconnected");
+  const [googleLeadFormStatus, setGoogleLeadFormStatus] = useState<ConnectionStatus>("disconnected");
+  const [googleFormStatus, setGoogleFormStatus] = useState<ConnectionStatus>("disconnected");
+  const [hubspotStatus, setHubspotStatus] = useState<ConnectionStatus>("disconnected");
+  const [goHighLevelStatus, setGoHighLevelStatus] = useState<ConnectionStatus>("disconnected");
+  const [typeformStatus, setTypeformStatus] = useState<ConnectionStatus>("disconnected");
+  const [pipedriveStatus, setPipedriveStatus] = useState<ConnectionStatus>("disconnected");
+  const [gravityFormStatus, setGravityFormStatus] = useState<ConnectionStatus>("disconnected");
+  const [nexHealthStatus, setNexHealthStatus] = useState<ConnectionStatus>("disconnected");
+
+  // Modal visibility states
+  const [showFacebookLeadModal, setShowFacebookLeadModal] = useState(false);
+  const [showJotformModal, setShowJotformModal] = useState(false);
+  const [showGoogleLeadFormModal, setShowGoogleLeadFormModal] = useState(false);
+  const [showGoogleFormModal, setShowGoogleFormModal] = useState(false);
+  const [showHubspotModal, setShowHubspotModal] = useState(false);
+  const [showGoHighLevelModal, setShowGoHighLevelModal] = useState(false);
+  const [showTypeformModal, setShowTypeformModal] = useState(false);
+  const [showPipedriveModal, setShowPipedriveModal] = useState(false);
+  const [showGravityFormModal, setShowGravityFormModal] = useState(false);
+  const [showNexHealthModal, setShowNexHealthModal] = useState(false);
+  const [showCsvUploadModal, setShowCsvUploadModal] = useState(false);
+  const [showCustomCrmModal, setShowCustomCrmModal] = useState(false);
+
 
   useEffect(() => {
     const fetchIntegrations = async () => {
@@ -78,6 +176,50 @@ export default function IntegrationsPage() {
 
     fetchIntegrations();
   }, [supabase]);
+
+  useEffect(() => {
+    const initializeAllIntegrationStatuses = async () => {
+      try {
+        const clinicData = await getClinicData();
+        if (!clinicData?.id) {
+          ErrorToast("Clinic ID is not found.");
+          setLoading(false);
+          return;
+        }
+
+        // Check all integration statuses in parallel
+        const statusChecks = await Promise.allSettled([
+          updateIntegrationConnectionStatus(clinicData.id, "Facebook Lead Forms"),
+          updateIntegrationConnectionStatus(clinicData.id, "Jotform"),
+          updateIntegrationConnectionStatus(clinicData.id, "Google Lead Forms"),
+          updateIntegrationConnectionStatus(clinicData.id, "Google Forms"),
+          updateIntegrationConnectionStatus(clinicData.id, "Hubspot"),
+          updateIntegrationConnectionStatus(clinicData.id, "GoHighLevel"),
+          updateIntegrationConnectionStatus(clinicData.id, "Typeform"),
+          updateIntegrationConnectionStatus(clinicData.id, "Pipedrive"),
+          updateIntegrationConnectionStatus(clinicData.id, "Gravity Form"),
+          updateIntegrationConnectionStatus(clinicData.id, "NextHealth")
+        ]);
+
+        // Update states based on results
+        if (statusChecks[0].status === "fulfilled") setFacebookLeadFormStatus(statusChecks[0].value);
+        if (statusChecks[1].status === "fulfilled") setJotformStatus(statusChecks[1].value);
+        if (statusChecks[2].status === "fulfilled") setGoogleLeadFormStatus(statusChecks[2].value);
+        if (statusChecks[3].status === "fulfilled") setGoogleFormStatus(statusChecks[3].value);
+        if (statusChecks[4].status === "fulfilled") setHubspotStatus(statusChecks[4].value);
+        if (statusChecks[5].status === "fulfilled") setGoHighLevelStatus(statusChecks[5].value);
+        if (statusChecks[6].status === "fulfilled") setTypeformStatus(statusChecks[6].value);
+        if (statusChecks[7].status === "fulfilled") setPipedriveStatus(statusChecks[7].value);
+        if (statusChecks[8].status === "fulfilled") setGravityFormStatus(statusChecks[8].value);
+        if (statusChecks[9].status === "fulfilled") setNexHealthStatus(statusChecks[9].value);
+
+      } catch (error) {
+        console.log("Failed to initialize integration statuses:", error);
+      }
+    };
+
+    initializeAllIntegrationStatuses();
+  }, []);
 
   const handleIntegrationClick = async (integration: IntegrationWithStatus) => {
     if (!integration.connected) {
@@ -138,82 +280,114 @@ export default function IntegrationsPage() {
     }
   };
 
-  const syncGoogleFormLeads = async () => {
-    if (!selectedIntegration) return;
+  // const syncGoogleFormLeads = async (selectedSheetsObjects: ({ spreadsheet_id: any; spreadsheet_title: any; sheet_id: any; sheet_title: any; } | null)[]) => {
+  //   if (!selectedIntegration) return;
 
-    try {
-      const { data: savedSheets, error: savedError } = await supabase
-        .from("google_form_sheets")
-        .select("spreadsheet_id, sheet_id")
-        .eq("connection_id", selectedIntegration.connection_id);
+  //   try {
+  //     const { data: savedSheets, error: savedError } = await supabase
+  //       .from("google_form_sheets")
+  //       .select("spreadsheet_id, sheet_id")
+  //       .eq("connection_id", selectedIntegration.connection_id);
 
-      if (savedError) throw savedError;
+  //     if (savedError) throw savedError;
 
-      const savedKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
+  //     const savedKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
-      const newSheets = selectedSheets.filter(key => !savedKeys.includes(key));
+  //     const newSheets = selectedSheets.filter(key => !savedKeys.includes(key));
 
-      const removedSheets = savedKeys.filter(key => !selectedSheets.includes(key));
-      if (removedSheets.length > 0) {
-        await Promise.all(
-          removedSheets.map(async key => {
-            const [spreadsheet_id, sheet_id] = key.split(":");
-            await supabase
-              .from("google_form_sheets")
-              .delete()
-              .eq("connection_id", selectedIntegration.connection_id)
-              .eq("spreadsheet_id", spreadsheet_id)
-              .eq("sheet_id", sheet_id);
-          }),
-        );
-      }
+  //     const removedSheets = savedKeys.filter(key => !selectedSheets.includes(key));
+  //     if (removedSheets.length > 0) {
+  //       await Promise.all(
+  //         removedSheets.map(async key => {
+  //           const [spreadsheet_id, sheet_id] = key.split(":");
+  //           await supabase
+  //             .from("google_form_sheets")
+  //             .delete()
+  //             .eq("connection_id", selectedIntegration.connection_id)
+  //             .eq("spreadsheet_id", spreadsheet_id)
+  //             .eq("sheet_id", sheet_id);
+  //         }),
+  //       );
+  //     }
 
-      if (newSheets.length === 0) {
-        SuccessToast("✅ Sheets are already synced!");
-        setShowModal(false);
-        return;
-      }
+  //     if (newSheets.length === 0) {
+  //       SuccessToast("Sheets are already synced!");
+  //       setShowModal(false);
+  //       return;
+  //     }
 
-      const newSheetsPayload = newSheets.map(key => {
-        const [spreadsheet_id, sheet_id] = key.split(":");
-        const spreadsheet = googleFormTreeData.find(s => s.value === spreadsheet_id);
-        const sheet = spreadsheet?.children?.find((c: any) => c.value === key);
+  //     const newSheetsPayload = newSheets.map(key => {
+  //       const [spreadsheet_id, sheet_id] = key.split(":");
+  //       const spreadsheet = googleFormTreeData.find(s => s.value === spreadsheet_id);
+  //       const sheet = spreadsheet?.children?.find((c: any) => c.value === key);
 
-        return {
-          spreadsheet_id,
-          spreadsheet_title: spreadsheet?.title || "",
-          sheet_id,
-          sheet_title: sheet?.title || "",
-        };
-      });
+  //       return {
+  //         spreadsheet_id,
+  //         spreadsheet_title: spreadsheet?.title || "",
+  //         sheet_id,
+  //         sheet_title: sheet?.title || "",
+  //       };
+  //     });
 
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          connection_id: selectedIntegration.connection_id,
-          selected_sheets: newSheetsPayload,
-        }),
-      });
+  //     const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json",
+  //         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  //         apikey: SUPABASE_ANON_KEY,
+  //       },
+  //       body: JSON.stringify({
+  //         connection_id: selectedIntegration.connection_id,
+  //         selected_sheets: newSheetsPayload,
+  //       }),
+  //     });
 
-      if (!response.ok) throw new Error(await response.text());
+  //     if (!response.ok) throw new Error(await response.text());
 
-      const result = await response.json();
-      SuccessToast(`✅ Successfully synced ${result.sync_result.leads_created} leads from Google Lead Form!`);
-      setShowModal(false);
-    } catch (error) {
-      console.error("Failed to sync leads:", error);
-      ErrorToast("Failed to sync leads");
-    }
-  };
+  //     const result = await response.json();
+  //     SuccessToast(`Successfully synced ${result.sync_result.leads_created} leads from Google Lead Form!`);
+  //     setShowModal(false);
+  //   } catch (error) {
+  //     console.error("Failed to sync leads:", error);
+  //     ErrorToast("Failed to sync leads");
+  //   }
+  // };
 
   const handleConnect = (integration: IntegrationWithStatus) => {
-    console.log(`Connecting to ${integration.integration_name}`);
-    // Add connection logic here
+    switch (integration.integration_name) {
+      case "Facebook Lead Forms":
+        setShowFacebookLeadModal(true);
+        break;
+      case "Jotform":
+        setShowJotformModal(true);
+        break;
+      case "Google Lead Forms":
+        setShowGoogleLeadFormModal(true);
+        break;
+      case "Google Forms":
+        setShowGoogleFormModal(true);
+        break;
+      case "Hubspot":
+        setShowHubspotModal(true);
+        break;
+      case "GoHighLevel":
+        setShowGoHighLevelModal(true);
+        break;
+      case "Typeform":
+        setShowTypeformModal(true);
+        break;
+      case "Pipedrive":
+        setShowPipedriveModal(true);
+        break;
+      case "Gravity Form":
+        setShowGravityFormModal(true);
+        break;
+      case "NextHealth":
+        setShowNexHealthModal(true);
+        break;
+      default:
+        console.log(`Connecting to ${integration.integration_name}`);
+    }
   };
 
   const connectedIntegrations = integrations.filter(i => i.connected);
@@ -250,7 +424,6 @@ export default function IntegrationsPage() {
                           </div>
                           <div className="flex-1">
                             <h3 className="text-lg font-medium text-gray-900">{integration.integration_name}</h3>
-                            {/* ✅ show description if available */}
                             <p className="text-gray-500 text-sm">{integration.description || "No description available"}</p>
                             <p className="text-gray-400 text-xs mt-1">
                               {integration.last_sync_at
@@ -300,7 +473,6 @@ export default function IntegrationsPage() {
                           </div>
                           <div className="flex-1">
                             <h3 className="text-lg font-medium text-gray-900">{integration.integration_name}</h3>
-                            {/* ✅ show description */}
                             <p className="text-gray-500 text-sm">{integration.description || "Click to connect this service"}</p>
                           </div>
                           <Button
@@ -323,6 +495,251 @@ export default function IntegrationsPage() {
           </div>
         )}
 
+        {/* All Integration Modals */}
+
+        {/* Facebook Lead Form Modal */}
+        <FacebookLeadFormModal
+          open={showFacebookLeadModal}
+          status={facebookLeadFormStatus}
+          onCancel={() => {
+            setShowFacebookLeadModal(false);
+            setButtonLoading(false);
+          }}
+          onOk={() => {
+            setButtonLoading(false);
+            setShowFacebookLeadModal(false);
+          }}
+          onConnect={async () => {
+            setButtonLoading(true);
+            window.location.href = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/start?clinic_id=${await getClinicId()}`;
+          }}
+          buttonLoading={buttonLoading}
+        />
+
+        {/* Jotform Modal */}
+        <JotformModal
+          buttonLoading={buttonLoading}
+          open={showJotformModal}
+          status={jotformStatus}
+          onCancel={() => {
+            setButtonLoading(false);
+            setShowJotformModal(false);
+          }}
+          onOk={() => {
+            setButtonLoading(false);
+            setShowJotformModal(false);
+          }}
+          onConnect={async (token: any) => {
+            setButtonLoading(true);
+            const res = await createJotformConnection(await getClinicId(), token);
+            console.log(res);
+            if (!res) {
+              setButtonLoading(false);
+              ErrorToast("Failed to connect to Jotform. Please try again.");
+              return;
+            }
+            SuccessToast("Jotform connected successfully");
+            setJotformStatus("connected");
+            setButtonLoading(false);
+          }}
+          treeData={jotformTreeData}
+          selectedForms={selectedJotformForms}
+          onSelectForms={setSelectedJotformForms}
+          onSyncLeads={() => {
+            syncJotformLeads(selectedJotformForms);
+            setJotformLeadsSynced(true);
+            setShowJotformModal(false);
+          }}
+          onDisconnect={() => {
+            setJotformStatus("disconnected");
+          }}
+        />
+
+        {/* Google Lead Form Modal */}
+        <GoogleLeadFormModal
+          open={showGoogleLeadFormModal}
+          status={googleLeadFormStatus}
+          onCancel={() => setShowGoogleLeadFormModal(false)}
+          onOk={() => setShowGoogleLeadFormModal(false)}
+          onConnect={() => {
+            () => connectToGoogleLeadForm(setButtonLoading);
+          }}
+          accountInfo={googleLeadFormAccountInfo}
+          onSyncLeads={syncGoogleLeadFormLeads}
+          onDisconnect={() => {
+            setGoogleLeadFormStatus("disconnected");
+            setGoogleLeadFormAccountInfo(null);
+          }}
+          buttonLoading={buttonLoading}
+        />
+
+        {/* Google Form Modal */}
+        <GoogleFormModal
+          open={showGoogleFormModal}
+          status={googleFormStatus}
+          onCancel={() => {
+            setShowGoogleFormModal(false);
+            setButtonLoading(false);
+          }}
+          onOk={() => {
+            setShowGoogleFormModal(false);
+            setButtonLoading(false);
+          }}
+          onConnect={() => {
+            connectToGoogleForm(setButtonLoading);
+          }}
+          buttonLoading={buttonLoading}
+          accountInfo={googleFormAccountInfo}
+          treeData={googleFormTreeData}
+          selectedWorksheets={selectedGoogleFormWorksheets}
+          onSelectWorksheets={setSelectedGoogleFormWorksheets}
+          onSyncLeads={async () => {
+            const selectedSheetsObjects = await selectedGoogleFormWorksheets
+              .map(value => findSheetDetails(googleFormTreeData, value))
+              .filter(Boolean);
+            syncGoogleFormLeads(selectedSheetsObjects);
+            setGoogleFormLeadsSynced(true);
+            setShowGoogleFormModal(false);
+          }}
+          onDisconnect={() => {
+            setGoogleFormStatus("disconnected");
+            setGoogleFormAccountInfo(null);
+          }}
+        />
+
+        {/* Hubspot Modal */}
+        <HubspotModal
+          open={showHubspotModal}
+          status={hubspotStatus}
+          accountInfo={hubspotAccountInfo}
+          onCancel={() => {
+            setButtonLoading(false)
+            setShowHubspotModal(false)
+          }}
+          onOk={() => {
+            setButtonLoading(false)
+            setShowHubspotModal(false)
+          }}
+          onConnect={() => connectToHubSpot(setButtonLoading)}
+          buttonLoading={buttonLoading}
+        />
+
+        {/* GoHighLevel Modal */}
+        <GoHighLevelLeadFormModal
+          open={showGoHighLevelModal}
+          status={goHighLevelStatus}
+          onCancel={() => {
+            setButtonLoading(false);
+            setShowGoHighLevelModal(false);
+          }}
+          onOk={() => {
+            setButtonLoading(false);
+            setShowGoHighLevelModal(false);
+          }}
+          onConnect={() => {
+            connectToGHL(setButtonLoading);
+          }}
+          buttonLoading={buttonLoading}
+          accountInfo={null}
+        />
+
+        {/* Typeform Modal */}
+        <TypeformModal
+          open={showTypeformModal}
+          status={typeformStatus}
+          onCancel={() => {
+            setButtonLoading(false);
+            setShowTypeformModal(false);
+          }}
+          onOk={() => {
+            setButtonLoading(false);
+            setShowTypeformModal(false);
+          }}
+          onConnect={() => {
+            connectToTypeform(setButtonLoading);
+          }}
+          buttonLoading={buttonLoading}
+          treeData={TypeformTreeData}
+          accountInfo={typeformAccountInfo}
+          onSyncLeads={() => {
+            syncTypeformLeads(selectedTypeformForms);
+            setTypeformLeadsSynced(true);
+            setButtonLoading(false);
+            setShowTypeformModal(false);
+          }}
+          onDisconnect={() => {
+            setTypeformStatus("disconnected");
+            setTypeformAccountInfo(null);
+          }}
+          selectedForms={selectedTypeformForms}
+          onSelectForms={setSelectedTypeformForms}
+        />
+
+        {/* Pipedrive Modal */}
+        <PipedriveModal
+          open={showPipedriveModal}
+          status={pipedriveStatus}
+          accountInfo={pipedriveAccountInfo}
+          onCancel={() => {
+            setButtonLoading(false);
+            setShowPipedriveModal(false);
+          }}
+          onOk={() => {
+            setButtonLoading(false);
+            setShowPipedriveModal(false);
+          }}
+          onConnect={() => {
+            connectToPipedrive(setButtonLoading);
+          }}
+          onDisconnect={() => {
+            setPipedriveStatus("disconnected");
+            setPipedriveAccountInfo(null);
+          }}
+          onSyncLeads={syncPipedriveLeads}
+          buttonLoading={buttonLoading}
+        />
+
+        {/* Gravity Form Modal */}
+        <GravityFormModal
+          open={showGravityFormModal}
+          status={gravityFormStatus}
+          onCancel={() => {
+            setButtonLoading(false);
+            setShowGravityFormModal(false);
+          }}
+          onOk={() => setShowGravityFormModal(false)}
+          onConnect={(token: any) => connnectToGravityForm(token, setButtonLoading)}
+          onDisconnect={() => {
+            setGravityFormStatus("disconnected");
+          }}
+          buttonLoading={buttonLoading}
+        />
+
+        {/* NextHealth Modal */}
+        <NexHealthLeadFormModal
+          open={showNexHealthModal}
+          status={nexHealthStatus}
+          onCancel={() => {
+            setButtonLoading(false);
+            setShowNexHealthModal(false);
+          }}
+          onOk={() => {
+            setButtonLoading(false);
+            setShowNexHealthModal(false);
+          }}
+          onConnect={(token: any) => {
+            connectToNextHealth(token, setButtonLoading);
+          }}
+          accountInfo={null}
+          buttonLoading={buttonLoading}
+        />
+
+        {/* CSV Upload Modal */}
+        <CsvUploadModal open={showCsvUploadModal} onCancel={() => setShowCsvUploadModal(false)} onOk={() => setShowCsvUploadModal(false)} />
+
+        {/* Custom CRM Modal */}
+        <CustomCrmModal open={showCustomCrmModal} onCancel={() => setShowCustomCrmModal(false)} onOk={() => setShowCustomCrmModal(false)} />
+
         {/* Google Forms/Lead Forms Modal */}
         <Modal
           title={
@@ -342,7 +759,7 @@ export default function IntegrationsPage() {
           <div className="py-6">
             <Alert
               message={`Connected to ${selectedIntegration?.integration_name}`}
-              description={selectedIntegration?.description || "Integration is active and ready to sync"} // ✅ show description here too
+              description={selectedIntegration?.description || "Integration is active and ready to sync"}
               type="success"
               showIcon
               className="mb-4"

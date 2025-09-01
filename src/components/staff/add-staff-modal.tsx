@@ -4,42 +4,39 @@ import type React from "react";
 
 import { X } from "lucide-react";
 import { Button } from "antd";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { ErrorToast} from "@/helpers/toast";
 
 interface NewStaff {
   email: string;
   name: string;
 }
 
-interface Message {
-  type: "success" | "error";
-  text: string;
-}
-
 interface AddStaffModalProps {
   isOpen: boolean;
   isSubmitting: boolean;
   newStaff: NewStaff;
-  message: Message | null;
   onClose: () => void;
   // eslint-disable-next-line no-unused-vars
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   // eslint-disable-next-line no-unused-vars
   onInputChange: (field: keyof NewStaff, value: string) => void;
-  onMessageClose: () => void;
 }
 
-export function AddStaffModal({
-  isOpen,
-  isSubmitting,
-  newStaff,
-  message,
-  onClose,
-  onSubmit,
-  onInputChange,
-  onMessageClose,
-}: AddStaffModalProps) {
+export function AddStaffModal({ isOpen, isSubmitting, newStaff, onClose, onSubmit, onInputChange }: AddStaffModalProps) {
   if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    try {
+      await onSubmit(e);
+      onClose();
+    } catch (error) {
+      // Show error toast
+      ErrorToast("Failed to create staff member. Please try again.");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -51,30 +48,13 @@ export function AddStaffModal({
           </button>
         </div>
 
-        {message && (
-          <div
-            className={`mb-4 rounded-lg p-3 ${
-              message.type === "success"
-                ? "border border-green-200 bg-green-50 text-green-800"
-                : "border border-red-200 bg-red-50 text-red-800"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-sm">{message.text}</span>
-              <button onClick={onMessageClose} className="text-current opacity-50 hover:opacity-75">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
         {isSubmitting && (
           <div className="mb-4">
             <LoadingSpinner message="Creating staff member..." size="sm" />
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Full Name</label>
             <input

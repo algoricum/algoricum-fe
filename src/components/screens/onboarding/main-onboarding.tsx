@@ -42,7 +42,7 @@ const supabase = createClient();
 const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
-  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
+  // { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
   // { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
   // { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
   // { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
@@ -588,7 +588,7 @@ export default function MainOnboarding() {
             return (
               <div key={step.id} className={`relative ${index === STEPS.length - 1 ? "" : "mb-3"}`}>
                 {/* Vertical connecting line */}
-                {index < STEPS.length - 1 && <div className="absolute left-3 top-5 w-px h-3 bg-white bg-opacity-30 z-10" />}
+                {index < STEPS.length - 1 && <div className="absolute left-3 top-6 w-px h-6 bg-white bg-opacity-30 z-10" />}
 
                 <div
                   className={`flex items-start cursor-pointer opacity-100 ${isAccessible ? "cursor-pointer" : "cursor-default opacity-70"}`}
