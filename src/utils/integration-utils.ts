@@ -51,20 +51,20 @@ export const syncGoogleFormLeads = async (worksheets: any) => {
       .limit(1)
       .single();
 
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        apikey: SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({
-        clinic_id: clinicId,
-        connection_id: connection?.id,
-        selected_sheets: worksheets,
-      }),
-    });
-
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          clinic_id: clinicId,
+          connection_id: connection?.id,
+          selected_sheets: worksheets,
+        }),
+      });
+      console.log("response");
     if (!response.ok) throw new Error("Failed to sync Google Form leads");
     SuccessToast("Google Form leads synced successfully");
     return true;
@@ -454,7 +454,7 @@ export const connnectToGravityForm = async (token: any,setButtonLoading:any) => 
     }
 
     console.log("🚀 Redirecting to Gravity Form OAuth:", data.auth_url);
-    window.location.href = window.location.origin+ "/onboarding?gravity_form_status=success";
+    window.location.href = window.location.href+ "?gravity_form_status=success";
   } catch (error) {
     setButtonLoading(false)
     console.error("Connection failed:", error);

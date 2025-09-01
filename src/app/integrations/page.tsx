@@ -10,29 +10,28 @@ import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import {
-        FacebookLeadFormModal,
-        CsvUploadModal, 
-        CustomCrmModal,
-        GoHighLevelLeadFormModal,
-        GoogleFormModal,
-        HubspotModal,
-        JotformModal,
-        GravityFormModal,
-        GoogleLeadFormModal,
-        PipedriveModal,
-        TypeformModal,
-        NexHealthLeadFormModal,
-        // CsvUploadModalProps,
-        // CustomCrmModalProps,
-        // ModalProps 
-        } from "@/components/modals/Modals"
-import {ConnectionStatus} from "@/app/types/types"
+  FacebookLeadFormModal,
+  CsvUploadModal,
+  CustomCrmModal,
+  GoHighLevelLeadFormModal,
+  GoogleFormModal,
+  HubspotModal,
+  JotformModal,
+  GravityFormModal,
+  GoogleLeadFormModal,
+  PipedriveModal,
+  TypeformModal,
+  NexHealthLeadFormModal,
+  // CsvUploadModalProps,
+  // CustomCrmModalProps,
+  // ModalProps
+} from "@/components/modals/Modals";
+import { ConnectionStatus } from "@/app/types/types";
 import { updateIntegrationConnectionStatus } from "./integrationUtils";
 import {
   getClinicId,
   // handleCsvUpload,
   syncPipedriveLeads,
-  syncGoogleFormLeads,
   syncGoogleLeadFormLeads,
   syncTypeformLeads,
   // clearOAuthState,
@@ -48,6 +47,8 @@ import {
   connectToNextHealth,
   connnectToGravityForm,
   connectToGoogleLeadForm,
+  fetchJotformForms,
+  fetchTypeformForms,
   // fetchGoogleFormSheets,
   // fetchTypeformForms,
   // fetchJotformForms,
@@ -62,7 +63,7 @@ const { Text } = Typography;
 // Interface for integration data from RPC
 interface IntegrationWithStatus {
   integration_id: string;
-  integration_name: string;
+  name: string;
   integration_type: string;
   auth_type: string;
   connected: boolean;
@@ -74,7 +75,7 @@ interface IntegrationWithStatus {
   created_at: string;
   updated_at: string;
   integration_logo: string;
-  description: string; 
+  description: string;
 }
 
 // Icon mapping for different integrations
@@ -90,27 +91,24 @@ export default function IntegrationsPage() {
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationWithStatus | null>(null);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const [googleFormTreeData, setGoogleFormTreeData] = useState<any[]>([]);
-  const [buttonLoading,setButtonLoading]=useState(false)
-  
-  // hubspot 
-  const [hubspotAccountInfo, ] = useState<any>(null);
-  
-  // TypeForm 
-  const [TypeformTreeData, ] = useState([]);
+  const [buttonLoading, setButtonLoading] = useState(false);
+
+  // hubspot
+  const [hubspotAccountInfo] = useState<any>(null);
+
+  // TypeForm
+  const [TypeformTreeData,setTypeFormTreeData] = useState([]);
   const [selectedTypeformForms, setSelectedTypeformForms] = useState<any[]>([]);
-  const [typeformAccountInfo, setTypeformAccountInfo] = useState<any>(null);
   const [, setTypeformLeadsSynced] = useState(false);
- 
+
   //jotform
-  const [jotformTreeData, ] = useState([]);
+  const [jotformTreeData, setJotformTreeData] = useState([]);
   const [selectedJotformForms, setSelectedJotformForms] = useState<any[]>([]);
   const [, setJotformLeadsSynced] = useState(false);
 
   // Google Lead Form
-  const [googleLeadFormAccountInfo, setGoogleLeadFormAccountInfo] = useState<any>(null);
 
   // Google Form
-  const [googleFormAccountInfo, setGoogleFormAccountInfo] = useState<any>(null);
   const [selectedGoogleFormWorksheets, setSelectedGoogleFormWorksheets] = useState<any[]>([]);
   const [, setGoogleFormLeadsSynced] = useState(false);
 
@@ -143,42 +141,42 @@ export default function IntegrationsPage() {
   const [showCsvUploadModal, setShowCsvUploadModal] = useState(false);
   const [showCustomCrmModal, setShowCustomCrmModal] = useState(false);
 
+  // useEffect(() => {
+  //   const fetchIntegrations = async () => {
+  //     setLoading(true);
+  //     try {
+  //       const clinicData = await getClinicData();
+  //       if (!clinicData?.id) {
+  //         setLoading(false);
+  //         return;
+  //       }
 
-  useEffect(() => {
-    const fetchIntegrations = async () => {
-      setLoading(true);
-      try {
-        const clinicData = await getClinicData();
-        if (!clinicData?.id) {
-          setLoading(false);
-          return;
-        }
+  //       // Call the RPC function to get all integrations with connection status
+  //       const { data, error } = await supabase.rpc("get_clinic_integrations_with_status", {
+  //         clinic_uuid: clinicData.id,
+  //       });
 
-        // Call the RPC function to get all integrations with connection status
-        const { data, error } = await supabase.rpc("get_clinic_integrations_with_status", {
-          clinic_uuid: clinicData.id,
-        });
+  //       if (error) {
+  //         console.error("Error fetching integrations:", error);
+  //         ErrorToast("Failed to fetch integrations");
+  //         return;
+  //       }
 
-        if (error) {
-          console.error("Error fetching integrations:", error);
-          ErrorToast("Failed to fetch integrations");
-          return;
-        }
+  //       setIntegrations(data || []);
+  //     } catch (error) {
+  //       console.error("Failed to fetch integrations:", error);
+  //       ErrorToast("Failed to fetch integrations");
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
 
-        setIntegrations(data || []);
-      } catch (error) {
-        console.error("Failed to fetch integrations:", error);
-        ErrorToast("Failed to fetch integrations");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchIntegrations();
-  }, [supabase]);
+  //   fetchIntegrations();
+  // }, [supabase]);
 
   useEffect(() => {
     const initializeAllIntegrationStatuses = async () => {
+      setLoading(true);
       try {
         const clinicData = await getClinicData();
         if (!clinicData?.id) {
@@ -187,59 +185,117 @@ export default function IntegrationsPage() {
           return;
         }
 
-        // Check all integration statuses in parallel
-        const statusChecks = await Promise.allSettled([
-          updateIntegrationConnectionStatus(clinicData.id, "Facebook Lead Forms"),
-          updateIntegrationConnectionStatus(clinicData.id, "Jotform"),
-          updateIntegrationConnectionStatus(clinicData.id, "Google Lead Forms"),
-          updateIntegrationConnectionStatus(clinicData.id, "Google Forms"),
-          updateIntegrationConnectionStatus(clinicData.id, "Hubspot"),
-          updateIntegrationConnectionStatus(clinicData.id, "GoHighLevel"),
-          updateIntegrationConnectionStatus(clinicData.id, "Typeform"),
-          updateIntegrationConnectionStatus(clinicData.id, "Pipedrive"),
-          updateIntegrationConnectionStatus(clinicData.id, "Gravity Form"),
-          updateIntegrationConnectionStatus(clinicData.id, "NextHealth")
-        ]);
+        // 1. Fetch all integrations from master table
+        const { data: allIntegrations, error } = await supabase.from("integrations").select("*");
 
-        // Update states based on results
-        if (statusChecks[0].status === "fulfilled") setFacebookLeadFormStatus(statusChecks[0].value);
-        if (statusChecks[1].status === "fulfilled") setJotformStatus(statusChecks[1].value);
-        if (statusChecks[2].status === "fulfilled") setGoogleLeadFormStatus(statusChecks[2].value);
-        if (statusChecks[3].status === "fulfilled") setGoogleFormStatus(statusChecks[3].value);
-        if (statusChecks[4].status === "fulfilled") setHubspotStatus(statusChecks[4].value);
-        if (statusChecks[5].status === "fulfilled") setGoHighLevelStatus(statusChecks[5].value);
-        if (statusChecks[6].status === "fulfilled") setTypeformStatus(statusChecks[6].value);
-        if (statusChecks[7].status === "fulfilled") setPipedriveStatus(statusChecks[7].value);
-        if (statusChecks[8].status === "fulfilled") setGravityFormStatus(statusChecks[8].value);
-        if (statusChecks[9].status === "fulfilled") setNexHealthStatus(statusChecks[9].value);
+        if (error) {
+          console.error("Error fetching integrations:", error);
+          ErrorToast("Failed to fetch integrations");
+          setLoading(false);
+          return;
+        }
 
+        // 2. Check connection status for each integration
+        const statusChecks = await Promise.allSettled(
+          allIntegrations.map(int => updateIntegrationConnectionStatus(clinicData.id, int.name)),
+        );
+
+        // 3. Merge statuses with integrations
+        const integrationsWithStatus = allIntegrations.map((int, idx) => {
+          const check = statusChecks[idx];
+          return {
+            ...int,
+            connected: check.status === "fulfilled" ? check.value === "connected" : false,
+          };
+        });
+
+      
+        setIntegrations(integrationsWithStatus);
+        // 5. Update individual integration states
+        const getStatus = (name: string): ConnectionStatus => {
+          return integrationsWithStatus.find(i => i.name === name)?.connected ? "connected" : "disconnected";
+        };
+
+        setFacebookLeadFormStatus(getStatus("Facebook Lead Forms"));
+        setJotformStatus(getStatus("Jotform"));
+        setGoogleLeadFormStatus(getStatus("Google Lead Forms"));
+        setGoogleFormStatus(getStatus("Google Forms"));
+        setHubspotStatus(getStatus("Hubspot"));
+        setGoHighLevelStatus(getStatus("GoHighLevel"));
+        setTypeformStatus(getStatus("Typeform"));
+        setPipedriveStatus(getStatus("Pipedrive"));
+        setGravityFormStatus(getStatus("Gravity Form"));
+        setNexHealthStatus(getStatus("NextHealth"));
+
+      
       } catch (error) {
-        console.log("Failed to initialize integration statuses:", error);
+        console.error("Failed to initialize integration statuses:", error);
+        ErrorToast("Failed to initialize integrations");
+      } finally {
+        setLoading(false);
       }
     };
 
     initializeAllIntegrationStatuses();
-  }, []);
-
+  }, [supabase]);
   const handleIntegrationClick = async (integration: IntegrationWithStatus) => {
     if (!integration.connected) {
       handleConnect(integration);
       return;
     }
 
-    if (integration.integration_name === "Google Forms" || integration.integration_name === "Google Lead Forms") {
+    if (integration.name === "Google Forms") {
       setSelectedIntegration(integration);
-      await fetchGoogleFormData(integration);
+      await fetchGoogleFormData();
       setShowModal(true);
+    } else if (integration.name === "Gravity Form") {
+      setGravityFormStatus("connecting");
+      setShowGravityFormModal(true);
+    } else if (integration.name === "Typeform") {
+       fetchTypeformForms(setTypeFormTreeData);
+          const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Typeform").limit(1).single();
+
+          const { data: typeform } = await supabase
+            .from("integration_connections")
+            .select("*")
+            .eq("clinic_id", await getClinicId())
+            .eq("integration_id", connection?.id)
+            .single();
+          console.warn("typeform", typeform);
+          setSelectedTypeformForms(typeform.auth_data?.forms);
+      setShowTypeformModal(true);
+    } else if (integration.name === "Jotform") {
+      fetchJotformForms(setJotformTreeData);
+          const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Jotform").limit(1).single();
+
+          const { data: jotformData } = await supabase
+            .from("integration_connections")
+            .select("*")
+            .eq("clinic_id", await getClinicId())
+            .eq("integration_id", connection?.id).single();
+          console.warn("jotformData", jotformData);
+          setSelectedJotformForms(jotformData.auth_data?.forms.map((form:any)=>form.form_id));
+      setShowJotformModal(true);
     }
   };
-
-  const fetchGoogleFormData = async (integration: IntegrationWithStatus) => {
+  const fetchGoogleFormData = async () => {
     try {
+      const clinicData = await getClinicData();
+      if (!clinicData?.id) {
+        ErrorToast("Clinic ID is not found.");
+        setLoading(false);
+        return;
+      }
+      const { data: connection } = await supabase
+        .from("google_form_connections")
+        .select("id")
+        .eq("clinic_id", clinicData.id)
+        .limit(1)
+        .single();
       const { data: savedSheets, error: savedError } = await supabase
         .from("google_form_sheets")
         .select("spreadsheet_id, sheet_id")
-        .eq("connection_id", integration.connection_id);
+        .eq("connection_id", connection?.id);
 
       if (savedError) throw savedError;
 
@@ -253,7 +309,7 @@ export default function IntegrationsPage() {
           apikey: SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
-          connection_id: integration.connection_id,
+          connection_id: connection?.id,
         }),
       });
 
@@ -280,81 +336,91 @@ export default function IntegrationsPage() {
     }
   };
 
-  // const syncGoogleFormLeads = async (selectedSheetsObjects: ({ spreadsheet_id: any; spreadsheet_title: any; sheet_id: any; sheet_title: any; } | null)[]) => {
-  //   if (!selectedIntegration) return;
+  const syncGoogleFormLeads = async (
+    // eslint-disable-next-line no-unused-vars
+    selectedSheetsObjects: ({ spreadsheet_id: any; spreadsheet_title: any; sheet_id: any; sheet_title: any } | null)[],
+  ) => {
+    if (!selectedIntegration) return;
 
-  //   try {
-  //     const { data: savedSheets, error: savedError } = await supabase
-  //       .from("google_form_sheets")
-  //       .select("spreadsheet_id, sheet_id")
-  //       .eq("connection_id", selectedIntegration.connection_id);
+    try {
+      const { data: connection } = await supabase
+        .from("google_form_connections")
+        .select("*")
+        .eq("clinic_id", await getClinicId())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      const { data: savedSheets, error: savedError } = await supabase
+        .from("google_form_sheets")
+        .select("spreadsheet_id, sheet_id")
+        .eq("connection_id", connection?.id);
 
-  //     if (savedError) throw savedError;
+      if (savedError) throw savedError;
 
-  //     const savedKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
+      const savedKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
-  //     const newSheets = selectedSheets.filter(key => !savedKeys.includes(key));
+      const newSheets = selectedSheets.filter(key => !savedKeys.includes(key));
 
-  //     const removedSheets = savedKeys.filter(key => !selectedSheets.includes(key));
-  //     if (removedSheets.length > 0) {
-  //       await Promise.all(
-  //         removedSheets.map(async key => {
-  //           const [spreadsheet_id, sheet_id] = key.split(":");
-  //           await supabase
-  //             .from("google_form_sheets")
-  //             .delete()
-  //             .eq("connection_id", selectedIntegration.connection_id)
-  //             .eq("spreadsheet_id", spreadsheet_id)
-  //             .eq("sheet_id", sheet_id);
-  //         }),
-  //       );
-  //     }
+      const removedSheets = savedKeys.filter(key => !selectedSheets.includes(key));
+      if (removedSheets.length > 0) {
+        await Promise.all(
+          removedSheets.map(async key => {
+            const [spreadsheet_id, sheet_id] = key.split(":");
+            await supabase
+              .from("google_form_sheets")
+              .delete()
+              .eq("connection_id", connection?.id)
+              .eq("spreadsheet_id", spreadsheet_id)
+              .eq("sheet_id", sheet_id);
+          }),
+        );
+      }
 
-  //     if (newSheets.length === 0) {
-  //       SuccessToast("Sheets are already synced!");
-  //       setShowModal(false);
-  //       return;
-  //     }
+      if (newSheets.length === 0) {
+        SuccessToast("Sheets are already synced!");
+        setShowModal(false);
+        return;
+      }
 
-  //     const newSheetsPayload = newSheets.map(key => {
-  //       const [spreadsheet_id, sheet_id] = key.split(":");
-  //       const spreadsheet = googleFormTreeData.find(s => s.value === spreadsheet_id);
-  //       const sheet = spreadsheet?.children?.find((c: any) => c.value === key);
+      const newSheetsPayload = newSheets.map(key => {
+        const [spreadsheet_id, sheet_id] = key.split(":");
+        const spreadsheet = googleFormTreeData.find(s => s.value === spreadsheet_id);
+        const sheet = spreadsheet?.children?.find((c: any) => c.value === key);
 
-  //       return {
-  //         spreadsheet_id,
-  //         spreadsheet_title: spreadsheet?.title || "",
-  //         sheet_id,
-  //         sheet_title: sheet?.title || "",
-  //       };
-  //     });
+        return {
+          spreadsheet_id,
+          spreadsheet_title: spreadsheet?.title || "",
+          sheet_id,
+          sheet_title: sheet?.title || "",
+        };
+      });
 
-  //     const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
-  //       method: "POST",
-  //       headers: {
-  //         "Content-Type": "application/json",
-  //         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-  //         apikey: SUPABASE_ANON_KEY,
-  //       },
-  //       body: JSON.stringify({
-  //         connection_id: selectedIntegration.connection_id,
-  //         selected_sheets: newSheetsPayload,
-  //       }),
-  //     });
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          connection_id: connection?.id,
+          selected_sheets: newSheetsPayload,
+        }),
+      });
 
-  //     if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw new Error(await response.text());
 
-  //     const result = await response.json();
-  //     SuccessToast(`Successfully synced ${result.sync_result.leads_created} leads from Google Lead Form!`);
-  //     setShowModal(false);
-  //   } catch (error) {
-  //     console.error("Failed to sync leads:", error);
-  //     ErrorToast("Failed to sync leads");
-  //   }
-  // };
+      const result = await response.json();
+      SuccessToast(`Successfully synced ${result.sync_result.leads_created} leads from Google Lead Form!`);
+      setShowModal(false);
+    } catch (error) {
+      console.error("Failed to sync leads:", error);
+      ErrorToast("Failed to sync leads");
+    }
+  };
 
   const handleConnect = (integration: IntegrationWithStatus) => {
-    switch (integration.integration_name) {
+    switch (integration.name) {
       case "Facebook Lead Forms":
         setShowFacebookLeadModal(true);
         break;
@@ -386,10 +452,9 @@ export default function IntegrationsPage() {
         setShowNexHealthModal(true);
         break;
       default:
-        console.log(`Connecting to ${integration.integration_name}`);
+        console.log(`Connecting to ${integration.name}`);
     }
   };
-
   const connectedIntegrations = integrations.filter(i => i.connected);
   const availableIntegrations = integrations.filter(i => !i.connected);
 
@@ -415,33 +480,34 @@ export default function IntegrationsPage() {
                   {connectedIntegrations.map(integration => (
                     <Col xs={24} sm={12} lg={8} key={integration.integration_id}>
                       <Card
-                        className="bg-gray-50 hover:bg-gray-100 cursor-pointer transition border border-green-200 rounded-lg h-full"
-                        onClick={() => handleIntegrationClick(integration)}
+                        className="bg-gray-50 hover:bg-gray-100  transition border border-green-200 rounded-lg h-full"
+                        // onClick={() => handleIntegrationClick(integration)}
                       >
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
                             {getIntegrationIcon(integration.integration_logo)}
                           </div>
                           <div className="flex-1">
-                            <h3 className="text-lg font-medium text-gray-900">{integration.integration_name}</h3>
+                            <h3 className="text-lg font-medium text-gray-900">{integration.name}</h3>
                             <p className="text-gray-500 text-sm">{integration.description || "No description available"}</p>
-                            <p className="text-gray-400 text-xs mt-1">
-                              {integration.last_sync_at
-                                ? `Last sync: ${dayjs(integration.last_sync_at).format("MMM D, h:mm A")}`
+                            {/* <p className="text-gray-400 text-xs mt-1">
+                              {integration.updated_at
+                                ? `Last sync: ${dayjs(integration.updated_at).format("MMM D, h:mm A")}`
                                 : "Not synced yet"}
-                            </p>
+                            </p> */}
                           </div>
                           <Button
                             type="primary"
                             size="small"
-                            style={{
-                              backgroundColor: "#10B981",
-                              borderColor: "#10B981",
-                              cursor: "default",
-                            }}
-                            disabled
+                            className={` ${["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name)) ? "bg-[#10B981]text-white" : "gray text-gray-900 hover:bg-gray-200 hover:text-gray-900"}`}
+                            disabled={
+                              !["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name))
+                            }
+                            onClick={() => handleIntegrationClick(integration)}
                           >
-                            Connected
+                            {!["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name))
+                              ? "Connected"
+                              : " Edit "}
                           </Button>
                         </div>
                       </Card>
@@ -472,7 +538,7 @@ export default function IntegrationsPage() {
                             {getIntegrationIcon(integration.integration_logo)}
                           </div>
                           <div className="flex-1">
-                            <h3 className="text-lg font-medium text-gray-900">{integration.integration_name}</h3>
+                            <h3 className="text-lg font-medium text-gray-900">{integration.name}</h3>
                             <p className="text-gray-500 text-sm">{integration.description || "Click to connect this service"}</p>
                           </div>
                           <Button
@@ -511,7 +577,7 @@ export default function IntegrationsPage() {
           }}
           onConnect={async () => {
             setButtonLoading(true);
-            window.location.href = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/start?clinic_id=${await getClinicId()}`;
+            window.location.href = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/start?clinic_id=${await getClinicId()}&redirect_to=${window.location.href}`;
           }}
           buttonLoading={buttonLoading}
         />
@@ -532,7 +598,6 @@ export default function IntegrationsPage() {
           onConnect={async (token: any) => {
             setButtonLoading(true);
             const res = await createJotformConnection(await getClinicId(), token);
-            console.log(res);
             if (!res) {
               setButtonLoading(false);
               ErrorToast("Failed to connect to Jotform. Please try again.");
@@ -564,11 +629,10 @@ export default function IntegrationsPage() {
           onConnect={() => {
             () => connectToGoogleLeadForm(setButtonLoading);
           }}
-          accountInfo={googleLeadFormAccountInfo}
+          accountInfo={{}}
           onSyncLeads={syncGoogleLeadFormLeads}
           onDisconnect={() => {
             setGoogleLeadFormStatus("disconnected");
-            setGoogleLeadFormAccountInfo(null);
           }}
           buttonLoading={buttonLoading}
         />
@@ -589,7 +653,7 @@ export default function IntegrationsPage() {
             connectToGoogleForm(setButtonLoading);
           }}
           buttonLoading={buttonLoading}
-          accountInfo={googleFormAccountInfo}
+          accountInfo={{}}
           treeData={googleFormTreeData}
           selectedWorksheets={selectedGoogleFormWorksheets}
           onSelectWorksheets={setSelectedGoogleFormWorksheets}
@@ -603,7 +667,6 @@ export default function IntegrationsPage() {
           }}
           onDisconnect={() => {
             setGoogleFormStatus("disconnected");
-            setGoogleFormAccountInfo(null);
           }}
         />
 
@@ -613,12 +676,12 @@ export default function IntegrationsPage() {
           status={hubspotStatus}
           accountInfo={hubspotAccountInfo}
           onCancel={() => {
-            setButtonLoading(false)
-            setShowHubspotModal(false)
+            setButtonLoading(false);
+            setShowHubspotModal(false);
           }}
           onOk={() => {
-            setButtonLoading(false)
-            setShowHubspotModal(false)
+            setButtonLoading(false);
+            setShowHubspotModal(false);
           }}
           onConnect={() => connectToHubSpot(setButtonLoading)}
           buttonLoading={buttonLoading}
@@ -660,7 +723,7 @@ export default function IntegrationsPage() {
           }}
           buttonLoading={buttonLoading}
           treeData={TypeformTreeData}
-          accountInfo={typeformAccountInfo}
+          accountInfo={{}}
           onSyncLeads={() => {
             syncTypeformLeads(selectedTypeformForms);
             setTypeformLeadsSynced(true);
@@ -669,7 +732,6 @@ export default function IntegrationsPage() {
           }}
           onDisconnect={() => {
             setTypeformStatus("disconnected");
-            setTypeformAccountInfo(null);
           }}
           selectedForms={selectedTypeformForms}
           onSelectForms={setSelectedTypeformForms}
@@ -747,7 +809,7 @@ export default function IntegrationsPage() {
               <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
                 <GoogleOutlined className="text-white text-lg" />
               </div>
-              <span className="text-xl font-semibold">{selectedIntegration?.integration_name} Integration</span>
+              <span className="text-xl font-semibold">{selectedIntegration?.name} Integration</span>
             </div>
           }
           open={showModal}
@@ -758,7 +820,7 @@ export default function IntegrationsPage() {
         >
           <div className="py-6">
             <Alert
-              message={`Connected to ${selectedIntegration?.integration_name}`}
+              message={`Connected to ${selectedIntegration?.name}`}
               description={selectedIntegration?.description || "Integration is active and ready to sync"}
               type="success"
               showIcon

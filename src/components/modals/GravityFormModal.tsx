@@ -3,14 +3,16 @@
 import { Modal, Alert, Button, Typography, Spin, Input, Select } from "antd";
 import { CalendarOutlined, LinkOutlined } from "@ant-design/icons";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CryptoJS from "crypto-js";
 import { ModalProps } from "./types";
 import Image from "next/image";
 import { ErrorToast } from "@/helpers/toast";
+import { createClient } from "@/utils/supabase/config/client";
+import { getClinicId } from "@/utils/integration-utils";
 
 const { Text } = Typography;
-
+const supabase = createClient();
 export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel, onConnect, buttonLoading }) => {
   const [consumerKey, setConsumerKey] = useState("");
   const [consumerSecret, setConsumerSecret] = useState("");
@@ -64,12 +66,11 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       const finalUrl = `${endpoint}?${paramString}&oauth_signature=${encodeURIComponent(signature)}`;
 
       const res = await fetch(finalUrl);
-      if(!res.ok){
+      if (!res.ok) {
         ErrorToast("Error fetching forms");
         return;
       }
       const data = await res.json();
-      console.log("Fetched forms:", data);
       const formsArray = Object.values(data);
 
       setForms(formsArray);
@@ -86,7 +87,30 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       setLoadingForms(false);
     }
   };
+  async function getIntegrationData() {
+    const clinicId = await getClinicId();
+    const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Gravity Form").single();
+    const { data: auth_data } = await supabase
+      .from("integration_connections")
+      .select("*")
+      .eq("clinic_id", clinicId)
+      .eq("integration_id", connection?.id)
+      .single();
+    if (auth_data) {
+      setConsumerKey(auth_data.auth_data.consumerKey);
+      setConsumerSecret(auth_data.auth_data.consmerSecret);
+      setBaseURL(auth_data.auth_data.baseURL);
+    }
+    await fetchForms();
+    setSelectedForms(auth_data.auth_data.form_ids);
 
+
+  }
+  useEffect(() => {
+    if (status === "connecting") {
+      getIntegrationData();
+    }
+  }, [open, status]);
   const handleConnect = async () => {
     if (!selectedForms.length) return;
     onConnect?.({
@@ -96,7 +120,6 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       baseURL,
     });
   };
-
   return (
     <Modal
       title={
@@ -114,7 +137,7 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       centered
     >
       <div className="py-6">
-        {status === "disconnected" && (
+        {(status === "disconnected" || status === "connecting") && (
           <>
             <Alert
               message="Connect your Gravity Forms Account"
@@ -179,17 +202,6 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
               Connect Selected Forms
             </Button>
           </>
-        )}
-
-        {status === "connecting" && (
-          <div className="text-center py-8">
-            <Spin size="large" />
-            <div className="mt-4">
-              <Text className="text-lg">Connecting to Gravity Forms...</Text>
-              <br />
-              <Text className="text-gray-500">Please complete the process</Text>
-            </div>
-          </div>
         )}
 
         {status === "connected" && (
