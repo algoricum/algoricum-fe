@@ -8,6 +8,7 @@ import { Header } from "@/components/common";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   FacebookLeadFormModal,
   CsvUploadModal,
@@ -21,25 +22,19 @@ import {
   PipedriveModal,
   TypeformModal,
   NexHealthLeadFormModal,
-  // CsvUploadModalProps,
-  // CustomCrmModalProps,
-  // ModalProps
 } from "@/components/modals/Modals";
 import { ConnectionStatus } from "@/app/types/types";
 import { deleteIntegrationConnections, updateIntegrationConnectionStatus } from "./integrationUtils";
 import {
   getClinicId,
-  // handleCsvUpload,
   syncPipedriveLeads,
   syncGoogleLeadFormLeads,
   syncTypeformLeads,
-  // clearOAuthState,
   connectToHubSpot,
   connectToPipedrive,
   connectToGoogleForm,
   connectToTypeform,
   findSheetDetails,
-  // InfoToast,
   createJotformConnection,
   syncJotformLeads,
   connectToGHL,
@@ -48,11 +43,6 @@ import {
   connectToGoogleLeadForm,
   fetchJotformForms,
   fetchTypeformForms,
-  // fetchGoogleFormSheets,
-  // fetchTypeformForms,
-  // fetchJotformForms,
-  // handleInput,
-  // handle_Next,
 } from "@/utils/integration-utils";
 import { getUserData } from "@/utils/supabase/user-helper";
 
@@ -77,6 +67,27 @@ interface IntegrationWithStatus {
   description: string;
 }
 
+// Integration types for better type safety
+type IntegrationName =
+  | "Facebook Lead Forms"
+  | "Jotform"
+  | "Google Lead Forms"
+  | "Google Forms"
+  | "Hubspot"
+  | "GoHighLevel"
+  | "Typeform"
+  | "Pipedrive"
+  | "Gravity Form"
+  | "NextHealth"
+  | "CSV Upload"
+  | "Custom CRM";
+
+// Refactored state management
+interface IntegrationStates {
+  statuses: Record<IntegrationName, ConnectionStatus>;
+  modals: Record<IntegrationName, boolean>;
+}
+
 // Icon mapping for different integrations
 const getIntegrationIcon = (logo: string): JSX.Element => {
   return <img src={logo} alt="Integration Logo" style={{ width: "24px", height: "24px" }} />;
@@ -89,6 +100,38 @@ export default function IntegrationsPage() {
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const [googleFormTreeData, setGoogleFormTreeData] = useState<any[]>([]);
   const [buttonLoading, setButtonLoading] = useState(false);
+
+  // Refactored state management
+  const [integrationStates, setIntegrationStates] = useState<IntegrationStates>({
+    statuses: {
+      "Facebook Lead Forms": "disconnected",
+      Jotform: "disconnected",
+      "Google Lead Forms": "disconnected",
+      "Google Forms": "disconnected",
+      Hubspot: "disconnected",
+      GoHighLevel: "disconnected",
+      Typeform: "disconnected",
+      Pipedrive: "disconnected",
+      "Gravity Form": "disconnected",
+      NextHealth: "disconnected",
+      "CSV Upload": "disconnected",
+      "Custom CRM": "disconnected",
+    },
+    modals: {
+      "Facebook Lead Forms": false,
+      Jotform: false,
+      "Google Lead Forms": false,
+      "Google Forms": false,
+      Hubspot: false,
+      GoHighLevel: false,
+      Typeform: false,
+      Pipedrive: false,
+      "Gravity Form": false,
+      NextHealth: false,
+      "CSV Upload": false,
+      "Custom CRM": false,
+    },
+  });
 
   // hubspot
   const [hubspotAccountInfo] = useState<any>(null);
@@ -103,73 +146,43 @@ export default function IntegrationsPage() {
   const [selectedJotformForms, setSelectedJotformForms] = useState<any[]>([]);
   const [, setJotformLeadsSynced] = useState(false);
 
-  // Google Lead Form
-
   // Google Form
   const [, setGoogleFormLeadsSynced] = useState(false);
 
   //  pipedrive
   const [pipedriveAccountInfo, setPipedriveAccountInfo] = useState<any>(null);
 
-  // Integration status states
-  const [facebookLeadFormStatus, setFacebookLeadFormStatus] = useState<ConnectionStatus>("disconnected");
-  const [jotformStatus, setJotformStatus] = useState<ConnectionStatus>("disconnected");
-  const [googleLeadFormStatus, setGoogleLeadFormStatus] = useState<ConnectionStatus>("disconnected");
-  const [googleFormStatus, setGoogleFormStatus] = useState<ConnectionStatus>("disconnected");
-  const [hubspotStatus, setHubspotStatus] = useState<ConnectionStatus>("disconnected");
-  const [goHighLevelStatus, setGoHighLevelStatus] = useState<ConnectionStatus>("disconnected");
-  const [typeformStatus, setTypeformStatus] = useState<ConnectionStatus>("disconnected");
-  const [pipedriveStatus, setPipedriveStatus] = useState<ConnectionStatus>("disconnected");
-  const [gravityFormStatus, setGravityFormStatus] = useState<ConnectionStatus>("disconnected");
-  const [nexHealthStatus, setNexHealthStatus] = useState<ConnectionStatus>("disconnected");
+  // Helper functions for state management
+  const updateIntegrationStatus = (name: IntegrationName, status: ConnectionStatus) => {
+    setIntegrationStates(prev => ({
+      ...prev,
+      statuses: { ...prev.statuses, [name]: status },
+    }));
+  };
 
-  // Modal visibility states
-  const [showFacebookLeadModal, setShowFacebookLeadModal] = useState(false);
-  const [showJotformModal, setShowJotformModal] = useState(false);
-  const [showGoogleLeadFormModal, setShowGoogleLeadFormModal] = useState(false);
-  const [showGoogleFormModal, setShowGoogleFormModal] = useState(false);
-  const [showHubspotModal, setShowHubspotModal] = useState(false);
-  const [showGoHighLevelModal, setShowGoHighLevelModal] = useState(false);
-  const [showTypeformModal, setShowTypeformModal] = useState(false);
-  const [showPipedriveModal, setShowPipedriveModal] = useState(false);
-  const [showGravityFormModal, setShowGravityFormModal] = useState(false);
-  const [showNexHealthModal, setShowNexHealthModal] = useState(false);
-  const [showCsvUploadModal, setShowCsvUploadModal] = useState(false);
-  const [showCustomCrmModal, setShowCustomCrmModal] = useState(false);
+  const toggleModal = (name: IntegrationName, isOpen?: boolean) => {
+    setIntegrationStates(prev => ({
+      ...prev,
+      modals: { ...prev.modals, [name]: isOpen ?? !prev.modals[name] },
+    }));
+  };
 
-  // useEffect(() => {
-  //   const fetchIntegrations = async () => {
-  //     setLoading(true);
-  //     try {
-  //       const clinicData = await getClinicData();
-  //       if (!clinicData?.id) {
-  //         setLoading(false);
-  //         return;
-  //       }
+  const getIntegrationStatus = (name: IntegrationName): ConnectionStatus => {
+    return integrationStates.statuses[name];
+  };
 
-  //       // Call the RPC function to get all integrations with connection status
-  //       const { data, error } = await supabase.rpc("get_clinic_integrations_with_status", {
-  //         clinic_uuid: clinicData.id,
-  //       });
+  const isModalOpen = (name: IntegrationName): boolean => {
+    return integrationStates.modals[name];
+  };
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  //       if (error) {
-  //         console.error("Error fetching integrations:", error);
-  //         ErrorToast("Failed to fetch integrations");
-  //         return;
-  //       }
-
-  //       setIntegrations(data || []);
-  //     } catch (error) {
-  //       console.error("Failed to fetch integrations:", error);
-  //       ErrorToast("Failed to fetch integrations");
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   fetchIntegrations();
-  // }, [supabase]);
-
+  useEffect(() => {
+    if (searchParams.toString()) {
+      router.replace(pathname); // strips off all params
+    }
+  }, [pathname, searchParams, router]);
   useEffect(() => {
     const initializeAllIntegrationStatuses = async () => {
       setLoading(true);
@@ -206,21 +219,18 @@ export default function IntegrationsPage() {
         });
 
         setIntegrations(integrationsWithStatus);
-        // 5. Update individual integration states
-        const getStatus = (name: string): ConnectionStatus => {
-          return integrationsWithStatus.find(i => i.name === name)?.connected ? "connected" : "disconnected";
-        };
 
-        setFacebookLeadFormStatus(getStatus("Facebook Lead Forms"));
-        setJotformStatus(getStatus("Jotform"));
-        setGoogleLeadFormStatus(getStatus("Google Lead Forms"));
-        setGoogleFormStatus(getStatus("Google Forms"));
-        setHubspotStatus(getStatus("Hubspot"));
-        setGoHighLevelStatus(getStatus("GoHighLevel"));
-        setTypeformStatus(getStatus("Typeform"));
-        setPipedriveStatus(getStatus("Pipedrive"));
-        setGravityFormStatus(getStatus("Gravity Form"));
-        setNexHealthStatus(getStatus("NextHealth"));
+        // 4. Update individual integration states
+        const statusUpdates: Partial<Record<IntegrationName, ConnectionStatus>> = {};
+        integrationsWithStatus.forEach(integration => {
+          const name = integration.name as IntegrationName;
+          statusUpdates[name] = integration.connected ? "connected" : "disconnected";
+        });
+
+        setIntegrationStates(prev => ({
+          ...prev,
+          statuses: { ...prev.statuses, ...statusUpdates },
+        }));
       } catch (error) {
         console.error("Failed to initialize integration statuses:", error);
         ErrorToast("Failed to initialize integrations");
@@ -232,32 +242,25 @@ export default function IntegrationsPage() {
     initializeAllIntegrationStatuses();
   }, [
     supabase,
-    jotformStatus,
-    googleFormStatus,
-    typeformStatus,
-    hubspotStatus,
-    goHighLevelStatus,
-    facebookLeadFormStatus,
-    googleLeadFormStatus,
-    pipedriveStatus,
-    nexHealthStatus,
-    gravityFormStatus,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    getIntegrationStatus("Facebook Lead Forms"),getIntegrationStatus("Jotform"),getIntegrationStatus("Google Lead Forms"),getIntegrationStatus("Google Forms"),getIntegrationStatus("Hubspot"),getIntegrationStatus("GoHighLevel"),getIntegrationStatus("Typeform"),getIntegrationStatus("Pipedrive"),getIntegrationStatus("Gravity Form"),getIntegrationStatus("NextHealth"),getIntegrationStatus("CSV Upload"),getIntegrationStatus("Custom CRM")
   ]);
+
   const handleIntegrationClick = async (integration: IntegrationWithStatus) => {
     if (!integration.connected) {
       handleConnect(integration);
       return;
     }
 
-    if (integration.name === "Google Forms") {
-      // setSelectedIntegration(integration);
-      await fetchGoogleFormData();
+    const name = integration.name as IntegrationName;
 
-      setShowGoogleFormModal(true);
-    } else if (integration.name === "Gravity Form") {
-      setGravityFormStatus("connecting");
-      setShowGravityFormModal(true);
-    } else if (integration.name === "Typeform") {
+    if (name === "Google Forms") {
+      await fetchGoogleFormData();
+      toggleModal(name, true);
+    } else if (name === "Gravity Form") {
+      updateIntegrationStatus(name, "connecting");
+      toggleModal(name, true);
+    } else if (name === "Typeform") {
       fetchTypeformForms(setTypeFormTreeData);
       const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Typeform").limit(1).single();
 
@@ -269,8 +272,8 @@ export default function IntegrationsPage() {
         .single();
       console.warn("typeform", typeform);
       setSelectedTypeformForms(typeform.auth_data?.forms);
-      setShowTypeformModal(true);
-    } else if (integration.name === "Jotform") {
+      toggleModal(name, true);
+    } else if (name === "Jotform") {
       fetchJotformForms(setJotformTreeData);
       const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Jotform").limit(1).single();
 
@@ -282,9 +285,10 @@ export default function IntegrationsPage() {
         .single();
       console.warn("jotformData", jotformData);
       setSelectedJotformForms(jotformData.auth_data?.forms.map((form: any) => form.form_id));
-      setShowJotformModal(true);
+      toggleModal(name, true);
     }
   };
+
   const fetchGoogleFormData = async () => {
     try {
       const clinicData = await getClinicData();
@@ -342,13 +346,11 @@ export default function IntegrationsPage() {
       ErrorToast("Failed to fetch Google Forms data");
     }
   };
-  console.warn(selectedSheets);
+
   const syncGoogleFormLeads = async (
     // eslint-disable-next-line no-unused-vars
     selectedSheetsObjects: ({ spreadsheet_id: any; spreadsheet_title: any; sheet_id: any; sheet_title: any } | null)[],
   ) => {
-    // if (!selectedIntegration) return;
-
     try {
       const { data: connection } = await supabase
         .from("google_form_connections")
@@ -385,7 +387,7 @@ export default function IntegrationsPage() {
 
       if (newSheets.length === 0) {
         SuccessToast("Sheets are already synced!");
-        setShowGoogleFormModal(false);
+        toggleModal("Google Forms", false);
         return;
       }
 
@@ -419,7 +421,7 @@ export default function IntegrationsPage() {
 
       const result = await response.json();
       SuccessToast(`Successfully synced ${result.sync_result.leads_created} leads from Google Lead Form!`);
-      setShowGoogleFormModal(false);
+      toggleModal("Google Forms", false);
     } catch (error) {
       console.error("Failed to sync leads:", error);
       ErrorToast("Failed to sync leads");
@@ -427,41 +429,10 @@ export default function IntegrationsPage() {
   };
 
   const handleConnect = (integration: IntegrationWithStatus) => {
-    switch (integration.name) {
-      case "Facebook Lead Forms":
-        setShowFacebookLeadModal(true);
-        break;
-      case "Jotform":
-        setShowJotformModal(true);
-        break;
-      case "Google Lead Forms":
-        setShowGoogleLeadFormModal(true);
-        break;
-      case "Google Forms":
-        setShowGoogleFormModal(true);
-        break;
-      case "Hubspot":
-        setShowHubspotModal(true);
-        break;
-      case "GoHighLevel":
-        setShowGoHighLevelModal(true);
-        break;
-      case "Typeform":
-        setShowTypeformModal(true);
-        break;
-      case "Pipedrive":
-        setShowPipedriveModal(true);
-        break;
-      case "Gravity Form":
-        setShowGravityFormModal(true);
-        break;
-      case "NextHealth":
-        setShowNexHealthModal(true);
-        break;
-      default:
-        console.log(`Connecting to ${integration.name}`);
-    }
+    const name = integration.name as IntegrationName;
+    toggleModal(name, true);
   };
+
   const connectedIntegrations = integrations.filter(i => i.connected);
   const availableIntegrations = integrations.filter(i => !i.connected);
 
@@ -486,10 +457,7 @@ export default function IntegrationsPage() {
                 <Row gutter={[16, 16]}>
                   {connectedIntegrations.map(integration => (
                     <Col xs={24} sm={12} lg={8} key={integration.integration_id}>
-                      <Card
-                        className="bg-gray-50 hover:bg-gray-100  transition border border-green-200 rounded-lg h-full"
-                        // onClick={() => handleIntegrationClick(integration)}
-                      >
+                      <Card className="bg-gray-50 hover:bg-gray-100  transition border border-green-200 rounded-lg h-full">
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
                             {getIntegrationIcon(integration.integration_logo)}
@@ -497,19 +465,11 @@ export default function IntegrationsPage() {
                           <div className="flex-1">
                             <h3 className="text-lg font-medium text-gray-900">{integration.name}</h3>
                             <p className="text-gray-500 text-sm">{integration.description || "No description available"}</p>
-                            {/* <p className="text-gray-400 text-xs mt-1">
-                              {integration.updated_at
-                                ? `Last sync: ${dayjs(integration.updated_at).format("MMM D, h:mm A")}`
-                                : "Not synced yet"}
-                            </p> */}
                           </div>
                           <Button
                             type="primary"
                             size="small"
                             className={` ${["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name)) ? "bg-[#10B981] text-white hover:bg-green-600" : "gray text-white bg-red-500 hover:bg-red-700 hover:text-gray-900"}`}
-                            // disabled={
-                            //   !["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name))
-                            // }
                             onClick={async () => {
                               if (["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name))) {
                                 handleIntegrationClick(integration);
@@ -519,9 +479,13 @@ export default function IntegrationsPage() {
                                   deleteIntegrationConnections(clinicId, integration.name);
                                 } else {
                                   const user = await getUserData();
-                                  deleteIntegrationConnections(user?.id||"", integration.name);
+                                  deleteIntegrationConnections(user?.id || "", integration.name);
                                 }
-                                setFacebookLeadFormStatus(facebookLeadFormStatus === "connected" ? "disconnected" : "connected");
+                                const currentStatus = getIntegrationStatus(integration.name as IntegrationName);
+                                updateIntegrationStatus(
+                                  integration.name as IntegrationName,
+                                  currentStatus === "connected" ? "disconnected" : "connected",
+                                );
                               }
                             }}
                           >
@@ -585,15 +549,15 @@ export default function IntegrationsPage() {
 
         {/* Facebook Lead Form Modal */}
         <FacebookLeadFormModal
-          open={showFacebookLeadModal}
-          status={facebookLeadFormStatus}
+          open={isModalOpen("Facebook Lead Forms")}
+          status={getIntegrationStatus("Facebook Lead Forms")}
           onCancel={() => {
-            setShowFacebookLeadModal(false);
+            toggleModal("Facebook Lead Forms", false);
             setButtonLoading(false);
           }}
           onOk={() => {
             setButtonLoading(false);
-            setShowFacebookLeadModal(false);
+            toggleModal("Facebook Lead Forms", false);
           }}
           onConnect={async () => {
             setButtonLoading(true);
@@ -605,23 +569,23 @@ export default function IntegrationsPage() {
         {/* Jotform Modal */}
         <JotformModal
           buttonLoading={buttonLoading}
-          open={showJotformModal}
-          status={jotformStatus}
+          open={isModalOpen("Jotform")}
+          status={getIntegrationStatus("Jotform")}
           onCancel={() => {
             setButtonLoading(false);
-            setShowJotformModal(false);
+            toggleModal("Jotform", false);
           }}
           onOk={() => {
             setButtonLoading(false);
-            setShowJotformModal(false);
+            toggleModal("Jotform", false);
           }}
           onConnect={async (token: any) => {
             setButtonLoading(true);
             const res = await createJotformConnection(await getClinicId(), token);
             if (!res) {
               setButtonLoading(false);
-              setShowJotformModal(false);
-              setShowJotformModal(true);
+              toggleModal("Jotform", false);
+              toggleModal("Jotform", true);
 
               ErrorToast("Failed to connect to Jotform. Please try again.");
               return;
@@ -629,7 +593,7 @@ export default function IntegrationsPage() {
             fetchJotformForms(setJotformTreeData);
 
             SuccessToast("Jotform connected successfully");
-            setJotformStatus("connected");
+            updateIntegrationStatus("Jotform", "connected");
             setButtonLoading(false);
           }}
           treeData={jotformTreeData}
@@ -638,42 +602,42 @@ export default function IntegrationsPage() {
           onSyncLeads={() => {
             syncJotformLeads(selectedJotformForms);
             setJotformLeadsSynced(true);
-            setShowJotformModal(false);
+            toggleModal("Jotform", false);
           }}
           onDisconnect={async () => {
             deleteIntegrationConnections(await getClinicId(), "Jotform");
-            setShowJotformModal(false);
-            setJotformStatus("disconnected");
+            toggleModal("Jotform", false);
+            updateIntegrationStatus("Jotform", "disconnected");
           }}
         />
 
         {/* Google Lead Form Modal */}
         <GoogleLeadFormModal
-          open={showGoogleLeadFormModal}
-          status={googleLeadFormStatus}
-          onCancel={() => setShowGoogleLeadFormModal(false)}
-          onOk={() => setShowGoogleLeadFormModal(false)}
+          open={isModalOpen("Google Lead Forms")}
+          status={getIntegrationStatus("Google Lead Forms")}
+          onCancel={() => toggleModal("Google Lead Forms", false)}
+          onOk={() => toggleModal("Google Lead Forms", false)}
           onConnect={() => connectToGoogleLeadForm(setButtonLoading)}
           accountInfo={{}}
           onSyncLeads={syncGoogleLeadFormLeads}
           onDisconnect={async () => {
             deleteIntegrationConnections(await getClinicId(), "Google Lead Forms");
-            setShowGoogleLeadFormModal(false);
-            setGoogleLeadFormStatus("disconnected");
+            toggleModal("Google Lead Forms", false);
+            updateIntegrationStatus("Google Lead Forms", "disconnected");
           }}
           buttonLoading={buttonLoading}
         />
 
         {/* Google Form Modal */}
         <GoogleFormModal
-          open={showGoogleFormModal}
-          status={googleFormStatus}
+          open={isModalOpen("Google Forms")}
+          status={getIntegrationStatus("Google Forms")}
           onCancel={() => {
-            setShowGoogleFormModal(false);
+            toggleModal("Google Forms", false);
             setButtonLoading(false);
           }}
           onOk={() => {
-            setShowGoogleFormModal(false);
+            toggleModal("Google Forms", false);
             setButtonLoading(false);
           }}
           onConnect={() => {
@@ -688,27 +652,27 @@ export default function IntegrationsPage() {
             const selectedSheetsObjects = await selectedSheets.map(value => findSheetDetails(googleFormTreeData, value)).filter(Boolean);
             syncGoogleFormLeads(selectedSheetsObjects);
             setGoogleFormLeadsSynced(true);
-            setShowGoogleFormModal(false);
+            toggleModal("Google Forms", false);
           }}
           onDisconnect={async () => {
             deleteIntegrationConnections(await getClinicId(), "Google Forms");
-            setShowGoogleFormModal(false);
-            setGoogleFormStatus("disconnected");
+            toggleModal("Google Forms", false);
+            updateIntegrationStatus("Google Forms", "disconnected");
           }}
         />
 
         {/* Hubspot Modal */}
         <HubspotModal
-          open={showHubspotModal}
-          status={hubspotStatus}
+          open={isModalOpen("Hubspot")}
+          status={getIntegrationStatus("Hubspot")}
           accountInfo={hubspotAccountInfo}
           onCancel={() => {
             setButtonLoading(false);
-            setShowHubspotModal(false);
+            toggleModal("Hubspot", false);
           }}
           onOk={() => {
             setButtonLoading(false);
-            setShowHubspotModal(false);
+            toggleModal("Hubspot", false);
           }}
           onConnect={() => connectToHubSpot(setButtonLoading)}
           buttonLoading={buttonLoading}
@@ -716,15 +680,15 @@ export default function IntegrationsPage() {
 
         {/* GoHighLevel Modal */}
         <GoHighLevelLeadFormModal
-          open={showGoHighLevelModal}
-          status={goHighLevelStatus}
+          open={isModalOpen("GoHighLevel")}
+          status={getIntegrationStatus("GoHighLevel")}
           onCancel={() => {
             setButtonLoading(false);
-            setShowGoHighLevelModal(false);
+            toggleModal("GoHighLevel", false);
           }}
           onOk={() => {
             setButtonLoading(false);
-            setShowGoHighLevelModal(false);
+            toggleModal("GoHighLevel", false);
           }}
           onConnect={() => {
             connectToGHL(setButtonLoading);
@@ -735,15 +699,15 @@ export default function IntegrationsPage() {
 
         {/* Typeform Modal */}
         <TypeformModal
-          open={showTypeformModal}
-          status={typeformStatus}
+          open={isModalOpen("Typeform")}
+          status={getIntegrationStatus("Typeform")}
           onCancel={() => {
             setButtonLoading(false);
-            setShowTypeformModal(false);
+            toggleModal("Typeform", false);
           }}
           onOk={() => {
             setButtonLoading(false);
-            setShowTypeformModal(false);
+            toggleModal("Typeform", false);
           }}
           onConnect={() => {
             connectToTypeform(setButtonLoading);
@@ -755,12 +719,12 @@ export default function IntegrationsPage() {
             syncTypeformLeads(selectedTypeformForms);
             setTypeformLeadsSynced(true);
             setButtonLoading(false);
-            setShowTypeformModal(false);
+            toggleModal("Typeform", false);
           }}
           onDisconnect={async () => {
             deleteIntegrationConnections(await getClinicId(), "Typeform");
-            setShowTypeformModal(false);
-            setTypeformStatus("disconnected");
+            toggleModal("Typeform", false);
+            updateIntegrationStatus("Typeform", "disconnected");
           }}
           selectedForms={selectedTypeformForms}
           onSelectForms={setSelectedTypeformForms}
@@ -768,22 +732,22 @@ export default function IntegrationsPage() {
 
         {/* Pipedrive Modal */}
         <PipedriveModal
-          open={showPipedriveModal}
-          status={pipedriveStatus}
+          open={isModalOpen("Pipedrive")}
+          status={getIntegrationStatus("Pipedrive")}
           accountInfo={pipedriveAccountInfo}
           onCancel={() => {
             setButtonLoading(false);
-            setShowPipedriveModal(false);
+            toggleModal("Pipedrive", false);
           }}
           onOk={() => {
             setButtonLoading(false);
-            setShowPipedriveModal(false);
+            toggleModal("Pipedrive", false);
           }}
           onConnect={() => {
             connectToPipedrive(setButtonLoading);
           }}
           onDisconnect={() => {
-            setPipedriveStatus("disconnected");
+            updateIntegrationStatus("Pipedrive", "disconnected");
             setPipedriveAccountInfo(null);
           }}
           onSyncLeads={syncPipedriveLeads}
@@ -792,31 +756,31 @@ export default function IntegrationsPage() {
 
         {/* Gravity Form Modal */}
         <GravityFormModal
-          open={showGravityFormModal}
-          status={gravityFormStatus}
+          open={isModalOpen("Gravity Form")}
+          status={getIntegrationStatus("Gravity Form")}
           onCancel={() => {
             setButtonLoading(false);
-            setShowGravityFormModal(false);
+            toggleModal("Gravity Form", false);
           }}
-          onOk={() => setShowGravityFormModal(false)}
+          onOk={() => toggleModal("Gravity Form", false)}
           onConnect={(token: any) => connnectToGravityForm(token, setButtonLoading)}
           onDisconnect={() => {
-            setGravityFormStatus("disconnected");
+            updateIntegrationStatus("Gravity Form", "disconnected");
           }}
           buttonLoading={buttonLoading}
         />
 
         {/* NextHealth Modal */}
         <NexHealthLeadFormModal
-          open={showNexHealthModal}
-          status={nexHealthStatus}
+          open={isModalOpen("NextHealth")}
+          status={getIntegrationStatus("NextHealth")}
           onCancel={() => {
             setButtonLoading(false);
-            setShowNexHealthModal(false);
+            toggleModal("NextHealth", false);
           }}
           onOk={() => {
             setButtonLoading(false);
-            setShowNexHealthModal(false);
+            toggleModal("NextHealth", false);
           }}
           onConnect={(token: any) => {
             connectToNextHealth(token, setButtonLoading);
@@ -826,12 +790,24 @@ export default function IntegrationsPage() {
         />
 
         {/* CSV Upload Modal */}
-        <CsvUploadModal open={showCsvUploadModal} onCancel={() => setShowCsvUploadModal(false)} onOk={() => setShowCsvUploadModal(false)} />
+        <CsvUploadModal
+          open={isModalOpen("CSV Upload")}
+          onCancel={() => toggleModal("CSV Upload", false)}
+          onOk={() => toggleModal("CSV Upload", false)}
+        />
 
         {/* Custom CRM Modal */}
-        <CustomCrmModal open={showCustomCrmModal} onCancel={() => setShowCustomCrmModal(false)} onOk={() => setShowCustomCrmModal(false)} />
-
-     
+        <CustomCrmModal
+          open={isModalOpen("Custom CRM")}
+          onCancel={() => {
+            setButtonLoading(false);
+            toggleModal("Custom CRM", false);
+          }}
+          onOk={() => {
+            setButtonLoading(false);
+            toggleModal("Custom CRM", false);
+          }}
+        />
       </div>
     </DashboardLayout>
   );
