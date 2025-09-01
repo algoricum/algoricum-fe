@@ -1,5 +1,4 @@
 import { createClient } from "@/utils/supabase/config/client";
-import { ErrorToast } from "@/helpers/toast";
 import { ConnectionStatus } from "@/app/types/types";
 
 const supabase = createClient();

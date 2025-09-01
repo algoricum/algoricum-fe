@@ -1,9 +1,8 @@
 "use client";
 import { JSX, useEffect, useState } from "react";
-import { Card, Modal, Button, Alert, TreeSelect, Typography, Row, Col, Divider } from "antd";
-import { GoogleOutlined } from "@ant-design/icons";
+import { Card,  Button,  Row, Col, Divider } from "antd";
 import { createClient } from "@/utils/supabase/config/client";
-import dayjs from "dayjs";
+// import dayjs from "dayjs";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { Header } from "@/components/common";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
@@ -58,7 +57,6 @@ import {
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const { Text } = Typography;
 
 // Interface for integration data from RPC
 interface IntegrationWithStatus {
@@ -87,8 +85,6 @@ export default function IntegrationsPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [integrations, setIntegrations] = useState<IntegrationWithStatus[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedIntegration, setSelectedIntegration] = useState<IntegrationWithStatus | null>(null);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const [googleFormTreeData, setGoogleFormTreeData] = useState<any[]>([]);
   const [buttonLoading, setButtonLoading] = useState(false);
@@ -109,7 +105,6 @@ export default function IntegrationsPage() {
   // Google Lead Form
 
   // Google Form
-  const [selectedGoogleFormWorksheets, setSelectedGoogleFormWorksheets] = useState<any[]>([]);
   const [, setGoogleFormLeadsSynced] = useState(false);
 
   //  pipedrive
@@ -245,9 +240,10 @@ export default function IntegrationsPage() {
     }
 
     if (integration.name === "Google Forms") {
-      setSelectedIntegration(integration);
+      // setSelectedIntegration(integration);
       await fetchGoogleFormData();
-      setShowModal(true);
+      
+      setShowGoogleFormModal(true);
     } else if (integration.name === "Gravity Form") {
       setGravityFormStatus("connecting");
       setShowGravityFormModal(true);
@@ -298,7 +294,7 @@ export default function IntegrationsPage() {
         .eq("connection_id", connection?.id);
 
       if (savedError) throw savedError;
-
+console.error(savedSheets)
       const savedSheetKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
       const res = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
@@ -335,12 +331,12 @@ export default function IntegrationsPage() {
       ErrorToast("Failed to fetch Google Forms data");
     }
   };
-
+console.warn(selectedSheets)
   const syncGoogleFormLeads = async (
     // eslint-disable-next-line no-unused-vars
     selectedSheetsObjects: ({ spreadsheet_id: any; spreadsheet_title: any; sheet_id: any; sheet_title: any } | null)[],
   ) => {
-    if (!selectedIntegration) return;
+    // if (!selectedIntegration) return;
 
     try {
       const { data: connection } = await supabase
@@ -378,7 +374,7 @@ export default function IntegrationsPage() {
 
       if (newSheets.length === 0) {
         SuccessToast("Sheets are already synced!");
-        setShowModal(false);
+        setShowGoogleFormModal(false);
         return;
       }
 
@@ -412,7 +408,7 @@ export default function IntegrationsPage() {
 
       const result = await response.json();
       SuccessToast(`Successfully synced ${result.sync_result.leads_created} leads from Google Lead Form!`);
-      setShowModal(false);
+      setShowGoogleFormModal(false);
     } catch (error) {
       console.error("Failed to sync leads:", error);
       ErrorToast("Failed to sync leads");
@@ -655,10 +651,10 @@ export default function IntegrationsPage() {
           buttonLoading={buttonLoading}
           accountInfo={{}}
           treeData={googleFormTreeData}
-          selectedWorksheets={selectedGoogleFormWorksheets}
-          onSelectWorksheets={setSelectedGoogleFormWorksheets}
+          selectedWorksheets={selectedSheets}
+          onSelectWorksheets={setSelectedSheets}
           onSyncLeads={async () => {
-            const selectedSheetsObjects = await selectedGoogleFormWorksheets
+            const selectedSheetsObjects = await selectedSheets
               .map(value => findSheetDetails(googleFormTreeData, value))
               .filter(Boolean);
             syncGoogleFormLeads(selectedSheetsObjects);
@@ -803,7 +799,7 @@ export default function IntegrationsPage() {
         <CustomCrmModal open={showCustomCrmModal} onCancel={() => setShowCustomCrmModal(false)} onOk={() => setShowCustomCrmModal(false)} />
 
         {/* Google Forms/Lead Forms Modal */}
-        <Modal
+        {/* <Modal
           title={
             <div className="flex items-center">
               <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
@@ -857,7 +853,7 @@ export default function IntegrationsPage() {
               </Button>
             </div>
           </div>
-        </Modal>
+        </Modal> */}
       </div>
     </DashboardLayout>
   );
