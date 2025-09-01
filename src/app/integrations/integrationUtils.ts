@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/config/client";
 import { ConnectionStatus } from "@/app/types/types";
+import { ErrorToast } from "@/helpers/toast";
 
 const supabase = createClient();
 
@@ -108,5 +109,100 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
   } catch (error) {
     console.error(`Failed to check ${integrationName} status:`, error);
     return "disconnected";
+  }
+};
+
+
+export const deleteIntegrationConnections = async (
+  clinicId: string,
+  integrationName: string,
+): Promise<boolean> => {
+  try {
+    let error = null;
+
+    switch (integrationName) {
+      case "Hubspot": {
+        const { error: deleteError } = await supabase
+          .from("hubspot_connections")
+          .delete()
+          .eq("user_id", clinicId); // ⚠️ change to clinic_id if schema uses that
+        error = deleteError;
+        break;
+      }
+
+      case "Pipedrive": {
+        const { error: deleteError } = await supabase
+          .from("pipedrive_integration")
+          .delete()
+          .eq("clinic_id", clinicId);
+        error = deleteError;
+        break;
+      }
+
+      case "Google Lead Forms": {
+        const { error: deleteError } = await supabase
+          .from("google_lead_form_connections")
+          .delete()
+          .eq("clinic_id", clinicId);
+        error = deleteError;
+        break;
+      }
+
+      case "Google Forms": {
+        const { data: connection } = await supabase
+          .from("google_form_connections")
+          .select("*")
+          .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        if(!connection) return true;
+        const { error: deleteError } = await supabase
+          .from("google_form_sheets")
+          .delete()
+          .eq("connection_id", connection?.id);
+          
+        const { error: deletedError } = await supabase
+          .from("google_form_connections")
+          .delete()
+          .eq("id", connection?.id);
+
+        error = deleteError,deletedError;
+        break;
+      }
+
+      case "Facebook Lead Forms": {
+        const { error: deleteError } = await supabase
+          .from("facebook_lead_form_connections")
+          .delete()
+          .eq("clinic_id", clinicId);
+        error = deleteError;
+        break;
+      }
+
+      default: {
+        
+        const {data:integration}=await supabase.from("integrations").select("*").eq("name", integrationName).single();
+        const { error: deleteError } = await supabase
+          .from("integration_connections")
+          .delete()
+          .eq("clinic_id", clinicId)
+          .eq("integration_id", integration.id);
+        error = deleteError;
+        break;
+      }
+    }
+
+    if (error) {
+      console.error(`Error deleting ${integrationName} connections:`, error);
+      ErrorToast(`Failed to delete ${integrationName} connections`);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error(`Unexpected error deleting ${integrationName} connections:`, err);
+    ErrorToast(`Unexpected error deleting ${integrationName} connections`);
+    return false;
   }
 };

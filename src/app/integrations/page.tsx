@@ -1,6 +1,6 @@
 "use client";
 import { JSX, useEffect, useState } from "react";
-import { Card,  Button,  Row, Col, Divider } from "antd";
+import { Card, Button, Row, Col, Divider } from "antd";
 import { createClient } from "@/utils/supabase/config/client";
 // import dayjs from "dayjs";
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -26,7 +26,7 @@ import {
   // ModalProps
 } from "@/components/modals/Modals";
 import { ConnectionStatus } from "@/app/types/types";
-import { updateIntegrationConnectionStatus } from "./integrationUtils";
+import { deleteIntegrationConnections, updateIntegrationConnectionStatus } from "./integrationUtils";
 import {
   getClinicId,
   // handleCsvUpload,
@@ -54,6 +54,7 @@ import {
   // handleInput,
   // handle_Next,
 } from "@/utils/integration-utils";
+import { getUserData } from "@/utils/supabase/user-helper";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -93,7 +94,7 @@ export default function IntegrationsPage() {
   const [hubspotAccountInfo] = useState<any>(null);
 
   // TypeForm
-  const [TypeformTreeData,setTypeFormTreeData] = useState([]);
+  const [TypeformTreeData, setTypeFormTreeData] = useState([]);
   const [selectedTypeformForms, setSelectedTypeformForms] = useState<any[]>([]);
   const [, setTypeformLeadsSynced] = useState(false);
 
@@ -204,7 +205,6 @@ export default function IntegrationsPage() {
           };
         });
 
-      
         setIntegrations(integrationsWithStatus);
         // 5. Update individual integration states
         const getStatus = (name: string): ConnectionStatus => {
@@ -221,8 +221,6 @@ export default function IntegrationsPage() {
         setPipedriveStatus(getStatus("Pipedrive"));
         setGravityFormStatus(getStatus("Gravity Form"));
         setNexHealthStatus(getStatus("NextHealth"));
-
-      
       } catch (error) {
         console.error("Failed to initialize integration statuses:", error);
         ErrorToast("Failed to initialize integrations");
@@ -232,7 +230,19 @@ export default function IntegrationsPage() {
     };
 
     initializeAllIntegrationStatuses();
-  }, [supabase]);
+  }, [
+    supabase,
+    jotformStatus,
+    googleFormStatus,
+    typeformStatus,
+    hubspotStatus,
+    goHighLevelStatus,
+    facebookLeadFormStatus,
+    googleLeadFormStatus,
+    pipedriveStatus,
+    nexHealthStatus,
+    gravityFormStatus,
+  ]);
   const handleIntegrationClick = async (integration: IntegrationWithStatus) => {
     if (!integration.connected) {
       handleConnect(integration);
@@ -242,35 +252,36 @@ export default function IntegrationsPage() {
     if (integration.name === "Google Forms") {
       // setSelectedIntegration(integration);
       await fetchGoogleFormData();
-      
+
       setShowGoogleFormModal(true);
     } else if (integration.name === "Gravity Form") {
       setGravityFormStatus("connecting");
       setShowGravityFormModal(true);
     } else if (integration.name === "Typeform") {
-       fetchTypeformForms(setTypeFormTreeData);
-          const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Typeform").limit(1).single();
+      fetchTypeformForms(setTypeFormTreeData);
+      const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Typeform").limit(1).single();
 
-          const { data: typeform } = await supabase
-            .from("integration_connections")
-            .select("*")
-            .eq("clinic_id", await getClinicId())
-            .eq("integration_id", connection?.id)
-            .single();
-          console.warn("typeform", typeform);
-          setSelectedTypeformForms(typeform.auth_data?.forms);
+      const { data: typeform } = await supabase
+        .from("integration_connections")
+        .select("*")
+        .eq("clinic_id", await getClinicId())
+        .eq("integration_id", connection?.id)
+        .single();
+      console.warn("typeform", typeform);
+      setSelectedTypeformForms(typeform.auth_data?.forms);
       setShowTypeformModal(true);
     } else if (integration.name === "Jotform") {
       fetchJotformForms(setJotformTreeData);
-          const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Jotform").limit(1).single();
+      const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Jotform").limit(1).single();
 
-          const { data: jotformData } = await supabase
-            .from("integration_connections")
-            .select("*")
-            .eq("clinic_id", await getClinicId())
-            .eq("integration_id", connection?.id).single();
-          console.warn("jotformData", jotformData);
-          setSelectedJotformForms(jotformData.auth_data?.forms.map((form:any)=>form.form_id));
+      const { data: jotformData } = await supabase
+        .from("integration_connections")
+        .select("*")
+        .eq("clinic_id", await getClinicId())
+        .eq("integration_id", connection?.id)
+        .single();
+      console.warn("jotformData", jotformData);
+      setSelectedJotformForms(jotformData.auth_data?.forms.map((form: any) => form.form_id));
       setShowJotformModal(true);
     }
   };
@@ -294,7 +305,7 @@ export default function IntegrationsPage() {
         .eq("connection_id", connection?.id);
 
       if (savedError) throw savedError;
-console.error(savedSheets)
+      console.error(savedSheets);
       const savedSheetKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
       const res = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
@@ -331,7 +342,7 @@ console.error(savedSheets)
       ErrorToast("Failed to fetch Google Forms data");
     }
   };
-console.warn(selectedSheets)
+  console.warn(selectedSheets);
   const syncGoogleFormLeads = async (
     // eslint-disable-next-line no-unused-vars
     selectedSheetsObjects: ({ spreadsheet_id: any; spreadsheet_title: any; sheet_id: any; sheet_title: any } | null)[],
@@ -495,14 +506,27 @@ console.warn(selectedSheets)
                           <Button
                             type="primary"
                             size="small"
-                            className={` ${["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name)) ? "bg-[#10B981]text-white" : "gray text-gray-900 hover:bg-gray-200 hover:text-gray-900"}`}
-                            disabled={
-                              !["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name))
-                            }
-                            onClick={() => handleIntegrationClick(integration)}
+                            className={` ${["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name)) ? "bg-[#10B981] text-white hover:bg-green-600" : "gray text-white bg-red-500 hover:bg-red-700 hover:text-gray-900"}`}
+                            // disabled={
+                            //   !["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name))
+                            // }
+                            onClick={async () => {
+                              if (["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name))) {
+                                handleIntegrationClick(integration);
+                              } else {
+                                if (integration.name != "Hubspot") {
+                                  const clinicId = await getClinicId();
+                                  deleteIntegrationConnections(clinicId, integration.name);
+                                } else {
+                                  const user = await getUserData();
+                                  deleteIntegrationConnections(user?.id||"", integration.name);
+                                }
+                                setFacebookLeadFormStatus(facebookLeadFormStatus === "connected" ? "disconnected" : "connected");
+                              }
+                            }}
                           >
                             {!["Jotform", "Google Forms", "Typeform", "Gravity Form"].some(name => integration.name.includes(name))
-                              ? "Connected"
+                              ? "Disconnect"
                               : " Edit "}
                           </Button>
                         </div>
@@ -596,9 +620,14 @@ console.warn(selectedSheets)
             const res = await createJotformConnection(await getClinicId(), token);
             if (!res) {
               setButtonLoading(false);
+              setShowJotformModal(false);
+              setShowJotformModal(true);
+
               ErrorToast("Failed to connect to Jotform. Please try again.");
               return;
             }
+            fetchJotformForms(setJotformTreeData);
+
             SuccessToast("Jotform connected successfully");
             setJotformStatus("connected");
             setButtonLoading(false);
@@ -611,7 +640,9 @@ console.warn(selectedSheets)
             setJotformLeadsSynced(true);
             setShowJotformModal(false);
           }}
-          onDisconnect={() => {
+          onDisconnect={async () => {
+            deleteIntegrationConnections(await getClinicId(), "Jotform");
+            setShowJotformModal(false);
             setJotformStatus("disconnected");
           }}
         />
@@ -622,12 +653,12 @@ console.warn(selectedSheets)
           status={googleLeadFormStatus}
           onCancel={() => setShowGoogleLeadFormModal(false)}
           onOk={() => setShowGoogleLeadFormModal(false)}
-          onConnect={() => {
-            () => connectToGoogleLeadForm(setButtonLoading);
-          }}
+          onConnect={() => connectToGoogleLeadForm(setButtonLoading)}
           accountInfo={{}}
           onSyncLeads={syncGoogleLeadFormLeads}
-          onDisconnect={() => {
+          onDisconnect={async () => {
+            deleteIntegrationConnections(await getClinicId(), "Google Lead Forms");
+            setShowGoogleLeadFormModal(false);
             setGoogleLeadFormStatus("disconnected");
           }}
           buttonLoading={buttonLoading}
@@ -654,14 +685,14 @@ console.warn(selectedSheets)
           selectedWorksheets={selectedSheets}
           onSelectWorksheets={setSelectedSheets}
           onSyncLeads={async () => {
-            const selectedSheetsObjects = await selectedSheets
-              .map(value => findSheetDetails(googleFormTreeData, value))
-              .filter(Boolean);
+            const selectedSheetsObjects = await selectedSheets.map(value => findSheetDetails(googleFormTreeData, value)).filter(Boolean);
             syncGoogleFormLeads(selectedSheetsObjects);
             setGoogleFormLeadsSynced(true);
             setShowGoogleFormModal(false);
           }}
-          onDisconnect={() => {
+          onDisconnect={async () => {
+            deleteIntegrationConnections(await getClinicId(), "Google Forms");
+            setShowGoogleFormModal(false);
             setGoogleFormStatus("disconnected");
           }}
         />
@@ -726,7 +757,9 @@ console.warn(selectedSheets)
             setButtonLoading(false);
             setShowTypeformModal(false);
           }}
-          onDisconnect={() => {
+          onDisconnect={async () => {
+            deleteIntegrationConnections(await getClinicId(), "Typeform");
+            setShowTypeformModal(false);
             setTypeformStatus("disconnected");
           }}
           selectedForms={selectedTypeformForms}
