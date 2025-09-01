@@ -4,9 +4,10 @@ import type React from "react";
 import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { Header } from "@/components/common";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { createStaffUser } from "../../utils/supabase/config/staff";
 import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import type { JSX } from "react/jsx-runtime";
 import {
   getClinicStaff,
@@ -16,7 +17,6 @@ import {
 } from "../../utils/supabase/clinic-staff-helper";
 
 // Component imports
-import { MessageAlert } from "@/components/staff/message-alert";
 import { StaffStats } from "@/components/staff/staff-stats";
 import { StaffFilters } from "@/components/staff/staff-filters";
 import { StaffTable } from "@/components/staff/staff-table";
@@ -47,11 +47,6 @@ interface EditStaff {
   status: string;
 }
 
-interface Message {
-  type: "success" | "error";
-  text: string;
-}
-
 interface CreateStaffResponse {
   data?: { emailSent?: boolean; tempPassword?: string };
   error?: { message?: string };
@@ -67,7 +62,6 @@ export default function StaffPageRefactored(): JSX.Element {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
-  const [message, setMessage] = useState<Message | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [selectedStaffForEdit, setSelectedStaffForEdit] = useState<Staff | null>(null);
   const [selectedStaffForDelete, setSelectedStaffForDelete] = useState<Staff | null>(null);
@@ -104,20 +98,12 @@ export default function StaffPageRefactored(): JSX.Element {
 
   // Effects
   useEffect(() => {
-    if (message) {
-      const timeout = message.type === "success" ? 5000 : 7000;
-      const timer = setTimeout(() => setMessage(null), timeout);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
-
-  useEffect(() => {
     const loadStaffData = async (): Promise<void> => {
       try {
         setIsLoading(true);
         const currentClinicId: string | null = await getCurrentUserClinic();
         if (!currentClinicId) {
-          setMessage({ type: "error", text: "No clinic found. Please make sure you have a clinic set up." });
+          ErrorToast("No clinic found. Please make sure you have a clinic set up.");
           return;
         }
         setClinicId(currentClinicId);
@@ -125,7 +111,7 @@ export default function StaffPageRefactored(): JSX.Element {
         const { data: staffMembers, error } = await getClinicStaff(currentClinicId);
         if (error) {
           console.error("Error loading staff data:", error);
-          setMessage({ type: "error", text: "Failed to load staff data. Please try again." });
+          ErrorToast("Failed to load staff data. Please try again.");
           return;
         }
 
@@ -145,7 +131,7 @@ export default function StaffPageRefactored(): JSX.Element {
         setStaffData(transformedStaff);
       } catch (error: any) {
         console.error("Error loading staff data:", error);
-        setMessage({ type: "error", text: "Failed to load staff data. Please try again." });
+        ErrorToast("Failed to load staff data. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -222,19 +208,18 @@ export default function StaffPageRefactored(): JSX.Element {
   const handleAddStaff = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newStaff.email.trim()) {
-      setMessage({ type: "error", text: "Please enter staff email" });
+      ErrorToast("Please enter staff email");
       return;
     }
     if (!newStaff.name.trim()) {
-      setMessage({ type: "error", text: "Please enter staff name" });
+      ErrorToast("Please enter staff name");
       return;
     }
     setIsSubmitting(true);
-    setMessage(null);
     try {
       const clinic_id: string | null = await getCurrentUserClinic();
       if (!clinic_id) {
-        setMessage({ type: "error", text: "No clinic found. Please make sure you have a clinic set up." });
+        ErrorToast("No clinic found. Please make sure you have a clinic set up.");
         return;
       }
       const response: CreateStaffResponse = await createStaffUser({
@@ -244,25 +229,23 @@ export default function StaffPageRefactored(): JSX.Element {
         roleId: "074a8cb5-03ea-422c-8786-da5ef8fd5d00",
       });
       if (response.error) {
-        setMessage({ type: "error", text: response.error.message || "Failed to create staff member" });
+        ErrorToast(response.error.message || "Failed to create staff member");
         return;
       }
       if (response.data) {
-        setMessage({
-          type: "success",
-          text: `✅ Staff member created successfully! ${
-            response.data.emailSent
-              ? "Login credentials have been sent to " + newStaff.email
-              : "Please share the credentials manually: " + response.data.tempPassword
-          }`,
-        });
+        const successMessage = `Staff member created successfully! ${
+          response.data.emailSent
+            ? `Login credentials have been sent to ${newStaff.email}`
+            : `Please share the credentials manually: ${response.data.tempPassword}`
+        }`;
+        SuccessToast(successMessage);
         setNewStaff({ email: "", name: "" });
         setShowAddStaffModal(false);
         await refreshStaffData();
       }
     } catch (error: any) {
       console.error("Unexpected error:", error);
-      setMessage({ type: "error", text: "An unexpected error occurred. Please try again." });
+      ErrorToast("An unexpected error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -270,7 +253,6 @@ export default function StaffPageRefactored(): JSX.Element {
 
   const handleEditStaff = (staff: Staff) => {
     setShowEditStaffModal(true);
-
     setSelectedStaffForEdit(staff);
     setEditStaff({ id: staff.id, name: staff.name, status: staff.status || "active" });
   };
@@ -278,22 +260,21 @@ export default function StaffPageRefactored(): JSX.Element {
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editStaff.name.trim()) {
-      setMessage({ type: "error", text: "Please fill in all required fields." });
+      ErrorToast("Please fill in all required fields.");
       return;
     }
     if (!clinicId) {
-      setMessage({ type: "error", text: "No clinic found. Please try again." });
+      ErrorToast("No clinic found. Please try again.");
       return;
     }
     setIsSubmitting(true);
-    setMessage(null);
     try {
       const result = await updateStaffMember(editStaff.id, clinicId, {
         name: editStaff.name,
         is_active: mapFrontendStatusToDatabase(editStaff.status),
       });
       if (result.error) {
-        setMessage({ type: "error", text: result.error });
+        ErrorToast(result.error);
         return;
       }
       setStaffData(prev =>
@@ -301,13 +282,13 @@ export default function StaffPageRefactored(): JSX.Element {
           s.id === editStaff.id ? { ...s, name: editStaff.name, status: editStaff.status, avatar: getInitials(editStaff.name) } : s,
         ),
       );
-      setMessage({ type: "success", text: `✅ Staff member "${editStaff.name}" has been updated successfully.` });
+      SuccessToast(`Staff member "${editStaff.name}" has been updated successfully.`);
       setShowEditStaffModal(false);
       setSelectedStaffForEdit(null);
       await refreshStaffData();
     } catch (error: any) {
       console.error("Error updating staff:", error);
-      setMessage({ type: "error", text: "Failed to update staff member. Please try again." });
+      ErrorToast("Failed to update staff member. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -320,28 +301,24 @@ export default function StaffPageRefactored(): JSX.Element {
 
   const confirmDeleteStaff = async () => {
     if (!selectedStaffForDelete || !clinicId) {
-      setMessage({ type: "error", text: "Missing required information. Please try again." });
+      ErrorToast("Missing required information. Please try again.");
       return;
     }
     setIsDeleting(true);
-    setMessage(null);
     try {
       const result = await deleteStaffMember(selectedStaffForDelete.id, clinicId);
       if (result.error) {
-        setMessage({ type: "error", text: result.error });
+        ErrorToast(result.error);
         return;
       }
       setStaffData(prev => prev.filter(s => s.id !== selectedStaffForDelete.id));
-      setMessage({
-        type: "success",
-        text: `✅ Staff member "${selectedStaffForDelete.name}" has been removed successfully.`,
-      });
+      SuccessToast(`Staff member "${selectedStaffForDelete.name}" has been removed successfully.`);
       setShowDeleteConfirmModal(false);
       setSelectedStaffForDelete(null);
       await refreshStaffData();
     } catch (error: any) {
       console.error("Error deleting staff:", error);
-      setMessage({ type: "error", text: "Failed to remove staff member. Please try again." });
+      ErrorToast("Failed to remove staff member. Please try again.");
     } finally {
       setIsDeleting(false);
     }
@@ -364,9 +341,6 @@ export default function StaffPageRefactored(): JSX.Element {
       header={<Header title="Staff Management" description="Manage your healthcare team and staff information." showHamburgerMenu />}
     >
       <div>
-        {/* Success/Error messages */}
-        {message && <MessageAlert message={message} onClose={() => setMessage(null)} />}
-
         {/* Stats */}
         <StaffStats
           totalStaff={staffData.length}
@@ -407,11 +381,9 @@ export default function StaffPageRefactored(): JSX.Element {
           isOpen={showAddStaffModal}
           isSubmitting={isSubmitting}
           newStaff={newStaff}
-          message={message}
           onClose={() => setShowAddStaffModal(false)}
           onSubmit={handleAddStaff}
           onInputChange={handleInputChange}
-          onMessageClose={() => setMessage(null)}
         />
 
         <EditStaffModal
