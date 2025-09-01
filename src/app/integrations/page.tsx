@@ -831,62 +831,7 @@ export default function IntegrationsPage() {
         {/* Custom CRM Modal */}
         <CustomCrmModal open={showCustomCrmModal} onCancel={() => setShowCustomCrmModal(false)} onOk={() => setShowCustomCrmModal(false)} />
 
-        {/* Google Forms/Lead Forms Modal */}
-        {/* <Modal
-          title={
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-                <GoogleOutlined className="text-white text-lg" />
-              </div>
-              <span className="text-xl font-semibold">{selectedIntegration?.name} Integration</span>
-            </div>
-          }
-          open={showModal}
-          onCancel={() => setShowModal(false)}
-          footer={null}
-          width={500}
-          centered
-        >
-          <div className="py-6">
-            <Alert
-              message={`Connected to ${selectedIntegration?.name}`}
-              description={selectedIntegration?.description || "Integration is active and ready to sync"}
-              type="success"
-              showIcon
-              className="mb-4"
-            />
-
-            <div className="mb-4">
-              <Text strong>Last Sync:</Text>{" "}
-              {selectedIntegration?.last_sync_at ? dayjs(selectedIntegration.last_sync_at).format("MMM D, YYYY h:mm A") : "Never"}
-            </div>
-
-            <div className="mb-4">
-              <Text className="block mb-2">Select worksheets to sync leads from:</Text>
-              <TreeSelect
-                style={{ width: "100%" }}
-                dropdownStyle={{ maxHeight: 400, overflow: "auto" }}
-                placeholder="Select worksheets"
-                treeData={googleFormTreeData}
-                multiple
-                treeCheckable
-                value={selectedSheets}
-                onChange={setSelectedSheets}
-              />
-            </div>
-
-            <div className="flex justify-between items-center mt-6">
-              <Button
-                type="primary"
-                onClick={syncGoogleFormLeads}
-                className="bg-yellow-600 border-yellow-600 hover:bg-yellow-700"
-                disabled={selectedSheets.length === 0}
-              >
-                Sync Leads
-              </Button>
-            </div>
-          </div>
-        </Modal> */}
+     
       </div>
     </DashboardLayout>
   );
