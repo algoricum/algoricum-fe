@@ -40,6 +40,7 @@ import CurrentInput from "./CurrentInput";
 import IntegrationsModals from "./IntegrationModals";
 
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [buttonsLoading, setButtonsLoading] = useState(false);
@@ -745,7 +746,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           setButtonsLoading(true);
           try {
             localStorage.setItem("oauth_form_data", JSON.stringify(formData));
-            window.location.href = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/start?clinic_id=${await getClinicId()}`;
+            window.location.href = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/start?clinic_id=${await getClinicId()}&redirect_to=${window.location.href}`;
           } catch (error) {
             console.error("Error:", error);
             setButtonsLoading(false);
