@@ -6,7 +6,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    domains: process.env.SUPABASE_URL,
+    domains:[ process.env.NEXT_PUBLIC_SUPABASE_KEY]
   },
 };
 
