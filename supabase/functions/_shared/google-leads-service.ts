@@ -51,7 +51,17 @@ export async function handleOAuthCallback(code: string, clinic_id: string, redir
 
   const tokens = await tokenRes.json();
   if (tokens.error) throw new Error(tokens.error_description);
+  const expiryDate = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
+  const { error } = await supabase.from("google_lead_form_connections").upsert({
+    clinic_id,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    token_expiry: expiryDate,
+    
+  }, { onConflict: ["clinic_id"] });
+
+  if (error) throw new Error(error.message);
   return redirectTo;
 }
 
