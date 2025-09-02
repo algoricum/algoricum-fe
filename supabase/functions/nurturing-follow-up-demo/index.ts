@@ -60,7 +60,62 @@ function logError(message: string, error?: any) {
 // Get all follow-up rules except initial_contact
 const FOLLOWUP_RULES = FOLLOW_UP_RULES.filter(rule => rule.name !== 'sms_5min_initial')
 
-// Process all follow-ups except initial contact
+// Check if clinic has demo_user role
+async function checkClinicRole(supabase: any, clinicId: string): Promise<{ isAuthorized: boolean, roleType?: string }> {
+  try {
+    logInfo(`Checking role for clinic: ${clinicId}`)
+    
+    // Check if any user associated with this clinic has demo_user role
+    const { data: userClinics, error: userClinicError } = await supabase
+      .from('user_clinic')
+      .select(`
+        user_id,
+        role_id,
+        is_active,
+        role!inner(
+          type
+        )
+      `)
+      .eq('clinic_id', clinicId)
+      .eq('is_active', true)
+
+    if (userClinicError) {
+      logError('Error fetching clinic roles', userClinicError)
+      return { isAuthorized: false }
+    }
+
+    if (!userClinics || userClinics.length === 0) {
+      logInfo(`No active users found for clinic: ${clinicId}`)
+      return { isAuthorized: false }
+    }
+
+    // Check if any user has demo_user role
+    const demoUser = userClinics.find(uc => uc.role?.type === 'demo_user')
+    
+    if (demoUser) {
+      logInfo(`Clinic ${clinicId} has demo_user role through user ${demoUser.user_id}`)
+      return {
+        isAuthorized: true,
+        roleType: 'demo_user'
+      }
+    }
+
+    // Log all roles found for debugging
+    const roleTypes = userClinics.map(uc => uc.role?.type).filter(Boolean)
+    logInfo(`Clinic ${clinicId} roles found: ${roleTypes.join(', ')} - NOT AUTHORIZED`)
+
+    return {
+      isAuthorized: false,
+      roleType: roleTypes.join(', ') || 'unknown'
+    }
+
+  } catch (error: any) {
+    logError('Error in checkClinicRole', error)
+    return { isAuthorized: false }
+  }
+}
+
+// Process all follow-ups except initial contact for all demo clinics
 async function processNurturingFollowups(supabase: any) {
   logInfo('=== Starting Nurturing Follow-ups Processing ===')
   
@@ -109,12 +164,26 @@ async function processNurturingFollowups(supabase: any) {
     let smsProcessed = 0
     let emailProcessed = 0
     let totalErrors = 0
+    let clinicsProcessed = 0
+    let clinicsSkipped = 0
     const allResults: ProcessingResult[] = []
 
     // Process each clinic
     for (const clinic of clinics) {
       try {
-        logInfo(`Processing clinic: ${clinic.name}`)
+        logInfo(`Checking access for clinic: ${clinic.name} (${clinic.id})`)
+
+        // Check if clinic has demo_user role
+        const roleCheck = await checkClinicRole(supabase, clinic.id)
+        
+        if (!roleCheck.isAuthorized) {
+          logInfo(`Skipping clinic ${clinic.name} - no demo_user role (roles: ${roleCheck.roleType})`)
+          clinicsSkipped++
+          continue
+        }
+
+        logInfo(`Processing authorized clinic: ${clinic.name}`)
+        clinicsProcessed++
 
         // Check SMS capabilities
         const hasSMS = clinic.twilio_config && 
@@ -297,6 +366,7 @@ async function processNurturingFollowups(supabase: any) {
     }
 
     logInfo(`Follow-ups processing completed: ${smsProcessed} SMS, ${emailProcessed} emails, ${totalErrors} errors`)
+    logInfo(`Clinics processed: ${clinicsProcessed}, skipped: ${clinicsSkipped}`)
 
     return {
       success: true,
@@ -304,7 +374,9 @@ async function processNurturingFollowups(supabase: any) {
         sms: smsProcessed,
         email: emailProcessed,
         errors: totalErrors,
-        total: smsProcessed + emailProcessed
+        total: smsProcessed + emailProcessed,
+        clinicsProcessed: clinicsProcessed,
+        clinicsSkipped: clinicsSkipped
       },
       results: allResults,
       rulesProcessed: FOLLOWUP_RULES.map(r => r.name),
@@ -416,7 +488,7 @@ async function saveMessageToHistory(
 serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   }
 
@@ -438,14 +510,16 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
     logInfo('Supabase client created successfully')
 
-    // Process all nurturing follow-ups
+    // Process all nurturing follow-ups (only for demo clinics)
     logInfo('Starting nurturing follow-ups processing')
     const result = await processNurturingFollowups(supabase)
     
     logInfo('Nurturing follow-ups processing completed', {
       sms: result.summary?.sms || 0,
       email: result.summary?.email || 0,
-      errors: result.summary?.errors || 0
+      errors: result.summary?.errors || 0,
+      clinicsProcessed: result.summary?.clinicsProcessed || 0,
+      clinicsSkipped: result.summary?.clinicsSkipped || 0
     })
     
     return new Response(
