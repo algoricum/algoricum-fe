@@ -121,7 +121,7 @@ if (!code || !state) {
       });
     }
     if (error) {
-      const redirectUrl = new URL(`${redirectUri}onboarding`);
+      const redirectUrl = new URL(`${redirectUri}`);
       redirectUrl.searchParams.set("google_form_status", "error");
       redirectUrl.searchParams.set("error", error);
 
@@ -155,7 +155,7 @@ if (!code || !state) {
     });
 
     if (!tokenResponse.ok) {
-      const redirectUrl = new URL(`${redirectUri}/onboarding`);
+      const redirectUrl = new URL(`${redirectUri}`);
       redirectUrl.searchParams.set("google_form_status", "error");
       redirectUrl.searchParams.set("error", "token_exchange_failed");
 
@@ -190,7 +190,7 @@ if (!code || !state) {
 
     if (connectionError) {
       console.error("Database error:", connectionError);
-      const redirectUrl = new URL(`${redirectUri}/onboarding`);
+      const redirectUrl = new URL(`${redirectUri}`);
       redirectUrl.searchParams.set("google_form_status", "error");
       redirectUrl.searchParams.set("error", "database_error");
 
@@ -204,7 +204,7 @@ if (!code || !state) {
     }
 
     // Redirect to success page with connection ID
-      const redirectUrl = new URL(`${redirectUri}/onboarding`);
+      const redirectUrl = new URL(`${redirectUri}`);
     redirectUrl.searchParams.set("google_form_status", "success");
     redirectUrl.searchParams.set("connection_id", connection.id);
 
@@ -217,7 +217,7 @@ if (!code || !state) {
     });
   } catch (error) {
     console.error("OAuth callback error:", error);
-      const redirectUrl = new URL(`${APP_URL}/onboarding`);
+      const redirectUrl = new URL(`${APP_URL}`);
     redirectUrl.searchParams.set("google_form_status", "error");
     redirectUrl.searchParams.set("error", "unexpected_error");
 

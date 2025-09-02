@@ -409,7 +409,7 @@ export const connectToNextHealth = async (apiKey: string,setButtonLoading:any) =
     console.log("NextHealth response:", data);
     //redirect
     SuccessToast("NextHealth connected successfully");
-    window.location.href = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000" + "/onboarding?next_health_status=success";
+    window.location.href = window.location.href+"?next_health_status=success";
 
     return data;
   } catch (err) {
