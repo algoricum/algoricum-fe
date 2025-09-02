@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-// import { handleCsvUpload } from "@/utils/csvUtils"
+import { handleCsvUpload } from "@/utils/csvUtils";
 import { Button } from "antd";
 
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -16,8 +16,8 @@ import TodayTasks from "./TodayTasks";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 
-import { X, CheckCircle, Bot } from "lucide-react";
-// import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
+import { X, Bot } from "lucide-react";
+import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
 import AiActivityLog from "./AiActivityLogs";
 import ChatbotTrainingModal from "@/components/common/TrainingChatbotModal/chatbot-training-modal";
 
@@ -41,14 +41,9 @@ export default function DashboardPage() {
   const [appointmentFilter, setAppointmentFilter] = useState<"today" | "week" | "month" | "year">("month");
 
   // Integrations state
-  const [hubspotConnected, setHubspotConnected] = useState(false);
-  const [pipedriveActive, setPipedriveActive] = useState(true);
-  // const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
+  const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
   const [showTrainingModal, setShowTrainingModal] = useState(false);
-
-  const [showPipedriveBanner, setShowPipedriveBanner] = useState(false);
-  const [showHubspotBanner, setShowHubspotBanner] = useState(false);
-  // const [showCsvBanner] = useState(true)
+  const [showCsvBanner,] = useState(true);
 
   // Modal state
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -63,8 +58,6 @@ export default function DashboardPage() {
       try {
         const data = await getClinicData();
         if (data?.id) setClinicId(data.id);
-        if (data?.uses_hubspot) setShowHubspotBanner(true);
-        if (data?.use_pipedrive) setShowPipedriveBanner(true);
       } catch (e) {
         console.error("Error fetching clinic data:", e);
       }
@@ -180,138 +173,86 @@ export default function DashboardPage() {
         <Header title="Dashboard Overview" description="Welcome back! Here's what's happening with your clinic today." showHamburgerMenu />
       }
     >
-      <div className="space-y-8 p-4 sm:p-6">
+      <div className="space-y-8 p-0 sm:p-4">
         {/* Integration Banners */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* HubSpot */}
-          {showHubspotBanner && (
-            <div className={`rounded-lg border p-4 ${hubspotConnected ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center font-semibold text-gray-900">
-                    <span>HubSpot Integration</span>
-                    {hubspotConnected && <CheckCircle className="ml-2 h-4 w-4 text-green-600" />}
+        <div className="w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* CSV Upload Banner */}
+            {showCsvBanner && (
+              <div className="w-full rounded-xl border-2 p-4 bg-blue-50 border-blue-200 shadow-sm transition-all hover:shadow-md">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-lg p-3 bg-blue-100 border border-blue-200">
+                      <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-gray-900 block mb-1">Upload CSV Leads</span>
+                      <p className="text-sm text-gray-600 leading-relaxed">
+                        Import your leads data from CSV files to get started quickly with your patient management.
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">
-                    {hubspotConnected
-                      ? "HubSpot is connected and syncing data successfully."
-                      : "Connect your HubSpot account to sync leads and contacts automatically."}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
-                  {!hubspotConnected && (
-                    <button onClick={() => setHubspotConnected(true)} className="btn btn-primary btn-sm w-full md:w-auto">
-                      Connect HubSpot
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setShowHubspotBanner(false)}
-                    className="inline-flex w-full items-center justify-center rounded-md px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 md:w-auto"
-                    aria-label="Dismiss HubSpot banner"
-                  >
-                    <X className="mr-1 h-4 w-4" />
-                    Dismiss
-                  </button>
+                  <div className="flex-shrink-0">
+                    <Button
+                      onClick={() => setShowManualLeadsModal(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                      aria-label="Open CSV upload modal"
+                    >
+                      Upload CSV
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Pipedrive */}
-          {showPipedriveBanner && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center font-semibold text-gray-900">
-                    <span>Pipedrive Integration</span>
+            {/* ChatBot Training Banner */}
+            <div className="w-full rounded-xl border-2 p-4 bg-purple-50 border-purple-200 shadow-sm transition-all hover:shadow-md">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-lg p-3 bg-purple-100 border border-purple-200">
+                    <Bot className="h-5 w-5 text-purple-600" />
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">
-                    {pipedriveActive
-                      ? "Pipedrive integration is active and working properly."
-                      : "Pipedrive integration is currently inactive."}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
-                  <button
-                    onClick={() => setPipedriveActive(p => !p)}
-                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                      pipedriveActive ? "bg-green-500" : "bg-gray-300"
-                    }`}
-                    aria-pressed={pipedriveActive}
-                    aria-label="Toggle Pipedrive"
-                    type="button"
-                  >
-                    <span
-                      className={`inline-block h-6 w-6 translate-x-1 rounded-full bg-white transition-transform ${
-                        pipedriveActive ? "translate-x-7" : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                  <button
-                    onClick={() => setShowPipedriveBanner(false)}
-                    className="inline-flex w-full items-center justify-center rounded-md px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 md:w-auto"
-                    aria-label="Dismiss Pipedrive banner"
-                  >
-                    <X className="mr-1 h-4 w-4" />
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ChatBot Training Banner */}
-          <div className="rounded-lg border p-4 bg-purple-50 border-purple-200">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              {/* Left: icon + title + desc */}
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-md p-1.5 bg-purple-100">
-                  <Bot className="h-4 w-4 text-purple-600" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center font-semibold text-gray-900">
-                    <span>Train Your ChatBot Now</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-semibold text-gray-900 block mb-1">Train Your ChatBot Now</span>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      Upload training documents to enhance your ChatBot&apos;s knowledge and improve patient interactions.
+                    </p>
                   </div>
-                  <p className="mt-1 text-sm text-gray-600">
-                    Upload training documents to enhance your ChatBot&apos;s knowledge and improve patient interactions.
-                  </p>
                 </div>
-              </div>
-
-              {/* Right: actions – stacked on mobile, inline on md+ */}
-              <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2 md:self-center md:shrink-0">
-                <Button
-                  type="primary"
-                  onClick={() => setShowTrainingModal(true)}
-                  icon={<Bot className="h-4 w-4" />}
-                  className="w-full md:w-auto"
-                  style={{
-                    backgroundColor: "#9D5EE3",
-                    borderColor: "#9D5EE3",
-                    height: "40px",
-                    paddingLeft: "20px",
-                    paddingRight: "20px",
-                    fontWeight: "500",
-                  }}
-                  aria-label="Open ChatBot training modal"
-                >
-                  Train Now
-                </Button>
+                <div className="flex-shrink-0">
+                  <Button
+                    onClick={() => setShowTrainingModal(true)}
+                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    aria-label="Open ChatBot training modal"
+                  >
+                    <Bot className="h-4 w-4 mr-2" />
+                    Train Now
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Stats Grid - Pass leadsData directly for real-time updates */}
-        <StatsGrid clinicId={clinicId} leadsData={leadsData} />
+        <div className="mt-8">
+          <StatsGrid clinicId={clinicId} leadsData={leadsData} />
+        </div>
 
         {/* Charts Grid */}
-        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="card lg:col-span-2">
-            <div className="mb-6 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Appointment Trends</h3>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 mt-8">
+          <div className="lg:col-span-2 bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
+            <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Appointment Trends</h3>
               <select
-                className="rounded-lg border border-gray-300 px-3 py-1 text-sm"
+                className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
                 value={appointmentFilter}
                 onChange={e => setAppointmentFilter(e.target.value as typeof appointmentFilter)}
               >
@@ -321,55 +262,72 @@ export default function DashboardPage() {
                 <option value="year">This Year</option>
               </select>
             </div>
-            <SimpleBarChart appointmentsData={filteredLeadsForChart} filter={appointmentFilter} />
+            <div className="mt-4">
+              <SimpleBarChart appointmentsData={filteredLeadsForChart} filter={appointmentFilter} />
+            </div>
           </div>
 
-          <TodayTasks clinicId={clinicId} />
+          <div className="bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
+            <TodayTasks clinicId={clinicId} />
+          </div>
         </div>
 
         {/* Conversion Funnel and AI Activity Log - Horizontal Layout */}
         {clinicId && (
-          <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 mt-8">
             {/* Left Side - Conversion Funnel */}
-            <div className="card">
-              <h3 className="mb-6 text-lg font-semibold">Conversion Funnel</h3>
-              <ConversionFunnel clinicId={clinicId} />
+            <div className="bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
+              <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-4 mb-6">Conversion Funnel</h3>
+              <div className="mt-4">
+                <ConversionFunnel clinicId={clinicId} />
+              </div>
             </div>
 
             {/* Right Side - AI Activity Log */}
-            <div className="card">
+            <div className="bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
               <AiActivityLog clinicId={clinicId} />
             </div>
           </div>
         )}
       </div>
-
       {/* Add Task Modal (kept for parity; closed by default) */}
       {showAddTaskModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Add New Task</h3>
-              <button
-                onClick={() => setShowAddTaskModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label="Close add task modal"
-              >
-                <X className="h-6 w-6" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-white border-2 border-gray-200 shadow-xl">
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Add New Task</h3>
+                <button
+                  onClick={() => setShowAddTaskModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  aria-label="Close add task modal"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
             </div>
-            {/* Your form implementation can go here */}
-            <p className="text-sm text-gray-600">Add Task form placeholder…</p>
+            <div className="p-6">
+              {/* Your form implementation can go here */}
+              <p className="text-sm text-gray-600">Add Task form placeholder…</p>
+            </div>
           </div>
         </div>
       )}
-
-      {/* <CsvUploadModal
+      <CsvUploadModal
         open={showManualLeadsModal}
-        onOk={handleCsvUploadComplete}
+        onOk={async leads => {
+          try {
+            await handleCsvUpload(leads, true); // The second parameter triggers the upload
+            setShowManualLeadsModal(false); // Close modal after successful upload
+            await fetchLeads(); // Refresh the leads data
+            // You might want to show a success toast here
+          } catch (error) {
+            console.error("Upload failed:", error);
+            // Error is already handled in handleCsvUpload, but modal stays open
+          }
+        }}
         onCancel={() => setShowManualLeadsModal(false)}
-      /> */}
-
+      />
       <ChatbotTrainingModal open={showTrainingModal} onClose={() => setShowTrainingModal(false)} />
     </DashboardLayout>
   );

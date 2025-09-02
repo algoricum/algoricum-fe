@@ -9,7 +9,7 @@ import StaffHoursStep from "./staff-hours-step";
 // import ToneIdentityStep from "./tone-identity-step";
 // import AiAssistantStep from "./ai-assistant-step";
 import BookingSetupStep from "./booking-setup-step";
-import IntegrationsStep from "./integrations-step";
+import IntegrationsStep from "./Integration";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 // Import your existing services and helpers
 import apiKeyService from "@/services/apiKey";
@@ -588,7 +588,7 @@ export default function MainOnboarding() {
             return (
               <div key={step.id} className={`relative ${index === STEPS.length - 1 ? "" : "mb-3"}`}>
                 {/* Vertical connecting line */}
-                {index < STEPS.length - 1 && <div className="absolute left-3 top-5 w-px h-3 bg-white bg-opacity-30 z-10" />}
+                {index < STEPS.length - 1 && <div className="absolute left-3 top-6 w-px h-6 bg-white bg-opacity-30 z-10" />}
 
                 <div
                   className={`flex items-start cursor-pointer opacity-100 ${isAccessible ? "cursor-pointer" : "cursor-default opacity-70"}`}

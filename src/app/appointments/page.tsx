@@ -3,11 +3,12 @@
 import type React from "react";
 import { useState, useEffect, useRef } from "react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { Calendar, CheckCircle, Clock, X, SearchIcon, Plus, MoreVertical, Edit, Trash2, Mail, PhoneIcon } from "lucide-react";
+import { Calendar, CheckCircle, Clock, SearchIcon, Plus, MoreVertical, Edit, Trash2, Mail, PhoneIcon } from "lucide-react";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
 import { appointmentHelper, type MeetingSchedule } from "@/utils/appointment-helper";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { Form } from "antd";
 import { createClient } from "@/utils/supabase/config/client";
 import dayjs from "dayjs";
@@ -16,11 +17,6 @@ import { StatCard } from "@/components/appointments/stat-card";
 import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
 import { EditStatusModal } from "@/components/appointments/edit-status-modal";
 import { DeleteConfirmationModal } from "@/components/appointments/delete-confirmation-modal";
-
-interface Message {
-  type: "error" | "success";
-  text: string;
-}
 
 export default function AppointmentsPage() {
   const [appointmentsData, setAppointmentsData] = useState<MeetingSchedule[]>([]);
@@ -33,13 +29,13 @@ export default function AppointmentsPage() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [message, setMessage] = useState<Message | null>(null);
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [, setPhoneError] = useState<string>("");
   const [form] = Form.useForm();
-  const dropdownRef = useRef<HTMLTableCellElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
 
   const supabase = createClient();
 
@@ -51,12 +47,10 @@ export default function AppointmentsPage() {
       try {
         const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
         setAppointmentsData(meetings);
+        
       } catch (error) {
         console.error("Error loading appointments:", error);
-        setMessage({
-          type: "error",
-          text: "Failed to load appointments. Please try again.",
-        });
+        ErrorToast("Failed to load appointments. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -70,19 +64,14 @@ export default function AppointmentsPage() {
       try {
         const clinic_id = await getCurrentUserClinic();
         if (!clinic_id) {
-          setMessage({
-            type: "error",
-            text: "No clinic found. Please make sure you have a clinic set up.",
-          });
+          ErrorToast("No clinic found. Please make sure you have a clinic set up.");
           return;
         }
         setClinicId(clinic_id);
+        
       } catch (error) {
         console.error("Error fetching clinic ID:", error);
-        setMessage({
-          type: "error",
-          text: "Failed to fetch clinic information.",
-        });
+        ErrorToast("Failed to fetch clinic information.");
       }
     };
     fetchClinicId();
@@ -95,21 +84,13 @@ export default function AppointmentsPage() {
         setActiveDropdown(null);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  // Clear message after 5 seconds
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => {
-        setMessage(null);
-      }, 5000);
-      return () => clearTimeout(timer);
+    if (activeDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
     }
-  }, [message]);
+  }, [activeDropdown]);
 
   // Clear copied link indicator after 2 seconds
   useEffect(() => {
@@ -121,13 +102,9 @@ export default function AppointmentsPage() {
     }
   }, [copiedLink]);
 
-
   const handleAddAppointment = async () => {
     if (!clinicId) {
-      setMessage({
-        type: "error",
-        text: "No clinic found. Please make sure you have a clinic set up.",
-      });
+      ErrorToast("No clinic found. Please make sure you have a clinic set up.");
       return;
     }
     setShowAddAppointmentModal(true);
@@ -142,17 +119,20 @@ export default function AppointmentsPage() {
         const time = dayjs(values.preferred_meeting_time).format("HH:mm:ss");
         fullDateTime = `${date} ${time}`;
       }
-      
-      const { error } = await supabase.from("meeting_schedule").upsert([
-        {
-          username: `${values.first_name} ${values.last_name}`.trim(),
-          email: values.email,
-          phone_number: values.phone_number || phoneNumber,
-          preferred_meeting_time: fullDateTime,
-          meeting_notes: values.meeting_notes || null,
-          clinic_id: clinicId,
-        },
-      ], { onConflict: "email" });
+
+      const { error } = await supabase.from("meeting_schedule").upsert(
+        [
+          {
+            username: `${values.first_name} ${values.last_name}`.trim(),
+            email: values.email,
+            phone_number: values.phone_number || phoneNumber,
+            preferred_meeting_time: fullDateTime,
+            meeting_notes: values.meeting_notes || null,
+            clinic_id: clinicId,
+          },
+        ],
+        { onConflict: "email" },
+      );
 
       const { data: leadSourceData, error: leadSourceError } = await supabase
         .from("lead_source")
@@ -160,25 +140,25 @@ export default function AppointmentsPage() {
         .eq("name", "Others")
         .single();
 
-      const { error: leadError } = await supabase.from("lead").upsert([
-        {
-          first_name: values.first_name.trim(),
-          last_name: values.last_name.trim(),
-          email: values.email,
-          phone: values.phone_number || phoneNumber,
-          status: "Booked",
-          interest: "medium",
-          clinic_id: clinicId,
-          source_id: leadSourceData?.id,
-        },
-      ],{ onConflict: "email,clinic_id" });
+      const { error: leadError } = await supabase.from("lead").upsert(
+        [
+          {
+            first_name: values.first_name.trim(),
+            last_name: values.last_name.trim(),
+            email: values.email,
+            phone: values.phone_number || phoneNumber,
+            status: "Booked",
+            interest_level: "medium",
+            clinic_id: clinicId,
+            source_id: leadSourceData?.id,
+          },
+        ],
+        { onConflict: "email,clinic_id" },
+      );
 
       if (error || leadError || leadSourceError) {
         if (error?.code === "23505") {
-          setMessage({
-            type: "error",
-            text: "This email is already registered for a meeting",
-          });
+          ErrorToast("This email is already registered for a meeting");
         } else {
           throw error;
         }
@@ -189,20 +169,14 @@ export default function AppointmentsPage() {
       const meetings = await appointmentHelper.getMeetingsByClinic(clinicId!);
       setAppointmentsData(meetings);
 
-      setMessage({
-        type: "success",
-        text: "Meeting schedule saved successfully!",
-      });
+      SuccessToast("Meeting schedule saved successfully!");
       form.resetFields();
       setPhoneNumber("");
       setPhoneError("");
       setShowAddAppointmentModal(false);
     } catch (error: any) {
       console.error("Error saving meeting schedule:", error);
-      setMessage({
-        type: "error",
-        text: error.message || "Failed to save meeting schedule",
-      });
+      ErrorToast(error.message || "Failed to save meeting schedule");
     } finally {
       setIsSubmitting(false);
     }
@@ -210,7 +184,10 @@ export default function AppointmentsPage() {
 
   const handleEditStatus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedAppointment) return;
+    
+    if (!selectedAppointment) {
+      return;
+    }
     setIsSubmitting(true);
     try {
       const updatedMeeting = await appointmentHelper.updateMeetingStatus(selectedAppointment.id, selectedAppointment.status);
@@ -218,20 +195,20 @@ export default function AppointmentsPage() {
       setAppointmentsData(prev => prev.map(apt => (apt.id === selectedAppointment.id ? updatedMeeting : apt)));
       setShowEditStatusModal(false);
       setSelectedAppointment(null);
-      setMessage({ type: "success", text: "Appointment status updated successfully!" });
+      SuccessToast("Appointment status updated successfully!");
     } catch (error: any) {
       console.error("Error updating appointment:", error);
-      setMessage({
-        type: "error",
-        text: error.message || "Failed to update appointment status. Please try again.",
-      });
+      ErrorToast(error.message || "Failed to update appointment status. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDeleteAppointment = async () => {
-    if (!selectedAppointment) return;
+    
+    if (!selectedAppointment) {
+      return;
+    }
     setIsSubmitting(true);
     try {
       await appointmentHelper.deleteMeeting(selectedAppointment.id);
@@ -239,37 +216,43 @@ export default function AppointmentsPage() {
       setAppointmentsData(prev => prev.filter(apt => apt.id !== selectedAppointment.id));
       setShowDeleteConfirmation(false);
       setSelectedAppointment(null);
-      setMessage({ type: "success", text: "Appointment deleted successfully!" });
+      SuccessToast("Appointment deleted successfully!");
     } catch (error: any) {
       console.error("Error deleting appointment:", error);
-      setMessage({
-        type: "error",
-        text: error.message || "Failed to delete appointment. Please try again.",
-      });
+      ErrorToast(error.message || "Failed to delete appointment. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const toggleDropdown = (e: React.MouseEvent, appointmentId: string) => {
-    e.preventDefault();
     e.stopPropagation();
-    setActiveDropdown(activeDropdown === appointmentId ? null : appointmentId);
+    if (activeDropdown === appointmentId) {
+      setActiveDropdown(null);
+    } else {
+      // Calculate position relative to viewport
+      const rect = e.currentTarget.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8, // 8px gap below the button
+        left: rect.right - 192, // 192px is the width of dropdown (w-48)
+      });
+      setActiveDropdown(appointmentId);
+    }
   };
 
   const openEditModal = (appointment: MeetingSchedule) => {
     setSelectedAppointment(appointment);
     setShowEditStatusModal(true);
     setActiveDropdown(null);
+    
   };
 
   const openDeleteConfirmation = (appointment: MeetingSchedule) => {
+    
     setSelectedAppointment(appointment);
     setShowDeleteConfirmation(true);
     setActiveDropdown(null);
   };
-
-
 
   // Filter appointments based on search and status
   const filteredAppointments = appointmentsData.filter(appointment => {
@@ -313,25 +296,9 @@ export default function AppointmentsPage() {
 
   return (
     <DashboardLayout header={<Header title="Appointments" description="Manage patient appointments and scheduling." showHamburgerMenu />}>
-      <div>
-        {/* Message */}
-        {message && (
-          <div
-            className={`mb-6 rounded-lg border p-4 ${
-              message.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-green-200 bg-green-50 text-green-800"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">{message.text}</p>
-              <button onClick={() => setMessage(null)} className="text-gray-400 hover:text-gray-600">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Stats: single row per card on mobile */}
-        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="space-y-6 px-4">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <StatCard
             icon={<Calendar className="h-5 w-5 text-blue-600 md:h-6 md:w-6" />}
             iconBg="bg-blue-100"
@@ -352,107 +319,83 @@ export default function AppointmentsPage() {
           />
         </div>
 
-        {/* Filters + Action: mobile stacks 100% width, md+ inline and compact */}
-        <div className="rounded-lg bg-white p-4 shadow sm:p-6">
-          <div className="mb-4 md:mb-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              {/* Left: inputs group */}
-              <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:gap-4 md:pr-4">
-                {/* Search */}
-                <div className="relative md:w-[320px]">
-                  <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by name, email, or notes..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-10 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Status */}
-                <select
-                  value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 md:w-[220px]"
-                >
-                  <option value="all">All Status</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
-
-              {/* Right: action button */}
-              <button
-                onClick={handleAddAppointment}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-purple-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-purple-700 md:h-10 md:w-auto"
-              >
-                <Plus className="h-4 w-4" />
-                Add Appointment
-              </button>
-            </div>
-
-            {/* Filter Indicator */}
-            {(searchQuery || statusFilter !== "all") && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                <span>
-                  {filteredAppointments.length} of {appointmentsData.length} appointments
-                </span>
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setStatusFilter("all");
-                  }}
-                  className="text-purple-600 underline hover:text-purple-800"
-                >
-                  Clear filters
-                </button>
-              </div>
-            )}
+        {/* Search and Filter Controls */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Search Bar */}
+          <div className="relative flex-1 max-w-md">
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search appointments..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            />
           </div>
 
-          {/* Table wrapper: allows horizontal scroll on small screens */}
-          <div className="relative -mx-4 max-w-full overflow-x-auto touch-pan-x overscroll-x-contain md:mx-0 md:overflow-visible">
-            <table className="w-full min-w-[900px] sm:min-w-0">
+          {/* Filter and Add Button */}
+          <div className="flex gap-3">
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            >
+              <option value="all">All Status</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="pending">Pending</option>
+            </select>
+
+            {/* Add Appointment Button */}
+            <button
+              onClick={handleAddAppointment}
+              className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Appointment
+            </button>
+          </div>
+        </div>
+
+        {/* Enhanced Table */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto overflow-y-visible">
+            <table className="w-full min-w-[900px]">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Patient</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Email</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Phone</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Date & Time</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Meeting Notes</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Actions</th>
+                <tr className="border-b-2 border-gray-100 bg-gradient-to-r from-gray-50 to-gray-100">
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Patient</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Email</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Phone</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Date & Time</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Meeting Notes</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Status</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100">
                 {filteredAppointments.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-12 text-center">
                       {appointmentsData.length === 0 ? (
                         <div className="flex flex-col items-center">
-                          <Calendar className="mb-4 h-12 w-12 text-gray-300" />
-                          <p className="mb-2 text-lg font-medium text-gray-600">No appointments yet</p>
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-4">
+                            <Calendar className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <p className="mb-2 text-lg font-medium text-gray-700">No appointments yet</p>
                           <p className="text-sm text-gray-500">Create your first appointment to get started</p>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center">
-                          <SearchIcon className="mb-4 h-12 w-12 text-gray-300" />
-                          <p className="mb-2 text-lg font-medium text-gray-600">No appointments match your filters</p>
+                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-4">
+                            <SearchIcon className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <p className="mb-2 text-lg font-medium text-gray-700">No appointments match your filters</p>
                           <button
                             onClick={() => {
                               setSearchQuery("");
                               setStatusFilter("all");
                             }}
-                            className="text-sm text-purple-600 underline hover:text-purple-800"
+                            className="mt-2 text-sm font-medium text-purple-600 transition-colors hover:text-purple-800 underline underline-offset-2"
                           >
                             Clear filters to see all appointments
                           </button>
@@ -461,102 +404,101 @@ export default function AppointmentsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredAppointments.map(appointment => {
+                  filteredAppointments.map((appointment, index) => {
                     const { date, time } = formatAppointmentDateTime(appointment.preferred_meeting_time);
                     return (
-                      <tr key={appointment.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <tr
+                        key={appointment.id}
+                        className={`group transition-all duration-200 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50 hover:shadow-sm ${
+                          index % 2 === 0 ? "bg-white" : "bg-gray-50/30"
+                        }`}
+                      >
                         {/* Patient */}
-                        <td className="px-4 py-3">
+                        <td className="px-6 py-4">
                           <div className="flex items-center">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-semibold text-blue-600">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-blue-100 to-purple-100 font-semibold text-blue-700 shadow-sm ring-2 ring-white">
                               {appointment.username
                                 .split(" ")
                                 .map(n => n[0])
                                 .join("")
                                 .toUpperCase()}
                             </div>
-                            <div className="ml-3">
-                              <p className="font-medium text-gray-900">{appointment.username}</p>
+                            <div className="ml-4">
+                              <p className="font-medium text-gray-900 group-hover:text-gray-800">{appointment.username}</p>
                             </div>
                           </div>
                         </td>
+
                         {/* Email */}
-                        <td className="px-4 py-3">
+                        <td className="px-6 py-4">
                           <div className="flex items-center">
-                            <Mail className="mr-2 h-4 w-4 text-gray-400" />
-                            <span className="truncate text-gray-900">{appointment.email}</span>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 mr-3">
+                              <Mail className="h-4 w-4 text-gray-500" />
+                            </div>
+                            <span className="truncate text-gray-700 font-medium">{appointment.email}</span>
                           </div>
                         </td>
+
                         {/* Phone */}
-                        <td className="px-4 py-3">
+                        <td className="px-6 py-4">
                           <div className="flex items-center">
-                            <PhoneIcon className="mr-2 h-4 w-4 text-gray-400" />
-                            <span className="text-gray-900">{appointment.phone_number || "No phone"}</span>
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 mr-3">
+                              <PhoneIcon className="h-4 w-4 text-green-600" />
+                            </div>
+                            <span className="text-gray-700 font-medium">{appointment.phone_number || "No phone"}</span>
                           </div>
                         </td>
+
                         {/* Date & Time */}
-                        <td className="px-4 py-3">
-                          <div>
-                            <p className="text-gray-900">{date}</p>
-                            <p className="text-sm text-gray-500">{time}</p>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center">
+                              <div className="h-2 w-2 rounded-full bg-blue-500 mr-2"></div>
+                              <p className="font-medium text-gray-900">{date}</p>
+                            </div>
+                            <p className="text-sm text-gray-500 ml-4">{time}</p>
                           </div>
                         </td>
+
                         {/* Notes */}
-                        <td className="px-4 py-3">
+                        <td className="px-6 py-4">
                           <div className="max-w-[220px]">
-                            <p className="truncate text-sm text-gray-900" title={appointment.meeting_notes || ""}>
-                              {appointment.meeting_notes || "No notes"}
-                            </p>
+                            <div className="rounded-lg bg-gray-50 px-3 py-2 border border-gray-200">
+                              <p className="truncate text-sm text-gray-700" title={appointment.meeting_notes || ""}>
+                                {appointment.meeting_notes || "No notes"}
+                              </p>
+                            </div>
                           </div>
                         </td>
+
                         {/* Status */}
-                        <td className="px-4 py-3">
+                        <td className="px-6 py-4">
                           <span
-                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                              appointment.status === "confirmed" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                            className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset ${
+                              appointment.status === "confirmed"
+                                ? "bg-green-50 text-green-700 ring-green-600/20"
+                                : "bg-amber-50 text-amber-700 ring-amber-600/20"
                             }`}
                           >
+                            <div
+                              className={`mr-1.5 h-1.5 w-1.5 rounded-full ${
+                                appointment.status === "confirmed" ? "bg-green-600" : "bg-amber-600"
+                              }`}
+                            ></div>
                             {appointment.status === "confirmed" ? "CONFIRMED" : "PENDING"}
                           </span>
                         </td>
+
                         {/* Actions */}
-                        <td className="relative px-4 py-3" ref={activeDropdown === appointment.id ? dropdownRef : undefined}>
+                        <td className="px-6 py-4 static">
                           <div className="dropdown-container relative">
                             <button
                               onClick={e => toggleDropdown(e, appointment.id)}
-                              className="rounded-full p-2 transition-colors duration-200 hover:bg-gray-100"
+                              className="rounded-lg p-2.5 transition-all duration-200 hover:bg-gray-100 hover:shadow-sm border border-transparent hover:border-gray-200"
                               type="button"
                             >
                               <MoreVertical className="h-4 w-4 text-gray-600" />
                             </button>
-
-                            {/* Dropdown Menu */}
-                            {activeDropdown === appointment.id && (
-                              <div className="absolute z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                                <button
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    openEditModal(appointment);
-                                  }}
-                                  className="flex w-full items-center rounded-t-lg px-4 py-2 text-sm text-gray-700 transition-colors duration-200 hover:bg-gray-50"
-                                  type="button"
-                                >
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit Status
-                                </button>
-                                <button
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    openDeleteConfirmation(appointment);
-                                  }}
-                                  className="flex w-full items-center rounded-b-lg px-4 py-2 text-sm text-red-600 transition-colors duration-200 hover:bg-red-50"
-                                  type="button"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -566,9 +508,61 @@ export default function AppointmentsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Dropdown Menu Portal - Outside table container */}
+          {activeDropdown && (
+            <div className="fixed inset-0 z-[9999]">
+              {filteredAppointments.map(appointment => {
+                if (appointment.id !== activeDropdown) return null;
+
+                return (
+                  <div
+                    key={appointment.id}
+                    ref={dropdownRef}
+                    className="absolute w-48 rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5"
+                    style={{
+                      top: dropdownPosition.top,
+                      left: dropdownPosition.left,
+                    }}
+                  >
+                    <div className="py-2">
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          openEditModal(appointment);
+                          setActiveDropdown(null);
+                        }}
+                        className="flex w-full items-center px-4 py-3 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-blue-50 hover:text-blue-700"
+                        type="button"
+                      >
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-100 mr-3">
+                          <Edit className="h-3 w-3 text-blue-600" />
+                        </div>
+                        Edit Status
+                      </button>
+                      <hr className="my-1 border-gray-100" />
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          openDeleteConfirmation(appointment);
+                        }}
+                        className="flex w-full items-center px-4 py-3 text-sm font-medium text-red-600 transition-colors duration-200 hover:bg-red-50"
+                        type="button"
+                      >
+                        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-red-100 mr-3">
+                          <Trash2 className="h-3 w-3 text-red-600" />
+                        </div>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Add Appointment Modal - Enhanced Schedule Meeting Form */}
+        {/* Modals */}
         <AddAppointmentModal
           isOpen={showAddAppointmentModal}
           onClose={() => {
@@ -582,7 +576,6 @@ export default function AppointmentsPage() {
           clinicId={clinicId}
         />
 
-        {/* Edit Status Modal */}
         <EditStatusModal
           isOpen={showEditStatusModal}
           onClose={() => {
@@ -595,7 +588,6 @@ export default function AppointmentsPage() {
           onStatusChange={status => setSelectedAppointment(prev => (prev ? { ...prev, status } : null))}
         />
 
-        {/* Delete Confirmation Modal */}
         <DeleteConfirmationModal
           isOpen={showDeleteConfirmation}
           onClose={() => {

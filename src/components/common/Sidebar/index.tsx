@@ -3,12 +3,13 @@ import footerItems from "@/constants/footerItems";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useCallback, useState, useEffect } from "react";
+import type React from "react";
+import { useCallback, useState, useEffect } from "react";
 import { signOut } from "@/utils/supabase/auth-helper";
 import menuItems from "@/constants/menuItems";
 import { createClient } from "@/utils/supabase/config/client";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"; // Import your LoadingSpinner
-import { User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 import Image from "next/image";
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -53,7 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
         return push("/staff");
       case "billing":
         return push("/billing");
-        case "integrations":
+      case "integrations":
         return push("/integrations");
       case "profileSettings":
         return push("/settings/clinic-setting");
@@ -113,7 +114,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     <div
       className={`${
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
-      } fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}
+      } fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-lg border-r-2 border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}
     >
       {/* Header of side bar*/}
       <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
@@ -132,7 +133,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-4 mt-8">
+      <nav className="flex-1 px-3 mt-3">
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Main Navigation</div>
 
         {/* Show loading spinner while fetching user data */}
