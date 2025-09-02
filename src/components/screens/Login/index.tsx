@@ -22,6 +22,16 @@ const LoginPage = () => {
   const redirectUrl = searchParams.get("redirectUrl") || "/dashboard";
   const [form] = Form.useForm();
   const { checkAndRedirectIfNoClinic } = useClinicCheck();
+
+  const handleFieldFocus = (fieldName: string) => {
+    form.setFields([
+      {
+        name: fieldName,
+        errors: [],
+      },
+    ]);
+  };
+
   const { mutate, isLoading } = useMutation((data: LoginProps) => signInWithPassword(data.email, data.password), {
     onSuccess: async (data: any) => {
       console.log("Login success data:", data); // Debug log
@@ -120,7 +130,18 @@ const LoginPage = () => {
         <h1 className="text-2xl font-bold mb-1">Welcome To Algoricum</h1>
         <p className="text-sm text-gray-600">AI-powered lead optimization for healthcare clinics</p>
       </div>
-      <Form form={form} name="login" layout="vertical" className="w-full" initialValues={{ remember: true }} onFinish={onFinish}>
+      <Form
+        form={form}
+        name="login"
+        layout="vertical"
+        className="w-full"
+        initialValues={{ remember: true }}
+        onFinish={onFinish}
+        validateTrigger="onBlur"
+        onFinishFailed={errorInfo => {
+          console.log("Form validation failed:", errorInfo);
+        }}
+      >
         <Flex vertical>
           <Form.Item
             name="email"
@@ -135,11 +156,27 @@ const LoginPage = () => {
                 message: "Invalid email address",
               },
             ]}
+            validateTrigger={["onBlur", "onSubmit"]}
           >
-            <Input prefix={<MailIcon />} className="w-full rounded-md py-2" placeholder="Type here" />
+            <Input
+              prefix={<MailIcon />}
+              className="w-full rounded-md py-2"
+              placeholder="Type here"
+              onFocus={() => handleFieldFocus("email")}
+            />
           </Form.Item>
-          <Form.Item name="password" label="Password" rules={[{ required: true, message: "Please input your password" }]}>
-            <PasswordInput prefix={<PasswordIcon />} className="w-full rounded-md py-2" placeholder="Type here" />
+          <Form.Item
+            name="password"
+            label="Password"
+            rules={[{ required: true, message: "Please input your password" }]}
+            validateTrigger={["onBlur", "onSubmit"]}
+          >
+            <PasswordInput
+              prefix={<PasswordIcon />}
+              className="w-full rounded-md py-2"
+              placeholder="Type here"
+              onFocus={() => handleFieldFocus("password")}
+            />
           </Form.Item>
           <div className="flex justify-end">
             <Link href="/forgot-password" className="text-sm text-brand-primary hover:underline">
@@ -158,7 +195,7 @@ const LoginPage = () => {
           </Form.Item>
         </Flex>
       </Form>
-      <AuthSeparator />
+      <AuthSeparator /> 
       <div className="text-center mt-2">
         <Text className="text-sm text-gray-600">
           Don&apos;t have an account?{" "}
