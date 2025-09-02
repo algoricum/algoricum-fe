@@ -177,8 +177,19 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
   if (clinicError) {
     throw clinicError;
   }
-
-  const role_id=await getRoleId()
+    
+  const isDemoUser =
+    clinicData.name?.toLowerCase().includes("demo") ||
+    clinicData.legal_business_name?.toLowerCase().includes("demo") ||
+    clinicData.dba_name?.toLowerCase().includes("demo");
+  
+  let role_id = ""
+  if (isDemoUser){
+    role_id=await getRoleId("demo_user")
+  }else{
+    role_id = await getRoleId("owner");
+  }
+  
 
   const { error: userClinicError } = await supabase.from("user_clinic").insert([
     {
