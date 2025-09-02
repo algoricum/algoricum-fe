@@ -89,10 +89,10 @@ export const fetchClinicById = createAsyncThunk(
   }
 );
 
-export const getRoleId = async () => {
+export const getRoleId = async (role:string) => {
     console.log("🔍 Fetching role ID for type: owner");
 
-    const { data, error } = await supabase.from("role").select("id").eq("type", "owner").limit(1); // Get first owner role instead of using .single()
+    const { data, error } = await supabase.from("role").select("id").eq("type", role).limit(1); // Get first owner role instead of using .single()
 
     console.log("📊 Role query result:", { data, error });
 
@@ -111,49 +111,59 @@ export const getRoleId = async () => {
     return roleId;
 };
 
+export const createClinic = createAsyncThunk("clinic/createClinic", async (clinicData: CreateClinicProps, { rejectWithValue }) => {
+  let createdClinic: Clinic | null = null;
 
-export const createClinic = createAsyncThunk(
-  'clinic/createClinic',
-  async (clinicData: CreateClinicProps, { rejectWithValue }) => {
-    try {
-      // Insert new clinic
-      const { data, error } = await supabase
-        .from('clinic')
-        .insert([clinicData])
-        .select()
-        .single();
-        
-      if (error) {
-        return rejectWithValue(error.message);
-      }
-      
-      // Create user_clinic relationship if userId is provided
-      if (clinicData.owner_id) {
+  try {
+    // 1. Insert new clinic
+    const { data, error } = await supabase.from("clinic").insert([clinicData]).select().single();
 
-        const role_id= await getRoleId()
-        const { error: relationError } = await supabase
-          .from('user_clinic')
-          .insert([{
-            user_id: clinicData.owner_id,
-            clinic_id: data.id,
-            role_id,
-            is_active: true
-          }]);
-          
-        if (relationError) {
-          return rejectWithValue(relationError.message);
-        }
-      }
-      
-      // Cache clinic data in localStorage
-      await setClinicData(data as Clinic);
-      
-      return { clinic: data as Clinic };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create clinic');
+    if (error) {
+      throw new Error(error.message);
     }
+
+    createdClinic = data as Clinic;
+
+    // 2. Check if it's a demo user
+    const isDemoUser =
+      clinicData.name?.toLowerCase().includes("demo") ||
+      clinicData.legal_business_name?.toLowerCase().includes("demo") ||
+      clinicData.dba_name?.toLowerCase().includes("demo");
+
+    let role_id = "";
+    if (isDemoUser) {
+      role_id = await getRoleId("demo_user");
+    } else {
+      role_id = await getRoleId("owner");
+    }
+
+    // 3. Insert relation in user_clinic
+    const { error: relationError } = await supabase.from("user_clinic").insert([
+      {
+        user_id: clinicData.owner_id,
+        clinic_id: createdClinic.id,
+        role_id,
+        is_active: true,
+      },
+    ]);
+
+    if (relationError) {
+      throw new Error(relationError.message);
+    }
+
+    // 4. Cache clinic data locally
+    await setClinicData(createdClinic);
+
+    return { clinic: createdClinic };
+  } catch (err: any) {
+    return rejectWithValue(err.message || "Failed to create clinic");
+  } finally {
+    // ✅ Here you can handle any cleanup logic
+    // e.g., stop a loading spinner, reset temp states, logging, etc.
+    console.log("createClinic request finished");
   }
-);
+});
+
 
 export const updateClinic = createAsyncThunk(
   'clinic/updateClinic',

@@ -177,8 +177,19 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
   if (clinicError) {
     throw clinicError;
   }
-
-  const role_id=await getRoleId()
+    
+  const isDemoUser =
+    clinicData.name?.toLowerCase().includes("demo") ||
+    clinicData.legal_business_name?.toLowerCase().includes("demo") ||
+    clinicData.dba_name?.toLowerCase().includes("demo");
+  
+  let role_id = ""
+  if (isDemoUser){
+    role_id=await getRoleId("demo_user")
+  }else{
+    role_id = await getRoleId("owner");
+  }
+  
 
   const { error: userClinicError } = await supabase.from("user_clinic").insert([
     {
@@ -206,6 +217,31 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
  */
 export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => {
   const { id, ...updateData } = data;
+  
+  const isDemoUser =
+    updateData.name?.toLowerCase().includes("demo");
+  
+  let role_id = ""
+  if (isDemoUser){
+    role_id=await getRoleId("demo_user")
+  }else{
+    role_id = await getRoleId("owner");
+  }
+
+  const { error: userClinicError } = await supabase
+  .from("user_clinic")
+  .update({
+    role_id,
+    updated_at: new Date().toISOString(),
+  })
+  .eq("clinic_id", id); // condition for which row(s) to update
+
+
+  if (userClinicError) {
+    console.error("Failed to create user-clinic relationship:", userClinicError);
+    throw userClinicError;
+  }
+
 
   // Prepare update data
   const updateObject: any = {
