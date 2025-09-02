@@ -45,13 +45,14 @@ import {
   fetchTypeformForms,
 } from "@/utils/integration-utils";
 import { getUserData } from "@/utils/supabase/user-helper";
+import Image from "next/image";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Interface for integration data from RPC
 interface IntegrationWithStatus {
-  integration_id: string;
+  id: string;
   name: string;
   integration_type: string;
   auth_type: string;
@@ -90,7 +91,13 @@ interface IntegrationStates {
 
 // Icon mapping for different integrations
 const getIntegrationIcon = (logo: string): JSX.Element => {
-  return <img src={logo} alt="Integration Logo" style={{ width: "24px", height: "24px" }} />;
+  return    <Image
+      src={logo}
+      alt={`${name} logo`}
+      width={24}
+      height={24}
+      className="object-contain"
+    />;
 };
 
 export default function IntegrationsPage() {
@@ -435,7 +442,8 @@ export default function IntegrationsPage() {
 
   const connectedIntegrations = integrations.filter(i => i.connected);
   const availableIntegrations = integrations.filter(i => !i.connected);
-
+console.log("connectedIntegrations", connectedIntegrations)
+console.log("available ")
   return (
     <DashboardLayout
       header={
@@ -456,7 +464,7 @@ export default function IntegrationsPage() {
                 </div>
                 <Row gutter={[16, 16]}>
                   {connectedIntegrations.map(integration => (
-                    <Col xs={24} sm={12} lg={8} key={integration.integration_id}>
+                    <Col xs={24} sm={12} lg={8} key={integration.id}>
                       <Card className="bg-gray-50 hover:bg-gray-100  transition border border-green-200 rounded-lg h-full">
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center shadow-sm">
@@ -512,7 +520,7 @@ export default function IntegrationsPage() {
                 </div>
                 <Row gutter={[16, 16]}>
                   {availableIntegrations.map(integration => (
-                    <Col xs={24} sm={12} lg={8} key={integration.integration_id}>
+                    <Col xs={24} sm={12} lg={8} key={integration.id}>
                       <Card
                         className="bg-gray-50 hover:bg-gray-100 transition border border-gray-200 rounded-lg h-full cursor-pointer"
                         onClick={() => handleIntegrationClick(integration)}
