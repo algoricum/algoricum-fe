@@ -199,6 +199,7 @@ serve(async (req) => {
         tools = [{ type: "file_search" }];
       }
     } catch (e) {
+      console.error('Error parsing tools JSON:', e.message);
       tools = [{ type: "file_search" }];
     }
 

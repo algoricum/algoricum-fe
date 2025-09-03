@@ -323,7 +323,7 @@ async function getDmarcRecord(domain: string, subdomain: string, mailgunDnsRecor
 
 // Helper function to execute Namecheap API calls with IP fallback
 async function executeWithIpFallback<T>(
-  // eslint-disable-next-line no-unused-vars
+   
   operation: (_clientIp: string) => Promise<T>,
   operationName: string
 ): Promise<T> {

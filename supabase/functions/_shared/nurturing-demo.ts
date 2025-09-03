@@ -212,7 +212,6 @@ async function processScheduledFollowUps(supabase: any, communicationType?: 'sms
   return processAllLeads(supabase, communicationType, FOLLOW_UP_RULES)
 }
 
-export { 
-  processScheduledFollowUps,
-  FOLLOW_UP_RULES 
+export {
+  FOLLOW_UP_RULES, processScheduledFollowUps
 }

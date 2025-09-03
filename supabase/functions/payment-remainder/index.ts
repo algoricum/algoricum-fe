@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { supabase } from "../_shared/supabaseClient.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { supabase } from "../_shared/supabaseClient.ts";
 
 async function sendEmail(to: string, subject: string, html: string, clinicMailgunDomain?: string) {
   
@@ -104,8 +104,6 @@ serve(async (req) => {
   }
 
   try {
-    const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
-    
     const now = new Date();
     const eightDaysAgo = new Date(now.getTime() - (8 * 24 * 60 * 60 * 1000));
 

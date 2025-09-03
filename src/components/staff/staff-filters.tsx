@@ -12,11 +12,11 @@ interface StaffFiltersProps {
   availableRoles: Array<{ value: string; label: string }>;
   totalStaff: number;
   filteredStaff: number;
-  // eslint-disable-next-line no-unused-vars
+   
   onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onRoleChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onStatusChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   onClearSearch: () => void;
   onClearFilters: () => void;

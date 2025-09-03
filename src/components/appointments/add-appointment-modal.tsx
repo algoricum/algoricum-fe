@@ -15,7 +15,7 @@ const { TextArea } = Input;
 interface AddAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onSubmit: (values: any) => Promise<void>;
   isSubmitting: boolean;
   clinicId: string | null;
@@ -49,6 +49,7 @@ export function AddAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting }:
       setPhoneError("");
       return true;
     } catch (error) {
+      console.error('Error validating phone number:', error);
       setPhoneError("Invalid phone number format");
       return false;
     }

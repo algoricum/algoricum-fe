@@ -34,6 +34,7 @@ export function DeleteConfirmModal({ isOpen, isDeleting, selectedStaff, onClose,
       
       onClose();
     } catch (error) {
+      console.error('Error deleting staff member:', error);
       ErrorToast("Failed to delete staff member. Please try again.");
     }
   };
