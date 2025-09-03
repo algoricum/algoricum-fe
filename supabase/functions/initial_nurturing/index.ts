@@ -142,17 +142,21 @@ async function processInitialContact(supabase: any) {
           try {
             // Use shared function to determine if initial contact should be sent
             const applicableRules = await determineFollowUpsForLead(lead, supabase, 'sms')
+            
+            logInfo(`applicatble leads rules ${applicableRules} `)
+
+            
             const shouldSendInitial = applicableRules.some(rule => rule.name === 'sms_5min_initial')
 
-            if (!shouldSendInitial) {
-              logInfo(`Lead ${lead.id} not eligible for initial contact (may already be sent)`)
-              results.push({
-                leadId: lead.id,
-                action: 'skipped',
-                reason: 'Initial contact not applicable or already sent'
-              })
-              continue
-            }
+            // if (!shouldSendInitial) {
+            //   logInfo(`Lead ${lead.id} not eligible for initial contact (may already be sent)`)
+            //   results.push({
+            //     leadId: lead.id,
+            //     action: 'skipped',
+            //     reason: 'Initial contact not applicable or already sent'
+            //   })
+            //   continue
+            // }
 
             // Get or create thread (using shared logic pattern)
             let threadId = await getOrCreateThread(lead, supabase)

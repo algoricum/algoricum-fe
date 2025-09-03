@@ -131,7 +131,7 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                 type="primary"
                 size="small"
                 icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/your-team/google-ads-lead-form-setup", "_blank")}
+                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
                 className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
               >
                 Book a Support Meeting

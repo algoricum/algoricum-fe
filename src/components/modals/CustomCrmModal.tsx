@@ -47,7 +47,7 @@ export const CustomCrmModal: React.FC<CustomCrmModalProps> = ({ open, onOk, onCa
           type="primary"
           size="large"
           icon={<CalendarOutlined />}
-          onClick={() => window.open("https://calendly.com/your-team/custom-crm-setup", "_blank")}
+          onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
           className="!mt-4 !bg-gray-600 !border-gray-600 hover:!bg-purple-600 h-12 px-8 text-lg font-medium"
         >
           Book a Support Meeting

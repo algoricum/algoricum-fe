@@ -220,7 +220,7 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
                 type="primary"
                 size="small"
                 icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/your-team/gravity-forms-setup", "_blank")}
+                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
                 className="mt-2 bg-green-600 border-green-600 hover:bg-green-700"
               >
                 Book a Support Meeting
