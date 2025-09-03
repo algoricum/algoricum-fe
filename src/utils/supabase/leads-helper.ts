@@ -276,16 +276,17 @@ export async function fetchMessagesForLead(leadId: string, clinicId: string, thr
   }
 }
 
-// Send a message to a lead
 export async function sendMessageToLead(leadId: string, clinicId: string, content: string, isFromUser: boolean = false): Promise<Message> {
   try {
-    // Get or create thread for this lead
-    let { data: thread, error: threadError } = await supabase
+    const res = await supabase
       .from("threads")
       .select("id")
       .eq("lead_id", leadId)
       .eq("clinic_id", clinicId)
       .maybeSingle();
+
+      const threadError = res.error;
+      let thread = res.data;
 
     if (threadError && threadError.code !== "PGRST116") {
       throw threadError;
