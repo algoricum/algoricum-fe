@@ -198,7 +198,6 @@ export const connectToHubSpot = async (setButtonLoading:any) => {
         apikey: SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({
-        userId: await getCurrentUserId(),
         clinic_id: clinicId,
         redirectUrl: window.location.href,
       }),
