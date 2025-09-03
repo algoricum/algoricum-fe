@@ -130,7 +130,7 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
                 type="primary"
                 size="small"
                 icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/your-team/google-form-setup", "_blank")}
+                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
                 className="mt-2 !bg-gray-500 !border-gray-500 hover:!bg-gray-600"
               >
                 Book a Support Meeting

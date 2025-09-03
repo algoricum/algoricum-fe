@@ -109,7 +109,7 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({ open, status, acc
                 type="primary"
                 size="small"
                 icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/your-team/nexhealth-setup", "_blank")}
+                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
                 className="mt-2 bg-blue-600 border-blue-600 hover:bg-blue-700"
               >
                 Book a Support Meeting
