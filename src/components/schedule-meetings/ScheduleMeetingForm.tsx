@@ -60,19 +60,21 @@ const ScheduleMeetingForm = ({ supabase, clinicId, onSuccess }: ScheduleMeetingF
         .single();
 
       // Insert into leads
-      const { error: leadError } = await supabase.from("lead").upsert([
-        {
-          first_name: values.first_name.trim(),
-          last_name: values.last_name.trim(),
-          email: values.email,
-          phone: phoneNumber || values.phone_number,
-          status: "Booked",
-          clinicId: clinicId,
-          interest:"medium",
-          lead_source: leadSourceData?.id,
-        },
-      ], { onConflict: "email,clinic_id" }
-    );
+      const { error: leadError } = await supabase.from("lead").upsert(
+        [
+          {
+            first_name: values.first_name.trim(),
+            last_name: values.last_name.trim(),
+            email: values.email,
+            phone: phoneNumber || values.phone_number,
+            status: "Booked",
+            clinic_id: clinicId,
+            interest: "medium",
+            lead_source: leadSourceData?.id,
+          },
+        ],
+        { onConflict: "email,clinic_id" },
+      );
 
       if (error || leadError || leadSourceError) {
         if (error?.code === "23505") {
