@@ -32,11 +32,22 @@ serve(async req => {
     }
     const { data: clinic, error: clinicError } = await supabase
       .from("clinic")
-      .select("id, stripe_customer_id, name, email")
+      .select("id, stripe_customer_id, name, email,owner_id")
       .eq("id", clinic_id)
       .single();
     if (clinicError || !clinic) {
       return new Response("Clinic not found", {
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+    const {data:user,error:userError}=await supabase
+    .from("user")
+    .select("id, email")
+    .eq("id", clinic.owner_id)
+    .single();
+    if (userError || !user) {
+      return new Response("User not found", {
         status: 404,
         headers: corsHeaders,
       });
@@ -46,7 +57,7 @@ serve(async req => {
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         name: clinic.name || "Unknown Client",
-        email: clinic.email || undefined,
+        email: clinic.email || user.email||undefined,
         metadata: {
           clinic_id,
         },
