@@ -78,208 +78,208 @@ function logError(message: string, error?: any) {
 
 // Complete follow-up rules - ONLY ADDED tolerance windows, everything else stays the same
 const FOLLOW_UP_RULES: FollowUpRule[] = [
-  // SMS FLOW
+  // SMS FLOW - All set to 3 minutes
   {
     name: 'sms_5min_initial',
-    timeFromCreated: 5 * 60 * 1000, // 5 minutes
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 5 minutes)
     leadStatus: ['New'],
     communicationType: 'sms',
     onlyOnce: true,
-    toleranceWindow: 2 * 60 * 1000 // 2 minutes
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'sms_2day_followup',
-    timeFromCreated: 2 * 24 * 60 * 60 * 1000, // 2 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 2 days)
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 30 * 60 * 1000 // 30 minutes
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'sms_5day_followup',
-    timeFromCreated: 5 * 24 * 60 * 60 * 1000, // 5 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 5 days)
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 60 * 60 * 1000 // 1 hour
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'sms_10day_followup',
-    timeFromCreated: 10 * 24 * 60 * 60 * 1000, // 10 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 10 days)
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 2 * 60 * 60 * 1000 // 2 hours
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'sms_20day_followup',
-    timeFromCreated: 20 * 24 * 60 * 60 * 1000, // 20 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 20 days)
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000 // 4 hours
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   
-  // EMAIL FLOW (starts from day 21)
+  // EMAIL FLOW - All set to 3 minutes (changed from day-based schedule)
   {
     name: 'email_21day_followup',
-    timeFromCreated: 21 * 24 * 60 * 60 * 1000, // 21 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 21 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000 // 4 hours
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_24day_followup',
-    timeFromCreated: 24 * 24 * 60 * 60 * 1000, // 24 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 24 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_27day_followup',
-    timeFromCreated: 27 * 24 * 60 * 60 * 1000, // 27 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 27 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_30day_followup',
-    timeFromCreated: 30 * 24 * 60 * 60 * 1000, // 30 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 30 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_33day_followup',
-    timeFromCreated: 33 * 24 * 60 * 60 * 1000, // 33 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 33 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_36day_followup',
-    timeFromCreated: 36 * 24 * 60 * 60 * 1000, // 36 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 36 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_39day_followup',
-    timeFromCreated: 39 * 24 * 60 * 60 * 1000, // 39 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 39 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_42day_followup',
-    timeFromCreated: 42 * 24 * 60 * 60 * 1000, // 42 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 42 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_45day_followup',
-    timeFromCreated: 45 * 24 * 60 * 60 * 1000, // 45 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 45 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 4 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_50day_followup',
-    timeFromCreated: 50 * 24 * 60 * 60 * 1000, // 50 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 50 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 6 * 60 * 60 * 1000 // 6 hours
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_55day_followup',
-    timeFromCreated: 55 * 24 * 60 * 60 * 1000, // 55 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 55 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 6 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_60day_followup',
-    timeFromCreated: 60 * 24 * 60 * 60 * 1000, // 60 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 60 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 6 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_70day_followup',
-    timeFromCreated: 70 * 24 * 60 * 60 * 1000, // 70 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 70 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 12 * 60 * 60 * 1000 // 12 hours
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_80day_followup',
-    timeFromCreated: 80 * 24 * 60 * 60 * 1000, // 80 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 80 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 12 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_90day_followup',
-    timeFromCreated: 90 * 24 * 60 * 60 * 1000, // 90 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 90 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 24 * 60 * 60 * 1000 // 24 hours
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_100day_followup',
-    timeFromCreated: 100 * 24 * 60 * 60 * 1000, // 100 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 100 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 24 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_110day_followup',
-    timeFromCreated: 110 * 24 * 60 * 60 * 1000, // 110 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 110 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 24 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_115day_followup',
-    timeFromCreated: 115 * 24 * 60 * 60 * 1000, // 115 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 115 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 24 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_118day_followup',
-    timeFromCreated: 118 * 24 * 60 * 60 * 1000, // 118 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 118 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 24 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   },
   {
     name: 'email_120day_followup',
-    timeFromCreated: 120 * 24 * 60 * 60 * 1000, // 120 days
+    timeFromCreated: 3 * 60 * 1000, // 3 minutes (changed from 120 days)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
-    toleranceWindow: 24 * 60 * 60 * 1000
+    toleranceWindow: 1 * 60 * 1000 // 1 minute tolerance window
   }
 ]
 

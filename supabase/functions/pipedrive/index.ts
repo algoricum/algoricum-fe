@@ -262,6 +262,9 @@ serve(async (req) => {
     } else if (lastSegment === 'sync-leads' && req.method === 'POST') {
       console.log('Routing to sync leads')
       return await handleSyncLeads(req)
+    } else if (lastSegment === 'sync-all-leads' && req.method === 'POST') {
+      console.log('Routing to sync all leads (cron)')
+      return await handleSyncAllLeads(req)
     } else if (lastSegment === 'webhook' && req.method === 'POST') {
       console.log('Routing to webhook handler')
       return await handleWebhook(req)
@@ -764,17 +767,15 @@ async function getAccountInfo(accessToken: string, apiDomain: string) {
   }
 }
 
-// Handle syncing leads from Pipedrive to our database
+// Scenario 1: Handle syncing leads from Pipedrive for a specific clinic
 async function handleSyncLeads(req: Request) {
   const requestId = crypto.randomUUID()
-  console.log(`[${requestId}] Starting lead sync with token refresh support`)
+  console.log(`[${requestId}] Starting lead sync for specific clinic`)
   
   try {
     // Initialize Supabase client with service role key (bypass RLS)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const clientId = Deno.env.get('PIPEDRIVE_CLIENT_ID')!
-    const clientSecret = Deno.env.get('PIPEDRIVE_CLIENT_SECRET')!
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
@@ -786,7 +787,7 @@ async function handleSyncLeads(req: Request) {
 
     console.log(`[${requestId}] Processing for clinic_id: ${clinic_id}`)
 
-    // Get Pipedrive integration (no user validation)
+    // Get Pipedrive integration (no user validation for service calls)
     const { data: integration, error: integrationError } = await supabase
       .from('pipedrive_integration')
       .select('*')
@@ -801,262 +802,25 @@ async function handleSyncLeads(req: Request) {
 
     console.log(`[${requestId}] Found integration for clinic ${clinic_id}`)
 
-    // Check if token is expired and refresh if needed
-    let accessToken = integration.access_token
-    const tokenExpired = integration.expires_at && new Date(integration.expires_at) <= new Date()
-    
-    if (tokenExpired && integration.refresh_token) {
-      console.log(`[${requestId}] Token expired, refreshing...`)
-      
-      const refreshResponse = await fetch('https://oauth.pipedrive.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: integration.refresh_token,
-          client_id: clientId,
-          client_secret: clientSecret,
-        }),
-      })
+    // Sync leads using the core function
+    const result = await syncPipedriveIntegration(integration, requestId)
 
-      if (refreshResponse.ok) {
-        const refreshData = await refreshResponse.json()
-        accessToken = refreshData.access_token
-        
-        console.log(`[${requestId}] Token refreshed successfully`)
-        
-        // Update token in database
-        const { error: updateError } = await supabase
-          .from('pipedrive_integration')
-          .update({
-            access_token: refreshData.access_token,
-            refresh_token: refreshData.refresh_token || integration.refresh_token,
-            expires_at: refreshData.expires_in 
-              ? new Date(Date.now() + (refreshData.expires_in * 1000)).toISOString()
-              : null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', integration.id)
-
-        if (updateError) {
-          console.error(`[${requestId}] Failed to update refreshed token:`, updateError)
-        } else {
-          console.log(`[${requestId}] Updated token in database`)
-        }
-      } else {
-        const refreshError = await refreshResponse.text()
-        console.error(`[${requestId}] Token refresh failed:`, refreshError)
-        throw new Error('Failed to refresh access token. Please re-authenticate with Pipedrive.')
-      }
-    } else if (tokenExpired && !integration.refresh_token) {
-      console.error(`[${requestId}] Token expired and no refresh token available`)
-      throw new Error('Access token expired and no refresh token available. Please re-authenticate with Pipedrive.')
-    }
-
-    // Test the token before proceeding
-    console.log(`[${requestId}] Testing API connection...`)
-    const testResponse = await fetch(buildPipedriveUrl(integration.api_domain, 'users/me'), {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    })
-
-    if (!testResponse.ok) {
-      const testError = await testResponse.text()
-      console.error(`[${requestId}] API test failed:`, testError)
-      
-      if (testResponse.status === 401) {
-        // Mark integration as inactive if token is completely invalid
-        await supabase
-          .from('pipedrive_integration')
-          .update({ is_active: false, updated_at: new Date().toISOString() })
-          .eq('id', integration.id)
-          
-        throw new Error('Access token is invalid. Please re-authenticate with Pipedrive.')
-      }
-      
-      throw new Error(`Pipedrive API connection failed: ${testResponse.status}`)
-    }
-
-    console.log(`[${requestId}] API connection successful`)
-
-    // Discover available properties
-    await discoverPipedriveProperties(accessToken, integration.api_domain, requestId)
-
-    // Get or create lead source for Pipedrive
-    const { data: leadSource, error: sourceError } = await supabase
-      .from('lead_source')
-      .select('id')
-      .eq('name', 'Pipedrive')
-      .single()
-
-    let sourceId = leadSource?.id
-
-    if (!sourceId) {
-      const { data: newSource, error: createSourceError } = await supabase
-        .from('lead_source')
-        .insert({
-          name: 'Pipedrive',
-          clinic_id: clinic_id,
-        })
-        .select('id')
-        .single()
-
-      if (createSourceError) {
-        console.error(`[${requestId}] Source creation error:`, createSourceError)
-        throw new Error('Failed to create lead source')
-      }
-      sourceId = newSource.id
-      console.log(`[${requestId}] Created new lead source with ID: ${sourceId}`)
-    } else {
-      console.log(`[${requestId}] Using existing lead source ID: ${sourceId}`)
-    }
-
-    // Fetch leads from Pipedrive with retry logic
-    const leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=500')
-    console.log(`[${requestId}] Fetching leads from: ${leadsUrl}`)
-    
-    let leadsResponse
-    let retryCount = 0
-    const maxRetries = 2
-
-    while (retryCount <= maxRetries) {
-      leadsResponse = await fetch(leadsUrl, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      })
-
-      if (leadsResponse.ok) {
-        break
-      }
-
-      if (leadsResponse.status === 401 && retryCount < maxRetries) {
-        console.log(`[${requestId}] 401 error, attempting token refresh (retry ${retryCount + 1})`)
-        
-        if (integration.refresh_token) {
-          // Try to refresh token one more time
-          const refreshResponse = await fetch('https://oauth.pipedrive.com/oauth/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              grant_type: 'refresh_token',
-              refresh_token: integration.refresh_token,
-              client_id: clientId,
-              client_secret: clientSecret,
-            }),
-          })
-
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json()
-            accessToken = refreshData.access_token
-            console.log(`[${requestId}] Token refreshed on retry`)
-          }
-        }
-      }
-
-      retryCount++
-    }
-
-    if (!leadsResponse.ok) {
-      const errorText = await leadsResponse.text()
-      console.error(`[${requestId}] Pipedrive API error after retries:`, errorText)
-      
-      if (leadsResponse.status === 401) {
-        // Mark integration as inactive
-        await supabase
-          .from('pipedrive_integration')
-          .update({ is_active: false, updated_at: new Date().toISOString() })
-          .eq('id', integration.id)
-      }
-      
-      throw new Error(`Pipedrive API error: ${leadsResponse.status} - ${errorText}`)
-    }
-
-    const leadsData = await leadsResponse.json()
-    const pipedriveLeads = leadsData.data || []
-
-    console.log(`[${requestId}] Found ${pipedriveLeads.length} leads in Pipedrive`)
-
-    // Fetch persons for additional contact info
-    const personsUrl = buildPipedriveUrl(integration.api_domain, 'persons?limit=500')
-    console.log(`[${requestId}] Fetching persons from: ${personsUrl}`)
-    
-    const personsResponse = await fetch(personsUrl, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    })
-
-    let personsData = { data: [] }
-    if (personsResponse.ok) {
-      personsData = await personsResponse.json()
-      console.log(`[${requestId}] Successfully fetched persons data`)
-    } else {
-      console.warn(`[${requestId}] Failed to fetch persons: ${personsResponse.status}`)
-    }
-
-    // Create persons map
-    const personsMap = new Map()
-    if (personsData.data) {
-      personsData.data.forEach((person: any) => {
-        personsMap.set(person.id, person)
-      })
-    }
-
-    console.log(`[${requestId}] Found ${personsMap.size} persons in Pipedrive`)
-
-    // Transform and save leads
-    const leadsToInsert = []
-    let skippedCount = 0
-    
-    for (const pipedriveData of pipedriveLeads) {
-      const person = personsMap.get(pipedriveData.person_id)
-      
-      const mappedLead = mapPipedriveDataToLead(
-        pipedriveData, 
-        person, 
-        clinic_id, 
-        sourceId, 
-        requestId
-      )
-
-      if (mappedLead) {
-        leadsToInsert.push(mappedLead)
-      } else {
-        skippedCount++
-      }
-    }
-
-    console.log(`[${requestId}] Preparing to insert ${leadsToInsert.length} leads, skipped ${skippedCount} leads`)
-
-    let insertedCount = 0
-    if (leadsToInsert.length > 0) {
-      const { data: insertedLeads, error: insertError } = await supabase
-        .from('lead')
-        .upsert(leadsToInsert, {
-          onConflict: 'email',
-          ignoreDuplicates: true
-        })
-        .select('id')
-
-      if (insertError) {
-        console.error(`[${requestId}] Insert error:`, insertError)
-        throw new Error(`Failed to save leads: ${insertError.message}`)
-      }
-
-      insertedCount = insertedLeads?.length || leadsToInsert.length
-      console.log(`[${requestId}] Successfully synced ${insertedCount} leads`)
-    }
-
-    // Update integration to mark last sync time
+    // Update last_sync_at timestamp for this integration
     await supabase
       .from('pipedrive_integration')
-      .update({ updated_at: new Date().toISOString() })
+      .update({ 
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', integration.id)
 
     return new Response(
       JSON.stringify({
         success: true,
-        synced_count: insertedCount,
-        skipped_count: skippedCount,
-        total_pipedrive_leads: pipedriveLeads.length,
-        total_persons: personsMap.size,
-        token_refreshed: tokenExpired
+        synced_count: result.synced_count,
+        skipped_count: result.skipped_count,
+        total_pipedrive_leads: result.total_fetched,
+        total_persons: result.total_persons || 0,
+        token_refreshed: result.token_refreshed || false
       }),
       {
         headers: {
@@ -1081,6 +845,311 @@ async function handleSyncLeads(req: Request) {
         },
       }
     )
+  }
+}
+
+// Scenario 2: Cron job - sync leads from the last 15 minutes for all clinics
+async function handleSyncAllLeads(req: Request) {
+  const requestId = crypto.randomUUID()
+  console.log(`[${requestId}] Starting cron sync for all clinics`)
+  
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Get all active Pipedrive integrations
+    const { data: integrations, error: integrationsError } = await supabase
+      .from('pipedrive_integration')
+      .select('*')
+      .eq('is_active', true)
+
+    if (integrationsError || !integrations) {
+      throw new Error('Failed to fetch integrations')
+    }
+
+    console.log(`[${requestId}] Found ${integrations.length} active Pipedrive integrations`)
+
+    let totalSynced = 0
+    const results = []
+
+    // Calculate 15 minutes ago timestamp for filtering recent leads
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+
+    for (const integration of integrations) {
+      try {
+        const result = await syncPipedriveIntegration(integration, requestId, fifteenMinutesAgo)
+        totalSynced += result.synced_count
+        results.push({
+          clinic_id: integration.clinic_id,
+          provider: 'pipedrive',
+          synced_count: result.synced_count,
+          skipped_count: result.skipped_count,
+          total_fetched: result.total_fetched
+        })
+
+        // Update last_sync_at timestamp
+        await supabase
+          .from('pipedrive_integration')
+          .update({ 
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', integration.id)
+
+      } catch (error) {
+        console.error(`[${requestId}] Error syncing clinic ${integration.clinic_id}:`, error)
+        results.push({
+          clinic_id: integration.clinic_id,
+          provider: 'pipedrive',
+          error: error.message
+        })
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        total_synced: totalSynced,
+        processed_integrations: integrations.length,
+        fifteen_minutes_ago: fifteenMinutesAgo,
+        results
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      }
+    )
+  } catch (error) {
+    console.error(`[${requestId}] Cron sync error:`, error)
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message,
+        request_id: requestId 
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      }
+    )
+  }
+}
+
+// Core sync function that works with Pipedrive integrations
+async function syncPipedriveIntegration(
+  integration: any, 
+  requestId: string, 
+  modifiedSince?: string
+) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const clientId = Deno.env.get('PIPEDRIVE_CLIENT_ID')!
+  const clientSecret = Deno.env.get('PIPEDRIVE_CLIENT_SECRET')!
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  // Check if token is expired and refresh if needed
+  let accessToken = integration.access_token
+  let tokenRefreshed = false
+  const tokenExpired = integration.expires_at && new Date(integration.expires_at) <= new Date()
+  
+  if (tokenExpired && integration.refresh_token) {
+    console.log(`[${requestId}] Token expired for clinic ${integration.clinic_id}, refreshing...`)
+    
+    const refreshResponse = await fetch('https://oauth.pipedrive.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: integration.refresh_token,
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    })
+
+    if (refreshResponse.ok) {
+      const refreshData = await refreshResponse.json()
+      accessToken = refreshData.access_token
+      tokenRefreshed = true
+      
+      console.log(`[${requestId}] Token refreshed successfully for clinic ${integration.clinic_id}`)
+      
+      // Update token in database
+      await supabase
+        .from('pipedrive_integration')
+        .update({
+          access_token: refreshData.access_token,
+          refresh_token: refreshData.refresh_token || integration.refresh_token,
+          expires_at: refreshData.expires_in 
+            ? new Date(Date.now() + (refreshData.expires_in * 1000)).toISOString()
+            : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', integration.id)
+    } else {
+      const refreshError = await refreshResponse.text()
+      console.error(`[${requestId}] Token refresh failed for clinic ${integration.clinic_id}:`, refreshError)
+      throw new Error('Failed to refresh access token. Please re-authenticate with Pipedrive.')
+    }
+  } else if (tokenExpired && !integration.refresh_token) {
+    console.error(`[${requestId}] Token expired and no refresh token for clinic ${integration.clinic_id}`)
+    throw new Error('Access token expired and no refresh token available. Please re-authenticate with Pipedrive.')
+  }
+
+  // Test the token before proceeding
+  console.log(`[${requestId}] Testing API connection for clinic ${integration.clinic_id}...`)
+  const testResponse = await fetch(buildPipedriveUrl(integration.api_domain, 'users/me'), {
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  })
+
+  if (!testResponse.ok) {
+    const testError = await testResponse.text()
+    console.error(`[${requestId}] API test failed for clinic ${integration.clinic_id}:`, testError)
+    
+    if (testResponse.status === 401) {
+      // Mark integration as inactive if token is completely invalid
+      await supabase
+        .from('pipedrive_integration')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', integration.id)
+        
+      throw new Error('Access token is invalid. Please re-authenticate with Pipedrive.')
+    }
+    
+    throw new Error(`Pipedrive API connection failed: ${testResponse.status}`)
+  }
+
+  console.log(`[${requestId}] API connection successful for clinic ${integration.clinic_id}`)
+
+  // Get or create lead source for Pipedrive
+  const { data: leadSource } = await supabase
+    .from('lead_source')
+    .select('id')
+    .eq('name', 'Pipedrive')
+    .single()
+
+  let sourceId = leadSource?.id
+
+  if (!sourceId) {
+    const { data: newSource } = await supabase
+      .from('lead_source')
+      .insert({
+        name: 'Pipedrive',
+      })
+      .select('id')
+      .single()
+    
+    sourceId = newSource?.id
+    console.log(`[${requestId}] Created new lead source with ID: ${sourceId}`)
+  }
+
+  // Fetch leads from Pipedrive with optional date filtering
+  let leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=500')
+  
+  // Add date filter for cron jobs (15 minutes ago)
+  if (modifiedSince) {
+    // Convert to Pipedrive date format (YYYY-MM-DD HH:MM:SS)
+    const startDate = new Date(modifiedSince).toISOString().slice(0, 19).replace('T', ' ')
+    leadsUrl += `&start_date=${encodeURIComponent(startDate)}`
+    console.log(`[${requestId}] Filtering leads modified since: ${startDate}`)
+  }
+  
+  console.log(`[${requestId}] Fetching leads from: ${leadsUrl}`)
+  
+  const leadsResponse = await fetch(leadsUrl, {
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  })
+
+  if (!leadsResponse.ok) {
+    const errorText = await leadsResponse.text()
+    console.error(`[${requestId}] Pipedrive leads API error:`, errorText)
+    throw new Error(`Pipedrive API error: ${leadsResponse.status} - ${errorText}`)
+  }
+
+  const leadsData = await leadsResponse.json()
+  const pipedriveLeads = leadsData.data || []
+
+  console.log(`[${requestId}] Found ${pipedriveLeads.length} leads in Pipedrive for clinic ${integration.clinic_id}`)
+
+  // Fetch persons for additional contact info
+  const personsUrl = buildPipedriveUrl(integration.api_domain, 'persons?limit=500')
+  console.log(`[${requestId}] Fetching persons from: ${personsUrl}`)
+  
+  const personsResponse = await fetch(personsUrl, {
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  })
+
+  let personsData = { data: [] }
+  if (personsResponse.ok) {
+    personsData = await personsResponse.json()
+    console.log(`[${requestId}] Successfully fetched ${personsData.data?.length || 0} persons`)
+  } else {
+    console.warn(`[${requestId}] Failed to fetch persons: ${personsResponse.status}`)
+  }
+
+  // Create persons map
+  const personsMap = new Map()
+  if (personsData.data) {
+    personsData.data.forEach((person: any) => {
+      personsMap.set(person.id, person)
+    })
+  }
+
+  console.log(`[${requestId}] Found ${personsMap.size} persons in Pipedrive`)
+
+  // Transform and save leads
+  const leadsToInsert = []
+  let skippedCount = 0
+  
+  for (const pipedriveData of pipedriveLeads) {
+    const person = personsMap.get(pipedriveData.person_id)
+    
+    const mappedLead = mapPipedriveDataToLead(
+      pipedriveData, 
+      person, 
+      integration.clinic_id, 
+      sourceId, 
+      requestId
+    )
+
+    if (mappedLead) {
+      leadsToInsert.push(mappedLead)
+    } else {
+      skippedCount++
+    }
+  }
+
+  console.log(`[${requestId}] Preparing to insert ${leadsToInsert.length} leads, skipped ${skippedCount} leads`)
+
+  let insertedCount = 0
+  if (leadsToInsert.length > 0) {
+    const { data: insertedLeads, error: insertError } = await supabase
+      .from('lead')
+      .upsert(leadsToInsert, {
+        onConflict: 'email',
+        ignoreDuplicates: true
+      })
+      .select('id')
+
+    if (insertError) {
+      console.error(`[${requestId}] Insert error:`, insertError)
+      throw new Error(`Failed to save leads: ${insertError.message}`)
+    }
+
+    insertedCount = insertedLeads?.length || 0
+    console.log(`[${requestId}] Successfully synced ${insertedCount} leads for clinic ${integration.clinic_id}`)
+  }
+
+  return {
+    synced_count: insertedCount,
+    skipped_count: skippedCount,
+    total_fetched: pipedriveLeads.length,
+    total_persons: personsMap.size,
+    token_refreshed: tokenRefreshed
   }
 }
 
@@ -1175,7 +1244,7 @@ async function handleGetLeads(req: Request) {
     }
 
     // Fetch leads from Pipedrive
-    const leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=100')
+    const leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=200')
     const leadsResponse = await fetch(leadsUrl, {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     })

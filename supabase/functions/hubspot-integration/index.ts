@@ -209,7 +209,9 @@ async function handleSyncAllConnections(req: Request, requestId: string) {
   const { data: connections, error: connError } = await supabase
     .from("hubspot_connections")
     .select("clinic_id, access_token, refresh_token, token_expires_at, last_sync_at")
-    .eq("connection_status", "connected");
+    .eq("connection_status", "connected")
+    .not("access_token", "is", null)
+    .not("refresh_token", "is", null);
 
   if (connError) {
     console.error(`[${requestId}] Failed to fetch connections:`, connError);
@@ -642,6 +644,8 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
     .select("access_token, refresh_token, hub_id, last_sync_at, token_expires_at, clinic_id")
     .eq("clinic_id", clinic_id)
     .eq("connection_status", "connected")
+    .not("access_token", "is", null)
+    .not("refresh_token", "is", null)
     .limit(1)
     .single();
 
