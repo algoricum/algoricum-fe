@@ -95,7 +95,7 @@ export const FacebookLeadFormModal: React.FC<ModalProps> = ({ open, status, acco
                 type="primary"
                 size="small"
                 icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/your-team/facebook-lead-form-setup", "_blank")}
+                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
                 className="mt-2 !bg-gray-500 !border-gray-500 hover:!bg-purple-700"
               >
                 Book a Support Meeting
