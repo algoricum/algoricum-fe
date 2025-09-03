@@ -2,7 +2,6 @@
 import { JSX, useEffect, useState } from "react";
 import { Card, Button, Row, Col, Divider } from "antd";
 import { createClient } from "@/utils/supabase/config/client";
-// import dayjs from "dayjs";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { Header } from "@/components/common";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
@@ -34,7 +33,6 @@ import {
   connectToPipedrive,
   connectToGoogleForm,
   connectToTypeform,
-  findSheetDetails,
   createJotformConnection,
   syncJotformLeads,
   connectToGHL,
@@ -249,7 +247,7 @@ export default function IntegrationsPage() {
     initializeAllIntegrationStatuses();
   }, [
     supabase,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     getIntegrationStatus("Facebook Lead Forms"),getIntegrationStatus("Jotform"),getIntegrationStatus("Google Lead Forms"),getIntegrationStatus("Google Forms"),getIntegrationStatus("Hubspot"),getIntegrationStatus("GoHighLevel"),getIntegrationStatus("Typeform"),getIntegrationStatus("Pipedrive"),getIntegrationStatus("Gravity Form"),getIntegrationStatus("NextHealth"),getIntegrationStatus("CSV Upload"),getIntegrationStatus("Custom CRM")
   ]);
 
@@ -354,10 +352,7 @@ export default function IntegrationsPage() {
     }
   };
 
-  const syncGoogleFormLeads = async (
-    // eslint-disable-next-line no-unused-vars
-    selectedSheetsObjects: ({ spreadsheet_id: any; spreadsheet_title: any; sheet_id: any; sheet_title: any } | null)[],
-  ) => {
+  const syncGoogleFormLeads = async () => {
     try {
       const { data: connection } = await supabase
         .from("google_form_connections")
@@ -657,8 +652,8 @@ export default function IntegrationsPage() {
           selectedWorksheets={selectedSheets}
           onSelectWorksheets={setSelectedSheets}
           onSyncLeads={async () => {
-            const selectedSheetsObjects = await selectedSheets.map(value => findSheetDetails(googleFormTreeData, value)).filter(Boolean);
-            syncGoogleFormLeads(selectedSheetsObjects);
+            // const selectedSheetsObjects = await selectedSheets.map(value => findSheetDetails(googleFormTreeData, value)).filter(Boolean);
+            syncGoogleFormLeads();
             setGoogleFormLeadsSynced(true);
             toggleModal("Google Forms", false);
           }}

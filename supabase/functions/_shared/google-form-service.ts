@@ -108,6 +108,7 @@ if (!code || !state) {
       stateData = JSON.parse(atob(state));
       redirectUri=stateData.redirectTo
     } catch (e) {
+      console.error('Error parsing state:', e.message);
       const redirectUrl = new URL(`${APP_URL}onboarding`);
       redirectUrl.searchParams.set("google_form_status", "error");
       redirectUrl.searchParams.set("error", "invalid_state");
@@ -513,7 +514,7 @@ export async function syncSheets(req, supabase) {
       );
     }
 
-    let totalResults = {
+    const totalResults = {
       total_processed: 0,
       leads_created: 0,
       connections_processed: 0,

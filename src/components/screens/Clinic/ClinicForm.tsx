@@ -5,7 +5,7 @@ import { Flex, Form } from "antd";
 
 interface CreateWorkSpaceProps {
   form: any;
-  /* eslint-disable no-unused-vars */
+   
   mutate: (values: CreateClinicProps) => void;
   isLoading: boolean;
 }

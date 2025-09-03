@@ -1,38 +1,28 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Button, Typography } from "antd";
-import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import ClinicInfoStep from "./clinic-info-step";
-import StaffHoursStep from "./staff-hours-step";
-// import ToneIdentityStep from "./tone-identity-step";
-// import AiAssistantStep from "./ai-assistant-step";
-import BookingSetupStep from "./booking-setup-step";
-import IntegrationsStep from "./Integration";
-import { handleCsvLeadsUpload } from "@/utils/csvUtils";
-// Import your existing services and helpers
-import apiKeyService from "@/services/apiKey";
-import Image from "next/image";
-
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
-// import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
-import { updateClinic, getClinicData, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
-import { getUserData } from "@/utils/supabase/user-helper";
-// import generateClinicInstructions from "@/utils/generateClinicInstructions";
-// import { getSupabaseSession } from "@/utils/supabase/auth-helper";
-import { useAuth } from "@/hooks/useAuth";
-// import ChatbotSetupStep from "./chatbot-setup-step";
-// import type { MailgunMessageData } from "mailgun.js";
-import { createClient } from "@/utils/supabase/config/client";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
-
 import {
-  ONBOARDING_STORAGE_KEY,
-  ONBOARDING_STEP_KEY,
   ONBOARDING_COMPLETED_STEPS_KEY,
   ONBOARDING_LEADS_FILE_NAME,
+  ONBOARDING_STEP_KEY,
+  ONBOARDING_STORAGE_KEY,
 } from "@/constants/localStorageKeys";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { useAuth } from "@/hooks/useAuth";
+import apiKeyService from "@/services/apiKey";
+import { handleCsvLeadsUpload } from "@/utils/csvUtils";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+import { getClinicData, updateClinic, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
+import { getUserData } from "@/utils/supabase/user-helper";
+import { Button, Typography } from "antd";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import BookingSetupStep from "./booking-setup-step";
+import ClinicInfoStep from "./clinic-info-step";
+import IntegrationsStep from "./Integration";
+import StaffHoursStep from "./staff-hours-step";
 // import { log } from "console";
 // import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
@@ -122,6 +112,7 @@ export default function MainOnboarding() {
         const stored = localStorage.getItem(key);
         return stored ? JSON.parse(stored) : null;
       } catch (error) {
+        console.error('Error parsing JSON:', error);
         ErrorToast("Error reading from localStorage");
         return null;
       }
@@ -146,6 +137,7 @@ export default function MainOnboarding() {
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
+      console.error('Error writing to localStorage:', error);
       ErrorToast("Error writing to localStorage");
     }
   };
@@ -159,6 +151,7 @@ export default function MainOnboarding() {
       localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
       localStorage.removeItem("oauth_form_data"); // Clear any OAuth form data
     } catch (error) {
+      console.error('Error clearing localStorage:', error);
       ErrorToast("Error clearing localStorage");
     }
   };
@@ -568,6 +561,7 @@ export default function MainOnboarding() {
         ErrorToast("Logout failed. Please try again.");
       }
     } catch (error) {
+      console.error('Error during logout:', error);
       ErrorToast("Logout failed. Please try again.");
     }
   };

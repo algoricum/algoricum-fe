@@ -13,7 +13,7 @@ import type { User } from "@supabase/supabase-js";
 import Image from "next/image";
 interface SidebarProps {
   sidebarOpen: boolean;
-  // eslint-disable-next-line no-unused-vars
+   
   setSidebarOpen: (open: boolean) => void;
 }
 

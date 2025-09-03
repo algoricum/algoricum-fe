@@ -219,7 +219,7 @@ export const getSupabaseSession = async (): Promise<Session> => {
 /**
  * Set up authentication state change listener
  */
-// eslint-disable-next-line no-unused-vars
+ 
 export const setupAuthListener = (onSignIn: (_user: User, _token: string) => void, onSignOut: () => void): (() => void) => {
   const {
     data: { subscription },

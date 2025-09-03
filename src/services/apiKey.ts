@@ -147,6 +147,7 @@ const apiKeyService = {
 
       return true;
     } catch (error) {
+      console.error('API key validation error:', error);
       return false;
     }
   },

@@ -11,7 +11,7 @@ import { ErrorToast } from "@/helpers/toast";
 import { handleSubscribe } from "@/utils/stripe";
 
 interface StaffHoursStepProps {
-  // eslint-disable-next-line no-unused-vars
+   
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;

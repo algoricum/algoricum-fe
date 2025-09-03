@@ -187,7 +187,6 @@ async function processProductionLeads(supabase: any, communicationType?: 'sms' |
 }
 
 // Export all functions
-export { 
-  processProductionLeads as processAllLeads, 
-  FOLLOW_UP_RULES
+export {
+  FOLLOW_UP_RULES, processProductionLeads as processAllLeads
 }

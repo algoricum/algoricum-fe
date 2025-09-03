@@ -1,10 +1,10 @@
 // supabase/functions/pipedrive/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { 
-  initializeOAuth,
+import {
   handleOAuthCallback,
-  syncLeadsForClinic,
-  syncAllLeads
+  initializeOAuth,
+  syncAllLeads,
+  syncLeadsForClinic
 } from '../_shared/pipedrive-service.ts'
 
 const corsHeaders = {

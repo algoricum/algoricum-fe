@@ -2,10 +2,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Import shared logic from _shared folder
-import { 
-  processAllLeads, 
-  FOLLOW_UP_RULES
+import {
+  FOLLOW_UP_RULES,
+  processAllLeads
 } from '../_shared/nurturing.ts'
 
 // Enhanced logging function

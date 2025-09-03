@@ -21,9 +21,9 @@ interface StaffTableProps {
   searchTerm: string;
   selectedRole: string;
   selectedStatus: string;
-  // eslint-disable-next-line no-unused-vars
+   
   onEdit: (staff: Staff) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onDelete: (staff: Staff) => void;
   onClearFilters: () => void;
 }

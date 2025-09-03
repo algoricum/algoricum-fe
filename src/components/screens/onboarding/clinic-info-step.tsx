@@ -13,7 +13,7 @@ const { Title, Text } = Typography;
 const supabase = createClient();
 
 interface ClinicInfoStepProps {
-  // eslint-disable-next-line no-unused-vars
+   
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;

@@ -7,10 +7,10 @@ export function useClinicCheck() {
     checkAndRedirectIfNoClinic: async (
       supabase: SupabaseClient,
       userId: string,
-      // eslint-disable-next-line no-unused-vars
+       
       router: { push: (url: string) => void },
       targetUrl: string = "/dashboard",
-      // eslint-disable-next-line no-unused-vars
+       
       setClinicData?: (data: any) => void,
     ) => {
       try {
@@ -50,7 +50,7 @@ export async function ensureUserHasClinic(
   supabase: SupabaseClient,
   userId: string,
   
-  // eslint-disable-next-line no-unused-vars
+   
   redirectFunction: (url: string) => void,
   targetUrl: string = "/dashboard",
 ): Promise<boolean> {

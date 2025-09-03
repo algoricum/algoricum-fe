@@ -12,7 +12,6 @@ import {
   clearError
 } from '@/redux/slices/user.slice';
 import { RootState } from '@/redux/store';
-import { User } from '@/interfaces/services_type';
 import { AppDispatch } from '@/redux/store';
 import { setupAuthListener, signOut } from '@/utils/supabase/auth-helper';
 import { clearAll } from '@/helpers/storage-helper';
@@ -32,8 +31,8 @@ export const useAuth = () => {
     // Set up auth listener for realtime updates
     const unsubscribe = setupAuthListener(
       // onSignIn callback
-      // eslint-disable-next-line no-unused-vars
-      (_userData: User, _token: string) => {
+       
+      () => {
         dispatch(fetchCurrentUser());
       },
       // onSignOut callback
@@ -60,6 +59,7 @@ export const useAuth = () => {
       router.push('/dashboard');
       return true;
     } catch (error) {
+      console.error("Error logging in:", error);
       return false;
     }
   }, [dispatch, router]);
@@ -71,6 +71,7 @@ export const useAuth = () => {
       router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
       return true;
     } catch (error) {
+      console.error("Error signing up:", error);
       return false;
     }
   }, [dispatch, router]);
@@ -82,6 +83,7 @@ export const useAuth = () => {
       router.push('/login');
       return true;
     } catch (error) {
+      console.error("Error verifying OTP:", error);  
       return false;
     }
   }, [dispatch, router]);
@@ -92,6 +94,7 @@ export const useAuth = () => {
       await dispatch(resendOtp(email)).unwrap();
       return true;
     } catch (error) {
+      console.error("Error resending OTP:", error);
       return false;
     }
   }, [dispatch]);
@@ -103,6 +106,7 @@ export const useAuth = () => {
       router.push(`/reset-password?email=${encodeURIComponent(email)}`);
       return true;
     } catch (error) {
+      console.error("Error in forgot password:", error);
       return false;
     }
   }, [router]);
@@ -114,6 +118,7 @@ export const useAuth = () => {
       router.push('/login');
       return true;
     } catch (error) {
+      console.error("Error resetting password:", error);
       return false;
     }
   }, [dispatch, router]);

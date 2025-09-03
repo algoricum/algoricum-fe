@@ -11,7 +11,7 @@ import Image from "next/image";
 
 interface MessagesPanelProps {
   lead: Lead | null;
-  // eslint-disable-next-line no-unused-vars
+   
   onSendMessage: (content: string) => void;
 }
 

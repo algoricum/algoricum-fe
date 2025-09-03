@@ -17,9 +17,9 @@ interface AddStaffModalProps {
   isSubmitting: boolean;
   newStaff: NewStaff;
   onClose: () => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onInputChange: (field: keyof NewStaff, value: string) => void;
 }
 
@@ -33,7 +33,7 @@ export function AddStaffModal({ isOpen, isSubmitting, newStaff, onClose, onSubmi
       await onSubmit(e);
       onClose();
     } catch (error) {
-      // Show error toast
+      console.error("Error creating staff member:", error);
       ErrorToast("Failed to create staff member. Please try again.");
     }
   };

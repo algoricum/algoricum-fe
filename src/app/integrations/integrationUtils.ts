@@ -1,6 +1,6 @@
-import { createClient } from "@/utils/supabase/config/client";
 import { ConnectionStatus } from "@/app/types/types";
 import { ErrorToast } from "@/helpers/toast";
+import { createClient } from "@/utils/supabase/config/client";
 
 const supabase = createClient();
 
@@ -158,7 +158,7 @@ export const deleteIntegrationConnections = async (clinicId: string, integration
 
         const { error: deletedError } = await supabase.from("google_form_connections").delete().eq("id", connection?.id);
 
-        ((error = deleteError), deletedError);
+        error = deleteError || deletedError;
         break;
       }
 

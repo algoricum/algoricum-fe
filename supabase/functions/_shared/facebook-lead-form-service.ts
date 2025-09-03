@@ -558,7 +558,7 @@ export async function fetchFacebookLeadFormResponses(reqOrClinicId: Request | st
         try {
           const pageToken = connection.page_access_token;
           const leadFormId = connection.lead_form_id;
-          let leadsUrl = `https://graph.facebook.com/${FACEBOOK_API_VERSION}/${leadFormId}/leads?access_token=${encodeURIComponent(pageToken)}&fields=id,created_time,field_data`;
+          const leadsUrl = `https://graph.facebook.com/${FACEBOOK_API_VERSION}/${leadFormId}/leads?access_token=${encodeURIComponent(pageToken)}&fields=id,created_time,field_data`;
           if (connection.last_sync_at) {
             // const since = Math.floor(new Date(connection.last_sync_at).getTime() / 1000)
             // leadsUrl += `&since=${since}`

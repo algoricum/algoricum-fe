@@ -502,10 +502,9 @@ async function processIncomingEmail(supabaseClient, settings, email) {
     // Create thread if needed
     if (!threadId) {
       // Check/create lead
-      let leadId = null;
       const { data: leadData } = await supabaseClient.from('lead').select('id').eq('clinic_id', settings.clinic_id).eq('email', fromEmail).eq('source_id', emailSource.id).single();
       if (!leadData) {
-        const { data: newLead, error: leadError } = await supabaseClient.from('lead').insert({
+        const { error: leadError } = await supabaseClient.from('lead').insert({
           clinic_id: settings.clinic_id,
           email: fromEmail,
           status: 'new',
@@ -515,9 +514,6 @@ async function processIncomingEmail(supabaseClient, settings, email) {
         if (leadError) {
           throw new Error(`Failed to create lead: ${leadError.message}`);
         }
-        leadId = newLead.id;
-      } else {
-        leadId = leadData.id;
       }
       // Create thread
       const { data: newThread, error: threadError } = await supabaseClient.from('thread').insert({

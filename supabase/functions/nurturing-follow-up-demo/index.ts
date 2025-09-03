@@ -1,11 +1,9 @@
-// supabase/functions/nurturing-follow-up-demo/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Import shared logic from _shared folder
-import { 
-  processScheduledFollowUps, 
-  FOLLOW_UP_RULES
+import {
+  FOLLOW_UP_RULES,
+  processScheduledFollowUps
 } from '../_shared/nurturing-demo.ts'
 
 // Enhanced logging function
