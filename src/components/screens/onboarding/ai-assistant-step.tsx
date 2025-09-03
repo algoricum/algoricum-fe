@@ -8,7 +8,7 @@ const { Dragger } = Upload;
 const { Title, Text } = Typography;
 
 interface AiAssistantStepProps {
-  // eslint-disable-next-line no-unused-vars
+   
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;

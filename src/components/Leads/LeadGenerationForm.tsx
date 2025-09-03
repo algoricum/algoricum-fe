@@ -21,7 +21,7 @@ type FormField = {
 
 type FormData = { [key: string]: string | number };
 
-// eslint-disable-next-line no-unused-vars
+ 
 type Props = { clinicId: string; onSuccess?: (newLead?: any) => void };
 
 const validatePhoneNumber = (phone: string | undefined): boolean => {
@@ -41,6 +41,7 @@ const validatePhoneNumber = (phone: string | undefined): boolean => {
 
     return true;
   } catch (error) {
+    console.error('Error validating phone number:', error);
     return false;
   }
 };

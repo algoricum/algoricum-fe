@@ -6,7 +6,7 @@ export interface FormData {
 }
 
 export interface IntegrationsStepProps {
-  // eslint-disable-next-line no-unused-vars
+   
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: Partial<FormData>;
@@ -19,9 +19,9 @@ export interface ModalProps {
   accountInfo?: any;
   onOk: () => void;
   onCancel: () => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onConnect?: (
-    // eslint-disable-next-line no-unused-vars
+     
     token?:
       | string
       | {
@@ -35,10 +35,10 @@ export interface ModalProps {
   onDisconnect?: () => void;
   treeData?: any[];
   selectedWorksheets?: any[];
-  // eslint-disable-next-line no-unused-vars
+   
   onSelectWorksheets?: (value: any[]) => void;
   selectedForms?: any[];
-  // eslint-disable-next-line no-unused-vars
+   
   onSelectForms?: (value: any[]) => void;
 }
 
@@ -66,7 +66,7 @@ export interface PreviousQuestionsProps {
 export interface CurrentInputProps {
   currentQuestion: any;
   currentValue: any;
-  // eslint-disable-next-line no-unused-vars
+   
   handleInputChange: (value: any) => void;
   isSubmitting: boolean;
 }
@@ -108,7 +108,7 @@ export type Props = {
   googleFormAccountInfo: any;
   googleFormTreeData: any[];
   selectedGoogleFormWorksheets: string[];
-  // eslint-disable-next-line no-unused-vars
+   
   onSelectGoogleFormWorksheets: (values: string[]) => void;
   onGoogleFormOk: () => void;
   onGoogleFormCancel: () => void;
@@ -140,7 +140,7 @@ export type Props = {
   typeformAccountInfo: any;
   typeformTreeData: any[];
   selectedTypeformForms: string[];
-  // eslint-disable-next-line no-unused-vars
+   
   onSelectTypeformForms: (values: string[]) => void;
   onTypeformOk: () => void;
   onTypeformCancel: () => void;
@@ -153,18 +153,18 @@ export type Props = {
   jotformStatus: ConnectionStatus;
   jotformTreeData: any[];
   selectedJotformForms: string[];
-  // eslint-disable-next-line no-unused-vars
+   
   onSelectJotformForms: (values: string[]) => void;
   onJotformOk: () => void;
   onJotformCancel: () => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onJotformConnect: (token: any) => void;
   onJotformSyncLeads: () => void;
   onJotformDisconnect: () => void;
 
     // CSV Upload
   showManualLeadsModal: boolean;
-  // eslint-disable-next-line no-unused-vars
+   
   onCsvUploadOk: (leads: any[]) => void;
   onCsvUploadCancel: () => void;
 
@@ -178,7 +178,7 @@ export type Props = {
   nextHealthStatus: ConnectionStatus;
   onNexHealthOk: () => void;
   onNexHealthCancel: () => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onNexHealthConnect: (token:string) => void;
 
   // Gravity Form
@@ -186,7 +186,7 @@ export type Props = {
   gravityFormStatus: ConnectionStatus;
   onGravityFormOk: () => void;
   onGravityFormCancel: () => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onGravityFormConnect: (token:any) => void;
   onGravityFormDisconnect: () => void;
 };

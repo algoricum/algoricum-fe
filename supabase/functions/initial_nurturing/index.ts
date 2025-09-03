@@ -27,14 +27,6 @@ interface Lead {
   updated_at: string
 }
 
-interface Clinic {
-  id: string
-  name: string
-  openai_api_key?: string
-  assistant_prompt?: string
-  assistant_model?: string
-  chatbot_name?: string
-}
 
 // Enhanced logging function
 function logInfo(message: string, data?: any) {
@@ -155,7 +147,7 @@ async function processInitialContact(supabase: any) {
             }
 
             // Get or create thread (using shared logic pattern)
-            let threadId = await getOrCreateThread(lead, supabase)
+            const threadId = await getOrCreateThread(lead, supabase)
             if (!threadId) {
               totalErrors++
               results.push({

@@ -10,7 +10,7 @@ import { ErrorToast } from "@/helpers/toast";
 const supabase = createClient();
 
 interface OnboardingSubscriptionStepProps {
-  // eslint-disable-next-line no-unused-vars
+   
   onNext: (data?: any) => void;
 }
 
@@ -96,7 +96,7 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
       features?: string[];
     }[];
     subscribingId: string | null;
-    // eslint-disable-next-line no-unused-vars
+     
     handleSubscribe: (priceId: string) => void;
   }
 

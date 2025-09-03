@@ -7,7 +7,7 @@ const { Option } = Select;
 const { Title, Text } = Typography;
 
 interface StaffHoursStepProps {
-  // eslint-disable-next-line no-unused-vars
+   
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;

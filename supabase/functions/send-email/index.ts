@@ -40,13 +40,11 @@ serve(async (req)=>{
       });
     }
     // Get thread information
-    let threadData = null;
     let recipientEmail = to_email;
     let emailSubject = subject;
     if (thread_id) {
       const { data: thread, error: threadError } = await supabaseClient.from('thread').select('email_from, email_subject').eq('id', thread_id).single();
       if (thread && !threadError) {
-        threadData = thread;
         recipientEmail = recipientEmail || thread.email_from;
         emailSubject = emailSubject || `Re: ${thread.email_subject || 'Your inquiry'}`;
       }

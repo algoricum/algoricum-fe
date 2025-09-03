@@ -167,7 +167,7 @@ export const deleteIntegrationConnections = async (
           .delete()
           .eq("id", connection?.id);
 
-        error = deleteError,deletedError;
+        error = deleteError || deletedError;
         break;
       }
 

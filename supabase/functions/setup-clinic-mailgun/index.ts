@@ -120,7 +120,7 @@ class Logger {
 }
 
 // Fetch Mailgun DNS records for a domain
-async function fetchMailgunDNSRecords(domain: string, apiKey: string, logger: Logger): Promise<any> {
+async function fetchMailgunDNSRecords(domain: string, apiKey: string): Promise<any> {
   const stepLogger = new Logger('MailgunDNSFetch')
   const stepStart = Date.now()
 
@@ -160,7 +160,7 @@ async function fetchMailgunDNSRecords(domain: string, apiKey: string, logger: Lo
 }
 
 // DNS function that calls Next.js API route with proxy support
-async function createNamecheapDNSRecords(domain: string, subdomain: string, mailgunApiKey: string, logger: Logger) {
+async function createNamecheapDNSRecords(domain: string, subdomain: string, mailgunApiKey: string) {
   const stepLogger = new Logger('NamecheapDNS')
   const stepStart = Date.now()
 
@@ -187,7 +187,7 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
   // Fetch Mailgun DNS records
   let mailgunDnsRecords = null
   try {
-    const mailgunData = await fetchMailgunDNSRecords(subdomain, mailgunApiKey, stepLogger)
+    const mailgunData = await fetchMailgunDNSRecords(subdomain, mailgunApiKey)
     mailgunDnsRecords = {
       sending_dns_records: mailgunData.sending_dns_records || []
     }
@@ -328,7 +328,7 @@ function getRequiredDNSRecords(subdomain: string, logger: Logger) {
 }
 
 // Improved domain verification function
-async function checkDomainVerification(domain: string, apiKey: string, logger: Logger) {
+async function checkDomainVerification(domain: string, apiKey: string) {
   const stepLogger = new Logger('DomainVerification')
   const stepStart = Date.now()
 
@@ -404,7 +404,7 @@ async function checkDomainVerification(domain: string, apiKey: string, logger: L
 }
 
 // Improved Mailgun domain creation with better error handling
-async function createMailgunDomain(subdomain: string, apiKey: string, logger: Logger) {
+async function createMailgunDomain(subdomain: string, apiKey: string) {
   const stepLogger = new Logger('MailgunDomainCreation')
   const stepStart = Date.now()
 
@@ -430,7 +430,7 @@ async function createMailgunDomain(subdomain: string, apiKey: string, logger: Lo
     payload: { ...mailgunPayload, smtp_password: '[REDACTED]' }
   })
 
-  const existingDomain = await checkDomainVerification(subdomain, apiKey, stepLogger)
+  const existingDomain = await checkDomainVerification(subdomain, apiKey)
   if (existingDomain.exists) {
     stepLogger.info('Domain already exists in Mailgun', { domain: subdomain, verified: existingDomain.verified })
     return existingDomain
@@ -724,7 +724,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
   const clinicEmail = `assistant@${subdomain}`
 
   setupLogger.step('Creating domain in Mailgun')
-  const mailgunData = await createMailgunDomain(subdomain, mailgunApiKey, setupLogger)
+  const mailgunData = await createMailgunDomain(subdomain, mailgunApiKey)
 
   setupLogger.step('Checking domain verification status')
   const domainInfo = await checkDomainVerification(subdomain, mailgunApiKey, setupLogger)
@@ -733,7 +733,7 @@ async function handleSetupAction(clinic: any, baseDomain: string, mailgunApiKey:
   const requiredRecords = getRequiredDNSRecords(subdomain, setupLogger)
 
   setupLogger.step('Attempting automated DNS setup via proxy')
-  const dnsResult = await createNamecheapDNSRecords(baseDomain, subdomain, mailgunApiKey, setupLogger)
+  const dnsResult = await createNamecheapDNSRecords(baseDomain, subdomain, mailgunApiKey)
 
   let routeCreated = false
   let routeInfo = null

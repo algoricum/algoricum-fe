@@ -5,9 +5,9 @@ export interface ModalProps {
   accountInfo?: any;
   onOk: () => void;
   onCancel: () => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onConnect?: (
-    // eslint-disable-next-line no-unused-vars
+     
     token?:
       | string
       | {
@@ -21,16 +21,16 @@ export interface ModalProps {
   onDisconnect?: () => void;
   treeData?: any[];
   selectedWorksheets?: any[];
-  // eslint-disable-next-line no-unused-vars
+   
   onSelectWorksheets?: (value: any[]) => void;
   selectedForms?: any[];
-  // eslint-disable-next-line no-unused-vars
+   
   onSelectForms?: (value: any[]) => void;
 }
 
 export interface CsvUploadModalProps {
   open: boolean;
-  // eslint-disable-next-line no-unused-vars
+   
   onOk: (leads: any) => void;
   onCancel: () => void;
 }

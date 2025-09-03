@@ -31,9 +31,9 @@ interface EditStaffModalProps {
   selectedStaff: Staff | null;
   editStaff: EditStaff;
   onClose: () => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>; // Changed to async
-  // eslint-disable-next-line no-unused-vars
+   
   onInputChange: (field: keyof EditStaff, value: string) => void;
 }
 
@@ -49,7 +49,7 @@ export function EditStaffModal({ isOpen, isSubmitting, selectedStaff, editStaff,
       // Close modal on success
       onClose();
     } catch (error) {
-      // Show error toast
+      console.error("Error updating staff member:", error);
       ErrorToast("Failed to update staff member. Please try again.");
     }
   };

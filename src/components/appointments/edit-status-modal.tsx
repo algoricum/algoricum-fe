@@ -8,11 +8,11 @@ import { type MeetingSchedule, type MeetingStatus, formatMeetingDate } from "@/u
 interface EditStatusModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // eslint-disable-next-line no-unused-vars
+   
   onSubmit: (e: React.FormEvent) => Promise<void>;
   isSubmitting: boolean;
   appointment: MeetingSchedule | null;
-  // eslint-disable-next-line no-unused-vars
+   
   onStatusChange: (status: MeetingStatus) => void;
 }
 

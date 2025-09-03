@@ -182,7 +182,7 @@ export async function fetchLeadsForClinic(clinicId: string, filters?: LeadsFilte
       const latestThread = lead.threads?.[0];
       let lastMessage = "No messages yet";
       let lastActivity = new Date(lead.updated_at);
-      let thread_id = latestThread?.id;
+      const thread_id = latestThread?.id;
 
       if (latestThread?.latest_message?.[0]) {
         const msg = latestThread.latest_message[0];

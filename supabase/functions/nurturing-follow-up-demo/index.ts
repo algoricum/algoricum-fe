@@ -1,10 +1,7 @@
-// supabase/functions/nurturing-follow-up-demo/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Import shared logic from _shared folder
 import { 
-  processAllLeads, 
   FOLLOW_UP_RULES, 
   generateIntelligentResponse,
   sendSMS,
@@ -26,15 +23,6 @@ interface Lead {
   urgency: string
   created_at: string
   updated_at: string
-}
-
-interface Clinic {
-  id: string
-  name: string
-  openai_api_key?: string
-  assistant_prompt?: string
-  assistant_model?: string
-  chatbot_name?: string
 }
 
 interface ProcessingResult {

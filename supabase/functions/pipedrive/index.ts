@@ -803,7 +803,7 @@ async function handleSyncLeads(req: Request) {
     await discoverPipedriveProperties(integration.access_token, integration.api_domain, requestId)
 
     // Get or create lead source for Pipedrive
-    const { data: leadSource, error: sourceError } = await supabase
+    const { data: leadSource } = await supabase
       .from('lead_source')
       .select('id')
       .eq('name', 'Pipedrive')

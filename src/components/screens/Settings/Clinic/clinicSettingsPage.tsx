@@ -129,7 +129,7 @@ const ClinicSettingsPage = () => {
 
     try {
       setLoading(true);
-      let logoUrl = clinic?.logo;
+      const logoUrl = clinic?.logo;
 
       // Handle logo upload if changed
       if (isLogoChanged && logoFile && user?.id) {

@@ -396,7 +396,7 @@ serve(async (req) => {
     }
 
     // Format the message content - YOUR EXACT ORIGINAL LOGIC
-    let messageContent = latestMessage.content.map((content) => {
+    const messageContent = latestMessage.content.map((content) => {
       if (content.type === 'text') {
         return content.text.value;
       }

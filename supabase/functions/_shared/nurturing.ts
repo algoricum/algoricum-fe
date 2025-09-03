@@ -1359,6 +1359,7 @@ async function sendEmail(
           errorMessage = `Mailgun error: ${errorJson.message}`;
         }
       } catch (e) {
+        console.error('Error parsing JSON:', e.message);
         errorMessage = `Mailgun error: ${errorText}`;
       }
 

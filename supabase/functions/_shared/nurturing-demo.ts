@@ -1563,6 +1563,7 @@ async function sendEmail(
           errorMessage = `Mailgun error: ${errorJson.message}`;
         }
       } catch (e) {
+        console.error('Error parsing JSON:', e.message);
         errorMessage = `Mailgun error: ${errorText}`;
       }
 
@@ -1806,7 +1807,7 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
 }
 
 // Example handler function for scheduled processing (call this every 5 minutes)
-export async function scheduledHandler(req: Request) {
+export async function scheduledHandler() {
   try {
     const { createClient } = await import('@supabase/supabase-js')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!

@@ -338,7 +338,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
         redirectUrl = stateData.redirectUrl || redirectUrl;
       }
     } catch (e) {
-      console.error("Could not parse state for OAuth error redirect");
+      console.error("Could not parse state for OAuth error redirect", e.message);
     }
     
     const redirectUrlWithError = new URL(redirectUrl);
@@ -611,7 +611,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
       const stateData = JSON.parse(atob(state));
       redirectUrl = stateData.redirectUrl || redirectUrl;
     } catch (e) {
-      console.error("Could not parse state for error redirect");
+      console.error("Could not parse state for error redirect", e.message);
     }
     
     const redirectUrlWithError = new URL(redirectUrl);
@@ -713,7 +713,7 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
   }
 
   // Check token expiration and refresh if needed (placeholder)
-  let accessToken = connection.access_token;
+  const accessToken = connection.access_token;
 
   // **CONFIRMED: Fetch contacts from last 1 day (24 hours)**
   const afterDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

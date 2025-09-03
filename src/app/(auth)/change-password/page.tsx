@@ -36,10 +36,7 @@ const PasswordSetupPage = () => {
               });
             }
           } catch (error) {
-            console.error({
-              message: "Error",
-              description: "Failed to verify session.",
-            });
+            console.error('Error verifying session:', error);
           }
         };
         verifySession();

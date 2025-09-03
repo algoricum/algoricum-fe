@@ -113,7 +113,7 @@ export const getAssistantByClinicId = async (clinicId:string) => {
     throw error;
   }
 };
-export const getClincApiKey = async (clinicId: string): Promise<String | null> => {
+export const getClincApiKey = async (clinicId: string): Promise<string | null> => {
   try {
     // Get user-clinic mapping
     const { data: apiKeyData } = await supabase.from("api_key").select("api_key").eq("clinic_id", clinicId).limit(1).single();

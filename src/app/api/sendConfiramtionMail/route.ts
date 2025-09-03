@@ -19,6 +19,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: result.error || "Failed to send email" }, { status: 500 });
     }
   } catch (error) {
+    console.error("Error in sendConfirmationMail:", error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

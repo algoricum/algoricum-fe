@@ -70,6 +70,7 @@ serve(async (req) => {
           try {
             webhookData = JSON.parse(textBody);
           } catch (jsonError) {
+            console.error('Error parsing JSON:', jsonError);
             const urlParams = new URLSearchParams(textBody);
             for (const [key, value] of urlParams.entries()) {
               webhookData[key as keyof MailgunWebhookData] = value;
@@ -109,7 +110,7 @@ serve(async (req) => {
 
     // Quick signature verification (optional in development)
     if (webhookData.signature && webhookData.timestamp && webhookData.token) {
-      if (!verifyMailgunSignature(webhookData, mailgunSigningKey)) {
+      if (!verifyMailgunSignature(webhookData)) {
         console.error('❌ Invalid Mailgun signature');
         return new Response(JSON.stringify({
           success: false,
@@ -135,7 +136,7 @@ serve(async (req) => {
     console.log(`📦 Queuing email job ${jobId} with priority ${queueMessage.priority}`);
 
     // Add to pgmq queue
-    const { data, error } = await supabaseClient.rpc('send_email_to_queue', {
+    const { error } = await supabaseClient.rpc('send_email_to_queue', {
       queue_name: 'email_processing',
       message: queueMessage
     });
@@ -182,7 +183,7 @@ serve(async (req) => {
   }
 });
 
-function verifyMailgunSignature(data: Partial<MailgunWebhookData>, signingKey: string): boolean {
+function verifyMailgunSignature(data: Partial<MailgunWebhookData>): boolean {
   try {
     const { timestamp, token, signature } = data;
     
