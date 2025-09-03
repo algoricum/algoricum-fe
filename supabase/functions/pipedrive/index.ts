@@ -1129,10 +1129,7 @@ async function syncPipedriveIntegration(
   if (leadsToInsert.length > 0) {
     const { data: insertedLeads, error: insertError } = await supabase
       .from('lead')
-      .upsert(leadsToInsert, {
-        onConflict: 'email',
-        ignoreDuplicates: true
-      })
+      .upsert(leadsToInsert)
       .select('id')
 
     if (insertError) {
