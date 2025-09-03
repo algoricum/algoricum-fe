@@ -79,7 +79,7 @@
     "@types/react-dom": "19.1.5"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,css,md}": [
+    "*.{ts,tsx,js,jsx,json,css,md,html}": [
       "prettier --write",
       "eslint --fix"
     ]
