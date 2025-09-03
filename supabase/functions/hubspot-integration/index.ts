@@ -651,7 +651,7 @@ async function handleAuthenticatedRequest(req, body, requestId) {
   if (req.method === "POST") {
     const url = new URL(req.url);
     if (url.pathname.endsWith('/sync-contacts')) {
-      return await handleSyncContacts(body, supabase, requestId);
+      return await SyncContacts(supabase, requestId);
     }
     return await handleConnect(body, supabase, clientId, redirectUri, requestId);
   }
@@ -734,6 +734,260 @@ async function makeHubSpotRequest(url, options, accessToken, refreshToken, supab
   }
   return response;
 }
+
+
+async function SyncContacts(supabase, requestId) {
+  console.log(`[${requestId}] Handling contacts sync for all clinics`);
+
+  // Fetch all active HubSpot connections with associated clinic data
+  const { data: connections, error: connError } = await supabase
+    .from("hubspot_connections")
+    .select(`
+      user_id,
+      access_token,
+      refresh_token,
+      hub_id,
+      last_sync_at,
+      token_expires_at,
+      clinic:clinic!hubspot_connections_user_id_fkey (
+        id,
+        owner_id
+      )
+    `)
+    .eq("connection_status", "connected");
+
+  if (connError || !connections || connections.length === 0) {
+    console.error(`[${requestId}] Connection fetch error`, connError);
+    return new Response(
+      JSON.stringify({ error: "No active HubSpot connections found" }),
+      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const results = [];
+  
+  // Process each connection/clinic pair
+  for (const connection of connections) {
+    const userId = connection.user_id;
+    const clinic_id = connection.clinic?.id;
+    
+    if (!clinic_id) {
+      console.warn(`[${requestId}] No clinic found for user ${userId}, skipping`);
+      continue;
+    }
+
+    let accessToken = connection.access_token;
+    const refreshToken = connection.refresh_token;
+
+    if (!refreshToken) {
+      console.warn(`[${requestId}] No refresh token for user ${userId}, skipping`);
+      results.push({
+        userId,
+        clinic_id,
+        success: false,
+        message: "No refresh token available. Please reconnect HubSpot."
+      });
+      continue;
+    }
+
+    // Check if token is expired and refresh proactively
+    const expiresAt = connection.token_expires_at ? new Date(connection.token_expires_at) : null;
+    const now = new Date();
+    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+
+    if (expiresAt && expiresAt < fiveMinutesFromNow) {
+      console.log(`[${requestId}] Token expires soon for user ${userId}, refreshing proactively`);
+      try {
+        accessToken = await refreshHubSpotToken(refreshToken, supabase, userId, requestId);
+      } catch (error) {
+        console.error(`[${requestId}] Proactive token refresh failed for user ${userId}`, error);
+        results.push({
+          userId,
+          clinic_id,
+          success: false,
+          message: "Failed to refresh access token. Please reconnect HubSpot."
+        });
+        continue;
+      }
+    }
+
+    // Fetch contacts from last 15 minutes
+    const afterDate = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const contacts = [];
+    let after = null;
+
+    console.log(`[${requestId}] Fetching contacts for user ${userId} modified since ${afterDate}`);
+
+    const propertiesToFetch = getHubSpotPropertiesToFetch();
+
+    do {
+      const searchBody = {
+        filterGroups: [{
+          filters: [{
+            propertyName: "lastmodifieddate",
+            operator: "GTE",
+            value: afterDate,
+          }],
+        }],
+        properties: propertiesToFetch,
+        limit: 100,
+        after: after || undefined,
+      };
+
+      try {
+        const contactsResponse = await makeHubSpotRequest(
+          "https://api.hubapi.com/crm/v3/objects/contacts/search",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(searchBody),
+          },
+          accessToken,
+          refreshToken,
+          supabase,
+          userId,
+          requestId
+        );
+
+        if (!contactsResponse.ok) {
+          const errorText = await contactsResponse.text();
+          console.error(`[${requestId}] Contacts search failed for user ${userId}`, {
+            status: contactsResponse.status,
+            error: errorText
+          });
+          results.push({
+            userId,
+            clinic_id,
+            success: false,
+            message: `Failed to fetch contacts: ${contactsResponse.status}`
+          });
+          break;
+        }
+
+        const contactsData = await contactsResponse.json();
+        contacts.push(...contactsData.results);
+        after = contactsData.paging?.next?.after || null;
+      } catch (error) {
+        console.error(`[${requestId}] Error during contacts fetch for user ${userId}`, error);
+        results.push({
+          userId,
+          clinic_id,
+          success: false,
+          message: "Network error while fetching contacts"
+        });
+        break;
+      }
+    } while (after);
+
+    console.log(`[${requestId}] Fetched ${contacts.length} contacts for user ${userId}`);
+
+    // Save contacts to lead table
+    if (contacts.length > 0) {
+      const { data: sourceData, error: sourceError } = await supabase
+        .from('lead_source')
+        .select('id')
+        .eq('name', 'Hubspot')
+        .single();
+
+      if (sourceError || !sourceData) {
+        console.error(`[${requestId}] Error fetching lead source for user ${userId}`, sourceError);
+        results.push({
+          userId,
+          clinic_id,
+          success: false,
+          message: "Could not find HubSpot in lead_source table"
+        });
+        continue;
+      }
+
+      const source_id = sourceData.id;
+
+      const leadsToInsert = contacts
+        .map((contact) => {
+          if (!contact.id) {
+            console.warn(`[${requestId}] Contact missing ID for user ${userId}`, { contact });
+            return null;
+          }
+          return mapHubSpotContactToLead(contact, clinic_id, source_id);
+        })
+        .filter(lead => lead !== null);
+
+      if (leadsToInsert.length === 0) {
+        console.warn(`[${requestId}] No valid leads to insert for user ${userId}`);
+      } else {
+        let retries = 3;
+        let leadError = null;
+        while (retries > 0) {
+          try {
+            const { error } = await supabase
+              .from("lead")
+              .upsert(leadsToInsert);
+
+            if (error) {
+              console.error(`[${requestId}] Lead save error for user ${userId}`, {
+                error: JSON.stringify(error),
+                leadSample: leadsToInsert[0]
+              });
+              leadError = error;
+              retries--;
+              if (retries === 0) throw new Error(`Lead save failed after retries: ${JSON.stringify(error)}`);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+            console.log(`[${requestId}] Successfully saved ${leadsToInsert.length} leads for user ${userId}`);
+            break;
+          } catch (err) {
+            console.error(`[${requestId}] Lead save attempt failed for user ${userId}`, { error: err.message });
+            leadError = err;
+            retries--;
+            if (retries === 0) throw new Error(`Lead save failed after retries: ${err.message}`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        if (leadError) {
+          results.push({
+            userId,
+            clinic_id,
+            success: false,
+            message: `Failed to save leads for user ${userId}`
+          });
+          continue;
+        }
+      }
+    }
+
+    // Update last_sync_at
+    const { error: updateError } = await supabase
+      .from("hubspot_connections")
+      .update({ last_sync_at: new Date().toISOString() })
+      .eq("user_id", userId);
+
+    if (updateError) {
+      console.error(`[${requestId}] Update last_sync_at error for user ${userId}`, updateError);
+    }
+
+    results.push({
+      userId,
+      clinic_id,
+      success: true,
+      message: `Synced ${contacts.length} leads`,
+      contactCount: contacts.length
+    });
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      results,
+      totalClinicsProcessed: connections.length
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+
 async function handleSyncContacts(body, supabase, requestId) {
   console.log(`[${requestId}] Handling contacts sync`);
   const { userId, clinic_id } = body;
