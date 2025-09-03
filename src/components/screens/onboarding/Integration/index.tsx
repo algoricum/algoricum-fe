@@ -90,12 +90,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   });
 
   const filteredQuestions =
-    formData.selectedCrm === "HubSpot" ||
-    formData.selectedCrm === "Pipedrive" ||
-    formData.selectedCrm === "GoHighLevel" ||
-    formData.selectedCrm === "NextHealth"
-      ? [questions[0], questions[3]]
-      : questions;
+    (formData.selectedCrm === "GoHighLevel" ||
+    formData.selectedCrm === "NextHealth")
+      ? [questions[0], questions[3]]:(formData.selectedCrm === "HubSpot" ||
+    formData.selectedCrm === "Pipedrive") ?
+      [questions[0]] : questions;
 
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
@@ -582,7 +581,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             <Button
               type="primary"
               onClick={handleNext}
-              disabled={(currentQuestion.type === "radio" || currentQuestion.type === "select" ? !currentValue : false) || isSubmitting}
+              disabled={
+                (filteredQuestions?.length > 1 && currentQuestion.type === "radio" || currentQuestion.type === "select" ? !currentValue : false) ||
+                isSubmitting
+              }
               loading={isSubmitting && currentQuestionIndex === filteredQuestions?.length - 1}
               className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
             >
@@ -750,7 +752,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           } catch (error) {
             console.error("Error:", error);
             setButtonsLoading(false);
-            ErrorToast("Error: "+ error)
+            ErrorToast("Error: " + error);
             setShowCompletionButtons(false);
             setFormData(prev => ({ ...prev, adsConnections: "" }));
             localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
@@ -780,7 +782,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         typeformTreeData={TypeformTreeData}
         selectedTypeformForms={selectedTypeformForms}
         onSelectTypeformForms={setSelectedTypeformForms}
-        onTypeformConnect={()=>connectToTypeform(setButtonsLoading)}
+        onTypeformConnect={() => connectToTypeform(setButtonsLoading)}
         onTypeformOk={() => {
           if (typeformStatus === "connected" && typeformLeadsSynced) {
             setShowTypeformModal(false);
@@ -826,7 +828,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           }
           SuccessToast("Jotform connected successfully");
           setJotformStatus("connected");
-          setButtonsLoading(false)
+          setButtonsLoading(false);
         }}
         onJotformSyncLeads={() => {
           syncJotformLeads(selectedJotformForms);
@@ -859,7 +861,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         showManualLeadsModal={showManualLeadsModal}
         onCsvUploadOk={leads => {
           setShowManualLeadsModal(false);
-          handleCsvUpload(leads,false);
+          handleCsvUpload(leads, false);
           if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
             SuccessToast("Leads saved successfully");
           }
@@ -877,7 +879,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // NexHealth
         showNexHealthModal={showNexHealthModal}
         nextHealthStatus={nextHealthStatus}
-        onNexHealthConnect={(token: any) => connectToNextHealth(token,setButtonsLoading)}
+        onNexHealthConnect={(token: any) => connectToNextHealth(token, setButtonsLoading)}
         onNexHealthOk={() => {
           if (nextHealthStatus === "connected") {
             setShowNexHealthModal(false);
@@ -900,9 +902,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // Gravity Form
         showGravityFormModal={showGravityFormModal}
         gravityFormStatus={gravityFormStatus}
-        onGravityFormConnect={(token: any) => connnectToGravityForm(token,setButtonsLoading)}
+        onGravityFormConnect={(token: any) => connnectToGravityForm(token, setButtonsLoading)}
         onGravityFormOk={() => {
-          if (gravityFormStatus === "connected" ) {
+          if (gravityFormStatus === "connected") {
             setShowGravityFormModal(false);
             autoProgressToNext();
           } else {
