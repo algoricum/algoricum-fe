@@ -7,6 +7,8 @@ import { useState } from "react";
 import Image from "next/image";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
+
 
 const { Text } = Typography;
 
@@ -79,6 +81,13 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({ open, status, acc
                 </Text>
               </div>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-gray-50"
+              borderColor="border-gray-500"
+              textColor="gray-700"
+              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
+              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
 

@@ -6,6 +6,8 @@ import type React from "react";
 import Image from "next/image";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
+
 
 const { Text } = Typography;
 
@@ -66,6 +68,13 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, a
               </Text>
             </div>
           </div>
+          <BookingLinkComponent
+            bgColor="bg-blue-50"
+            borderColor="border-blue-400"
+            textColor="navy-400"
+            buttonBgColor="navy-400" // Normal button color
+            hoverBgColor="blue-600" // Hover color
+          />
         </>
       )}
       {status === "connecting" && (

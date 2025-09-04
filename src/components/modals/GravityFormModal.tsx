@@ -10,6 +10,9 @@ import Image from "next/image";
 import { ErrorToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
 import { getClinicId } from "@/utils/integration-utils";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
+import { commonAlertStyles } from "./utils";
+
 
 const { Text } = Typography;
 const supabase = createClient();
@@ -143,8 +146,13 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
               message="Connect your Gravity Forms Account"
               description="Enter your API credentials and Base URL to fetch available forms."
               type="info"
-              showIcon
-              className="mb-6"
+              className="mb-6 !bg-gray-100 !border-gray-300 !text-gray-800"
+              style={{
+                ...commonAlertStyles,
+                backgroundColor: "#f9fafb",
+                borderColor: "#d1d5db",
+                color: "#1f2937",
+              }}
             />
 
             <Input placeholder="Consumer Key" value={consumerKey} onChange={e => setConsumerKey(e.target.value)} className="mb-3 h-12" />
@@ -201,6 +209,13 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
             >
               Connect Selected Forms
             </Button>
+            <BookingLinkComponent
+              bgColor="bg-orange-50"
+              borderColor="border-orange-400"
+              textColor="orange-700"
+              buttonBgColor="orange-400" // Normal button color (matches your Tailwind)
+              hoverBgColor="orange-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
 

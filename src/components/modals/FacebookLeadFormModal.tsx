@@ -5,7 +5,9 @@ import { CalendarOutlined } from "@ant-design/icons";
 import type React from "react";
 import Image from "next/image";
 import { ModalProps } from "./types";
-// Removed unused import
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
+
+
 
 const { Text } = Typography;
 
@@ -65,6 +67,13 @@ export const FacebookLeadFormModal: React.FC<ModalProps> = ({ open, status, acco
                 </Text>
               </div>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-blue-50"
+              borderColor="border-blue-200"
+              textColor="blue-700"
+              buttonBgColor="custom-blue" // Normal button color (#3D5DCF)
+              hoverBgColor="blue-800" // Hover color (#1e40af)
+            />
           </>
         )}
         {status === "connecting" && (
@@ -96,7 +105,7 @@ export const FacebookLeadFormModal: React.FC<ModalProps> = ({ open, status, acco
                 size="small"
                 icon={<CalendarOutlined />}
                 onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
-                className="mt-2 !bg-gray-500 !border-gray-500 hover:!bg-purple-700"
+                className="mt-2 !bg-blue-500 !border-blue-500 hover:!bg-blue-800"
               >
                 Book a Support Meeting
               </Button>
