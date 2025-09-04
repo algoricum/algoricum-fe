@@ -65,9 +65,9 @@ export const dashboardHeaderLinks = [
     label: "Leads",
   },
   {
-    href:"/billing",
+    href: "/billing",
     label: "Billing",
-  }
+  },
 ];
 
 export const publicRoutes = ["/login", "/signup", "/forgot-password", "/clinic", "/verify-otp", "/reset-password"];

@@ -64,7 +64,7 @@ const ForgotPasswordPage = () => {
               setIsResetMode(false);
             }
           } catch (error) {
-            console.error('Error verifying session:', error);
+            console.error("Error verifying session:", error);
             setIsResetMode(false);
           }
         };

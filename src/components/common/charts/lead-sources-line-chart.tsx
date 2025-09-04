@@ -1,7 +1,7 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
-import { TrendingUp } from "lucide-react";
 import dayjs from "dayjs";
+import { TrendingUp } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface LeadSourcesLineChartProps {
   leadsData: any[];
@@ -93,17 +93,7 @@ const LeadSourcesLineChart: React.FC<LeadSourcesLineChartProps> = ({ leadsData }
           {yTicks.map((value, i) => {
             const ratio = value / maxValue;
             const y = height - padding - ratio * innerHeight;
-            return (
-              <line
-                key={i}
-                x1={padding}
-                x2={width}
-                y1={y}
-                y2={y}
-                stroke="#e5e7eb"
-                strokeDasharray="4"
-              />
-            );
+            return <line key={i} x1={padding} x2={width} y1={y} y2={y} stroke="#e5e7eb" strokeDasharray="4" />;
           })}
 
           {/* Y-axis labels */}
@@ -111,14 +101,7 @@ const LeadSourcesLineChart: React.FC<LeadSourcesLineChartProps> = ({ leadsData }
             const ratio = value / maxValue;
             const y = height - padding - ratio * innerHeight;
             return (
-              <text
-                key={i}
-                x={padding - 10}
-                y={y + 4}
-                textAnchor="end"
-                fontSize={10}
-                fill="#6b7280"
-              >
+              <text key={i} x={padding - 10} y={y + 4} textAnchor="end" fontSize={10} fill="#6b7280">
                 {value}
               </text>
             );
@@ -134,24 +117,11 @@ const LeadSourcesLineChart: React.FC<LeadSourcesLineChartProps> = ({ leadsData }
 
             return (
               <g key={`line-${source}`}>
-                <polyline
-                  points={points.join(" ")}
-                  fill="none"
-                  stroke={colors[sIndex % colors.length]}
-                  strokeWidth={2}
-                />
+                <polyline points={points.join(" ")} fill="none" stroke={colors[sIndex % colors.length]} strokeWidth={2} />
                 {chartData.map((item, i) => {
                   const x = padding + (i / (months.length - 1)) * innerWidth;
                   const y = height - padding - (item[source] / maxValue) * innerHeight;
-                  return (
-                    <circle
-                      key={`pt-${source}-${i}`}
-                      cx={x}
-                      cy={y}
-                      r={4}
-                      fill={colors[sIndex % colors.length]}
-                    />
-                  );
+                  return <circle key={`pt-${source}-${i}`} cx={x} cy={y} r={4} fill={colors[sIndex % colors.length]} />;
                 })}
               </g>
             );
@@ -161,14 +131,7 @@ const LeadSourcesLineChart: React.FC<LeadSourcesLineChartProps> = ({ leadsData }
           {months.map((month, i) => {
             const x = padding + (i / (months.length - 1)) * innerWidth;
             return (
-              <text
-                key={month}
-                x={x}
-                y={height - padding + 15}
-                fontSize={10}
-                textAnchor="middle"
-                fill="#6b7280"
-              >
+              <text key={month} x={x} y={height - padding + 15} fontSize={10} textAnchor="middle" fill="#6b7280">
                 {month}
               </text>
             );
@@ -179,10 +142,7 @@ const LeadSourcesLineChart: React.FC<LeadSourcesLineChartProps> = ({ leadsData }
         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-4 flex flex-wrap justify-center text-sm">
           {sources.map((source, index) => (
             <div key={source} className="flex items-center mr-4 mb-2">
-              <span
-                className="inline-block w-3 h-3 rounded-full mr-2"
-                style={{ backgroundColor: colors[index % colors.length] }}
-              />
+              <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: colors[index % colors.length] }} />
               <span>{source}</span>
             </div>
           ))}

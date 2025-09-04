@@ -1,15 +1,15 @@
 "use client";
-import AuthLayout from "@/layouts/AuthLayout";
 import { Button } from "@/components/elements";
 import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { PasswordIcon } from "@/icons";
+import AuthLayout from "@/layouts/AuthLayout";
+import { updateLoggedStatus } from "@/utils/supabase/auth-helper";
+import { createClient } from "@/utils/supabase/config/client";
 import { Flex, Form, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMutation } from "react-query";
-import { createClient } from "@/utils/supabase/config/client";
-import {updateLoggedStatus} from "@/utils/supabase/auth-helper";
 const { Title, Text } = Typography;
 
 const PasswordSetupPage = () => {

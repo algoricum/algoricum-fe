@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "./utils/supabase/config/middleware";
 import { checkUserStatus } from "@/utils/supabase/auth-helper";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "./utils/supabase/config/middleware";
 // List of public routes that don't require authentication
 const publicRoutes = [
   "/login",

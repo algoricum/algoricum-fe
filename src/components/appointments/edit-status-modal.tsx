@@ -1,18 +1,17 @@
 "use client";
-
-import type React from "react";
-import { X } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { type MeetingSchedule, type MeetingStatus, formatMeetingDate } from "@/utils/appointment-helper";
+import { X } from "lucide-react";
+import type React from "react";
 
 interface EditStatusModalProps {
   isOpen: boolean;
   onClose: () => void;
-   
+
   onSubmit: (e: React.FormEvent) => Promise<void>;
   isSubmitting: boolean;
   appointment: MeetingSchedule | null;
-   
+
   onStatusChange: (status: MeetingStatus) => void;
 }
 

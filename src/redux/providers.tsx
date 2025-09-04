@@ -1,5 +1,4 @@
 "use client";
-
 import ThemeWrapper from "@/wrappers/ThemeWrapper";
 import { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "react-query";

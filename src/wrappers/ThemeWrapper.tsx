@@ -5,7 +5,6 @@ interface ThemeWrapperProps {
 }
 
 const ThemeWrapper: React.FC<ThemeWrapperProps> = ({ children }) => {
-
   // useEffect(() => {
   //   // Safe check for primaryColor with optional chaining and default to defaultTheme
   //   const primaryColor = clinic?.dashboard_theme?.primary_color;

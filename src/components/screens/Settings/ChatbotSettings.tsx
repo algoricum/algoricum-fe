@@ -1,19 +1,16 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Flex, Form, Input, Select, Tooltip, Upload } from "antd";
-import { Button } from "@/components/elements";
-import { MessageOutlined, UserOutlined, InfoCircleOutlined } from "@ant-design/icons";
-import { SuccessToast, ErrorToast } from "@/helpers/toast";
 import { ColorConfigurator } from "@/components/common";
 import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { Button } from "@/components/elements";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { getPreviewText } from "@/utils/getPreviewChatbot";
 import { getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { getUserData } from "@/utils/supabase/user-helper";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-// import generateClinicInstructions from "@/utils/generateClinicInstructions";
-// import { getSupabaseSession } from "@/utils/supabase/auth-helper";
-import { getPreviewText } from "@/utils/getPreviewChatbot";
-// import ChatbotPreview from "@/components/common/WidgetPreview/ChatbotPreview";
+import { InfoCircleOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons";
+import { Flex, Form, Input, Select, Tooltip, Upload } from "antd";
+import { useEffect, useState } from "react";
 
 const { TextArea } = Input;
 

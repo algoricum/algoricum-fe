@@ -7,7 +7,7 @@ interface SocialButtonProps {
   onClick?: () => void;
 }
 
-const SocialButton = ({ isGoogle, label,onClick }: SocialButtonProps) => {
+const SocialButton = ({ isGoogle, label, onClick }: SocialButtonProps) => {
   return (
     <Flex
       justify="center"

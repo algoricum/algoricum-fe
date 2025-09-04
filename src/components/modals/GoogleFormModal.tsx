@@ -1,11 +1,11 @@
 "use client";
 
-import { Modal, Alert, Button, TreeSelect, Typography } from "antd";
-import type React from "react";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
+import { Alert, Button, Modal, TreeSelect, Typography } from "antd";
 import Image from "next/image";
+import type React from "react";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
-import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 
 const { Text } = Typography;
 

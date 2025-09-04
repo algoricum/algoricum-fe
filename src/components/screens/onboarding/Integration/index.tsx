@@ -1,45 +1,44 @@
 "use client";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { questions } from "@/constants";
+import { handleCsvUpload } from "@/utils/csvUtils";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
-import { useState, useEffect, useCallback } from "react";
 import { Button, Typography } from "antd";
-import { IntegrationsStepProps, FormData, ConnectionStatus } from "../../../../app/types/types";
+import { useCallback, useEffect, useState } from "react";
+import { ConnectionStatus, FormData, IntegrationsStepProps } from "../../../../app/types/types";
+import { ONBOARDING_LEADS_FILE_NAME, SUPABASE_URL } from "../../../../constants/integration-constants";
 import {
-  getClinicId,
-  syncPipedriveLeads,
-  syncGoogleFormLeads,
-  syncGoogleLeadFormLeads,
-  syncTypeformLeads,
-  clearOAuthState,
-  connectToHubSpot,
-  connectToPipedrive,
-  connectToGoogleForm,
-  connectToTypeform,
-  findSheetDetails,
   ErrorToast,
   SuccessToast,
-  createJotformConnection,
-  syncJotformLeads,
+  clearOAuthState,
   connectToGHL,
-  connectToNextHealth,
-  connnectToGravityForm,
+  connectToGoogleForm,
   connectToGoogleLeadForm,
+  connectToHubSpot,
+  connectToNextHealth,
+  connectToPipedrive,
+  connectToTypeform,
+  connnectToGravityForm,
+  createJotformConnection,
   fetchGoogleFormSheets,
-  fetchTypeformForms,
   fetchJotformForms,
+  fetchTypeformForms,
+  findSheetDetails,
+  getClinicId,
   handleInput,
   handle_Next,
+  syncGoogleFormLeads,
+  syncGoogleLeadFormLeads,
+  syncJotformLeads,
+  syncPipedriveLeads,
+  syncTypeformLeads,
 } from "../../../../utils/integration-utils";
-
-import {handleCsvUpload} from "@/utils/csvUtils";
-
-import { SUPABASE_URL, ONBOARDING_LEADS_FILE_NAME } from "../../../../constants/integration-constants";
-import { questions } from "@/constants";
-const { Title } = Typography;
-import { PreviousQuestions } from "./PreviousQuestions";
 import CurrentInput from "./CurrentInput";
 import IntegrationsModals from "./IntegrationModals";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { PreviousQuestions } from "./PreviousQuestions";
+const { Title } = Typography;
+
 
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [loading,setLoading]=useState(true)

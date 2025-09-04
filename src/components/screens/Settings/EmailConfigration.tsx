@@ -1,30 +1,30 @@
 "use client";
-import React, { useState, useEffect, JSX, useCallback } from "react";
-import { Form, Input, Switch, InputNumber, Card, Space, Alert, Modal } from "antd";
 import { Button } from "@/components/elements";
-import {
-  EyeInvisibleOutlined,
-  EyeTwoTone,
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  InfoCircleOutlined,
-  MessageOutlined,
-  MailOutlined,
-  PhoneOutlined,
-} from "@ant-design/icons";
-import { SuccessToast, ErrorToast } from "@/helpers/toast";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import {
+  getDefaultEmailSettings,
   getEmailSettings,
   saveEmailSettings,
   testEmailConnection,
   testSMSConnection,
   validateEmailSettings,
-  getDefaultEmailSettings,
   type EmailSettingsInput,
   type EmailTestResult,
   type SMSTestResult,
 } from "@/utils/supabase/email-settings-helper";
+import {
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  EyeInvisibleOutlined,
+  EyeTwoTone,
+  InfoCircleOutlined,
+  MailOutlined,
+  MessageOutlined,
+  PhoneOutlined,
+} from "@ant-design/icons";
+import { Alert, Card, Form, Input, InputNumber, Modal, Space, Switch } from "antd";
+import React, { JSX, useCallback, useEffect, useState } from "react";
 
 interface ClinicData {
   id: string;
@@ -46,8 +46,9 @@ const CommunicationConfiguration: React.FC = () => {
 
   const [smsTestResults, setSmsTestResults] = useState<SMSTestResult | null>(null);
   const [showSMSTestModal, setShowSMSTestModal] = useState<boolean>(false);
-  
-  const fetchCommunicationSettings = useCallback( async (clinicId: string): Promise<void> => {
+
+  const fetchCommunicationSettings = useCallback(
+    async (clinicId: string): Promise<void> => {
       try {
         setLoading(true);
 
@@ -111,30 +112,27 @@ const CommunicationConfiguration: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    
-    },[form])
+    },
+    [form],
+  );
 
-   const initializeComponent = useCallback( async (): Promise<void> => {
-     try {
-       const clinicRes = await getClinicData();
-       setClinicData(clinicRes);
+  const initializeComponent = useCallback(async (): Promise<void> => {
+    try {
+      const clinicRes = await getClinicData();
+      setClinicData(clinicRes);
 
-       if (clinicRes?.id) {
-         await fetchCommunicationSettings(clinicRes.id);
-       }
-     } catch (error) {
-       console.error("Error initializing component:", error);
-       ErrorToast("Failed to load clinic data");
-     }
-   },[fetchCommunicationSettings]);
+      if (clinicRes?.id) {
+        await fetchCommunicationSettings(clinicRes.id);
+      }
+    } catch (error) {
+      console.error("Error initializing component:", error);
+      ErrorToast("Failed to load clinic data");
+    }
+  }, [fetchCommunicationSettings]);
 
   useEffect(() => {
     initializeComponent();
   }, [initializeComponent]);
-
- 
-
-
 
   const handleSaveSettings = async (values: EmailSettingsInput): Promise<void> => {
     try {

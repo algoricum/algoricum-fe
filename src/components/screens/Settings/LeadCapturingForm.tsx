@@ -1,14 +1,14 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Input, Select } from "antd";
-import { Button } from "@/components/elements";
-import { PlusOutlined, EyeOutlined } from "@ant-design/icons";
-import { SuccessToast, ErrorToast } from "@/helpers/toast";
-import { createClient } from "@/utils/supabase/config/client";
-import { getLocalClinicData } from "@/helpers/storage-helper";
-import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
 import { Modal } from "@/components/common";
+import { Button } from "@/components/elements";
 import LeadGenerationForm from "@/components/Leads/LeadGenerationForm"; // adjust path if needed
+import { getLocalClinicData } from "@/helpers/storage-helper";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { createClient } from "@/utils/supabase/config/client";
+import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
+import { EyeOutlined, PlusOutlined } from "@ant-design/icons";
+import { Input, Select } from "antd";
+import { useEffect, useState } from "react";
 
 const { TextArea } = Input;
 
@@ -131,7 +131,6 @@ const LeadCapturingForm = () => {
     };
 
     fetchFormFields();
-   
   }, [clinicData?.id]);
 
   const handleSave = async () => {

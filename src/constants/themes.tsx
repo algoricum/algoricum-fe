@@ -155,17 +155,17 @@ export const COLORS = {
     800: "#1F2937",
     900: "#111827",
   },
-}
+};
 
 export const FONTS = {
   primary: "Inter, sans-serif",
-}
+};
 
 export const SHADOWS = {
   sm: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
   md: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
   lg: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-}
+};
 
 export const BREAKPOINTS = {
   sm: "640px",
@@ -173,4 +173,4 @@ export const BREAKPOINTS = {
   lg: "1024px",
   xl: "1280px",
   "2xl": "1536px",
-}
+};

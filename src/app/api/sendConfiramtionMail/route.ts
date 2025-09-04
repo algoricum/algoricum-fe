@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { sendGoLiveEmail } from "@/utils/sendGoLiveEmail";
+import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {

@@ -1,22 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { supabase } from "../_shared/supabaseClient.ts";
-  import {  corsHeaders, handleOptions } from "../_shared/cors.ts";
-
+import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import {
-  handleAuthStart,
-  handleAuthCallback,
   fetchFacebookLeadFormResponses,
+  handleAuthCallback,
+  handleAuthStart,
+  handleFacebookWebhook,
   verifyFacebookWebhook,
-  handleFacebookWebhook
-  
 } from "../_shared/facebook-lead-form-service.ts";
-
-
+import { supabase } from "../_shared/supabaseClient.ts";
 
 serve(async req => {
-    const optionsResponse = handleOptions(req);
-    if (optionsResponse) return optionsResponse;
-
+  const optionsResponse = handleOptions(req);
+  if (optionsResponse) return optionsResponse;
 
   try {
     const url = new URL(req.url);

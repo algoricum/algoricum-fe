@@ -7,7 +7,7 @@ interface ColorConfiguratorProps {
   color?: string;
   fieldName: string;
   value?: string;
-   
+
   onChange?: (value: string) => void;
 }
 
