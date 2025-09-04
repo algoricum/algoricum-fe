@@ -69,12 +69,13 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({ open, status, acc
                 Connect to NexHealth
               </Button>
 
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg text-left">
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg text-left">
                 <Text className="text-sm text-gray-600">
-                  <strong>What happens next:</strong>
-                  <br />• You&apos;ll be redirected to NexHealth
-                  <br />• Grant permission to access your institution data
-                  <br />• We&apos;ll automatically sync your patients
+                  <strong>API Integration Guide</strong>
+                  <br />• Sign up for a NexHealth developer account (if not already created).
+                  <br />• Visit{" "}
+                  <a href="https://developers.nexhealth.com/api-key" target="_blank" rel="noopener noreferrer" className="underline">NexHealth API Key</a> and Copy API Key.
+                  <br />• Paste here. We&apos;ll automatically sync your patients
                   <br />• Takes less than 30 seconds!
                 </Text>
               </div>
