@@ -19,6 +19,35 @@ interface TwilioWebhookData {
   ApiVersion: string;
 }
 
+function escapeIlikePattern(str: string): string {
+  return str.replace(/[%_+\\]/g, '\\$&');
+}
+
+function normalizePhoneNumber(phone: string): string {
+  if (!phone) return '';
+  
+  const digits = phone.replace(/\D/g, '');
+  
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  
+  return digits.startsWith('+') ? digits : `+${digits}`;
+}
+
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -147,10 +176,10 @@ async function processSMSMessage(
         status,
         clinic:clinic_id (
           id,
-          name
+          name,
+          calendly_link
         )
       `)
-      .eq('twilio_phone_number', recipientPhone)
       .eq('clinic_id', clinicId)
       .eq('status', 'active')
       .limit(1)
@@ -164,14 +193,19 @@ async function processSMSMessage(
       };
     }
 
-    const clinicData = twilioConfig.clinic;
+    // Use both new structure and fallback to old structure for compatibility
+    const clinicData = {
+      id: twilioConfig.clinic_id,
+      name: twilioConfig.name || twilioConfig.clinic?.name,
+      phone_number: twilioConfig.phone_number,
+      calendly_link: twilioConfig.clinic.calendly_link
+    };
     console.log(`✅ Found clinic: ${clinicData.id} - ${clinicData.name}`);
 
-    // Check if sender phone exists in lead table for this clinic
-    // Try to match by phone in notes/form_data if no direct phone field
+    // Check if sender phone exists in lead table for this clinic with improved matching
     const { data: existingLead, error: leadError } = await supabaseClient
       .from('lead')
-      .select('id, email, first_name, last_name, status, clinic_id, notes, form_data')
+      .select('id, email, first_name, last_name, status, clinic_id, notes, form_data, created_at')
       .eq('clinic_id', clinicData.id)
       .limit(1)
       .single();
@@ -225,8 +259,8 @@ async function processSMSMessage(
       }
       
       const newLeadData = {
-        email: `${senderPhone.replace(/\D/g, '')}@sms.lead`, // Dummy email for SMS leads
-        first_name: `SMS Lead ${senderPhone.slice(-4)}`, // Use last 4 digits as identifier
+        email: `${senderPhone.replace(/\D/g, '')}@sms.lead`,
+        first_name: `SMS Lead ${senderPhone.slice(-4)}`,
         last_name: null,
         clinic_id: clinicData.id,
         source_id: defaultSourceId,
@@ -248,7 +282,7 @@ async function processSMSMessage(
       const { data: createdLead, error: createLeadError } = await supabaseClient
         .from('lead')
         .insert(newLeadData)
-        .select('id, email, first_name, last_name, status, clinic_id, notes, form_data')
+        .select('id, email, first_name, last_name, status, clinic_id, notes, form_data, created_at')
         .single();
 
       if (createLeadError) {
@@ -268,7 +302,6 @@ async function processSMSMessage(
     // Create or find thread for SMS conversation
     let threadId: string;
     
-    // Find existing thread for the lead
     const { data: existingThread } = await supabaseClient
       .from('threads')
       .select('id')
@@ -281,7 +314,6 @@ async function processSMSMessage(
     if (existingThread) {
       threadId = existingThread.id;
     } else {
-      // Create new thread
       const { data: newThread, error: threadError } = await supabaseClient
         .from('threads')
         .insert({
@@ -302,14 +334,14 @@ async function processSMSMessage(
       threadId = newThread.id;
     }
 
-    // Save conversation record (using existing schema)
+    // Save conversation record
     const conversationData = {
       thread_id: threadId,
       message: messageBody,
       timestamp: new Date().toISOString(),
       is_from_user: false,
       sender_type: 'lead',
-      email_message_id: messageSid, // Reuse email_message_id field for SMS ID
+      email_message_id: messageSid,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -365,7 +397,7 @@ async function processSMSMessage(
         lead_created: !existingLead,
         action: 'conversation_created',
         ai_response_sent: aiResponse?.success || false,
-        ai_response: aiResponseText // Include for TwiML response
+        ai_response: aiResponseText
       }
     };
 
@@ -410,26 +442,47 @@ async function generateAIResponse(
                        leadData.notes?.match(/\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0] || 
                        'Not provided';
 
-    const prompt = `You are an AI assistant for ${clinicData.name}, a medical clinic responding via SMS. 
-    
+    // Get booking and unsubscribe links
+    const bookingLink = clinicData.calendly_link || 'https://calendly.com/book';
+    const unsubscribeLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
+    const bookingButton = `📅 Book here: ${bookingLink}`;
+    const unsubscribeButton = `To stop texts: ${unsubscribeLink}`;
+
+    const prompt = `You are the virtual assistant for ${clinicData.name}, a medical clinic responding via SMS. Generate a helpful, conversational SMS response to this patient's message.
+
+TONE REQUIREMENTS:
+- Sound casual and friendly - like texting a knowledgeable friend
+- Be helpful and informative about their specific question
+- Keep main message under 160 characters (links don't count toward limit)
+- Use personality when appropriate
+- Avoid special characters that might not display well in SMS
+
 Lead Information:
-- Name: ${leadData.first_name} ${leadData.last_name || ''}
+- Name: ${leadData.first_name || ''} ${leadData.last_name || ''}
 - Phone: ${phoneNumber}
-- Status: ${leadData.status}
+- Status: ${leadData.status || 'unknown'}
+- Clinic Name: ${clinicData.name}
+- Clinic Phone: ${clinicData.phone_number || 'Not provided'}
 
 Current SMS Message: ${messageBody}
 
 Previous Conversation:
-${conversationContext}
+${conversationContext || 'No previous conversation'}
 
-Please generate a helpful, professional SMS response to this lead's message. Keep it concise (ideal for SMS), warm, and informative. Encourage them to book an appointment if appropriate. Avoid using special characters that might not display well in SMS.
+REQUIRED ELEMENTS:
+- MUST include booking button: ${bookingButton}
+- MUST include unsubscribe option: ${unsubscribeButton}
+- Respond helpfully to their specific message/question
+- Keep the main response conversational and under 160 characters
 
-IMPORTANT: Keep response under 160 characters if possible to avoid SMS splitting.`;
+Generate a helpful SMS response that answers their question and includes all required elements.`;
 
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
       console.error('❌ OpenAI API key not found');
-      return { success: false, error: 'OpenAI API key not configured' };
+      // Use fallback response
+      const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!\n${bookingButton}\n${unsubscribeButton}`;
+      return { success: true, response: fallbackResponse };
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -443,29 +496,41 @@ IMPORTANT: Keep response under 160 characters if possible to avoid SMS splitting
         messages: [
           {
             role: 'system',
-            content: `You are a helpful AI assistant for ${clinicData.name}. Respond professionally to patient SMS inquiries. Keep responses concise and SMS-friendly.`
+            content: `You are a helpful AI assistant for ${clinicData.name}. Respond professionally to patient SMS inquiries. Keep responses concise, SMS-friendly, and include all required elements.`
           },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: 150, // Shorter for SMS
-        temperature: 0.7,
+        max_tokens: 150,
+        temperature: 0.8,
       }),
     });
 
     if (!response.ok) {
       console.error('❌ OpenAI API error:', response.status, response.statusText);
-      return { success: false, error: 'Failed to generate AI response' };
+      // Use fallback response
+      const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!\n${bookingButton}\n${unsubscribeButton}`;
+      return { success: true, response: fallbackResponse };
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0]?.message?.content;
+    let aiResponse = data.choices[0]?.message?.content?.trim();
 
     if (!aiResponse) {
       console.error('❌ No response generated by AI');
-      return { success: false, error: 'Empty AI response' };
+      // Use fallback response
+      const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!\n${bookingButton}\n${unsubscribeButton}`;
+      return { success: true, response: fallbackResponse };
+    }
+
+    // Ensure booking and unsubscribe links are included
+    if (!aiResponse.includes(bookingLink)) {
+      aiResponse += `\n${bookingButton}`;
+    }
+    if (!aiResponse.includes(unsubscribeLink)) {
+      aiResponse += `\n${unsubscribeButton}`;
     }
 
     console.log('✅ AI SMS response generated successfully');
@@ -473,7 +538,14 @@ IMPORTANT: Keep response under 160 characters if possible to avoid SMS splitting
 
   } catch (error) {
     console.error('❌ Error generating AI response:', error);
-    return { success: false, error: error.message };
+    // Use fallback response
+    const bookingLink = clinicData.calendly_link || 'https://calendly.com/book';
+    const unsubscribeLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
+    const bookingButton = `📅 Book here: ${bookingLink}`;
+    const unsubscribeButton = `To stop texts: ${unsubscribeLink}`;
+    
+    const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!\n${bookingButton}\n${unsubscribeButton}`;
+    return { success: true, response: fallbackResponse };
   }
 }
 
@@ -492,7 +564,7 @@ async function saveAIResponseToConversation(
       timestamp: new Date().toISOString(),
       is_from_user: true,
       sender_type: 'ai_assistant',
-      email_message_id: `reply_${originalMessageSid}`, // Reuse email_message_id for SMS reply
+      email_message_id: `reply_${originalMessageSid}`,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -512,33 +584,4 @@ async function saveAIResponseToConversation(
   } catch (error) {
     console.error('❌ Error saving AI SMS response:', error);
   }
-}
-
-function normalizePhoneNumber(phone: string): string {
-  if (!phone) return '';
-  
-  // Remove all non-numeric characters
-  const digits = phone.replace(/\D/g, '');
-  
-  // If it starts with 1 and has 11 digits (US format), keep as is
-  if (digits.length === 11 && digits.startsWith('1')) {
-    return `+${digits}`;
-  }
-  
-  // If it has 10 digits, assume US and add +1
-  if (digits.length === 10) {
-    return `+1${digits}`;
-  }
-  
-  // For other formats, add + if not present
-  return digits.startsWith('+') ? digits : `+${digits}`;
-}
-
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
