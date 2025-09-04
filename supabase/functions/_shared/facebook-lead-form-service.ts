@@ -159,8 +159,11 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
 
     for (const form of forms) {
       const leadFormId = form.id;
-      // generate verify token per connection (optional)
+      // generate verify token per connection (clinic-specific)
       const webhookVerifyToken = generateRandomToken(30);
+      
+      // Create unique webhook URL for this clinic
+      const uniqueWebhookUrl = `${SUPABASE_URL}/functions/v1/facebook-lead-form/webhook/${clinic_id}`;
 
       const row = {
         clinic_id,
@@ -170,7 +173,7 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
         app_id: FACEBOOK_APP_ID,
         app_secret: FACEBOOK_APP_SECRET,
         webhook_verify_token: webhookVerifyToken,
-        webhook_url: "", // we'll use the app-level webhook endpoint /facebook-webhook
+        webhook_url: uniqueWebhookUrl,
         last_sync_at: null,
         sync_status: "active",
         token_expiry: userTokenExpiry,
@@ -186,12 +189,32 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
         if (upsertErr) {
           console.error("Upsert error", upsertErr);
           results.push({ pageId, formId: leadFormId, ok: false, error: upsertErr.message });
+          continue; // Skip webhook creation if DB operation failed
         } else {
           results.push({ pageId, formId: leadFormId, ok: true });
         }
       } catch (dbErr) {
         console.error("DB error upserting connection", dbErr);
         results.push({ pageId, formId: leadFormId, ok: false, error: String(dbErr) });
+        continue; // Skip webhook creation if DB operation failed
+      }
+
+      // Create/Update webhook subscription for this page
+      try {
+        await createOrUpdatePageWebhook(pageId, pageAccessToken, uniqueWebhookUrl, webhookVerifyToken);
+        console.log(`✅ Webhook created/updated for page ${pageId}, clinic ${clinic_id}`);
+      } catch (webhookErr) {
+        console.error(`❌ Failed to create webhook for page ${pageId}:`, webhookErr);
+        // Update the connection to mark webhook creation as failed
+        await supabaseAdmin
+          .from("facebook_lead_form_connections")
+          .update({ 
+            sync_status: "webhook_failed",
+            updated_at: new Date().toISOString() 
+          })
+          .eq("clinic_id", clinic_id)
+          .eq("facebook_page_id", pageId)
+          .eq("lead_form_id", leadFormId);
       }
 
       // Subscribe the app to page leadgen (POST /{page-id}/subscribed_apps?subscribed_fields=leadgen)
@@ -212,6 +235,14 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
     }
   }
 
+  try {
+    await fetchFacebookLeadFormResponses(clinic_id, supabaseAdmin);
+    console.log("✅ Past leads fetched successfully after auth");
+  } catch (error) {
+    console.error("❌ Failed to fetch past leads after auth:", error);
+  }
+      
+  const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
   // redirect back to UI if provided
   if (redirectTo) {
     try {
@@ -228,14 +259,6 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
       // if invalid redirect, fall through to JSON
     }
   }
-  try {
-    await fetchFacebookLeadFormResponses(clinic_id, supabaseAdmin);
-    console.log("✅ Past leads fetched successfully after auth");
-  } catch (error) {
-    console.error("❌ Failed to fetch past leads after auth:", error);
-  }
-      const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
-
    const redirectUrl = new URL(`${APP_URL}/onboarding`);
     redirectUrl.searchParams.set("facebook_lead_form_status", "success");
     return new Response(null, {
@@ -245,6 +268,180 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
         Location: redirectUrl.toString(),
       },
     });
+}
+
+// -------------------- WEBHOOK CREATION ----------------------
+async function createOrUpdatePageWebhook(pageId: string, pageAccessToken: string, callbackUrl: string, verifyToken: string) {
+  // First, try to get existing webhooks for the page
+  const getWebhooksUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
+  getWebhooksUrl.searchParams.set("access_token", pageAccessToken);
+  
+  try {
+    const getResponse = await fetch(getWebhooksUrl.toString());
+    if (getResponse.ok) {
+      const webhooks = await getResponse.json();
+      console.log(`Existing webhooks for page ${pageId}:`, webhooks);
+      
+      // Check if our callback URL already exists
+      const existingWebhook = webhooks.data?.find((webhook: any) => 
+        webhook.callback_url === callbackUrl
+      );
+      
+      if (existingWebhook) {
+        console.log(`Webhook already exists for page ${pageId}, updating...`);
+        // Update existing webhook
+        const updateUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
+        const updateResponse = await fetch(updateUrl.toString(), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            access_token: pageAccessToken,
+            callback_url: callbackUrl,
+            verify_token: verifyToken,
+            fields: 'leadgen',
+          }).toString()
+        });
+        
+        if (!updateResponse.ok) {
+          const errorText = await updateResponse.text();
+          throw new Error(`Failed to update webhook: ${errorText}`);
+        }
+        
+        console.log(`✅ Updated webhook for page ${pageId}`);
+        return;
+      }
+    }
+  } catch (error) {
+    console.warn(`Could not fetch existing webhooks for page ${pageId}:`, error);
+  }
+  
+  // Create new webhook
+  const createUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
+  const createResponse = await fetch(createUrl.toString(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      access_token: pageAccessToken,
+      callback_url: callbackUrl,
+      verify_token: verifyToken,
+      fields: 'leadgen',
+    }).toString()
+  });
+  
+  if (!createResponse.ok) {
+    const errorText = await createResponse.text();
+    throw new Error(`Failed to create webhook: ${errorText}`);
+  }
+  
+  const result = await createResponse.json();
+  console.log(`✅ Created new webhook for page ${pageId}:`, result);
+}
+
+// -------------------- UPDATED WEBHOOK HANDLERS ----------------------
+// Updated webhook verification to handle clinic-specific webhooks
+export async function verifyFacebookWebhook(req: Request, clinicId?: string, supabaseAdmin?: any) { 
+  try {
+    const url = new URL(req.url);
+    const mode = url.searchParams.get("hub.mode");
+    const token = url.searchParams.get("hub.verify_token");
+    const challenge = url.searchParams.get("hub.challenge");
+
+    if (mode === "subscribe" && token) {
+      // If clinic_id is provided, verify against clinic-specific token
+      if (clinicId && supabaseAdmin) {
+        const { data: connection } = await supabaseAdmin
+          .from("facebook_lead_form_connections")
+          .select("webhook_verify_token")
+          .eq("clinic_id", clinicId)
+          .eq("webhook_verify_token", token)
+          .single();
+        
+        if (connection) {
+          console.log(`Webhook verified for clinic ${clinicId}`);
+          return new Response(challenge || "OK", { status: 200 });
+        }
+      }
+      
+      // Fallback to global token verification
+      if (token === FACEBOOK_GLOBAL_WEBHOOK_VERIFY_TOKEN) {
+        console.log("Webhook verified with global token");
+        return new Response(challenge || "OK", { status: 200 });
+      }
+    }
+
+    console.warn("Webhook verification failed");
+    return new Response("Forbidden", { status: 403 });
+  } catch (err) {
+    console.error("verifyFacebookWebhook error", err);
+    return new Response("Error", { status: 500 });
+  }
+}
+
+// Updated webhook handler to work with clinic-specific routes
+export async function handleFacebookWebhook(req: Request, supabaseAdmin: any, clinicId?: string) {
+  try {
+    const body = await req.json();
+    if (!body) return new Response("No payload", { status: 400 });
+
+    if (body.object !== "page" || !Array.isArray(body.entry)) return new Response("Ignored", { status: 200 });
+
+    for (const entry of body.entry) {
+      if (!Array.isArray(entry.changes)) continue;
+      for (const change of entry.changes) {
+        if (change.field !== "leadgen") continue;
+
+        const leadgenId = change.value?.leadgen_id || change.value?.lead_id || null;
+        const formId = change.value?.form_id || null;
+        const page_id_from_payload = change.value?.page_id || entry.id || null;
+
+        if (!leadgenId || !formId || !page_id_from_payload) {
+          console.warn("Webhook missing identifiers", change);
+          continue;
+        }
+
+        // Build query for finding connections
+        let query = supabaseAdmin
+          .from("facebook_lead_form_connections")
+          .select("*")
+          .eq("facebook_page_id", page_id_from_payload)
+          .eq("lead_form_id", formId)
+          .in("sync_status", ["active", "pending"]);
+        
+        // If clinic_id is provided (from URL path), filter by it
+        if (clinicId) {
+          query = query.eq("clinic_id", clinicId);
+        }
+
+        const { data: connections, error: connErr } = await query;
+
+        if (connErr || !connections || connections.length === 0) {
+          console.warn("No active connection for webhook lead", { 
+            page_id_from_payload, 
+            formId, 
+            clinicId: clinicId || 'any' 
+          });
+          continue;
+        }
+
+        for (const connection of connections) {
+          try {
+            await processFacebookLead(leadgenId, connection, supabaseAdmin);
+          } catch (err) {
+            console.error("Error processing webhook lead for connection", connection.id, err);
+          }
+        }
+      }
+    }
+
+    return new Response("OK", { status: 200 });
+  } catch (err) {
+    console.error("handleFacebookWebhook error", err);
+    return new Response("Error", { status: 500 });
+  }
 }
 
 // -------------------- FETCH LEADS ----------------------
@@ -386,7 +583,7 @@ export async function fetchFacebookLeadFormResponses(reqOrClinicId: Request | st
                     created_at: leadData.created_time || new Date().toISOString(),
                     updated_at: new Date().toISOString(),
                   });
-                  console.log("insertErr", leadData.id);
+                  console.log("insertErr", insertErr);
                   if (insertErr) {
                     console.error("Insert error", insertErr);
                     errors.push(`Failed to insert lead ${email}: ${insertErr.message}`);
@@ -435,76 +632,6 @@ export async function fetchFacebookLeadFormResponses(reqOrClinicId: Request | st
     }
 }
 
-// -------------------- WEBHOOKS -------------------------
-export async function verifyFacebookWebhook(req: Request) { 
-    try {
-    const url = new URL(req.url);
-    const mode = url.searchParams.get("hub.mode");
-    const token = url.searchParams.get("hub.verify_token");
-    const challenge = url.searchParams.get("hub.challenge");
-
-    if (mode === "subscribe" && token && token === FACEBOOK_GLOBAL_WEBHOOK_VERIFY_TOKEN) {
-      console.log("Webhook verified with global token");
-      return new Response(challenge || "OK", { status: 200 });
-    }
-
-    console.warn("Webhook verification failed");
-    return new Response("Forbidden", { status: 403 });
-  } catch (err) {
-    console.error("verifyFacebookWebhook error", err);
-    return new Response("Error", { status: 500 });
-  }
- }
-export async function handleFacebookWebhook(req: Request, supabaseAdmin: any) {
-   try {
-    const body = await req.json();
-    if (!body) return new Response("No payload", { status: 400 });
-
-    if (body.object !== "page" || !Array.isArray(body.entry)) return new Response("Ignored", { status: 200 });
-
-    for (const entry of body.entry) {
-      if (!Array.isArray(entry.changes)) continue;
-      for (const change of entry.changes) {
-        if (change.field !== "leadgen") continue;
-
-        const leadgenId = change.value?.leadgen_id || change.value?.lead_id || null;
-        const formId = change.value?.form_id || null;
-        const page_id_from_payload = change.value?.page_id || entry.id || null;
-
-        if (!leadgenId || !formId || !page_id_from_payload) {
-          console.warn("Webhook missing identifiers", change);
-          continue;
-        }
-
-        // Find active connections in DB for page+form
-        const { data: connections, error: connErr } = await supabaseAdmin
-          .from("facebook_lead_form_connections")
-          .select("*")
-          .eq("facebook_page_id", page_id_from_payload)
-          .eq("lead_form_id", formId)
-          .in("sync_status", ["active", "pending"]);
-
-        if (connErr || !connections || connections.length === 0) {
-          console.warn("No active connection for webhook lead", { page_id_from_payload, formId });
-          continue;
-        }
-
-        for (const connection of connections) {
-          try {
-            await processFacebookLead(leadgenId, connection, supabaseAdmin);
-          } catch (err) {
-            console.error("Error processing webhook lead for connection", connection.id, err);
-          }
-        }
-      }
-    }
-
-    return new Response("OK", { status: 200 });
-  } catch (err) {
-    console.error("handleFacebookWebhook error", err);
-    return new Response("Error", { status: 500 });
-  }
- }
 async function processFacebookLead(leadgenId: string, connection: any, supabaseAdmin: any) { 
   try {
     const pageToken = connection.page_access_token;
