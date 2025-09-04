@@ -173,7 +173,6 @@ async function processSMSMessage(
       .from('lead')
       .select('id, email, first_name, last_name, status, clinic_id, notes, form_data')
       .eq('clinic_id', clinicData.id)
-      .or(`notes.ilike.%${senderPhone}%,form_data::text.ilike.%${senderPhone}%`)
       .limit(1)
       .single();
 
