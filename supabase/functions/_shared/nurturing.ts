@@ -1559,12 +1559,12 @@ async function handleEmailWebhook(emailData: any, supabase: any) {
 
 // Export all functions
 export {
-  processAllLeads,
-  FOLLOW_UP_RULES,
   determineFollowUpsForLead,
+  FOLLOW_UP_RULES,
   generateIntelligentResponse,
-  sendSMS,
-  sendEmail,
-  handleTwilioWebhook,
   handleEmailWebhook,
+  handleTwilioWebhook,
+  processAllLeads,
+  sendEmail,
+  sendSMS,
 };

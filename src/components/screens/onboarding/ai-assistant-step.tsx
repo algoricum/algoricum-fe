@@ -71,7 +71,6 @@ export default function AiAssistantStep({ onNext, onPrev, initialData = {} }: Ai
   const isCurrentStepValid = () => {
     const currentFiles = uploadedFiles[currentQuestion.id as keyof typeof uploadedFiles] || [];
 
-    // If current question is required, check if files are uploaded
     if (currentQuestion.required) {
       return currentFiles.length > 0;
     }
