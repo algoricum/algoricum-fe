@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal, Alert, Button, Typography, Spin, Input, Select } from "antd";
-import { CalendarOutlined, LinkOutlined } from "@ant-design/icons";
+import { LinkOutlined } from "@ant-design/icons";
 import type React from "react";
 import { useEffect, useState } from "react";
 import CryptoJS from "crypto-js";
@@ -231,16 +231,14 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
             <div className="flex flex-col items-center">
               <Text className="text-gray-600">⚡ Your Gravity Forms integration is ready! Need further help? Book a support meeting.</Text>
               <br />
-              <Button
-                type="primary"
-                size="small"
-                icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
-                className="mt-2 bg-green-600 border-green-600 hover:bg-green-700"
-              >
-                Book a Support Meeting
-              </Button>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-orange-50"
+              borderColor="border-orange-400"
+              textColor="orange-700"
+              buttonBgColor="orange-400" // Normal button color (matches your Tailwind)
+              hoverBgColor="orange-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
       </div>

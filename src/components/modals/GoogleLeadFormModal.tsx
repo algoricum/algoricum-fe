@@ -1,7 +1,6 @@
 "use client";
 
 import { Modal, Alert, Button, Typography, Spin } from "antd";
-import { CalendarOutlined } from "@ant-design/icons";
 import type React from "react";
 import Image from "next/image";
 import { ModalProps } from "./types";
@@ -135,16 +134,14 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                 ⚡ Your Google Ads Lead Forms integration is ready! Need further help? Book a support meeting.
               </Text>
               <br />
-              <Button
-                type="primary"
-                size="small"
-                icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
-                className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
-              >
-                Book a Support Meeting
-              </Button>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-gray-50"
+              borderColor="border-gray-500"
+              textColor="gray-700"
+              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
+              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
       </div>

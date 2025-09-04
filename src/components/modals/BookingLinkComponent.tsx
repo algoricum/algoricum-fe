@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { BookingLinkComponentProps } from "./types";
 import { Button, Typography } from "antd";
 import { CalendarOutlined } from "@ant-design/icons";
-import { colorMapForBookingLinkComponent } from "./constants";
+import { BOOKING_LINK, TARGET_VALUE} from "./constants";
+import { colorMapForBookingLinkComponent } from "./utils";
 
 const { Text } = Typography;
 
@@ -14,7 +15,7 @@ export const BookingLinkComponent: React.FC<BookingLinkComponentProps> = ({
   hoverBgColor,
   buttonBgColor,
 }) => {
-  
+
   const [isHovered, setIsHovered] = useState(false);
   const getColor = (colorName: string) => colorMapForBookingLinkComponent[colorName as keyof typeof colorMapForBookingLinkComponent] || "#16a34a";
   const buttonStyle = {
@@ -41,7 +42,7 @@ export const BookingLinkComponent: React.FC<BookingLinkComponentProps> = ({
             <Button
               size="small"
               icon={<CalendarOutlined />}
-              onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
+              onClick={() => window.open(BOOKING_LINK, TARGET_VALUE)}
               className="mt-2"
               style={buttonStyle}
               onMouseEnter={() => setIsHovered(true)}
