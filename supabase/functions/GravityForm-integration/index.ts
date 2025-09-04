@@ -63,9 +63,14 @@ const { data: integration } = await supabase
         form_title: structure.title,
         entries: normalizedEntries,
       });
+      const { data: source } = await supabase
+    .from("lead_source")
+    .select("id")
+    .eq("name", "Others")
+    .single();
        const rows = normalizedEntries.map((p: any) => ({
         clinic_id,
-        source_id: "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c", // fixed UUID for Gravity
+        source_id: source.id, // fixed UUID for Gravity
         first_name: p.first_name,
         last_name: p.last_name,
         email: p.email,
