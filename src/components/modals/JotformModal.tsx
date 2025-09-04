@@ -2,6 +2,7 @@
 
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { Alert, Button, Modal, Spin, TreeSelect, Typography } from "antd";
+import Image from "next/image";
 import type React from "react";
 import { useEffect } from "react";
 import { ModalProps } from "./types";
