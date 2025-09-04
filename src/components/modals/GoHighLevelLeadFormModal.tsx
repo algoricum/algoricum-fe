@@ -1,5 +1,5 @@
 "use client";
-import { CalendarOutlined } from "@ant-design/icons";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { Alert, Button, Modal, Spin, Typography } from "antd";
 import Image from "next/image";
 import type React from "react";
@@ -65,6 +65,13 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, a
               </Text>
             </div>
           </div>
+          <BookingLinkComponent
+            bgColor="bg-blue-50"
+            borderColor="border-blue-400"
+            textColor="navy-400"
+            buttonBgColor="navy-400" // Normal button color
+            hoverBgColor="blue-600" // Hover color
+          />
         </>
       )}
       {status === "connecting" && (
@@ -89,16 +96,14 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, a
           <div className="mt-4 text-center">
             <Text className="text-gray-600">⚡ Your GoHighLevel integration is ready! Need further help? Book a support meeting.</Text>
             <br />
-            <Button
-              type="primary"
-              size="small"
-              icon={<CalendarOutlined />}
-              onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
-              className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
-            >
-              Book a Support Meeting
-            </Button>
           </div>
+          <BookingLinkComponent
+            bgColor="bg-blue-50"
+            borderColor="border-blue-400"
+            textColor="navy-400"
+            buttonBgColor="navy-400" // Normal button color
+            hoverBgColor="blue-600" // Hover color
+          />
         </>
       )}
     </div>

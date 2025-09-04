@@ -1,7 +1,6 @@
 "use client";
-import { CalendarOutlined } from "@ant-design/icons";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { Alert, Button, Modal, Spin, TreeSelect, Typography } from "antd";
-import Image from "next/image";
 import type React from "react";
 import { useEffect } from "react";
 import { ModalProps } from "./types";
@@ -113,6 +112,13 @@ export const JotformModal: React.FC<ModalProps> = ({
                 </Text>
               </div>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-gray-50"
+              borderColor="border-gray-500"
+              textColor="gray-700"
+              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
+              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
         {status === "connecting" && (
@@ -169,16 +175,14 @@ export const JotformModal: React.FC<ModalProps> = ({
             <div className="mt-4 text-center">
               <Text className="text-gray-600">⚡ Your Jotform integration is ready! Need help?</Text>
               <br />
-              <Button
-                type="primary"
-                size="small"
-                icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
-                className="mt-2 bg-blue-600 border-blue-600 hover:bg-blue-700"
-              >
-                Book a Support Meeting
-              </Button>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-gray-50"
+              borderColor="border-gray-500"
+              textColor="gray-700"
+              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
+              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
       </div>

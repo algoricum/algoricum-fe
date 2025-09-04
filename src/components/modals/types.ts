@@ -39,3 +39,11 @@ export interface CustomCrmModalProps {
   onOk: () => void;
   onCancel: () => void;
 }
+
+export interface BookingLinkComponentProps {
+  bgColor: string;
+  borderColor: string;
+  textColor: string;
+  hoverBgColor: string;
+  buttonBgColor: string;
+}

@@ -1,5 +1,5 @@
 "use client";
-import { CalendarOutlined } from "@ant-design/icons";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { Alert, Button, Modal, Spin, Typography } from "antd";
 import Image from "next/image";
 import type React from "react";
@@ -73,27 +73,13 @@ export const PipedriveModal: React.FC<ModalProps> = ({
                 </Text>
               </div>
             </div>
-            <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200 mt-6">
-              <div className="flex items-start">
-                <CalendarOutlined className="text-green-500 mt-1 mr-3" />
-                <div className="flex-1">
-                  <Text className="text-green-800 text-sm font-medium block mb-2">Need Help?</Text>
-                  <Text className="text-green-700 text-sm mb-3">
-                    Our team can help you set up the integration and configure your workflows.
-                    <br />
-                    <Button
-                      type="primary"
-                      size="small"
-                      icon={<CalendarOutlined />}
-                      onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
-                      className="mt-2 !bg-green-700 !border-green-700 hover:!bg-green-900"
-                    >
-                      Book a Support Meeting
-                    </Button>
-                  </Text>
-                </div>
-              </div>
-            </div>
+            <BookingLinkComponent
+              bgColor="bg-green-50"
+              borderColor="border-green-200"
+              textColor="green-700"
+              buttonBgColor="green-700" // Normal button color
+              hoverBgColor="green-900" // Hover color
+            />
           </>
         )}
 
