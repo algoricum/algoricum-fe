@@ -1,4 +1,3 @@
-// supabase/functions/sms-processor/index.ts
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
@@ -9,15 +8,15 @@ const corsHeaders = {
 };
 
 interface TwilioWebhookData {
-  To: string;          // Clinic's phone number
-  From: string;        // Sender's phone number
-  Body: string;        // SMS message body
-  MessageSid: string;  // Twilio message ID
-  AccountSid: string;  // Twilio account ID
-  NumSegments: string; // Number of message segments
-  SmsSid: string;      // SMS ID
-  SmsStatus: string;   // Message status
-  ApiVersion: string;  // Twilio API version
+  To: string;        
+  From: string;       
+  Body: string;  
+  MessageSid: string; 
+  AccountSid: string;
+  NumSegments: string;
+  SmsSid: string;   
+  SmsStatus: string;  
+  ApiVersion: string;
 }
 
 serve(async (req) => {
@@ -45,6 +44,21 @@ serve(async (req) => {
 
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
     
+    // Get clinic_id from query parameters
+    const url = new URL(req.url);
+    const clinicId = url.searchParams.get('clinic_id');
+
+    if (!clinicId) {
+      console.error('❌ Missing clinic_id in query parameters');
+      return new Response(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/xml' } 
+        }
+      );
+    }
+
     // Parse Twilio webhook data (form-encoded)
     const formData = await req.formData();
     const webhookData: TwilioWebhookData = {
@@ -71,7 +85,7 @@ serve(async (req) => {
     }
 
     // Process SMS message directly
-    const result = await processSMSMessage(webhookData, supabaseClient);
+    const result = await processSMSMessage(webhookData, supabaseClient, clinicId);
     
     const processingTime = Date.now() - startTime;
     console.log(`⏱️ SMS processed in ${processingTime}ms`);
@@ -109,7 +123,8 @@ serve(async (req) => {
 
 async function processSMSMessage(
   webhookData: TwilioWebhookData, 
-  supabaseClient: any
+  supabaseClient: any,
+  clinicId: string
 ): Promise<{ success: boolean; message: string; data?: any }> {
   try {
     const senderPhone = normalizePhoneNumber(webhookData.From);
@@ -119,7 +134,7 @@ async function processSMSMessage(
 
     console.log(`Processing SMS from: ${senderPhone} to: ${recipientPhone}`);
 
-    // Find the clinic by matching recipient phone to twilio_phone_number
+    // Find the clinic by matching recipient phone to twilio_phone_number and clinic_id
     const { data: twilioConfig, error: configError } = await supabaseClient
       .from('twilio_config')
       .select(`
@@ -136,6 +151,7 @@ async function processSMSMessage(
         )
       `)
       .eq('twilio_phone_number', recipientPhone)
+      .eq('clinic_id', clinicId)
       .eq('status', 'active')
       .limit(1)
       .single();
@@ -144,7 +160,7 @@ async function processSMSMessage(
       console.error('❌ Error finding Twilio config:', configError);
       return {
         success: false,
-        message: `No active Twilio config found for phone number: ${recipientPhone}`
+        message: `No active Twilio config found for phone number: ${recipientPhone} and clinic_id: ${clinicId}`
       };
     }
 
