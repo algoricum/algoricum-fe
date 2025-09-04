@@ -525,11 +525,16 @@ Generate a helpful SMS response that answers their question and includes all req
       return { success: true, response: fallbackResponse };
     }
 
-    // Ensure booking and unsubscribe links are included
-    if (!aiResponse.includes(bookingLink)) {
+    // Ensure booking and unsubscribe links are included (check for both URL and common unsubscribe text)
+    const hasBookingLink = aiResponse.includes(bookingLink);
+    const hasUnsubscribeLink = aiResponse.includes(unsubscribeLink) || 
+                              aiResponse.toLowerCase().includes('stop texts') || 
+                              aiResponse.toLowerCase().includes('unsubscribe');
+
+    if (!hasBookingLink) {
       aiResponse += `\n${bookingButton}`;
     }
-    if (!aiResponse.includes(unsubscribeLink)) {
+    if (!hasUnsubscribeLink) {
       aiResponse += `\n${unsubscribeButton}`;
     }
 

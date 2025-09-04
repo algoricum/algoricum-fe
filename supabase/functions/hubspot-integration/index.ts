@@ -159,7 +159,7 @@ serve(async (req) => {
   if (req.method === "POST") {
     try {
       const body = await req.json();
-      if (body.mode === 'sync_all_connections') {
+      if (!req.headers.get("authorization")) {
         console.log(`[${requestId}] 🕐 Starting cron job - sync all HubSpot connections`);
         return await handleSyncAllConnections(req, requestId);
       }
@@ -556,7 +556,43 @@ async function handleAuthenticatedRequest(req: Request, body: any, requestId: st
   if (req.method === "POST") {
     const url = new URL(req.url);
     if (url.pathname.endsWith('/sync-contacts')) {
-      return await handleSyncContacts(body, supabase, requestId);
+      // Get all connected clinic IDs
+      const { data: connections, error: connError } = await supabase
+        .from("hubspot_connections")
+        .select("clinic_id")
+        .eq("connection_status", "connected")
+        .not("access_token", "is", null)
+        .not("refresh_token", "is", null);
+
+      if (connError || !connections || connections.length === 0) {
+        return new Response(JSON.stringify({ error: "No active connections found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const results = [];
+      for (const connection of connections) {
+        const syncBody = { 
+          clinic_id: connection.clinic_id,
+          redirectUri: redirectUri 
+        };
+        try {
+          const result = await handleSyncContacts(syncBody, supabase, `${requestId}-${connection.clinic_id}`);
+          const resultData = await result.json();
+          results.push({ clinic_id: connection.clinic_id, ...resultData });
+        } catch (error) {
+          results.push({ clinic_id: connection.clinic_id, error: error.message });
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: `Synced contacts for ${connections.length} clinics`,
+        results
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
     }
     return await handleConnect(body, supabase, clientId, redirectUri, requestId);
   }
