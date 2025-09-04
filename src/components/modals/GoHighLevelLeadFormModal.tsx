@@ -94,7 +94,7 @@ export const GoHighLevelLeadFormModal: React.FC<ModalProps> = ({ open, status, a
               type="primary"
               size="small"
               icon={<CalendarOutlined />}
-              onClick={() => window.open("https://calendly.com/your-team/gohighlevel-setup", "_blank")}
+              onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
               className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
             >
               Book a Support Meeting

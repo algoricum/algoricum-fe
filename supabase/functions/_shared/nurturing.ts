@@ -584,7 +584,6 @@ async function determineFollowUpsForLead(lead: Lead, supabase: any): Promise<Fol
   
   // Filter out initial contact for nurturing function and sort by time
   const followupRules = FOLLOW_UP_RULES
-    .filter(rule => rule.name !== 'sms_5min_initial')
     .sort((a, b) => a.timeFromCreated - b.timeFromCreated) // Sort by time ascending
   
   logInfo(`Checking follow-ups for lead ${lead.id}, age: ${Math.round(timeSinceCreated / (24 * 60 * 60 * 1000))} days`)

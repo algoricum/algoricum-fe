@@ -86,7 +86,7 @@ export const PipedriveModal: React.FC<ModalProps> = ({
                       type="primary"
                       size="small"
                       icon={<CalendarOutlined />}
-                      onClick={() => window.open("https://calendly.com/your-team/google-form-setup", "_blank")}
+                      onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
                       className="mt-2 !bg-green-700 !border-green-700 hover:!bg-green-900"
                     >
                       Book a Support Meeting
