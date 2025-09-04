@@ -1,46 +1,42 @@
 "use client";
-
-import { useState, useEffect, useCallback } from "react";
+import { questions } from "@/constants";
+import { handleCsvUpload } from "@/utils/csvUtils";
 import { Button, Typography } from "antd";
-import { IntegrationsStepProps, FormData, ConnectionStatus } from "../../../../app/types/types";
+import { useCallback, useEffect, useState } from "react";
+import { ConnectionStatus, FormData, IntegrationsStepProps } from "../../../../app/types/types";
+import { ONBOARDING_LEADS_FILE_NAME, SUPABASE_URL } from "../../../../constants/integration-constants";
 import {
-  getClinicId,
-  syncPipedriveLeads,
-  syncGoogleFormLeads,
-  syncGoogleLeadFormLeads,
-  syncTypeformLeads,
-  clearOAuthState,
-  connectToHubSpot,
-  connectToPipedrive,
-  connectToGoogleForm,
-  connectToTypeform,
-  findSheetDetails,
   ErrorToast,
   SuccessToast,
-  createJotformConnection,
-  syncJotformLeads,
+  clearOAuthState,
   connectToGHL,
-  connectToNextHealth,
-  connnectToGravityForm,
+  connectToGoogleForm,
   connectToGoogleLeadForm,
+  connectToHubSpot,
+  connectToNextHealth,
+  connectToPipedrive,
+  connectToTypeform,
+  connnectToGravityForm,
+  createJotformConnection,
   fetchGoogleFormSheets,
-  fetchTypeformForms,
   fetchJotformForms,
+  fetchTypeformForms,
+  findSheetDetails,
+  getClinicId,
   handleInput,
   handle_Next,
+  syncGoogleFormLeads,
+  syncGoogleLeadFormLeads,
+  syncJotformLeads,
+  syncPipedriveLeads,
+  syncTypeformLeads,
 } from "../../../../utils/integration-utils";
-
-import {handleCsvUpload} from "@/utils/csvUtils";
-
-import { SUPABASE_URL, ONBOARDING_LEADS_FILE_NAME } from "../../../../constants/integration-constants";
-import { questions } from "@/constants";
-const { Title } = Typography;
-import { PreviousQuestions } from "./PreviousQuestions";
 import CurrentInput from "./CurrentInput";
 import IntegrationsModals from "./IntegrationModals";
+import { PreviousQuestions } from "./PreviousQuestions";
+const { Title } = Typography;
 
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
-
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [buttonsLoading, setButtonsLoading] = useState(false);
@@ -750,7 +746,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           } catch (error) {
             console.error("Error:", error);
             setButtonsLoading(false);
-            ErrorToast("Error: "+ error)
+            ErrorToast("Error: " + error);
             setShowCompletionButtons(false);
             setFormData(prev => ({ ...prev, adsConnections: "" }));
             localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
@@ -780,7 +776,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         typeformTreeData={TypeformTreeData}
         selectedTypeformForms={selectedTypeformForms}
         onSelectTypeformForms={setSelectedTypeformForms}
-        onTypeformConnect={()=>connectToTypeform(setButtonsLoading)}
+        onTypeformConnect={() => connectToTypeform(setButtonsLoading)}
         onTypeformOk={() => {
           if (typeformStatus === "connected" && typeformLeadsSynced) {
             setShowTypeformModal(false);
@@ -826,7 +822,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           }
           SuccessToast("Jotform connected successfully");
           setJotformStatus("connected");
-          setButtonsLoading(false)
+          setButtonsLoading(false);
         }}
         onJotformSyncLeads={() => {
           syncJotformLeads(selectedJotformForms);
@@ -859,7 +855,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         showManualLeadsModal={showManualLeadsModal}
         onCsvUploadOk={leads => {
           setShowManualLeadsModal(false);
-          handleCsvUpload(leads,false);
+          handleCsvUpload(leads, false);
           if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
             SuccessToast("Leads saved successfully");
           }
@@ -877,7 +873,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // NexHealth
         showNexHealthModal={showNexHealthModal}
         nextHealthStatus={nextHealthStatus}
-        onNexHealthConnect={(token: any) => connectToNextHealth(token,setButtonsLoading)}
+        onNexHealthConnect={(token: any) => connectToNextHealth(token, setButtonsLoading)}
         onNexHealthOk={() => {
           if (nextHealthStatus === "connected") {
             setShowNexHealthModal(false);
@@ -900,9 +896,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // Gravity Form
         showGravityFormModal={showGravityFormModal}
         gravityFormStatus={gravityFormStatus}
-        onGravityFormConnect={(token: any) => connnectToGravityForm(token,setButtonsLoading)}
+        onGravityFormConnect={(token: any) => connnectToGravityForm(token, setButtonsLoading)}
         onGravityFormOk={() => {
-          if (gravityFormStatus === "connected" ) {
+          if (gravityFormStatus === "connected") {
             setShowGravityFormModal(false);
             autoProgressToNext();
           } else {

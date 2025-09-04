@@ -81,4 +81,3 @@ export default function getNormalizedLead(leads: Partial<Lead>[], source_id: str
     return normalizedLead;
   });
 }
-

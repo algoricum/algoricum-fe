@@ -1,11 +1,9 @@
 "use client";
-
-import type React from "react";
-
-import { X } from "lucide-react";
-import { Button } from "antd";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { ErrorToast} from "@/helpers/toast";
+import { ErrorToast } from "@/helpers/toast";
+import { Button } from "antd";
+import { X } from "lucide-react";
+import type React from "react";
 
 interface NewStaff {
   email: string;
@@ -17,9 +15,9 @@ interface AddStaffModalProps {
   isSubmitting: boolean;
   newStaff: NewStaff;
   onClose: () => void;
-   
+
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-   
+
   onInputChange: (field: keyof NewStaff, value: string) => void;
 }
 

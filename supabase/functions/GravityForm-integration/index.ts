@@ -1,49 +1,39 @@
 // supabase/functions/fetch-gravity-forms/index.ts
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import {  corsHeaders, handleOptions } from "../_shared/cors.ts";
+import { corsHeaders, handleOptions } from "../_shared/cors.ts";
+import { fetchFormEntries, fetchFormStructure, mapFields, normalizeEntries } from "../_shared/gravityForm-service.ts";
 import { supabase } from "../_shared/supabaseClient.ts";
 
-import {
-  fetchFormStructure,
-  fetchFormEntries,
-  mapFields,
-  normalizeEntries,
-} from "../_shared/gravityForm-service.ts";
-
-serve(async (req) => {
+serve(async req => {
   const optionsResponse = handleOptions(req);
   if (optionsResponse) return optionsResponse;
 
   try {
-    const { clinic_id,form_ids, consumerKey, consmerSecret, baseURL } = await req.json();
-    if(!clinic_id){
+    const { clinic_id, form_ids, consumerKey, consmerSecret, baseURL } = await req.json();
+    if (!clinic_id) {
       return new Response(JSON.stringify({ error: "Missing clinic_id" }), { status: 400, headers: { ...corsHeaders() } });
     }
-const { data: integration } = await supabase
-    .from("integrations")
-    .select("id")
-    .eq("name", "Gravity Form")
-    .single();
+    const { data: integration } = await supabase.from("integrations").select("id").eq("name", "Gravity Form").single();
 
-  if (!integration) throw new Error("Integration not configured");
+    if (!integration) throw new Error("Integration not configured");
 
-  await supabase.from("integration_connections").upsert({
-    clinic_id,
-    integration_id: integration.id,
-    auth_data: { form_ids, consumerKey,consmerSecret, baseURL },
-    status: "active",
-  }, { onConflict: ["clinic_id", "integration_id"] });
+    await supabase.from("integration_connections").upsert(
+      {
+        clinic_id,
+        integration_id: integration.id,
+        auth_data: { form_ids, consumerKey, consmerSecret, baseURL },
+        status: "active",
+      },
+      { onConflict: ["clinic_id", "integration_id"] },
+    );
     if (!consumerKey || !consmerSecret || !baseURL) {
-      return new Response(
-        JSON.stringify({ error: "Missing consumerKey, consumerSecret or baseURL" }),
-        { status: 400, headers: { ...corsHeaders() } }
-      );
+      return new Response(JSON.stringify({ error: "Missing consumerKey, consumerSecret or baseURL" }), {
+        status: 400,
+        headers: { ...corsHeaders() },
+      });
     }
     if (!form_ids || !Array.isArray(form_ids)) {
-      return new Response(
-        JSON.stringify({ error: "form_ids array required" }),
-        { status: 400, headers: { ...corsHeaders() } }
-      );
+      return new Response(JSON.stringify({ error: "form_ids array required" }), { status: 400, headers: { ...corsHeaders() } });
     }
 
     const results: any[] = [];
@@ -61,7 +51,7 @@ const { data: integration } = await supabase
         form_title: structure.title,
         entries: normalizedEntries,
       });
-       const rows = normalizedEntries.map((p: any) => ({
+      const rows = normalizedEntries.map((p: any) => ({
         clinic_id,
         source_id: "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c", // fixed UUID for Gravity
         first_name: p.first_name,
@@ -73,7 +63,7 @@ const { data: integration } = await supabase
 
       allRows.push(...rows);
     }
-  if (allRows.length > 0) {
+    if (allRows.length > 0) {
       const { error } = await supabase.from("lead").upsert(allRows, { onConflict: ["clinic_id", "email"] });
       if (error) throw new Error(`Insert failed: ${error.message}`);
     }

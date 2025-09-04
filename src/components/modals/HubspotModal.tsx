@@ -1,8 +1,7 @@
 "use client";
-
-import { Modal, Alert, Button, Typography, Spin } from "antd";
-import type React from "react";
+import { Alert, Button, Modal, Spin, Typography } from "antd";
 import Image from "next/image";
+import type React from "react";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
 

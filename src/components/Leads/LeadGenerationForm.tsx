@@ -1,13 +1,13 @@
 "use client";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import getLeadSourceId from "@/utils/lead_source";
+import { createClient } from "@/utils/supabase/config/client";
+import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { Calendar, Mail, Phone, Stethoscope, User, Users } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { createClient } from "@/utils/supabase/config/client";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
-import getLeadSourceId from "@/utils/lead_source";
-import { User, Mail, Phone, Stethoscope, Users, Calendar } from "lucide-react";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
 
 type FormField = {
   id: string;
@@ -21,7 +21,6 @@ type FormField = {
 
 type FormData = { [key: string]: string | number };
 
- 
 type Props = { clinicId: string; onSuccess?: (newLead?: any) => void };
 
 const validatePhoneNumber = (phone: string | undefined): boolean => {
@@ -41,7 +40,7 @@ const validatePhoneNumber = (phone: string | undefined): boolean => {
 
     return true;
   } catch (error) {
-    console.error('Error validating phone number:', error);
+    console.error("Error validating phone number:", error);
     return false;
   }
 };
@@ -146,49 +145,48 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!validateForm()) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
 
-  setSubmitting(true);
-  const source_id = await getLeadSourceId("Others");
+    setSubmitting(true);
+    const source_id = await getLeadSourceId("Others");
 
-  try {
-    const submissionData = {
-      clinic_id: clinicId,
-      source_id: source_id,
-      first_name: formData.first_name || null,
-      last_name: formData.last_name || null,
-      email: formData.email || null,
-      phone: phoneNumber || null,
-      form_data: {
-        service_interest: formData.services_interest || null,
-        visit_reason: formData.visit_reason || null,
-        consultation_type: formData.consultation_type || null,
-      },
-      interest_level: "medium",
-      urgency: "curious",
-      status: "New",
-    };
+    try {
+      const submissionData = {
+        clinic_id: clinicId,
+        source_id: source_id,
+        first_name: formData.first_name || null,
+        last_name: formData.last_name || null,
+        email: formData.email || null,
+        phone: phoneNumber || null,
+        form_data: {
+          service_interest: formData.services_interest || null,
+          visit_reason: formData.visit_reason || null,
+          consultation_type: formData.consultation_type || null,
+        },
+        interest_level: "medium",
+        urgency: "curious",
+        status: "New",
+      };
 
-    const { data, error: insertError } = await supabase.from("lead").insert([submissionData]).select().single();
+      const { data, error: insertError } = await supabase.from("lead").insert([submissionData]).select().single();
 
-    if (insertError?.code === "23505") {
-      throw new Error("Lead with this email already registered in this clinic");
+      if (insertError?.code === "23505") {
+        throw new Error("Lead with this email already registered in this clinic");
+      }
+
+      SuccessToast(" Lead created successfully ");
+
+      onSuccess?.(data);
+      setSubmitted(true);
+    } catch (err) {
+      const error = err as Error;
+      ErrorToast(`${error}`);
+    } finally {
+      setSubmitting(false);
     }
-    
-     SuccessToast(" Lead created successfully ")
-
-    onSuccess?.(data);
-    setSubmitted(true);
-  } catch (err) {
-    const error = err as Error;
-    ErrorToast(`${error}`)
-
-  } finally {
-    setSubmitting(false);
-  }
-};
+  };
 
   const getFieldIcon = (fieldId: string) => {
     switch (fieldId) {

@@ -1,122 +1,148 @@
 // supabase/functions/send-email/index.js
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-serve(async (req)=>{
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: corsHeaders
+serve(async req => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: corsHeaders,
     });
   }
   try {
-    const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
     const { clinic_id, thread_id, message, to_email = null, subject = null } = await req.json();
     if (!clinic_id || !message) {
-      return new Response(JSON.stringify({
-        error: 'Missing required fields'
-      }), {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Missing required fields",
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        },
+      );
     }
     // Get email settings for the clinic
-    const { data: emailSettings, error: settingsError } = await supabaseClient.from('email_settings').select('*').eq('clinic_id', clinic_id).single();
+    const { data: emailSettings, error: settingsError } = await supabaseClient
+      .from("email_settings")
+      .select("*")
+      .eq("clinic_id", clinic_id)
+      .single();
     if (settingsError || !emailSettings) {
-      return new Response(JSON.stringify({
-        error: 'Email settings not configured for this clinic'
-      }), {
-        status: 404,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Email settings not configured for this clinic",
+        }),
+        {
+          status: 404,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        },
+      );
     }
     // Get thread information
     let recipientEmail = to_email;
     let emailSubject = subject;
     if (thread_id) {
-      const { data: thread, error: threadError } = await supabaseClient.from('thread').select('email_from, email_subject').eq('id', thread_id).single();
+      const { data: thread, error: threadError } = await supabaseClient
+        .from("thread")
+        .select("email_from, email_subject")
+        .eq("id", thread_id)
+        .single();
       if (thread && !threadError) {
         recipientEmail = recipientEmail || thread.email_from;
-        emailSubject = emailSubject || `Re: ${thread.email_subject || 'Your inquiry'}`;
+        emailSubject = emailSubject || `Re: ${thread.email_subject || "Your inquiry"}`;
       }
     }
     if (!recipientEmail) {
-      return new Response(JSON.stringify({
-        error: 'No recipient email found'
-      }), {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      });
+      return new Response(
+        JSON.stringify({
+          error: "No recipient email found",
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        },
+      );
     }
     // Get clinic information for personalization
-    const { data: clinicData } = await supabaseClient.from('clinic').select('name').eq('id', clinic_id).single();
-    const clinicName = clinicData?.name || 'Your Healthcare Provider';
+    const { data: clinicData } = await supabaseClient.from("clinic").select("name").eq("id", clinic_id).single();
+    const clinicName = clinicData?.name || "Your Healthcare Provider";
     // Send the email
     const emailResult = await sendSMTPEmail(emailSettings, {
       to: recipientEmail,
       subject: emailSubject || `Message from ${clinicName}`,
       body: message,
-      clinicName
+      clinicName,
     });
     if (!emailResult.success) {
-      return new Response(JSON.stringify({
-        error: 'Failed to send email',
-        details: emailResult.error
-      }), {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Failed to send email",
+          details: emailResult.error,
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        },
+      );
     }
     // Store the sent message in conversation table
     if (thread_id) {
-      const { error: conversationError } = await supabaseClient.from('conversation').insert({
+      const { error: conversationError } = await supabaseClient.from("conversation").insert({
         thread_id: thread_id,
         message: message,
-        sender_type: 'assistant',
-        timestamp: new Date().toISOString()
+        sender_type: "assistant",
+        timestamp: new Date().toISOString(),
       });
       if (conversationError) {
-        console.error('Failed to store conversation:', conversationError);
+        console.error("Failed to store conversation:", conversationError);
       }
     }
-    return new Response(JSON.stringify({
-      message: 'Email sent successfully',
-      to: recipientEmail,
-      subject: emailSubject,
-      thread_id: thread_id
-    }), {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
-    });
+    return new Response(
+      JSON.stringify({
+        message: "Email sent successfully",
+        to: recipientEmail,
+        subject: emailSubject,
+        thread_id: thread_id,
+      }),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      },
+    );
   } catch (error) {
-    console.error('Send email error:', error);
-    return new Response(JSON.stringify({
-      error: error.message
-    }), {
-      status: 500,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
-    });
+    console.error("Send email error:", error);
+    return new Response(
+      JSON.stringify({
+        error: error.message,
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      },
+    );
   }
 });
 async function sendSMTPEmail(settings, emailData) {
@@ -128,26 +154,26 @@ async function sendSMTPEmail(settings, emailData) {
         tls: settings.smtp_use_tls !== false,
         auth: {
           username: settings.smtp_user,
-          password: settings.smtp_password
-        }
-      }
+          password: settings.smtp_password,
+        },
+      },
     });
     await client.send({
       from: `${settings.smtp_sender_name || emailData.clinicName} <${settings.smtp_sender_email}>`,
       to: emailData.to,
       subject: emailData.subject,
       content: emailData.body,
-      html: formatEmailHTML(emailData.body, emailData.clinicName)
+      html: formatEmailHTML(emailData.body, emailData.clinicName),
     });
     await client.close();
     return {
-      success: true
+      success: true,
     };
   } catch (error) {
-    console.error('SMTP Error:', error);
+    console.error("SMTP Error:", error);
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }

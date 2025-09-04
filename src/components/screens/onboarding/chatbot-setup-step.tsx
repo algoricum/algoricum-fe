@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
-import { Button, Input, Select, Upload, Typography, Card, Flex, Radio, Space, Modal, Spin } from "antd";
-import { UserOutlined, MessageOutlined, FileTextOutlined, RobotOutlined } from "@ant-design/icons";
 import { ColorConfigurator } from "@/components/common";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
+import { FileTextOutlined, MessageOutlined, RobotOutlined, UserOutlined } from "@ant-design/icons";
+import { Button, Card, Flex, Input, Modal, Radio, Select, Space, Spin, Typography, Upload } from "antd";
+import { useEffect, useRef, useState } from "react";
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -11,7 +11,6 @@ const { Title, Text } = Typography;
 const { Dragger } = Upload;
 
 interface ChatbotSetupStepProps {
-   
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
@@ -96,7 +95,7 @@ export default function ChatbotSetupStep({ onNext, onPrev, initialData = {} }: C
     if (videoRef.current) {
       videoRef.current.playbackRate = 1.5;
     }
-  },[isModalVisible]);
+  }, [isModalVisible]);
 
   const currentQuestion = questions[currentQuestionIndex];
 

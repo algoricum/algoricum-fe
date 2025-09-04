@@ -2,15 +2,15 @@
 import { Button } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { ResendOtpProps, VerifyOtpProps } from "@/interfaces/services_type";
-import { Flex, Typography } from "antd";
-import { useRouter, useSearchParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
-import { useMutation } from "react-query";
-import OtpInput from "react-otp-input";
-import { createClient } from "@/utils/supabase/config/client";
-import { getUserData } from "@/utils/supabase/user-helper";
 import { resendOtp, verifyOtp } from "@/utils/supabase/auth-helper";
 import { createClinic, setClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
+import { getUserData } from "@/utils/supabase/user-helper";
+import { Flex, Typography } from "antd";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import OtpInput from "react-otp-input";
+import { useMutation } from "react-query";
 
 const { Title, Text } = Typography;
 

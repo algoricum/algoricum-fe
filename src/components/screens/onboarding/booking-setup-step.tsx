@@ -1,14 +1,11 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import { Button, Input, Radio, Card, Space, Typography } from "antd";
-// import { forEach } from "lodash";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
+import { Button, Card, Input, Radio, Space, Typography } from "antd";
+import { useEffect, useState } from "react";
 
 const { Title, Text } = Typography;
 
 interface BookingSetupStepProps {
-   
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
@@ -92,7 +89,6 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
   };
 
   const handleNext = () => {
-
     // Validate booking URL if it's the current question
     if (currentQuestion.id === "bookingLinkUrl") {
       const validation = validateBookingUrl(currentValue);
@@ -101,7 +97,7 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
         return;
       }
     }
-    
+
     // Check if we should skip the URL question
     if (currentQuestionIndex === 0 && formData.hasBookingLink === "No, I don't have one") {
       onNext(formData);

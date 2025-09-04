@@ -1,6 +1,6 @@
+import { Clinic } from "./clinic_model";
 import { Section } from "./section_modal";
 import { User } from "./user_model";
-import { Clinic } from "./clinic_model";
 
 export interface Article {
   id: string;

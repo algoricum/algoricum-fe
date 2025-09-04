@@ -64,13 +64,7 @@ export interface ChannelStats {
 }
 
 // Valid status options for the new comprehensive system
-export const LEAD_STATUSES = [
-  "New",
-  "Engaged",
-  "Cold",
-  "Booked",
-  "Converted"
-] as const;
+export const LEAD_STATUSES = ["New", "Engaged", "Cold", "Booked", "Converted"] as const;
 
 export const INTEREST_LEVELS = ["high", "medium", "low"] as const;
 export const URGENCY_LEVELS = ["asap", "this_month", "curious"] as const;
@@ -278,15 +272,10 @@ export async function fetchMessagesForLead(leadId: string, clinicId: string, thr
 
 export async function sendMessageToLead(leadId: string, clinicId: string, content: string, isFromUser: boolean = false): Promise<Message> {
   try {
-    const res = await supabase
-      .from("threads")
-      .select("id")
-      .eq("lead_id", leadId)
-      .eq("clinic_id", clinicId)
-      .maybeSingle();
+    const res = await supabase.from("threads").select("id").eq("lead_id", leadId).eq("clinic_id", clinicId).maybeSingle();
 
-      const threadError = res.error;
-      let thread = res.data;
+    const threadError = res.error;
+    let thread = res.data;
 
     if (threadError && threadError.code !== "PGRST116") {
       throw threadError;

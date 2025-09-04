@@ -1,29 +1,28 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-);
+const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
 export async function authenticate(api_key: string): Promise<string> {
   const res = await fetch("https://nexhealth.info/authenticates", {
     method: "POST",
     headers: {
-      "Accept": "application/vnd.Nexhealth+json;version=2",
-      "Authorization": api_key,
+      Accept: "application/vnd.Nexhealth+json;version=2",
+      Authorization: api_key,
     },
   });
 
   if (!res.ok) throw new Error(`Auth failed: ${await res.text()}`);
-  const { data: { token } } = await res.json();
+  const {
+    data: { token },
+  } = await res.json();
   return token;
 }
 
 export async function fetchInstitution(token: string) {
   const res = await fetch("https://nexhealth.info/institutions", {
     headers: {
-      "Accept": "application/vnd.Nexhealth+json;version=2",
-      "Authorization": `Bearer ${token}`,
+      Accept: "application/vnd.Nexhealth+json;version=2",
+      Authorization: `Bearer ${token}`,
     },
   });
   if (!res.ok) throw new Error(`Institutions fetch failed: ${await res.text()}`);
@@ -41,22 +40,21 @@ export async function upsertIntegrationConnection(
   token: string,
   subdomain: string,
   location_id: string,
-  api_key: string
+  api_key: string,
 ) {
-  const { data: integration } = await supabase
-    .from("integrations")
-    .select("id")
-    .eq("name", "NextHealth")
-    .single();
+  const { data: integration } = await supabase.from("integrations").select("id").eq("name", "NextHealth").single();
 
   if (!integration) throw new Error("Integration not configured");
 
-  await supabase.from("integration_connections").upsert({
-    clinic_id,
-    integration_id: integration.id,
-    auth_data: { token, subdomain, location_id, api_key },
-    status: "active",
-  }, { onConflict: ["clinic_id", "integration_id"] });
+  await supabase.from("integration_connections").upsert(
+    {
+      clinic_id,
+      integration_id: integration.id,
+      auth_data: { token, subdomain, location_id, api_key },
+      status: "active",
+    },
+    { onConflict: ["clinic_id", "integration_id"] },
+  );
 }
 
 export async function fetchPatients(token: string, subdomain: string, location_id: string) {
@@ -73,8 +71,8 @@ export async function fetchPatients(token: string, subdomain: string, location_i
     const res = await fetch(url.toString(), {
       headers: {
         "Nex-Api-Version": "v20240412",
-        "Accept": "application/json",
-        "Authorization": `Bearer ${token}`,
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
       },
     });
 
@@ -89,7 +87,7 @@ export async function fetchPatients(token: string, subdomain: string, location_i
 }
 
 export async function insertPatientsAsLeads(clinic_id: string, patients: any[]) {
-  const rows = patients.map((p) => ({
+  const rows = patients.map(p => ({
     clinic_id,
     source_id: "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c",
     first_name: p.first_name,

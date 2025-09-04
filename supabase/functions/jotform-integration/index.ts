@@ -1,8 +1,8 @@
 // supabase/functions/jotform-integration/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { supabase } from "../_shared/supabaseClient.ts";
 import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import { extractLeadInfo, insertLead, jotformFetch, saveFormsHandler, testWebhookHandler } from "../_shared/jotform-service.ts";
+import { supabase } from "../_shared/supabaseClient.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const JOTFORM_WEBHOOK_BASE_URL = `${supabaseUrl}/functions/v1/jotform-integration`;
@@ -52,7 +52,9 @@ serve(async req => {
         const { success, error } = await insertLead(leadData);
         if (!success) return new Response(JSON.stringify({ error: "Failed to insert lead", details: error.message }), { status: 500 });
 
-        return new Response(JSON.stringify({ status: "ok", submission_id: submissionID, form_id: formID }), { headers: { "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ status: "ok", submission_id: submissionID, form_id: formID }), {
+          headers: { "Content-Type": "application/json" },
+        });
       } catch (e) {
         return new Response(JSON.stringify({ error: "Failed to parse webhook data", details: e.message }), { status: 400 });
       }
@@ -75,7 +77,12 @@ serve(async req => {
       if (!clinic_id) return new Response(JSON.stringify({ error: "Missing clinic_id" }), { status: 400 });
 
       const { data: integration } = await supabase.from("integrations").select("id").eq("name", "Jotform").single();
-      const { data: integrationData } = await supabase.from("integration_connections").select("*").eq("clinic_id", clinic_id).eq("integration_id", integration.id).single();
+      const { data: integrationData } = await supabase
+        .from("integration_connections")
+        .select("*")
+        .eq("clinic_id", clinic_id)
+        .eq("integration_id", integration.id)
+        .single();
 
       const authData = integrationData.auth_data as any;
       const accessToken = authData?.access_token;
@@ -89,8 +96,18 @@ serve(async req => {
       if (action === "save_forms") {
         if (!Array.isArray(selectedForms)) return new Response(JSON.stringify({ error: "Forms must be an array" }), { status: 400 });
         try {
-          const newStoredForms = await saveFormsHandler(selectedForms, storedForms, clinic_id, accessToken, authData, integration.id, JOTFORM_WEBHOOK_BASE_URL);
-          return new Response(JSON.stringify({ status: "saved", forms: newStoredForms }), { headers: { "Content-Type": "application/json" } });
+          const newStoredForms = await saveFormsHandler(
+            selectedForms,
+            storedForms,
+            clinic_id,
+            accessToken,
+            authData,
+            integration.id,
+            JOTFORM_WEBHOOK_BASE_URL,
+          );
+          return new Response(JSON.stringify({ status: "saved", forms: newStoredForms }), {
+            headers: { "Content-Type": "application/json" },
+          });
         } catch (err) {
           return new Response(JSON.stringify({ error: err.message }), { status: 500 });
         }

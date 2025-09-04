@@ -1,19 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "./utils/supabase/config/middleware";
 
 // List of public routes that don't require authentication
 const publicRoutes = [
-  '/login',
-  '/signup',
-  '/forgot-password',
-  '/reset-password',
-  '/verify-otp',
-  '/auth/callback',
-  '/auth/oauth-redirect',
-  '/schedule-meeting',
-  '/api/namecheap-dns',
-  '/unsubscribe-lead',
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-otp",
+  "/auth/callback",
+  "/auth/oauth-redirect",
+  "/schedule-meeting",
+  "/api/namecheap-dns",
+  "/unsubscribe-lead",
 ];
 
 // Paths that should redirect to dashboard if already authenticated
@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
     };
     // Handle homepage separately - always redirect
     if (pathname === "/") {
-        return redirect("/login");
+      return redirect("/login");
     }
     // Check if this is a public route or auth route
     const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
@@ -102,7 +102,7 @@ export async function middleware(request: NextRequest) {
     try {
       const clinicPromise = checkIfUserHasClinic(supabase, user.id);
       const clinicTimeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Clinic check timeout")), 3000));
-      
+
       hasClinic = (await Promise.race([clinicPromise, clinicTimeoutPromise])) as boolean;
     } catch (error) {
       console.error("Clinic check timeout or error:", error);
@@ -185,5 +185,5 @@ async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>
 }
 
 export const config = {
-  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)']
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|webm)$).*)"],
 };

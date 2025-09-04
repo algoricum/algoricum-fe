@@ -1,14 +1,13 @@
 "use client";
-
-import { useEffect, useState } from "react";
-import { Button, Input, Select, Switch, Typography, Upload } from "antd";
-import { updateClinic, getClinicData } from "@/utils/supabase/clinic-helper";
-import { SuccessToast, ErrorToast } from "@/helpers/toast";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { CLINIC_FIELDS, DAYS, TIME_OPTIONS } from "@/constants";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { createClient } from "@/utils/supabase/config/client";
+import { Button, Input, Select, Switch, Typography, Upload } from "antd";
 import Image from "next/image";
-import { TIME_OPTIONS, DAYS, CLINIC_FIELDS } from "@/constants";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { useEffect, useState } from "react";
 
 const { Title } = Typography;
 const { Option } = Select;

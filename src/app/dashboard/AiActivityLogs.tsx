@@ -1,7 +1,6 @@
 "use client";
-
-import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/config/client";
+import { useEffect, useState } from "react";
 
 interface AiActivityLogProps {
   clinicId: string;

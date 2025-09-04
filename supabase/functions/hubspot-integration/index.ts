@@ -6,13 +6,25 @@ import { corsHeaders } from "../_shared/cors.ts";
 function getHubSpotPropertiesToFetch() {
   return [
     // Standard HubSpot properties
-    "email", "firstname", "lastname", "phone", 
-    "createdate", "lastmodifieddate",
+    "email",
+    "firstname",
+    "lastname",
+    "phone",
+    "createdate",
+    "lastmodifieddate",
     // Common alternative property names
-    "first_name", "last_name", "phone_number", "mobilephone",
-    "email_address", "primary_email", "work_email",
+    "first_name",
+    "last_name",
+    "phone_number",
+    "mobilephone",
+    "email_address",
+    "primary_email",
+    "work_email",
     // Custom property variations (add your custom fields here)
-    "custom_first_name", "custom_last_name", "custom_email", "custom_phone"
+    "custom_first_name",
+    "custom_last_name",
+    "custom_email",
+    "custom_phone",
   ];
 }
 
@@ -28,9 +40,9 @@ async function discoverHubSpotProperties(accessToken: string, requestId: string)
         name: prop.name,
         label: prop.label,
         type: prop.type,
-        fieldType: prop.fieldType
+        fieldType: prop.fieldType,
       }));
-      
+
       console.log(`[${requestId}] Available HubSpot properties:`, properties);
       return properties;
     }
@@ -42,7 +54,7 @@ async function discoverHubSpotProperties(accessToken: string, requestId: string)
 
 function mapHubSpotContactToLead(contact: any, clinic_id: string, source_id: string) {
   const props = contact.properties || {};
-  
+
   // Property mapping with fallbacks
   const propertyMappings = {
     first_name: [
@@ -71,13 +83,13 @@ function mapHubSpotContactToLead(contact: any, clinic_id: string, source_id: str
       props.mobilephone,
       props.custom_phone,
       // Add more fallbacks as needed
-    ]
+    ],
   };
 
   // Helper function to get first non-null/non-empty value
   const getFirstValidValue = (values: any[]) => {
     for (const value of values) {
-      if (value && typeof value === 'string' && value.trim() !== '') {
+      if (value && typeof value === "string" && value.trim() !== "") {
         return value.trim();
       }
     }
@@ -90,7 +102,7 @@ function mapHubSpotContactToLead(contact: any, clinic_id: string, source_id: str
     last_name: getFirstValidValue(propertyMappings.last_name),
     email: getFirstValidValue(propertyMappings.email),
     phone: getFirstValidValue(propertyMappings.phone),
-    status: 'New',
+    status: "New",
     source_id,
     created_at: props.createdate ? new Date(props.createdate).toISOString() : null,
     updated_at: props.lastmodifieddate ? new Date(props.lastmodifieddate).toISOString() : null,
@@ -98,9 +110,9 @@ function mapHubSpotContactToLead(contact: any, clinic_id: string, source_id: str
 
   // Validate that we have at least an email or phone
   if (!mappedLead.email && !mappedLead.phone) {
-    console.warn(`Contact ${contact.id} has no valid email or phone`, { 
+    console.warn(`Contact ${contact.id} has no valid email or phone`, {
       availableProps: Object.keys(props),
-      contactId: contact.id 
+      contactId: contact.id,
     });
     return null;
   }
@@ -108,7 +120,7 @@ function mapHubSpotContactToLead(contact: any, clinic_id: string, source_id: str
   return mappedLead;
 }
 
-serve(async (req) => {
+serve(async req => {
   const requestId = crypto.randomUUID();
   const url = new URL(req.url);
 
@@ -120,7 +132,7 @@ serve(async (req) => {
     hasCode: !!url.searchParams.get("code"),
     hasState: !!url.searchParams.get("state"),
     hasAuthHeader: !!req.headers.get("authorization"),
-    userAgent: req.headers.get("user-agent")?.substring(0, 50)
+    userAgent: req.headers.get("user-agent")?.substring(0, 50),
   });
 
   // Always allow OPTIONS
@@ -135,33 +147,30 @@ serve(async (req) => {
     console.log(`[${requestId}] 🔥 OAUTH CALLBACK IMMEDIATE PROCESSING`);
     console.log(`[${requestId}] Code: ${code?.substring(0, 10)}...`);
     console.log(`[${requestId}] State: ${url.searchParams.get("state")?.substring(0, 20)}...`);
-    
+
     return await processOAuthCallback(req, requestId);
   }
 
   // Health check - also public
   if (req.method === "GET") {
     console.log(`[${requestId}] ✅ Health check - Public access`);
-    
+
     const testParam = url.searchParams.get("test");
     if (testParam === "callback") {
-      return new Response(
-        createTestSuccessHtml(),
-        { headers: { "Content-Type": "text/html", ...corsHeaders } }
-      );
+      return new Response(createTestSuccessHtml(), { headers: { "Content-Type": "text/html", ...corsHeaders } });
     }
-    
+
     return new Response(
-      JSON.stringify({ 
-        status: "healthy", 
+      JSON.stringify({
+        status: "healthy",
         timestamp: new Date().toISOString(),
         public: true,
         environment: {
           hasClientId: !!Deno.env.get("HUBSPOT_CLIENT_ID"),
-          redirectUri: Deno.env.get("HUBSPOT_REDIRECT_URI")
-        }
+          redirectUri: Deno.env.get("HUBSPOT_REDIRECT_URI"),
+        },
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
@@ -169,22 +178,21 @@ serve(async (req) => {
   if (req.method === "POST") {
     try {
       const body = await req.json();
-      
+
       // Handle cron job for syncing all connections (no auth required for service role)
-      if (body.mode === 'sync_all_connections') {
+      if (body.mode === "sync_all_connections") {
         console.log(`[${requestId}] 🕐 Starting cron job - sync all HubSpot connections`);
         return await handleSyncAllConnections(req, requestId);
       }
-      
+
       // All other POST requests require authentication - pass the parsed body
       return await handleAuthenticatedRequest(req, body, requestId);
-      
     } catch (error) {
       console.error(`[${requestId}] Error parsing POST body:`, error);
-      return new Response(
-        JSON.stringify({ error: "Invalid JSON body" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
   }
 
@@ -195,78 +203,77 @@ serve(async (req) => {
       return await handleAuthenticatedRequest(req, body, requestId);
     } catch (error) {
       console.error(`[${requestId}] Error parsing DELETE body:`, error);
-      return new Response(
-        JSON.stringify({ error: "Invalid JSON body" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
   }
 
   console.log(`[${requestId}] ❌ Method not allowed: ${req.method}`);
-  return new Response(
-    JSON.stringify({ error: "Method not allowed" }),
-    { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+  return new Response(JSON.stringify({ error: "Method not allowed" }), {
+    status: 405,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 });
 
 async function handleSyncAllConnections(req: Request, requestId: string) {
   console.log(`[${requestId}] 🔄 Processing sync for all HubSpot connections`);
-  
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  
+
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error(`[${requestId}] Missing Supabase environment variables`);
-    return new Response(
-      JSON.stringify({ error: "Configuration error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Configuration error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
-  
+
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
+
   try {
     // Get all active HubSpot connections
     const { data: connections, error: connError } = await supabase
       .from("hubspot_connections")
       .select("user_id, clinic_id, access_token, last_sync_at")
       .eq("connection_status", "connected");
-      
+
     if (connError) {
       console.error(`[${requestId}] Failed to fetch connections:`, connError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch connections" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Failed to fetch connections" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    
+
     if (!connections || connections.length === 0) {
       console.log(`[${requestId}] No active HubSpot connections found`);
-      return new Response(
-        JSON.stringify({ message: "No active connections to sync", syncedCount: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ message: "No active connections to sync", syncedCount: 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-    
+
     console.log(`[${requestId}] Found ${connections.length} active connections to sync`);
-    
+
     let successCount = 0;
     let errorCount = 0;
     const errors = [];
-    
+
     // Sync contacts for each connection
     for (const connection of connections) {
       try {
         console.log(`[${requestId}] Syncing contacts for user ${connection.user_id}, clinic ${connection.clinic_id}`);
-        
+
         // Create sync data object instead of parsing request body
         const syncData = {
           userId: connection.user_id,
-          clinic_id: connection.clinic_id
+          clinic_id: connection.clinic_id,
         };
-        
+
         const syncResponse = await handleSyncContacts(syncData, supabase, `${requestId}-${connection.user_id}`);
-        
+
         if (syncResponse.status === 200) {
           successCount++;
           console.log(`[${requestId}] ✅ Successfully synced user ${connection.user_id}`);
@@ -276,52 +283,50 @@ async function handleSyncAllConnections(req: Request, requestId: string) {
           errors.push({ userId: connection.user_id, error: errorText });
           console.error(`[${requestId}] ❌ Failed to sync user ${connection.user_id}:`, errorText);
         }
-        
       } catch (error) {
         errorCount++;
         errors.push({ userId: connection.user_id, error: error.message });
         console.error(`[${requestId}] ❌ Exception syncing user ${connection.user_id}:`, error.message);
       }
-      
+
       // Add small delay between syncs to avoid rate limits
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    
+
     const summary = {
       totalConnections: connections.length,
       successCount,
       errorCount,
       errors: errors.length > 0 ? errors : undefined,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     console.log(`[${requestId}] ✅ Cron job completed:`, summary);
-    
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: "Sync completed for all connections",
-        ...summary
+        ...summary,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-    
   } catch (error) {
     console.error(`[${requestId}] Cron job failed:`, error.message);
     return new Response(
-      JSON.stringify({ 
-        error: "Cron job failed", 
+      JSON.stringify({
+        error: "Cron job failed",
         message: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 }
 
 async function processOAuthCallback(req: Request, requestId: string) {
   console.log(`[${requestId}] 🔄 Processing OAuth callback`);
-  
+
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
@@ -340,7 +345,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
     } catch (e) {
       console.error("Could not parse state for OAuth error redirect", e.message);
     }
-    
+
     const redirectUrlWithError = new URL(redirectUrl);
     redirectUrlWithError.searchParams.set("hubspot_status", "error");
     redirectUrlWithError.searchParams.set("error_message", `OAuth error: ${error}`);
@@ -349,8 +354,8 @@ async function processOAuthCallback(req: Request, requestId: string) {
       status: 302,
       headers: {
         ...corsHeaders,
-        "Location": redirectUrlWithError.toString()
-      }
+        Location: redirectUrlWithError.toString(),
+      },
     });
   }
 
@@ -365,8 +370,8 @@ async function processOAuthCallback(req: Request, requestId: string) {
       status: 302,
       headers: {
         ...corsHeaders,
-        "Location": redirectUrlWithError.toString()
-      }
+        Location: redirectUrlWithError.toString(),
+      },
     });
   }
 
@@ -378,17 +383,14 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
   if (!clientId || !clientSecret || !redirectUri || !supabaseUrl || !supabaseServiceKey) {
     console.error(`[${requestId}] Missing environment variables`);
-    return new Response(
-      createErrorHtml("Configuration Error", "Missing environment variables"),
-      { headers: htmlHeaders }
-    );
+    return new Response(createErrorHtml("Configuration Error", "Missing environment variables"), { headers: htmlHeaders });
   }
 
   try {
     const stateData = JSON.parse(atob(state));
-    console.log(`[${requestId}] State decoded`, { 
-      userId: stateData.userId, 
-      clinic_id: stateData.clinic_id 
+    console.log(`[${requestId}] State decoded`, {
+      userId: stateData.userId,
+      clinic_id: stateData.clinic_id,
     });
 
     // Get clinic_id from state instead of request body
@@ -405,7 +407,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json",
+        Accept: "application/json",
       },
       body: new URLSearchParams({
         grant_type: "authorization_code",
@@ -452,23 +454,26 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
     do {
       const searchBody = {
-        filterGroups: [{
-          filters: [
-            {
-              propertyName: "createdate",
-              operator: "GTE",
-              value: afterDate,
-            }
-          ],
-        }, {
-          filters: [
-            {
-              propertyName: "lastmodifieddate", 
-              operator: "GTE",
-              value: afterDate,
-            }
-          ],
-        }],
+        filterGroups: [
+          {
+            filters: [
+              {
+                propertyName: "createdate",
+                operator: "GTE",
+                value: afterDate,
+              },
+            ],
+          },
+          {
+            filters: [
+              {
+                propertyName: "lastmodifieddate",
+                operator: "GTE",
+                value: afterDate,
+              },
+            ],
+          },
+        ],
         properties: propertiesToFetch,
         limit: 100,
         after: after || undefined,
@@ -500,11 +505,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     if (contacts.length > 0) {
       // Fetch source_id for 'HubSpot'
-      const { data: sourceData, error: sourceError } = await supabase
-        .from('lead_source')
-        .select('id')
-        .eq('name', 'Hubspot')
-        .single();
+      const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Hubspot").single();
 
       if (sourceError || !sourceData) {
         console.error(`[${requestId}] Error fetching lead source:`, sourceError);
@@ -515,14 +516,16 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
       console.log(`[${requestId}] Using clinic_id from state: ${clinic_id}`);
 
-      const leadsToInsert = contacts.map((contact) => {
-        if (!contact.id) {
-          console.warn(`[${requestId}] Contact missing ID`, { contact });
-          return null;
-        }
+      const leadsToInsert = contacts
+        .map(contact => {
+          if (!contact.id) {
+            console.warn(`[${requestId}] Contact missing ID`, { contact });
+            return null;
+          }
 
-        return mapHubSpotContactToLead(contact, clinic_id, source_id);
-      }).filter(lead => lead !== null);
+          return mapHubSpotContactToLead(contact, clinic_id, source_id);
+        })
+        .filter(lead => lead !== null);
 
       if (leadsToInsert.length === 0) {
         console.warn(`[${requestId}] No valid leads to insert`);
@@ -531,10 +534,8 @@ async function processOAuthCallback(req: Request, requestId: string) {
         let leadError = null;
         while (retries > 0) {
           try {
-            const { error } = await supabase
-              .from("lead")
-              .upsert(leadsToInsert);
-            
+            const { error } = await supabase.from("lead").upsert(leadsToInsert);
+
             if (error) {
               console.error(`[${requestId}] Lead save error`, { error: JSON.stringify(error), leadSample: leadsToInsert[0] });
               leadError = error;
@@ -559,20 +560,18 @@ async function processOAuthCallback(req: Request, requestId: string) {
 
     // Save connection details
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
-    const { error: dbError } = await supabase
-      .from("hubspot_connections")
-      .upsert({
-        user_id: stateData.userId,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        token_expires_at: expiresAt.toISOString(),
-        account_name: accountData.companyName || `Hub ${accountData.portalId}`,
-        contact_count: totalContacts,
-        hub_id: accountData.portalId?.toString(),
-        connection_status: "connected",
-        last_sync_at: new Date().toISOString(),
-        error_message: null,
-      });
+    const { error: dbError } = await supabase.from("hubspot_connections").upsert({
+      user_id: stateData.userId,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_expires_at: expiresAt.toISOString(),
+      account_name: accountData.companyName || `Hub ${accountData.portalId}`,
+      contact_count: totalContacts,
+      hub_id: accountData.portalId?.toString(),
+      connection_status: "connected",
+      last_sync_at: new Date().toISOString(),
+      error_message: null,
+    });
 
     if (dbError) {
       console.error(`[${requestId}] Database error`, dbError);
@@ -600,10 +599,9 @@ async function processOAuthCallback(req: Request, requestId: string) {
       status: 302,
       headers: {
         ...corsHeaders,
-        "Location": redirectUrlWithParams.toString()
-      }
+        Location: redirectUrlWithParams.toString(),
+      },
     });
-
   } catch (error) {
     console.error(`[${requestId}] Callback processing error`, { error: error.message, stack: error.stack });
     let redirectUrl = "http://localhost:3001/onboarding";
@@ -613,7 +611,7 @@ async function processOAuthCallback(req: Request, requestId: string) {
     } catch (e) {
       console.error("Could not parse state for error redirect", e.message);
     }
-    
+
     const redirectUrlWithError = new URL(redirectUrl);
     redirectUrlWithError.searchParams.set("hubspot_status", "error");
     redirectUrlWithError.searchParams.set("error_message", error.message);
@@ -624,8 +622,8 @@ async function processOAuthCallback(req: Request, requestId: string) {
       status: 302,
       headers: {
         ...corsHeaders,
-        "Location": redirectUrlWithError.toString()
-      }
+        Location: redirectUrlWithError.toString(),
+      },
     });
   }
 }
@@ -633,13 +631,13 @@ async function processOAuthCallback(req: Request, requestId: string) {
 // Updated function signature to accept parsed body
 async function handleAuthenticatedRequest(req: Request, body: any, requestId: string) {
   console.log(`[${requestId}] Handling authenticated request`);
-  
+
   const authHeader = req.headers.get("authorization");
   if (!authHeader) {
-    return new Response(
-      JSON.stringify({ error: "Missing authorization header" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -649,10 +647,10 @@ async function handleAuthenticatedRequest(req: Request, body: any, requestId: st
   const redirectUri = Deno.env.get("HUBSPOT_REDIRECT_URI");
 
   if (!supabaseUrl || !supabaseServiceKey || !clientId || !clientSecret || !redirectUri) {
-    return new Response(
-      JSON.stringify({ error: "Configuration error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Configuration error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -669,25 +667,25 @@ async function handleAuthenticatedRequest(req: Request, body: any, requestId: st
     return await handleDisconnect(body, supabase, requestId);
   }
 
-  return new Response(
-    JSON.stringify({ error: "Method not allowed" }),
-    { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+  return new Response(JSON.stringify({ error: "Method not allowed" }), {
+    status: 405,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
 // Updated function signature to accept parsed body directly
 async function handleSyncContacts(body: any, supabase: any, requestId: string) {
   console.log(`[${requestId}] Handling contacts sync`);
-  
+
   const { userId, clinic_id } = body;
 
-  console.log("data is ", userId, clinic_id)
-  
+  console.log("data is ", userId, clinic_id);
+
   if (!userId) {
-    return new Response(
-      JSON.stringify({ error: "Missing userId" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Missing userId" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   // Get connection details
@@ -699,17 +697,17 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
 
   if (connError || !connection) {
     console.error(`[${requestId}] Connection fetch error`, connError);
-    return new Response(
-      JSON.stringify({ error: "No active HubSpot connection found" }),
-      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "No active HubSpot connection found" }), {
+      status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   if (!connection.first_sync_completed) {
-    return new Response(
-      JSON.stringify({ error: "Initial sync not completed" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Initial sync not completed" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   // Check token expiration and refresh if needed (placeholder)
@@ -721,19 +719,23 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
   let after = null;
 
   console.log(`[${requestId}] Fetching contacts modified since ${afterDate} (1 day ago)`);
-  
+
   // Define all possible property names to fetch
   const propertiesToFetch = getHubSpotPropertiesToFetch();
-  
+
   do {
     const searchBody = {
-      filterGroups: [{
-        filters: [{
-          propertyName: "lastmodifieddate",
-          operator: "GTE",
-          value: afterDate,
-        }],
-      }],
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: "lastmodifieddate",
+              operator: "GTE",
+              value: afterDate,
+            },
+          ],
+        },
+      ],
       properties: propertiesToFetch,
       limit: 100,
       after: after || undefined,
@@ -750,10 +752,10 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
 
     if (!contactsResponse.ok) {
       console.error(`[${requestId}] Contacts search failed`, { status: contactsResponse.status });
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch contacts" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Failed to fetch contacts" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const contactsData = await contactsResponse.json();
@@ -765,30 +767,28 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
 
   // Save contacts to lead table
   if (contacts.length > 0) {
-    const { data: sourceData, error: sourceError } = await supabase
-      .from('lead_source')
-      .select('id')
-      .eq('name', 'Hubspot')
-      .single();
+    const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Hubspot").single();
 
     if (sourceError || !sourceData) {
       console.error(`[${requestId}] Error fetching lead source:`, sourceError);
-      return new Response(
-        JSON.stringify({ error: "Could not find HubSpot in lead_source table" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Could not find HubSpot in lead_source table" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const source_id = sourceData.id;
 
-    const leadsToInsert = contacts.map((contact) => {
-      if (!contact.id) {
-        console.warn(`[${requestId}] Contact missing ID`, { contact });
-        return null;
-      }
+    const leadsToInsert = contacts
+      .map(contact => {
+        if (!contact.id) {
+          console.warn(`[${requestId}] Contact missing ID`, { contact });
+          return null;
+        }
 
-      return mapHubSpotContactToLead(contact, clinic_id, source_id);
-    }).filter(lead => lead !== null);
+        return mapHubSpotContactToLead(contact, clinic_id, source_id);
+      })
+      .filter(lead => lead !== null);
 
     if (leadsToInsert.length === 0) {
       console.warn(`[${requestId}] No valid leads to insert`);
@@ -797,10 +797,8 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
       let leadError = null;
       while (retries > 0) {
         try {
-          const { error } = await supabase
-            .from("lead")
-            .upsert(leadsToInsert);
-     
+          const { error } = await supabase.from("lead").upsert(leadsToInsert);
+
           if (error) {
             console.error(`[${requestId}] Lead save error`, { error: JSON.stringify(error), leadSample: leadsToInsert[0] });
             leadError = error;
@@ -834,12 +832,12 @@ async function handleSyncContacts(body: any, supabase: any, requestId: string) {
   }
 
   return new Response(
-    JSON.stringify({ 
-      success: true, 
-      message: `Synced ${contacts.length} leads`, 
-      contactCount: contacts.length 
+    JSON.stringify({
+      success: true,
+      message: `Synced ${contacts.length} leads`,
+      contactCount: contacts.length,
     }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
 }
 
@@ -899,35 +897,35 @@ function createTestSuccessHtml() {
 // Updated function signature to accept parsed body directly
 async function handleConnect(body: any, supabase: any, clientId: string, redirectUri: string, requestId: string) {
   console.log(`[${requestId}] Connect handler`);
-  
+
   const { userId, redirectUrl, clinic_id } = body; // Extract clinic_id here
-  
+
   if (!userId || !redirectUrl) {
-    return new Response(
-      JSON.stringify({ error: "Missing userId or redirectUrl" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Missing userId or redirectUrl" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   // Update database
-  await supabase
-    .from("hubspot_connections")
-    .upsert({
-      user_id: userId,
-      connection_status: "connecting",
-      error_message: null,
-    });
+  await supabase.from("hubspot_connections").upsert({
+    user_id: userId,
+    connection_status: "connecting",
+    error_message: null,
+  });
 
   // Create auth URL with clinic_id included in state
-  const state = btoa(JSON.stringify({ 
-    userId, 
-    redirectUrl, 
-    clinic_id, // Include clinic_id in state
-    timestamp: Date.now() 
-  }));
-  
+  const state = btoa(
+    JSON.stringify({
+      userId,
+      redirectUrl,
+      clinic_id, // Include clinic_id in state
+      timestamp: Date.now(),
+    }),
+  );
+
   const scopes = ["crm.objects.contacts.read", "crm.objects.leads.read"].join(" ");
-  
+
   const authUrl = new URL("https://app.hubspot.com/oauth/authorize");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("redirect_uri", redirectUri);
@@ -935,23 +933,20 @@ async function handleConnect(body: any, supabase: any, clientId: string, redirec
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("state", state);
 
-  return new Response(
-    JSON.stringify({ authUrl: authUrl.toString() }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+  return new Response(JSON.stringify({ authUrl: authUrl.toString() }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
 // Updated function signature to accept parsed body directly
 async function handleDisconnect(body: any, supabase: any, requestId: string) {
   console.log(`[${requestId}] Disconnect handler`);
-  
+
   const { userId } = body;
-  
+
   if (!userId) {
-    return new Response(
-      JSON.stringify({ error: "Missing userId" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Missing userId" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   // Update database
@@ -967,8 +962,7 @@ async function handleDisconnect(body: any, supabase: any, requestId: string) {
     })
     .eq("user_id", userId);
 
-  return new Response(
-    JSON.stringify({ success: true, message: "Successfully disconnected from HubSpot" }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+  return new Response(JSON.stringify({ success: true, message: "Successfully disconnected from HubSpot" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }

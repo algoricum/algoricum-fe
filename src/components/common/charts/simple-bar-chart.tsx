@@ -1,6 +1,6 @@
 "use client";
-import React from "react";
 import { Calendar } from "lucide-react";
+import React from "react";
 
 interface SimpleBarChartProps {
   appointmentsData: any[];
@@ -96,10 +96,7 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ appointmentsData, filte
     });
   }
 
-  const maxValue = Math.max(
-    ...chartData.map(item => (item.booked || 0) + (item.converted || 0)),
-    1
-  );
+  const maxValue = Math.max(...chartData.map(item => (item.booked || 0) + (item.converted || 0)), 1);
 
   const getTicks = (max: number): number[] => {
     if (max <= 5) return [0, 1, 2, 3, 4, 5].filter(n => n <= max);
@@ -122,10 +119,7 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ appointmentsData, filte
 
           return (
             <React.Fragment key={i}>
-              <div
-                className="absolute w-full border-t border-gray-200 border-dashed"
-                style={{ bottom: `${bottomOffset}%` }}
-              />
+              <div className="absolute w-full border-t border-gray-200 border-dashed" style={{ bottom: `${bottomOffset}%` }} />
               <div
                 className="absolute text-xs text-gray-500 -left-8"
                 style={{

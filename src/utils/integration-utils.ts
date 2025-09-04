@@ -1,8 +1,8 @@
-import { createClient } from "@/utils/supabase/config/client";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, ONBOARDING_LEADS_FILE_NAME } from "../constants/integration-constants";
-import { toast } from "react-toastify";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
 import { getUserData } from "@/utils/supabase/user-helper";
+import { toast } from "react-toastify";
+import { ONBOARDING_LEADS_FILE_NAME, SUPABASE_ANON_KEY, SUPABASE_URL } from "../constants/integration-constants";
 
 export const ErrorToast = (message: string) => toast.error(message);
 export const SuccessToast = (message: string) => toast.success(message);
@@ -51,20 +51,20 @@ export const syncGoogleFormLeads = async (worksheets: any) => {
       .limit(1)
       .single();
 
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          clinic_id: clinicId,
-          connection_id: connection?.id,
-          selected_sheets: worksheets,
-        }),
-      });
-      console.log("response");
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        clinic_id: clinicId,
+        connection_id: connection?.id,
+        selected_sheets: worksheets,
+      }),
+    });
+    console.log("response");
     if (!response.ok) throw new Error("Failed to sync Google Form leads");
     SuccessToast("Google Form leads synced successfully");
     return true;
@@ -183,7 +183,7 @@ const getCurrentUserId = async () => {
   const user = await getUserData();
   return user?.id;
 };
-export const connectToHubSpot = async (setButtonLoading:any) => {
+export const connectToHubSpot = async (setButtonLoading: any) => {
   setButtonLoading(true);
   try {
     const clinicId = await getClinicId();
@@ -219,13 +219,13 @@ export const connectToHubSpot = async (setButtonLoading:any) => {
     console.log("🚀 Redirecting to HubSpot OAuth:", data.authUrl);
     window.location.href = data.authUrl;
   } catch (error) {
-    setButtonLoading(false)
+    setButtonLoading(false);
     console.error("Connection failed:", error);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to HubSpot. Please try again"}`);
   }
 };
 const supabase = createClient();
-export const connectToGHL = async (setButtonLoading:any) => {
+export const connectToGHL = async (setButtonLoading: any) => {
   setButtonLoading(true);
   try {
     const response = await fetch(
@@ -243,7 +243,7 @@ export const connectToGHL = async (setButtonLoading:any) => {
     console.log("Response body:", responseText);
 
     if (!response.ok) {
-      setButtonLoading(false)
+      setButtonLoading(false);
       const errorText = await response.text();
       console.error("Response error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}, message: ${responseText}`);
@@ -262,7 +262,7 @@ export const connectToGHL = async (setButtonLoading:any) => {
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Go High Level. Please try again"}`);
   }
 };
-export const connectToPipedrive = async (setButtonLoading:any) => {
+export const connectToPipedrive = async (setButtonLoading: any) => {
   setButtonLoading(true);
   try {
     const {
@@ -277,8 +277,8 @@ export const connectToPipedrive = async (setButtonLoading:any) => {
     });
 
     if (!session?.access_token) {
-      setButtonLoading(false)
-      ErrorToast("Please log in to connect to Pipedrive.")
+      setButtonLoading(false);
+      ErrorToast("Please log in to connect to Pipedrive.");
       throw new Error("No valid session found. Please log in again.");
     }
 
@@ -315,14 +315,14 @@ export const connectToPipedrive = async (setButtonLoading:any) => {
     console.log("🚀 Redirecting to Pipedrive OAuth:", data.authUrl);
     window.location.href = data.authUrl;
   } catch (error) {
-    setButtonLoading(false)
+    setButtonLoading(false);
     console.error("Connection failed:", error);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Pipedrive. Please try again"}`);
   }
 };
 
-export const connectToGoogleForm = async (setButtonLoading:any) => {
-  setButtonLoading(true)
+export const connectToGoogleForm = async (setButtonLoading: any) => {
+  setButtonLoading(true);
   try {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/initiate-oauth`, {
       method: "POST",
@@ -360,7 +360,7 @@ export const connectToGoogleForm = async (setButtonLoading:any) => {
   }
 };
 
-export const connectToTypeform = async (setButtonLoading:any) => {
+export const connectToTypeform = async (setButtonLoading: any) => {
   setButtonLoading(true);
   const clinicId = await getClinicId();
   try {
@@ -383,7 +383,7 @@ export const connectToTypeform = async (setButtonLoading:any) => {
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Typeform. Please try again"}`);
   }
 };
-export const connectToNextHealth = async (apiKey: string,setButtonLoading:any) => {
+export const connectToNextHealth = async (apiKey: string, setButtonLoading: any) => {
   setButtonLoading(true);
   const clinicId = await getClinicId();
   try {
@@ -409,17 +409,17 @@ export const connectToNextHealth = async (apiKey: string,setButtonLoading:any) =
     console.log("NextHealth response:", data);
     //redirect
     SuccessToast("NextHealth connected successfully");
-    window.location.href = window.location.href+"?next_health_status=success";
+    window.location.href = window.location.href + "?next_health_status=success";
 
     return data;
   } catch (err) {
     setButtonLoading(false);
-    ErrorToast("Connection Failed: " + err)
+    ErrorToast("Connection Failed: " + err);
     console.error("Error connecting NextHealth:", err);
     throw err;
   }
 };
-export const connnectToGravityForm = async (token: any,setButtonLoading:any) => {
+export const connnectToGravityForm = async (token: any, setButtonLoading: any) => {
   setButtonLoading(true);
   try {
     const clinic_id = await getClinicId();
@@ -435,12 +435,12 @@ export const connnectToGravityForm = async (token: any,setButtonLoading:any) => 
         consumerKey: token.consumerKey,
         consmerSecret: token.consumerSecret,
         baseURL: token.baseURL,
-        clinic_id:clinic_id
+        clinic_id: clinic_id,
       }),
     });
 
     if (!response.ok) {
-      setButtonLoading(false)
+      setButtonLoading(false);
       const errorText = await response.text();
       console.error("Response error:", response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
@@ -454,9 +454,9 @@ export const connnectToGravityForm = async (token: any,setButtonLoading:any) => 
     }
 
     console.log("🚀 Redirecting to Gravity Form OAuth:", data.auth_url);
-    window.location.href = window.location.href+ "?gravity_form_status=success";
+    window.location.href = window.location.href + "?gravity_form_status=success";
   } catch (error) {
-    setButtonLoading(false)
+    setButtonLoading(false);
     console.error("Connection failed:", error);
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Gravity Form. Please try again"}`);
   }
@@ -499,138 +499,135 @@ export const createJotformConnection = async (clinicId: string, jotformToken: st
   return true;
 };
 
-export const connectToGoogleLeadForm = async (setButtonLoading:any) => {
+export const connectToGoogleLeadForm = async (setButtonLoading: any) => {
   setButtonLoading(true);
- try {
-            const res = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/start-auth`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ clinic_id: await getClinicId(),redirectTo:window.location.href }),
-            });
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/start-auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clinic_id: await getClinicId(), redirectTo: window.location.href }),
+    });
 
-            if (!res.ok) throw new Error("Failed to start Google auth");
+    if (!res.ok) throw new Error("Failed to start Google auth");
 
-            const data = await res.json();
-            if (!data.auth_url) throw new Error("No auth URL returned");
+    const data = await res.json();
+    if (!data.auth_url) throw new Error("No auth URL returned");
 
-            window.location.href = data.auth_url;
-          } catch (err) {
-            setButtonLoading(false)
-            console.error("Error starting Google auth:", err);
-            ErrorToast("Failed to start Google OAuth flow");
-          }
+    window.location.href = data.auth_url;
+  } catch (err) {
+    setButtonLoading(false);
+    console.error("Error starting Google auth:", err);
+    ErrorToast("Failed to start Google OAuth flow");
+  }
+};
 
-}
+export const fetchGoogleFormSheets = async (setGoogleFormTreeData: any) => {
+  try {
+    const clinicId = await getClinicId();
+    const { data: connection } = await supabase
+      .from("google_form_connections")
+      .select("id")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        clinic_id: clinicId,
+        connection_id: connection?.id || null,
+      }),
+    });
 
-export const fetchGoogleFormSheets = async (setGoogleFormTreeData:any) => {
-    try {
-      const clinicId = await getClinicId();
-      const { data: connection } = await supabase
-        .from("google_form_connections")
-        .select("id")
-        .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          clinic_id: clinicId,
-          connection_id: connection?.id || null,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch Google Sheets");
-      }
-
-      const data = await response.json();
-      setGoogleFormTreeData(
-        (data.spreadsheets || []).map((spreadsheet: any) => ({
-          title: spreadsheet.spreadsheet_title,
-          value: spreadsheet.spreadsheet_id,
-          selectable: false,
-          children: (spreadsheet.sheets || []).map((sheet: any) => ({
-            title: sheet.sheet_title,
-            value: `${spreadsheet.spreadsheet_id}:${sheet.sheet_id}`,
-            isLeaf: true,
-          })),
-        })),
-      );
-    } catch (error) {
-      ErrorToast("Failed to fetch Google Sheets");
-      console.error(error);
+    if (!response.ok) {
+      throw new Error("Failed to fetch Google Sheets");
     }
-  };
 
+    const data = await response.json();
+    setGoogleFormTreeData(
+      (data.spreadsheets || []).map((spreadsheet: any) => ({
+        title: spreadsheet.spreadsheet_title,
+        value: spreadsheet.spreadsheet_id,
+        selectable: false,
+        children: (spreadsheet.sheets || []).map((sheet: any) => ({
+          title: sheet.sheet_title,
+          value: `${spreadsheet.spreadsheet_id}:${sheet.sheet_id}`,
+          isLeaf: true,
+        })),
+      })),
+    );
+  } catch (error) {
+    ErrorToast("Failed to fetch Google Sheets");
+    console.error(error);
+  }
+};
 
-  export const fetchTypeformForms = async (setTypeFormTreeData: any) => {
-     try {
-       const clinicId = await getClinicId();
-       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/typeform-integration/getSheets`, {
-         method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-           apikey: SUPABASE_ANON_KEY,
-         },
-         body: JSON.stringify({
-           clinic_id: clinicId,
-         }),
-       });
+export const fetchTypeformForms = async (setTypeFormTreeData: any) => {
+  try {
+    const clinicId = await getClinicId();
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/typeform-integration/getSheets`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        clinic_id: clinicId,
+      }),
+    });
 
-       if (!response.ok) throw new Error("Failed to fetch Typeform forms");
+    if (!response.ok) throw new Error("Failed to fetch Typeform forms");
 
-       const data = await response.json();
-       setTypeFormTreeData(
-         (data.forms || []).map((form: any) => ({
-           title: form.title,
-           value: form.id,
-           isLeaf: true,
-         })),
-       );
-     } catch (error) {
-       ErrorToast("Failed to fetch Typeform forms");
-       console.error(error);
-     }
-   };
-   export const fetchJotformForms = async (setJotformTreeData: any) => {
-      try {
-        const clinicId = await getClinicId();
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/jotform-integration`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            // apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            action: "get_forms",
-            clinic_id: clinicId,
-          }),
-        });
-  
-        if (!response.ok) throw new Error("Failed to fetch Jotform forms");
-  
-        const data = await response.json();
-        setJotformTreeData(
-          (data.content || []).map((form: any) => ({
-            title: form.title,
-            value: form.id,
-            isLeaf: true,
-          })),
-        );
-      } catch (error) {
-        ErrorToast("Failed to fetch Typeform forms");
-        console.error(error);
-      }
-    };
+    const data = await response.json();
+    setTypeFormTreeData(
+      (data.forms || []).map((form: any) => ({
+        title: form.title,
+        value: form.id,
+        isLeaf: true,
+      })),
+    );
+  } catch (error) {
+    ErrorToast("Failed to fetch Typeform forms");
+    console.error(error);
+  }
+};
+export const fetchJotformForms = async (setJotformTreeData: any) => {
+  try {
+    const clinicId = await getClinicId();
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/jotform-integration`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        action: "get_forms",
+        clinic_id: clinicId,
+      }),
+    });
 
+    if (!response.ok) throw new Error("Failed to fetch Jotform forms");
 
-    //
+    const data = await response.json();
+    setJotformTreeData(
+      (data.content || []).map((form: any) => ({
+        title: form.title,
+        value: form.id,
+        isLeaf: true,
+      })),
+    );
+  } catch (error) {
+    ErrorToast("Failed to fetch Typeform forms");
+    console.error(error);
+  }
+};
+
+//
 type FormDataType = Record<string, any>;
 
 export const handleInput = ({
@@ -712,7 +709,7 @@ export const handleInput = ({
     } else if (value === "Gravity Forms") {
       setShowGravityFormModal(true);
       setShowCompletionButtons(true);
-      return
+      return;
     } else {
       setShowCompletionButtons(true);
     }
@@ -809,7 +806,7 @@ export const handle_Next = ({
     } else if (currentValue === "Gravity Forms" && gravityFormStatus !== "connected") {
       setShowGravityFormModal(true);
       setShowCompletionButtons(true);
-      return
+      return;
     } else {
       setShowCompletionButtons(true);
     }

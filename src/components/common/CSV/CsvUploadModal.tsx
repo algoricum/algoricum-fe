@@ -1,16 +1,15 @@
 "use client";
-
+import { CheckCircleOutlined, ExclamationCircleOutlined, EyeOutlined } from "@ant-design/icons";
+import { Modal, Popover, Typography } from "antd";
+import Papa from "papaparse";
 import type React from "react";
 import { useRef, useState } from "react";
-import { Modal, Typography, Popover } from "antd";
-import Papa from "papaparse";
-import { CheckCircleOutlined, ExclamationCircleOutlined, EyeOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
 
 interface CsvUploadModalProps {
   open: boolean;
-   
+
   onOk: (leads: any[]) => void;
   onCancel: () => void;
   okText?: string;

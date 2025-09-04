@@ -63,8 +63,8 @@ export const clinicRoutes = {
   update: (id: string) => `/clinic/${id}`,
   get: (id: string) => `/clinic/${id}`,
   delete: (id: string) => `/clinic/${id}`,
-  fetchClinics: (page: number, perPage: number, search: string) => 
-    `/clinic?page=${page}&perPage=${perPage}${search ? `&search=${search}` : ''}`,
+  fetchClinics: (page: number, perPage: number, search: string) =>
+    `/clinic?page=${page}&perPage=${perPage}${search ? `&search=${search}` : ""}`,
 };
 
 // User Routes

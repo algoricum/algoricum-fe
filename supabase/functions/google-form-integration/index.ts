@@ -1,15 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { supabase } from "../_shared/supabaseClient.ts";
 
-
-
-  import {  corsHeaders, handleOptions } from "../_shared/cors.ts";
-import { initiateOAuthFlow, listGoogleSpreadsheets, saveSelectedSheets, submitFormResponse, syncSheets,handleOAuthCallback } from "../_shared/google-form-service.ts";
+import { corsHeaders, handleOptions } from "../_shared/cors.ts";
+import {
+  handleOAuthCallback,
+  initiateOAuthFlow,
+  listGoogleSpreadsheets,
+  saveSelectedSheets,
+  submitFormResponse,
+  syncSheets,
+} from "../_shared/google-form-service.ts";
 
 serve(async req => {
-    const optionsResponse = handleOptions(req);
-     if (optionsResponse) return optionsResponse;
- 
+  const optionsResponse = handleOptions(req);
+  if (optionsResponse) return optionsResponse;
+
   try {
     const url = new URL(req.url);
     const path = url.pathname;
@@ -17,8 +22,6 @@ serve(async req => {
 
     console.log("Debug - Path:", path, "Method:", method);
 
-
-   
     // Route handlers
     if (method === "POST" && (path.includes("/initiate-oauth") || path.endsWith("/initiate-oauth"))) {
       return await initiateOAuthFlow(req);

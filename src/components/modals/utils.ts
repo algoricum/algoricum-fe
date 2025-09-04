@@ -16,7 +16,7 @@ export const getSuccessAlert = (accountName: string) => ({
   description: `Connected to ${accountName}. Moving to next step...`,
   type: "success" as const,
   showIcon: true,
-  className: "mb-4"
+  className: "mb-4",
 });
 
 export const getSupportButton = (calendlyUrl: string, buttonClass?: string) => ({
@@ -24,7 +24,7 @@ export const getSupportButton = (calendlyUrl: string, buttonClass?: string) => (
   size: "small" as const,
   icon: null, // Will be set in component
   onClick: () => window.open(calendlyUrl, "_blank"),
-  className: buttonClass || "mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
+  className: buttonClass || "mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700",
 });
 
 // Removed JSX function - use inline JSX in components instead

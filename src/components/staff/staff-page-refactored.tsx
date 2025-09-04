@@ -1,28 +1,27 @@
 "use client";
-
-import type React from "react";
-import { useState, useEffect, useMemo } from "react";
-import DashboardLayout from "@/layouts/DashboardLayout";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { createStaffUser } from "../../utils/supabase/config/staff";
-import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import type React from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { JSX } from "react/jsx-runtime";
 import {
+  deleteStaffMember,
   getClinicStaff,
   updateStaffMember,
-  deleteStaffMember,
   type TransformedStaffMember,
 } from "../../utils/supabase/clinic-staff-helper";
+import { createStaffUser } from "../../utils/supabase/config/staff";
+import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
 
 // Component imports
-import { StaffStats } from "@/components/staff/staff-stats";
-import { StaffFilters } from "@/components/staff/staff-filters";
-import { StaffTable } from "@/components/staff/staff-table";
 import { AddStaffModal } from "@/components/staff/add-staff-modal";
-import { EditStaffModal } from "@/components/staff/edit-staff-modal";
 import { DeleteConfirmModal } from "@/components/staff/delete-confirm-modal";
+import { EditStaffModal } from "@/components/staff/edit-staff-modal";
+import { StaffFilters } from "@/components/staff/staff-filters";
+import { StaffStats } from "@/components/staff/staff-stats";
+import { StaffTable } from "@/components/staff/staff-table";
 
 interface Staff {
   id: string;

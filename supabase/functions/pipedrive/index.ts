@@ -1,46 +1,46 @@
 // supabase/functions/pipedrive/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 // Helper function to construct proper Pipedrive API URLs
 function buildPipedriveUrl(apiDomain: string, endpoint: string): string {
-  const baseUrl = apiDomain.startsWith('http') ? apiDomain : `https://${apiDomain}`
-  return `${baseUrl}/api/v1/${endpoint.startsWith('/') ? endpoint.slice(1) : endpoint}`
+  const baseUrl = apiDomain.startsWith("http") ? apiDomain : `https://${apiDomain}`;
+  return `${baseUrl}/api/v1/${endpoint.startsWith("/") ? endpoint.slice(1) : endpoint}`;
 }
 
 // Property mapping configuration for Pipedrive
 async function discoverPipedriveProperties(accessToken: string, apiDomain: string, requestId: string) {
   try {
-    console.log(`[${requestId}] Discovering Pipedrive properties...`)
-    
-    // Get person fields
-    const personFieldsResponse = await fetch(buildPipedriveUrl(apiDomain, 'personFields'), {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    })
-    
-    // Get lead labels (custom fields for leads)
-    const leadLabelsResponse = await fetch(buildPipedriveUrl(apiDomain, 'leadLabels'), {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    })
+    console.log(`[${requestId}] Discovering Pipedrive properties...`);
 
-    let personFields = []
-    let leadLabels = []
+    // Get person fields
+    const personFieldsResponse = await fetch(buildPipedriveUrl(apiDomain, "personFields"), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    // Get lead labels (custom fields for leads)
+    const leadLabelsResponse = await fetch(buildPipedriveUrl(apiDomain, "leadLabels"), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    let personFields = [];
+    let leadLabels = [];
 
     if (personFieldsResponse.ok) {
-      const personData = await personFieldsResponse.json()
-      personFields = personData.data || []
-      console.log(`[${requestId}] Found ${personFields.length} person fields`)
+      const personData = await personFieldsResponse.json();
+      personFields = personData.data || [];
+      console.log(`[${requestId}] Found ${personFields.length} person fields`);
     }
 
     if (leadLabelsResponse.ok) {
-      const labelData = await leadLabelsResponse.json()
-      leadLabels = labelData.data || []
-      console.log(`[${requestId}] Found ${leadLabels.length} lead labels`)
+      const labelData = await leadLabelsResponse.json();
+      leadLabels = labelData.data || [];
+      console.log(`[${requestId}] Found ${leadLabels.length} lead labels`);
     }
 
     const properties = {
@@ -48,51 +48,45 @@ async function discoverPipedriveProperties(accessToken: string, apiDomain: strin
         key: field.key,
         name: field.name,
         field_type: field.field_type,
-        options: field.options
+        options: field.options,
       })),
       leadLabels: leadLabels.map((label: any) => ({
         id: label.id,
         name: label.name,
-        color: label.color
-      }))
-    }
+        color: label.color,
+      })),
+    };
 
-    console.log(`[${requestId}] Available Pipedrive properties:`, properties)
-    return properties
+    console.log(`[${requestId}] Available Pipedrive properties:`, properties);
+    return properties;
   } catch (error) {
-    console.warn(`[${requestId}] Could not fetch Pipedrive properties:`, error.message)
-    return { personFields: [], leadLabels: [] }
+    console.warn(`[${requestId}] Could not fetch Pipedrive properties:`, error.message);
+    return { personFields: [], leadLabels: [] };
   }
 }
 
-function mapPipedriveDataToLead(
-  pipedriveData: any, 
-  person: any, 
-  clinic_id: string, 
-  source_id: string,
-  requestId: string
-) {
-  console.log(`[${requestId}] Mapping Pipedrive data for lead ID: ${pipedriveData.id}`)
-  
+function mapPipedriveDataToLead(pipedriveData: any, person: any, clinic_id: string, source_id: string, requestId: string) {
+  console.log(`[${requestId}] Mapping Pipedrive data for lead ID: ${pipedriveData.id}`);
+
   // Helper function to get first valid value from multiple sources
   const getFirstValidValue = (values: any[]) => {
     for (const value of values) {
-      if (value && typeof value === 'string' && value.trim() !== '') {
-        return value.trim()
+      if (value && typeof value === "string" && value.trim() !== "") {
+        return value.trim();
       }
-      if (typeof value === 'object' && value !== null) {
+      if (typeof value === "object" && value !== null) {
         // Handle array of objects (like Pipedrive email/phone arrays)
         if (Array.isArray(value) && value.length > 0 && value[0].value) {
-          return value[0].value.trim()
+          return value[0].value.trim();
         }
         // Handle single object with value property
-        if (value.value && typeof value.value === 'string') {
-          return value.value.trim()
+        if (value.value && typeof value.value === "string") {
+          return value.value.trim();
         }
       }
     }
-    return null
-  }
+    return null;
+  };
 
   // Extract name components with multiple fallbacks
   const getNameComponents = () => {
@@ -102,58 +96,58 @@ function mapPipedriveDataToLead(
       pipedriveData.name,
       person?.first_name && person?.last_name ? `${person.first_name} ${person.last_name}` : null,
       // Custom field fallbacks
-      person?.['custom_name'],
-      person?.['full_name'],
-      pipedriveData.label
-    ].filter(Boolean)
+      person?.["custom_name"],
+      person?.["full_name"],
+      pipedriveData.label,
+    ].filter(Boolean);
 
     for (const nameSource of nameSources) {
-      if (nameSource && typeof nameSource === 'string') {
-        const nameParts = nameSource.trim().split(' ')
-        const firstName = nameParts[0] || null
-        const lastName = nameParts.slice(1).join(' ') || null
-        
+      if (nameSource && typeof nameSource === "string") {
+        const nameParts = nameSource.trim().split(" ");
+        const firstName = nameParts[0] || null;
+        const lastName = nameParts.slice(1).join(" ") || null;
+
         if (firstName) {
-          return { firstName, lastName }
+          return { firstName, lastName };
         }
       }
     }
-    
-    return { firstName: null, lastName: null }
-  }
 
-  const { firstName, lastName } = getNameComponents()
+    return { firstName: null, lastName: null };
+  };
+
+  const { firstName, lastName } = getNameComponents();
 
   // Email mapping with comprehensive fallbacks
   const emailSources = [
     person?.email,
     pipedriveData.email,
-    person?.['primary_email'],
-    person?.['work_email'],
-    person?.['business_email'],
-    person?.['contact_email'],
+    person?.["primary_email"],
+    person?.["work_email"],
+    person?.["business_email"],
+    person?.["contact_email"],
     // Custom email fields
-    person?.['custom_email'],
-    person?.['email_address'],
+    person?.["custom_email"],
+    person?.["email_address"],
     // Check if person has email array
     Array.isArray(person?.email) ? person.email : null,
-  ]
+  ];
 
-  // Phone mapping with comprehensive fallbacks  
+  // Phone mapping with comprehensive fallbacks
   const phoneSources = [
     person?.phone,
     pipedriveData.phone,
-    person?.['mobile'],
-    person?.['mobile_phone'],
-    person?.['work_phone'],
-    person?.['business_phone'],
-    person?.['contact_phone'],
+    person?.["mobile"],
+    person?.["mobile_phone"],
+    person?.["work_phone"],
+    person?.["business_phone"],
+    person?.["contact_phone"],
     // Custom phone fields
-    person?.['custom_phone'],
-    person?.['phone_number'],
+    person?.["custom_phone"],
+    person?.["phone_number"],
     // Check if person has phone array
     Array.isArray(person?.phone) ? person.phone : null,
-  ]
+  ];
 
   const mappedLead = {
     clinic_id: clinic_id,
@@ -161,11 +155,11 @@ function mapPipedriveDataToLead(
     last_name: lastName,
     email: getFirstValidValue(emailSources),
     phone: getFirstValidValue(phoneSources),
-    status: 'New' as const,
+    status: "New" as const,
     source_id,
     notes: pipedriveData.notes || null,
-    interest_level: 'medium' as const,
-    urgency: 'curious' as const,
+    interest_level: "medium" as const,
+    urgency: "curious" as const,
     form_data: {
       pipedrive_lead_id: pipedriveData.id,
       pipedrive_person_id: pipedriveData.person_id || person?.id,
@@ -180,104 +174,106 @@ function mapPipedriveDataToLead(
       // Include any custom fields
       pipedrive_custom_fields: {
         ...extractCustomFields(pipedriveData),
-        ...extractCustomFields(person)
-      }
-    }
-  }
+        ...extractCustomFields(person),
+      },
+    },
+  };
 
   // Validate that we have at least email or phone
   if (!mappedLead.email && !mappedLead.phone) {
-    console.warn(`[${requestId}] Lead ${pipedriveData.id} has no valid email or phone`, { 
+    console.warn(`[${requestId}] Lead ${pipedriveData.id} has no valid email or phone`, {
       availableLeadProps: Object.keys(pipedriveData),
       availablePersonProps: person ? Object.keys(person) : [],
       leadId: pipedriveData.id,
-      personId: person?.id
-    })
-    return null
+      personId: person?.id,
+    });
+    return null;
   }
 
   console.log(`[${requestId}] Successfully mapped lead:`, {
     id: pipedriveData.id,
     first_name: mappedLead.first_name,
     last_name: mappedLead.last_name,
-    email: mappedLead.email ? 'Present' : 'Missing',
-    phone: mappedLead.phone ? 'Present' : 'Missing'
-  })
+    email: mappedLead.email ? "Present" : "Missing",
+    phone: mappedLead.phone ? "Present" : "Missing",
+  });
 
-  return mappedLead
+  return mappedLead;
 }
 
 // Extract custom fields from Pipedrive objects
 function extractCustomFields(data: any) {
-  if (!data) return {}
-  
-  const customFields: any = {}
-  
+  if (!data) return {};
+
+  const customFields: any = {};
+
   // Pipedrive custom fields often have specific patterns
   Object.keys(data).forEach(key => {
     // Custom fields in Pipedrive are often prefixed or have specific patterns
-    if (key.startsWith('custom_') || 
-        key.includes('custom') || 
-        /^[a-f0-9]{40}$/.test(key) || // Pipedrive custom field hashes
-        key.match(/^[0-9a-f]{8,}$/)) { // Other hash patterns
-      customFields[key] = data[key]
+    if (
+      key.startsWith("custom_") ||
+      key.includes("custom") ||
+      /^[a-f0-9]{40}$/.test(key) || // Pipedrive custom field hashes
+      key.match(/^[0-9a-f]{8,}$/)
+    ) {
+      // Other hash patterns
+      customFields[key] = data[key];
     }
-  })
-  
-  return customFields
+  });
+
+  return customFields;
 }
 
-serve(async (req) => {
-  console.log(`Function called: ${req.method} ${req.url}`)
-  
-  if (req.method === 'OPTIONS') {
-    console.log('CORS preflight request handled')
-    return new Response('ok', { headers: corsHeaders })
+serve(async req => {
+  console.log(`Function called: ${req.method} ${req.url}`);
+
+  if (req.method === "OPTIONS") {
+    console.log("CORS preflight request handled");
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const url = new URL(req.url)
-    const pathSegments = url.pathname.split('/').filter(segment => segment !== '')
-    const lastSegment = pathSegments[pathSegments.length - 1]
-    const secondLastSegment = pathSegments.length > 1 ? pathSegments[pathSegments.length - 2] : null
-    
+    const url = new URL(req.url);
+    const pathSegments = url.pathname.split("/").filter(segment => segment !== "");
+    const lastSegment = pathSegments[pathSegments.length - 1];
+    const secondLastSegment = pathSegments.length > 1 ? pathSegments[pathSegments.length - 2] : null;
+
     console.log(`URL analysis:`, {
       fullPath: url.pathname,
       pathSegments,
       lastSegment,
       secondLastSegment,
-      method: req.method
-    })
-    
-    // Route based on path and method
-    if (lastSegment === 'pipedrive' && req.method === 'POST') {
-      console.log('Routing to OAuth initialization (direct POST)')
-      return await handleOAuthInit(req)
-    } else if (lastSegment === 'oauth-callback' && req.method === 'GET') {
-      console.log('Routing to OAuth callback')
-      return await handleOAuthCallback(req)
-    } else if (lastSegment === 'leads' && req.method === 'GET') {
-      console.log('Routing to get leads')
-      return await handleGetLeads(req)
-    } else if (lastSegment === 'sync-leads' && req.method === 'POST') {
-      console.log('Routing to sync leads')
-      return await handleSyncLeads(req)
-    } else if (lastSegment === 'webhook' && req.method === 'POST') {
-      console.log('Routing to webhook handler')
-      return await handleWebhook(req)
-    } else {
-      console.error(`Invalid endpoint: ${lastSegment} with method: ${req.method}`)
-      console.error(`Full URL: ${req.url}`)
-      throw new Error(`Invalid endpoint: ${lastSegment} with method: ${req.method}`)
-    }
+      method: req.method,
+    });
 
+    // Route based on path and method
+    if (lastSegment === "pipedrive" && req.method === "POST") {
+      console.log("Routing to OAuth initialization (direct POST)");
+      return await handleOAuthInit(req);
+    } else if (lastSegment === "oauth-callback" && req.method === "GET") {
+      console.log("Routing to OAuth callback");
+      return await handleOAuthCallback(req);
+    } else if (lastSegment === "leads" && req.method === "GET") {
+      console.log("Routing to get leads");
+      return await handleGetLeads(req);
+    } else if (lastSegment === "sync-leads" && req.method === "POST") {
+      console.log("Routing to sync leads");
+      return await handleSyncLeads(req);
+    } else if (lastSegment === "webhook" && req.method === "POST") {
+      console.log("Routing to webhook handler");
+      return await handleWebhook(req);
+    } else {
+      console.error(`Invalid endpoint: ${lastSegment} with method: ${req.method}`);
+      console.error(`Full URL: ${req.url}`);
+      throw new Error(`Invalid endpoint: ${lastSegment} with method: ${req.method}`);
+    }
   } catch (error) {
-    console.error('Main function error:', {
+    console.error("Main function error:", {
       message: error.message,
       stack: error.stack,
       url: req.url,
-      method: req.method
-    })
+      method: req.method,
+    });
     return new Response(
       JSON.stringify({
         success: false,
@@ -286,278 +282,282 @@ serve(async (req) => {
       {
         status: 400,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
-    )
+      },
+    );
   }
-})
+});
 
 // Handle OAuth initialization
 async function handleOAuthInit(req: Request) {
-  console.log('Starting OAuth initialization')
-  
+  console.log("Starting OAuth initialization");
+
   try {
     // Get JWT token from request
-    const authHeader = req.headers.get('authorization')
-    console.log('Auth header check:', {
+    const authHeader = req.headers.get("authorization");
+    console.log("Auth header check:", {
       hasAuthHeader: !!authHeader,
       authHeaderLength: authHeader ? authHeader.length : 0,
-      startsWithBearer: authHeader ? authHeader.startsWith('Bearer ') : false
-    })
-    
-    if (!authHeader) {
-      console.error('No authorization header found')
-      throw new Error('No authorization header')
-    }
-    console.log('Authorization header found')
+      startsWithBearer: authHeader ? authHeader.startsWith("Bearer ") : false,
+    });
 
-    const token = authHeader.replace('Bearer ', '')
-    console.log(`Token extracted (length: ${token.length})`)
-    console.log(`Token preview: ${token.substring(0, 20)}...`)
-    
-    // Check environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
-    const clientId = Deno.env.get('PIPEDRIVE_CLIENT_ID')
-    const redirectUri = Deno.env.get('PIPEDRIVE_REDIRECT_URI')
-    
-    console.log('Environment variables check:', {
-      supabaseUrl: supabaseUrl ? 'Set' : 'Missing',
-      supabaseKey: supabaseKey ? 'Set' : 'Missing',
-      clientId: clientId ? 'Set' : 'Missing',
-      redirectUri: redirectUri ? 'Set' : 'Missing'
-    })
-    
-    if (!supabaseUrl || !supabaseKey || !clientId || !redirectUri) {
-      throw new Error('Missing required environment variables')
+    if (!authHeader) {
+      console.error("No authorization header found");
+      throw new Error("No authorization header");
     }
-    
+    console.log("Authorization header found");
+
+    const token = authHeader.replace("Bearer ", "");
+    console.log(`Token extracted (length: ${token.length})`);
+    console.log(`Token preview: ${token.substring(0, 20)}...`);
+
+    // Check environment variables
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const clientId = Deno.env.get("PIPEDRIVE_CLIENT_ID");
+    const redirectUri = Deno.env.get("PIPEDRIVE_REDIRECT_URI");
+
+    console.log("Environment variables check:", {
+      supabaseUrl: supabaseUrl ? "Set" : "Missing",
+      supabaseKey: supabaseKey ? "Set" : "Missing",
+      clientId: clientId ? "Set" : "Missing",
+      redirectUri: redirectUri ? "Set" : "Missing",
+    });
+
+    if (!supabaseUrl || !supabaseKey || !clientId || !redirectUri) {
+      throw new Error("Missing required environment variables");
+    }
+
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
-    })
-    console.log('Supabase client initialized')
+      global: { headers: { Authorization: authHeader } },
+    });
+    console.log("Supabase client initialized");
 
     // Get user from token with detailed error logging
-    console.log('Verifying user token...')
+    console.log("Verifying user token...");
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser(token)
-      
-      console.log('User verification result:', {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser(token);
+
+      console.log("User verification result:", {
         hasUser: !!user,
         userId: user?.id,
         userEmail: user?.email,
         errorMessage: userError?.message,
-        errorCode: userError?.code
-      })
-      
+        errorCode: userError?.code,
+      });
+
       if (userError) {
-        console.error('User token verification failed:', {
+        console.error("User token verification failed:", {
           message: userError.message,
           code: userError.code,
-          details: userError
-        })
-        throw new Error(`Invalid user token: ${userError.message}`)
+          details: userError,
+        });
+        throw new Error(`Invalid user token: ${userError.message}`);
       }
-      
+
       if (!user) {
-        console.error('No user returned from token verification')
-        throw new Error('Invalid user token: No user found')
+        console.error("No user returned from token verification");
+        throw new Error("Invalid user token: No user found");
       }
-      
-      console.log(`User verified: ${user.id}`)
+
+      console.log(`User verified: ${user.id}`);
 
       // Get clinic_id from request body
-      console.log('Parsing request body...')
-      const requestBody = await req.json()
-      console.log('Request body:', requestBody)
-      
-      const { clinic_id,redirectUrl} = requestBody
+      console.log("Parsing request body...");
+      const requestBody = await req.json();
+      console.log("Request body:", requestBody);
+
+      const { clinic_id, redirectUrl } = requestBody;
       if (!clinic_id) {
-        console.error('Missing clinic_id in request body')
-        throw new Error('Missing clinic_id')
+        console.error("Missing clinic_id in request body");
+        throw new Error("Missing clinic_id");
       }
-      console.log(`Clinic ID: ${clinic_id}`)
+      console.log(`Clinic ID: ${clinic_id}`);
 
       // Verify user owns the clinic
-      console.log('Verifying clinic ownership...')
+      console.log("Verifying clinic ownership...");
       const { data: clinic, error: clinicError } = await supabase
-        .from('clinic')
-        .select('id, owner_id')
-        .eq('id', clinic_id)
-        .eq('owner_id', user.id)
-        .single()
+        .from("clinic")
+        .select("id, owner_id")
+        .eq("id", clinic_id)
+        .eq("owner_id", user.id)
+        .single();
 
-      console.log('Clinic verification result:', {
+      console.log("Clinic verification result:", {
         hasClinic: !!clinic,
         clinicId: clinic?.id,
         ownerId: clinic?.owner_id,
-        errorMessage: clinicError?.message
-      })
+        errorMessage: clinicError?.message,
+      });
 
       if (clinicError) {
-        console.error('Clinic query error:', clinicError)
-        throw new Error(`Clinic verification failed: ${clinicError.message}`)
+        console.error("Clinic query error:", clinicError);
+        throw new Error(`Clinic verification failed: ${clinicError.message}`);
       }
-      
+
       if (!clinic) {
-        console.error('Clinic not found or user not authorized')
-        throw new Error('Clinic not found or unauthorized')
+        console.error("Clinic not found or user not authorized");
+        throw new Error("Clinic not found or unauthorized");
       }
-      console.log('Clinic ownership verified')
+      console.log("Clinic ownership verified");
 
       // Build OAuth URL with user_id in state to help identify the clinic later
-      console.log('Building OAuth URL...')
-      const stateData = `${clinic_id}|${user.id}|${redirectUrl}` // Include both clinic_id and user_id
-      const oauthUrl = new URL('https://oauth.pipedrive.com/oauth/authorize')
-      oauthUrl.searchParams.set('client_id', clientId)
-      oauthUrl.searchParams.set('redirect_uri', redirectUri)
-      oauthUrl.searchParams.set('response_type', 'code')
-      oauthUrl.searchParams.set('state', stateData)
-      oauthUrl.searchParams.set('scope', 'deals:read leads:read persons:read')
+      console.log("Building OAuth URL...");
+      const stateData = `${clinic_id}|${user.id}|${redirectUrl}`; // Include both clinic_id and user_id
+      const oauthUrl = new URL("https://oauth.pipedrive.com/oauth/authorize");
+      oauthUrl.searchParams.set("client_id", clientId);
+      oauthUrl.searchParams.set("redirect_uri", redirectUri);
+      oauthUrl.searchParams.set("response_type", "code");
+      oauthUrl.searchParams.set("state", stateData);
+      oauthUrl.searchParams.set("scope", "deals:read leads:read persons:read");
 
-      console.log('OAuth URL built:', oauthUrl.toString())
+      console.log("OAuth URL built:", oauthUrl.toString());
 
       // Also store the pending integration in a temporary table or cache
       // This is a backup method in case state parameter gets lost
-      const { error: tempError } = await supabase
-        .from('pipedrive_integration')
-        .upsert({
+      const { error: tempError } = await supabase.from("pipedrive_integration").upsert(
+        {
           clinic_id: clinic_id,
-          access_token: 'PENDING',
-          api_domain: 'pending.pipedrive.com',
-          company_id: 'pending',
-          user_id: 'pending',
+          access_token: "PENDING",
+          api_domain: "pending.pipedrive.com",
+          company_id: "pending",
+          user_id: "pending",
           is_active: false,
           // Remove created_at and updated_at - let DB handle defaults
-        }, {
-          onConflict: 'clinic_id',
-          ignoreDuplicates: false
-        })
+        },
+        {
+          onConflict: "clinic_id",
+          ignoreDuplicates: false,
+        },
+      );
 
       if (tempError) {
-        console.log('Could not store pending integration:', tempError.message)
+        console.log("Could not store pending integration:", tempError.message);
       } else {
-        console.log('Stored pending integration for fallback')
+        console.log("Stored pending integration for fallback");
       }
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          authUrl: oauthUrl.toString() 
+        JSON.stringify({
+          success: true,
+          authUrl: oauthUrl.toString(),
         }),
         {
-          headers: { 
-            'Content-Type': 'application/json',
-            ...corsHeaders 
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
           },
-        }
-      )
+        },
+      );
     } catch (authError) {
-      console.error('Authentication error details:', {
+      console.error("Authentication error details:", {
         message: authError.message,
         stack: authError.stack,
-        tokenPreview: token ? token.substring(0, 20) + '...' : 'No token'
-      })
-      throw authError
+        tokenPreview: token ? token.substring(0, 20) + "..." : "No token",
+      });
+      throw authError;
     }
   } catch (error) {
-    console.error('OAuth init error:', {
+    console.error("OAuth init error:", {
       message: error.message,
-      stack: error.stack
-    })
-    throw error
+      stack: error.stack,
+    });
+    throw error;
   }
 }
 
 // Handle OAuth callback
 async function handleOAuthCallback(req: Request) {
-  const requestId = crypto.randomUUID()
-  console.log(`[${requestId}] Starting OAuth callback handling`)
-      let redirectUrl = null;
+  const requestId = crypto.randomUUID();
+  console.log(`[${requestId}] Starting OAuth callback handling`);
+  let redirectUrl = null;
 
   try {
-    const url = new URL(req.url)
-    const code = url.searchParams.get('code')
-    const state = url.searchParams.get('state') // Contains clinic_id:user_id or may be missing
-    
+    const url = new URL(req.url);
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state"); // Contains clinic_id:user_id or may be missing
+
     console.log(`[${requestId}] Callback parameters:`, {
-      code: code ? `${code.substring(0, 10)}...` : 'Missing',
-      state: state || 'Missing',
-      fullUrl: req.url
-    })
-    
+      code: code ? `${code.substring(0, 10)}...` : "Missing",
+      state: state || "Missing",
+      fullUrl: req.url,
+    });
+
     if (!code) {
-      console.error(`[${requestId}] Missing authorization code`)
-      throw new Error('Missing authorization code')
+      console.error(`[${requestId}] Missing authorization code`);
+      throw new Error("Missing authorization code");
     }
 
     // Parse state if available
-    let clinicId = null
-    let userId = null
-    
-    if (state && state.includes(':')) {
-      const [parsedClinicId, parsedUserId,parsedRedirectUrl] = state.split('|')
-      clinicId = parsedClinicId
-      userId = parsedUserId
-      redirectUrl=parsedRedirectUrl
-      console.log(`[${requestId}] Parsed state:`, { clinicId, userId })
+    let clinicId = null;
+    let userId = null;
+
+    if (state && state.includes(":")) {
+      const [parsedClinicId, parsedUserId, parsedRedirectUrl] = state.split("|");
+      clinicId = parsedClinicId;
+      userId = parsedUserId;
+      redirectUrl = parsedRedirectUrl;
+      console.log(`[${requestId}] Parsed state:`, { clinicId, userId });
     } else {
-      console.log(`[${requestId}] State parameter missing or malformed, will use fallback method`)
+      console.log(`[${requestId}] State parameter missing or malformed, will use fallback method`);
     }
 
     // Check environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const clientId = Deno.env.get('PIPEDRIVE_CLIENT_ID')
-    const clientSecret = Deno.env.get('PIPEDRIVE_CLIENT_SECRET')
-    const redirectUri = Deno.env.get('PIPEDRIVE_REDIRECT_URI')
-    const frontendUrl = Deno.env.get('FRONTEND_URL')
-    
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const clientId = Deno.env.get("PIPEDRIVE_CLIENT_ID");
+    const clientSecret = Deno.env.get("PIPEDRIVE_CLIENT_SECRET");
+    const redirectUri = Deno.env.get("PIPEDRIVE_REDIRECT_URI");
+    const frontendUrl = Deno.env.get("FRONTEND_URL");
+
     console.log(`[${requestId}] Environment variables check:`, {
-      supabaseUrl: supabaseUrl ? 'Set' : 'Missing',
-      supabaseKey: supabaseKey ? 'Set' : 'Missing',
-      clientId: clientId ? 'Set' : 'Missing',
-      clientSecret: clientSecret ? 'Set (hidden)' : 'Missing',
-      redirectUri: redirectUri ? 'Set' : 'Missing',
-      frontendUrl: frontendUrl ? 'Set' : 'Missing'
-    })
+      supabaseUrl: supabaseUrl ? "Set" : "Missing",
+      supabaseKey: supabaseKey ? "Set" : "Missing",
+      clientId: clientId ? "Set" : "Missing",
+      clientSecret: clientSecret ? "Set (hidden)" : "Missing",
+      redirectUri: redirectUri ? "Set" : "Missing",
+      frontendUrl: frontendUrl ? "Set" : "Missing",
+    });
 
     // Initialize Supabase client with service role key for callback
-    const supabase = createClient(supabaseUrl!, supabaseKey!)
-    console.log(`[${requestId}] Supabase client initialized with service role`)
+    const supabase = createClient(supabaseUrl!, supabaseKey!);
+    console.log(`[${requestId}] Supabase client initialized with service role`);
 
     // Exchange code for access token
-    console.log(`[${requestId}] Exchanging authorization code for access token...`)
-    const tokenResponse = await fetch('https://oauth.pipedrive.com/oauth/token', {
-      method: 'POST',
+    console.log(`[${requestId}] Exchanging authorization code for access token...`);
+    const tokenResponse = await fetch("https://oauth.pipedrive.com/oauth/token", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
-        grant_type: 'authorization_code',
+        grant_type: "authorization_code",
         code: code,
         client_id: clientId!,
         client_secret: clientSecret!,
         redirect_uri: redirectUri!,
       }),
-    })
+    });
 
-    console.log(`[${requestId}] Token exchange response status: ${tokenResponse.status}`)
-    
+    console.log(`[${requestId}] Token exchange response status: ${tokenResponse.status}`);
+
     if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text()
+      const errorText = await tokenResponse.text();
       console.error(`[${requestId}] Token exchange failed:`, {
         status: tokenResponse.status,
         statusText: tokenResponse.statusText,
-        error: errorText
-      })
-      throw new Error('Failed to exchange code for token')
+        error: errorText,
+      });
+      throw new Error("Failed to exchange code for token");
     }
 
-    const tokenData = await tokenResponse.json()
+    const tokenData = await tokenResponse.json();
     console.log(`[${requestId}] Token exchange successful:`, {
       hasAccessToken: !!tokenData.access_token,
       hasRefreshToken: !!tokenData.refresh_token,
@@ -565,99 +565,97 @@ async function handleOAuthCallback(req: Request) {
       companyId: tokenData.company_id,
       userId: tokenData.user_id,
       expiresIn: tokenData.expires_in,
-      fullTokenData: tokenData
-    })
+      fullTokenData: tokenData,
+    });
 
     // Discover available properties
-    await discoverPipedriveProperties(tokenData.access_token, tokenData.api_domain, requestId)
+    await discoverPipedriveProperties(tokenData.access_token, tokenData.api_domain, requestId);
 
     // Handle missing company_id and user_id gracefully
     if (!tokenData.company_id || !tokenData.user_id) {
-      console.log(`[${requestId}] Missing company_id or user_id, attempting to fetch from API...`)
-      
+      console.log(`[${requestId}] Missing company_id or user_id, attempting to fetch from API...`);
+
       // Try to get user info from Pipedrive API
       try {
-        const userResponse = await fetch(buildPipedriveUrl(tokenData.api_domain, 'users/me'), {
-          headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
-        })
-        
+        const userResponse = await fetch(buildPipedriveUrl(tokenData.api_domain, "users/me"), {
+          headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+
         if (userResponse.ok) {
-          const userData = await userResponse.json()
-          console.log(`[${requestId}] User data from API:`, userData.data)
-          
+          const userData = await userResponse.json();
+          console.log(`[${requestId}] User data from API:`, userData.data);
+
           if (!tokenData.company_id && userData.data?.company_id) {
-            tokenData.company_id = userData.data.company_id
+            tokenData.company_id = userData.data.company_id;
           }
           if (!tokenData.user_id && userData.data?.id) {
-            tokenData.user_id = userData.data.id
+            tokenData.user_id = userData.data.id;
           }
         }
       } catch (apiError) {
-        console.log(`[${requestId}] Could not fetch user data from API:`, apiError.message)
+        console.log(`[${requestId}] Could not fetch user data from API:`, apiError.message);
       }
     }
 
     // If we don't have clinicId from state, try to find it using the pending integration
     if (!clinicId) {
-      console.log(`[${requestId}] Looking for pending integration using company_id...`)
-      
+      console.log(`[${requestId}] Looking for pending integration using company_id...`);
+
       const { data: pendingIntegrations, error: pendingError } = await supabase
-        .from('pipedrive_integration')
-        .select('clinic_id, user_id')
-        .eq('access_token', 'PENDING')
-        .eq('is_active', false)
-        .order('created_at', { ascending: false })
-        .limit(5)
+        .from("pipedrive_integration")
+        .select("clinic_id, user_id")
+        .eq("access_token", "PENDING")
+        .eq("is_active", false)
+        .order("created_at", { ascending: false })
+        .limit(5);
 
       if (pendingError) {
-        console.error(`[${requestId}] Error finding pending integrations:`, pendingError)
+        console.error(`[${requestId}] Error finding pending integrations:`, pendingError);
       } else if (pendingIntegrations && pendingIntegrations.length > 0) {
-        console.log(`[${requestId}] Found pending integrations:`, pendingIntegrations.length)
-        
+        console.log(`[${requestId}] Found pending integrations:`, pendingIntegrations.length);
+
         // Use the most recent pending integration
-        const pendingIntegration = pendingIntegrations[0]
-        clinicId = pendingIntegration.clinic_id
-        userId = pendingIntegration.user_id
-        
-        console.log(`[${requestId}] Using pending integration:`, { clinicId, userId })
+        const pendingIntegration = pendingIntegrations[0];
+        clinicId = pendingIntegration.clinic_id;
+        userId = pendingIntegration.user_id;
+
+        console.log(`[${requestId}] Using pending integration:`, { clinicId, userId });
       }
     }
 
     if (!clinicId) {
-      console.error(`[${requestId}] Could not determine clinic_id from state or pending integrations`)
-      throw new Error('Could not determine clinic for this integration')
+      console.error(`[${requestId}] Could not determine clinic_id from state or pending integrations`);
+      throw new Error("Could not determine clinic for this integration");
     }
-    
+
     // Calculate expiry time
-    const expiresAt = tokenData.expires_in 
-      ? new Date(Date.now() + (tokenData.expires_in * 1000))
-      : null
-    
-    console.log(`[${requestId}] Token expiry calculated:`, expiresAt?.toISOString() || 'No expiry')
+    const expiresAt = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
+
+    console.log(`[${requestId}] Token expiry calculated:`, expiresAt?.toISOString() || "No expiry");
 
     // Validate required data before saving
     if (!tokenData.access_token) {
-      throw new Error('Missing access token from Pipedrive')
+      throw new Error("Missing access token from Pipedrive");
     }
-    
+
     if (!tokenData.api_domain) {
-      throw new Error('Missing API domain from Pipedrive')
+      throw new Error("Missing API domain from Pipedrive");
     }
 
     // Save integration to database
-    console.log(`[${requestId}] Saving integration to database...`)
+    console.log(`[${requestId}] Saving integration to database...`);
     const integrationData = {
       clinic_id: clinicId,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token || null,
       api_domain: tokenData.api_domain,
-      company_id: tokenData.company_id ? tokenData.company_id.toString() : 'unknown',
-      user_id: tokenData.user_id ? tokenData.user_id.toString() : 'unknown',
+      company_id: tokenData.company_id ? tokenData.company_id.toString() : "unknown",
+      user_id: tokenData.user_id ? tokenData.user_id.toString() : "unknown",
       expires_at: expiresAt?.toISOString() || null,
       is_active: true,
       // Don't set created_at and updated_at manually - let DB defaults handle them
-    }
-    
+    };
+
     console.log(`[${requestId}] Integration data to save:`, {
       clinic_id: integrationData.clinic_id,
       api_domain: integrationData.api_domain,
@@ -665,245 +663,232 @@ async function handleOAuthCallback(req: Request) {
       user_id: integrationData.user_id,
       expires_at: integrationData.expires_at,
       hasAccessToken: !!integrationData.access_token,
-      hasRefreshToken: !!integrationData.refresh_token
-    })
+      hasRefreshToken: !!integrationData.refresh_token,
+    });
 
     // First try to update existing record, then insert if not found
-    let data, error
+    let data, error;
 
     // Try update first
     const { data: updateData, error: updateError } = await supabase
-      .from('pipedrive_integration')
+      .from("pipedrive_integration")
       .update(integrationData)
-      .eq('clinic_id', clinicId)
-      .select()
+      .eq("clinic_id", clinicId)
+      .select();
 
     if (updateError) {
-      console.log(`[${requestId}] Update failed, trying insert:`, updateError.message)
-      
-      // If update fails, try insert
-      const { data: insertData, error: insertError } = await supabase
-        .from('pipedrive_integration')
-        .insert(integrationData)
-        .select()
+      console.log(`[${requestId}] Update failed, trying insert:`, updateError.message);
 
-      data = insertData
-      error = insertError
+      // If update fails, try insert
+      const { data: insertData, error: insertError } = await supabase.from("pipedrive_integration").insert(integrationData).select();
+
+      data = insertData;
+      error = insertError;
     } else {
-      data = updateData
-      error = updateError
+      data = updateData;
+      error = updateError;
     }
 
     if (error) {
-      console.error(`[${requestId}] Database save error:`, error)
-      throw new Error('Failed to save integration')
+      console.error(`[${requestId}] Database save error:`, error);
+      throw new Error("Failed to save integration");
     }
-    
-    console.log(`[${requestId}] Integration saved to database:`, data)
+
+    console.log(`[${requestId}] Integration saved to database:`, data);
 
     // Get account info and redirect with success
-    const accountInfo = await getAccountInfo(tokenData.access_token, tokenData.api_domain)
-    
-    const successUrl = `${redirectUrl || 'http://localhost:3000'}?pipedrive_status=success&account_name=${encodeURIComponent(accountInfo.accountName)}&contact_count=${accountInfo.contactCount}&deal_count=${accountInfo.dealCount}`
-    console.log(`[${requestId}] Redirecting to:`, successUrl)
-    
-    return Response.redirect(successUrl)
+    const accountInfo = await getAccountInfo(tokenData.access_token, tokenData.api_domain);
+
+    const successUrl = `${redirectUrl || "http://localhost:3000"}?pipedrive_status=success&account_name=${encodeURIComponent(accountInfo.accountName)}&contact_count=${accountInfo.contactCount}&deal_count=${accountInfo.dealCount}`;
+    console.log(`[${requestId}] Redirecting to:`, successUrl);
+
+    return Response.redirect(successUrl);
   } catch (error) {
     console.error(`[${requestId}] OAuth callback error:`, {
       message: error.message,
-      stack: error.stack
-    })
-    
-    const frontendUrl =redirectUrl || 'http://localhost:3000'
-    const errorUrl = `${frontendUrl}?pipedrive_status=error&error_message=${encodeURIComponent(error.message)}`
-    console.log(`[${requestId}] Redirecting to error page:`, errorUrl)
-    
-    return Response.redirect(errorUrl)
+      stack: error.stack,
+    });
+
+    const frontendUrl = redirectUrl || "http://localhost:3000";
+    const errorUrl = `${frontendUrl}?pipedrive_status=error&error_message=${encodeURIComponent(error.message)}`;
+    console.log(`[${requestId}] Redirecting to error page:`, errorUrl);
+
+    return Response.redirect(errorUrl);
   }
 }
 
 // Get account information
 async function getAccountInfo(accessToken: string, apiDomain: string) {
   try {
-    console.log('Fetching account information...')
-    
+    console.log("Fetching account information...");
+
     // Get persons (contacts) count
-    const personsResponse = await fetch(buildPipedriveUrl(apiDomain, 'persons?limit=1'), {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    })
-    
-    let contactCount = 0
+    const personsResponse = await fetch(buildPipedriveUrl(apiDomain, "persons?limit=1"), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    let contactCount = 0;
     if (personsResponse.ok) {
-      const personsData = await personsResponse.json()
-      contactCount = personsData.additional_data?.pagination?.total || 0
+      const personsData = await personsResponse.json();
+      contactCount = personsData.additional_data?.pagination?.total || 0;
     }
-    
+
     // Get deals count
-    const dealsResponse = await fetch(buildPipedriveUrl(apiDomain, 'deals?limit=1'), {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    })
-    
-    let dealCount = 0
+    const dealsResponse = await fetch(buildPipedriveUrl(apiDomain, "deals?limit=1"), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    let dealCount = 0;
     if (dealsResponse.ok) {
-      const dealsData = await dealsResponse.json()
-      dealCount = dealsData.additional_data?.pagination?.total || 0
+      const dealsData = await dealsResponse.json();
+      dealCount = dealsData.additional_data?.pagination?.total || 0;
     }
-    
+
     return {
-      accountName: 'Pipedrive Account',
+      accountName: "Pipedrive Account",
       contactCount,
-      dealCount
-    }
+      dealCount,
+    };
   } catch (error) {
-    console.error('Error fetching account info:', error)
+    console.error("Error fetching account info:", error);
     return {
-      accountName: 'Pipedrive Account',
+      accountName: "Pipedrive Account",
       contactCount: 0,
-      dealCount: 0
-    }
+      dealCount: 0,
+    };
   }
 }
 
 // Handle syncing leads from Pipedrive to our database
 // Handle syncing leads from Pipedrive to our database (No JWT validation)
 async function handleSyncLeads(req: Request) {
-  const requestId = crypto.randomUUID()
-  console.log(`[${requestId}] Starting lead sync (no JWT validation)`)
-  
+  const requestId = crypto.randomUUID();
+  console.log(`[${requestId}] Starting lead sync (no JWT validation)`);
+
   try {
     // Initialize Supabase client with service role key (bypass RLS)
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get clinic_id from request body
-    const { clinic_id } = await req.json()
+    const { clinic_id } = await req.json();
     if (!clinic_id) {
-      throw new Error('Missing clinic_id')
+      throw new Error("Missing clinic_id");
     }
 
-    console.log(`[${requestId}] Processing for clinic_id: ${clinic_id}`)
+    console.log(`[${requestId}] Processing for clinic_id: ${clinic_id}`);
 
     // Get Pipedrive integration (no user validation)
     const { data: integration, error: integrationError } = await supabase
-      .from('pipedrive_integration')
-      .select('*')
-      .eq('clinic_id', clinic_id)
-      .eq('is_active', true)
-      .single()
+      .from("pipedrive_integration")
+      .select("*")
+      .eq("clinic_id", clinic_id)
+      .eq("is_active", true)
+      .single();
 
     if (integrationError || !integration) {
-      console.error(`[${requestId}] Integration error:`, integrationError)
-      throw new Error('Pipedrive integration not found')
+      console.error(`[${requestId}] Integration error:`, integrationError);
+      throw new Error("Pipedrive integration not found");
     }
 
-    console.log(`[${requestId}] Found integration for clinic ${clinic_id}`)
+    console.log(`[${requestId}] Found integration for clinic ${clinic_id}`);
 
     // Discover available properties
-    await discoverPipedriveProperties(integration.access_token, integration.api_domain, requestId)
+    await discoverPipedriveProperties(integration.access_token, integration.api_domain, requestId);
 
     // Get or create lead source for Pipedrive
-    const { data: leadSource } = await supabase
-      .from('lead_source')
-      .select('id')
-      .eq('name', 'Pipedrive')
-      .single()
+    const { data: leadSource } = await supabase.from("lead_source").select("id").eq("name", "Pipedrive").single();
 
-    let sourceId = leadSource?.id
+    let sourceId = leadSource?.id;
 
     if (!sourceId) {
       const { data: newSource, error: createSourceError } = await supabase
-        .from('lead_source')
+        .from("lead_source")
         .insert({
-          name: 'Pipedrive',
+          name: "Pipedrive",
           clinic_id: clinic_id, // Add clinic_id if your schema requires it
         })
-        .select('id')
-        .single()
+        .select("id")
+        .single();
 
       if (createSourceError) {
-        console.error(`[${requestId}] Source creation error:`, createSourceError)
-        throw new Error('Failed to create lead source')
+        console.error(`[${requestId}] Source creation error:`, createSourceError);
+        throw new Error("Failed to create lead source");
       }
-      sourceId = newSource.id
+      sourceId = newSource.id;
     }
 
     // Fetch leads from Pipedrive
-    const leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=500')
-    console.log(`[${requestId}] Fetching from: ${leadsUrl}`)
-    
+    const leadsUrl = buildPipedriveUrl(integration.api_domain, "leads?limit=500");
+    console.log(`[${requestId}] Fetching from: ${leadsUrl}`);
+
     const leadsResponse = await fetch(leadsUrl, {
-      headers: { 'Authorization': `Bearer ${integration.access_token}` }
-    })
+      headers: { Authorization: `Bearer ${integration.access_token}` },
+    });
 
     if (!leadsResponse.ok) {
-      const errorText = await leadsResponse.text()
-      console.error(`[${requestId}] Pipedrive API error:`, errorText)
-      throw new Error(`Pipedrive API error: ${leadsResponse.status}`)
+      const errorText = await leadsResponse.text();
+      console.error(`[${requestId}] Pipedrive API error:`, errorText);
+      throw new Error(`Pipedrive API error: ${leadsResponse.status}`);
     }
 
-    const leadsData = await leadsResponse.json()
-    const pipedriveLeads = leadsData.data || []
+    const leadsData = await leadsResponse.json();
+    const pipedriveLeads = leadsData.data || [];
 
-    console.log(`[${requestId}] Found ${pipedriveLeads.length} leads in Pipedrive`)
+    console.log(`[${requestId}] Found ${pipedriveLeads.length} leads in Pipedrive`);
 
     // Fetch persons for additional contact info
-    const personsUrl = buildPipedriveUrl(integration.api_domain, 'persons?limit=500')
+    const personsUrl = buildPipedriveUrl(integration.api_domain, "persons?limit=500");
     const personsResponse = await fetch(personsUrl, {
-      headers: { 'Authorization': `Bearer ${integration.access_token}` }
-    })
+      headers: { Authorization: `Bearer ${integration.access_token}` },
+    });
 
-    let personsData = { data: [] }
+    let personsData = { data: [] };
     if (personsResponse.ok) {
-      personsData = await personsResponse.json()
+      personsData = await personsResponse.json();
     }
 
     // Create persons map
-    const personsMap = new Map()
+    const personsMap = new Map();
     if (personsData.data) {
       personsData.data.forEach((person: any) => {
-        personsMap.set(person.id, person)
-      })
+        personsMap.set(person.id, person);
+      });
     }
 
-    console.log(`[${requestId}] Found ${personsMap.size} persons in Pipedrive`)
+    console.log(`[${requestId}] Found ${personsMap.size} persons in Pipedrive`);
 
     // Transform and save leads
-    const leadsToInsert = []
-    
+    const leadsToInsert = [];
+
     for (const pipedriveData of pipedriveLeads) {
-      const person = personsMap.get(pipedriveData.person_id)
-      
-      const mappedLead = mapPipedriveDataToLead(
-        pipedriveData, 
-        person, 
-        clinic_id, 
-        sourceId, 
-        requestId
-      )
+      const person = personsMap.get(pipedriveData.person_id);
+
+      const mappedLead = mapPipedriveDataToLead(pipedriveData, person, clinic_id, sourceId, requestId);
 
       if (mappedLead) {
-        leadsToInsert.push(mappedLead)
+        leadsToInsert.push(mappedLead);
       }
     }
 
-    console.log(`[${requestId}] Preparing to insert ${leadsToInsert.length} leads`)
+    console.log(`[${requestId}] Preparing to insert ${leadsToInsert.length} leads`);
 
     if (leadsToInsert.length > 0) {
       const { data: insertedLeads, error: insertError } = await supabase
-        .from('lead')
+        .from("lead")
         .upsert(leadsToInsert, {
-          onConflict: 'email',
-          ignoreDuplicates: true
+          onConflict: "email",
+          ignoreDuplicates: true,
         })
-        .select('id')
+        .select("id");
 
       if (insertError) {
-        console.error(`[${requestId}] Insert error:`, insertError)
-        throw new Error(`Failed to save leads: ${insertError.message}`)
+        console.error(`[${requestId}] Insert error:`, insertError);
+        throw new Error(`Failed to save leads: ${insertError.message}`);
       }
 
-      console.log(`[${requestId}] Successfully synced ${insertedLeads?.length || leadsToInsert.length} leads`)
+      console.log(`[${requestId}] Successfully synced ${insertedLeads?.length || leadsToInsert.length} leads`);
     }
 
     return new Response(
@@ -911,17 +896,17 @@ async function handleSyncLeads(req: Request) {
         success: true,
         synced_count: leadsToInsert.length,
         total_pipedrive_leads: pipedriveLeads.length,
-        total_persons: personsMap.size
+        total_persons: personsMap.size,
       }),
       {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
-    )
+      },
+    );
   } catch (error) {
-    console.error(`[${requestId}] Sync leads error:`, error)
+    console.error(`[${requestId}] Sync leads error:`, error);
     return new Response(
       JSON.stringify({
         success: false,
@@ -930,125 +915,128 @@ async function handleSyncLeads(req: Request) {
       {
         status: 400,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
-    )
+      },
+    );
   }
 }
 
 // Handle getting leads (for API access)
 async function handleGetLeads(req: Request) {
-  console.log('Starting get leads handler')
-  
+  console.log("Starting get leads handler");
+
   try {
     // Get JWT token from request
-    const authHeader = req.headers.get('authorization')
+    const authHeader = req.headers.get("authorization");
     if (!authHeader) {
-      throw new Error('No authorization header')
+      throw new Error("No authorization header");
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    
+    const token = authHeader.replace("Bearer ", "");
+
     // Check environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
-    const clientId = Deno.env.get('PIPEDRIVE_CLIENT_ID')!
-    const clientSecret = Deno.env.get('PIPEDRIVE_CLIENT_SECRET')!
-    
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const clientId = Deno.env.get("PIPEDRIVE_CLIENT_ID")!;
+    const clientSecret = Deno.env.get("PIPEDRIVE_CLIENT_SECRET")!;
+
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
-    })
+      global: { headers: { Authorization: authHeader } },
+    });
 
     // Get user from token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token);
     if (userError || !user) {
-      throw new Error('Invalid user token')
+      throw new Error("Invalid user token");
     }
 
     // Get clinic_id from request
-    const url = new URL(req.url)
-    const clinicId = url.searchParams.get('clinic_id')
-    
+    const url = new URL(req.url);
+    const clinicId = url.searchParams.get("clinic_id");
+
     if (!clinicId) {
-      throw new Error('Missing clinic_id parameter')
+      throw new Error("Missing clinic_id parameter");
     }
 
     // Get Pipedrive integration with token refresh logic
     const { data: integration, error: integrationError } = await supabase
-      .from('pipedrive_integration')
-      .select(`
+      .from("pipedrive_integration")
+      .select(
+        `
         *,
         clinic!inner(owner_id)
-      `)
-      .eq('clinic_id', clinicId)
-      .eq('clinic.owner_id', user.id)
-      .eq('is_active', true)
-      .single()
+      `,
+      )
+      .eq("clinic_id", clinicId)
+      .eq("clinic.owner_id", user.id)
+      .eq("is_active", true)
+      .single();
 
     if (integrationError || !integration) {
-      throw new Error('Pipedrive integration not found or unauthorized')
+      throw new Error("Pipedrive integration not found or unauthorized");
     }
 
     // Check if token is expired and refresh if needed
-    let accessToken = integration.access_token
-    const tokenExpired = integration.expires_at && new Date(integration.expires_at) <= new Date()
-    
+    let accessToken = integration.access_token;
+    const tokenExpired = integration.expires_at && new Date(integration.expires_at) <= new Date();
+
     if (tokenExpired && integration.refresh_token) {
-      console.log('Token expired, refreshing...')
-      
-      const refreshResponse = await fetch('https://oauth.pipedrive.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      console.log("Token expired, refreshing...");
+
+      const refreshResponse = await fetch("https://oauth.pipedrive.com/oauth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          grant_type: 'refresh_token',
+          grant_type: "refresh_token",
           refresh_token: integration.refresh_token,
           client_id: clientId,
           client_secret: clientSecret,
         }),
-      })
+      });
 
       if (refreshResponse.ok) {
-        const refreshData = await refreshResponse.json()
-        accessToken = refreshData.access_token
-        
+        const refreshData = await refreshResponse.json();
+        accessToken = refreshData.access_token;
+
         // Update token in database
         await supabase
-          .from('pipedrive_integration')
+          .from("pipedrive_integration")
           .update({
             access_token: refreshData.access_token,
             refresh_token: refreshData.refresh_token || integration.refresh_token,
-            expires_at: refreshData.expires_in 
-              ? new Date(Date.now() + (refreshData.expires_in * 1000)).toISOString()
-              : null,
+            expires_at: refreshData.expires_in ? new Date(Date.now() + refreshData.expires_in * 1000).toISOString() : null,
           })
-          .eq('id', integration.id)
+          .eq("id", integration.id);
       }
     }
 
     // Fetch leads from Pipedrive
-    const leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=100')
+    const leadsUrl = buildPipedriveUrl(integration.api_domain, "leads?limit=100");
     const leadsResponse = await fetch(leadsUrl, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    })
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
     if (!leadsResponse.ok) {
-      throw new Error(`Pipedrive API error: ${leadsResponse.status}`)
+      throw new Error(`Pipedrive API error: ${leadsResponse.status}`);
     }
 
-    const leadsData = await leadsResponse.json()
+    const leadsData = await leadsResponse.json();
 
     // Also fetch deals
-    const dealsUrl = buildPipedriveUrl(integration.api_domain, 'deals?limit=100&status=open')
+    const dealsUrl = buildPipedriveUrl(integration.api_domain, "deals?limit=100&status=open");
     const dealsResponse = await fetch(dealsUrl, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    })
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
-    let dealsData = { data: [] }
+    let dealsData = { data: [] };
     if (dealsResponse.ok) {
-      dealsData = await dealsResponse.json()
+      dealsData = await dealsResponse.json();
     }
 
     return new Response(
@@ -1061,43 +1049,40 @@ async function handleGetLeads(req: Request) {
       }),
       {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
-    )
+      },
+    );
   } catch (error) {
-    console.error('Get leads error:', error)
-    throw error
+    console.error("Get leads error:", error);
+    throw error;
   }
 }
 
 // Handle webhook from Pipedrive
 async function handleWebhook(req: Request) {
-  console.log('Starting webhook handling')
-  
+  console.log("Starting webhook handling");
+
   try {
-    const webhookData = await req.json()
-    console.log('Webhook received:', {
+    const webhookData = await req.json();
+    console.log("Webhook received:", {
       event: webhookData.event,
       object: webhookData.object,
-      company_id: webhookData.meta?.company_id
-    })
+      company_id: webhookData.meta?.company_id,
+    });
 
     // You can add webhook handling logic here
     // For example, sync specific lead updates, new deals, etc.
-    
-    return new Response(
-      JSON.stringify({ success: true, received: true }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      }
-    )
+
+    return new Response(JSON.stringify({ success: true, received: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    });
   } catch (error) {
-    console.error('Webhook error:', error)
-    throw error
+    console.error("Webhook error:", error);
+    throw error;
   }
 }

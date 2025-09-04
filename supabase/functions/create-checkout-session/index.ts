@@ -1,13 +1,13 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import Stripe from "npm:stripe";
 import { createClient } from "https://esm.sh/@supabase/supabase-js";
+import Stripe from "npm:stripe";
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY"), {
   apiVersion: "2024-04-10",
 });
 const supabase = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 serve(async req => {
@@ -140,7 +140,7 @@ serve(async req => {
         },
         trial_period_days: 14,
       },
-       payment_method_collection: 'if_required',
+      payment_method_collection: "if_required",
       success_url: `${APP_URL}/billing`,
       cancel_url: `${APP_URL}/billing`,
     });

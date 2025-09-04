@@ -1,39 +1,34 @@
 // utils/supabase/clinic-relationships.ts
-import { createClient } from './config/client';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
+import { createClient } from "./config/client";
 
 const supabase = createClient();
 
 /**
  * Create user-clinic relationship
  */
-export const createUserClinicRelationship = async (params: {
-  userId: string;
-  clinicId: string;
-  role_id: string;
-  isActive?: boolean;
-}) => {
+export const createUserClinicRelationship = async (params: { userId: string; clinicId: string; role_id: string; isActive?: boolean }) => {
   const { userId, clinicId, role_id, isActive = true } = params;
-  
+
   // Check if relationship already exists
   const { data: existingRelationship, error: checkError } = await supabase
-    .from('user_clinic')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('clinic_id', clinicId)
+    .from("user_clinic")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("clinic_id", clinicId)
     .maybeSingle();
-    
+
   if (checkError) {
     throw checkError;
   }
-  
+
   if (existingRelationship) {
-    throw new Error('User already has a relationship with this clinic');
+    throw new Error("User already has a relationship with this clinic");
   }
-  
+
   // Create the relationship
   const { data: clinicUser, error } = await supabase
-    .from('user_clinic')
+    .from("user_clinic")
     .insert([
       {
         id: uuidv4(),
@@ -42,16 +37,16 @@ export const createUserClinicRelationship = async (params: {
         role_id,
         is_active: isActive,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
+        updated_at: new Date().toISOString(),
+      },
     ])
     .select()
     .single();
-    
+
   if (error) {
     throw error;
   }
-  
+
   return clinicUser;
 };
 
@@ -74,11 +69,7 @@ export const getUserActiveClinic = async (userId: string) => {
   }
 
   // Get clinic info using clinic_id
-  const { data: clinicData, error: clinicError } = await supabase
-    .from("clinic")
-    .select("*")
-    .eq("id", userClinicData.clinic_id)
-    .single();
+  const { data: clinicData, error: clinicError } = await supabase.from("clinic").select("*").eq("id", userClinicData.clinic_id).single();
 
   if (clinicError || !clinicData) {
     return null;
@@ -105,10 +96,7 @@ export const getUserClinics = async (userId: string) => {
   const clinicIds = userClinics.map(uc => uc.clinic_id);
 
   // Get clinic details
-  const { data: clinics, error: clinicsError } = await supabase
-    .from("clinic")
-    .select("*")
-    .in("id", clinicIds);
+  const { data: clinics, error: clinicsError } = await supabase.from("clinic").select("*").in("id", clinicIds);
 
   if (clinicsError || !clinics) {
     return [];
@@ -120,7 +108,7 @@ export const getUserClinics = async (userId: string) => {
     return {
       ...clinic,
       userRole: userClinic?.role_id,
-      isActive: userClinic?.is_active
+      isActive: userClinic?.is_active,
     };
   });
 };

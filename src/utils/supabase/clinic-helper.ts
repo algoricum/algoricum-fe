@@ -1,9 +1,9 @@
 // utils/supabase/clinic-helper.ts
-import { getLocalClinicData, setLocalClinicData } from '@/helpers/storage-helper';
-import { createClient } from './config/client';
-import { getUserData } from './user-helper';
-import type { Clinic, CreateClinicProps, UpdateClinicProps } from '@/interfaces/services_type';
+import { getLocalClinicData, setLocalClinicData } from "@/helpers/storage-helper";
+import type { Clinic, CreateClinicProps, UpdateClinicProps } from "@/interfaces/services_type";
 import { getRoleId } from "@/redux/slices/clinic.slice";
+import { createClient } from "./config/client";
+import { getUserData } from "./user-helper";
 
 const supabase = createClient();
 
@@ -25,7 +25,7 @@ export const getClinicData = async (): Promise<Clinic | null> => {
 
     if (userData) {
       // Get user-clinic mapping
-     const { data: userClinicData } = await supabase
+      const { data: userClinicData } = await supabase
         .from("user_clinic")
         .select("clinic_id")
         .eq("user_id", userData.id)
@@ -49,7 +49,7 @@ export const getClinicData = async (): Promise<Clinic | null> => {
       }
     }
   } catch (error) {
-    console.error('Error fetching clinic data from Supabase:', error);
+    console.error("Error fetching clinic data from Supabase:", error);
   }
 
   return null;
@@ -70,12 +70,7 @@ export async function updateMailgunDomainSettings(clinicId: string, mailgunData?
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase
-      .from("clinic")
-      .update(updateData)
-      .eq("id", clinicId)
-      .select()
-      .single();
+    const { data, error } = await supabase.from("clinic").update(updateData).eq("id", clinicId).select().single();
 
     if (error) {
       console.error("Error updating Mailgun settings:", error);
@@ -90,17 +85,17 @@ export async function updateMailgunDomainSettings(clinicId: string, mailgunData?
   }
 }
 
-export const getAssistantByClinicId = async (clinicId:string) => {
+export const getAssistantByClinicId = async (clinicId: string) => {
   try {
     if (!clinicId) {
-      throw new Error('Clinic ID is required');
+      throw new Error("Clinic ID is required");
     }
 
     // Query the assistants table to get the assistant for this clinic
     const { data: assistant, error } = await supabase.from("assistants").select("*").eq("clinic_id", clinicId).single(); // Use single() since each clinic should have one assistant
 
     if (error) {
-      if (error.code === 'PGRST116') {
+      if (error.code === "PGRST116") {
         // No assistant found for this clinic
         return null;
       }
@@ -109,7 +104,7 @@ export const getAssistantByClinicId = async (clinicId:string) => {
 
     return assistant;
   } catch (error) {
-    console.error('Error fetching assistant for clinic:', error);
+    console.error("Error fetching assistant for clinic:", error);
     throw error;
   }
 };
@@ -122,7 +117,7 @@ export const getClincApiKey = async (clinicId: string): Promise<string | null> =
       return apiKeyData.api_key;
     }
   } catch (error) {
-    console.error('Error fetching clinic data from Supabase:', error);
+    console.error("Error fetching clinic data from Supabase:", error);
   }
 
   return null;
@@ -152,7 +147,7 @@ export const getUserClinics = async (userId: string): Promise<Clinic[]> => {
 
     return clinics as Clinic[];
   } catch (error) {
-    console.error('Error fetching user clinics:', error);
+    console.error("Error fetching user clinics:", error);
     return [];
   }
 };
@@ -162,14 +157,14 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
 
   // Create the clinic record
   const { data: clinicResult, error: clinicError } = await supabase
-    .from('clinic')
+    .from("clinic")
     .insert([
       {
         ...clinicData,
         owner_id: owner_id,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
+        updated_at: new Date().toISOString(),
+      },
     ])
     .select()
     .single();
@@ -177,19 +172,18 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
   if (clinicError) {
     throw clinicError;
   }
-    
+
   const isDemoUser =
     clinicData.name?.toLowerCase().includes("demo") ||
     clinicData.legal_business_name?.toLowerCase().includes("demo") ||
     clinicData.dba_name?.toLowerCase().includes("demo");
-  
-  let role_id = ""
-  if (isDemoUser){
-    role_id=await getRoleId("demo_user")
-  }else{
+
+  let role_id = "";
+  if (isDemoUser) {
+    role_id = await getRoleId("demo_user");
+  } else {
     role_id = await getRoleId("owner");
   }
-  
 
   const { error: userClinicError } = await supabase.from("user_clinic").insert([
     {
@@ -217,36 +211,33 @@ export const createClinic = async (data: CreateClinicProps): Promise<Clinic> => 
  */
 export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => {
   const { id, ...updateData } = data;
-  
-  const isDemoUser =
-    updateData.name?.toLowerCase().includes("demo");
-  
-  let role_id = ""
-  if (isDemoUser){
-    role_id=await getRoleId("demo_user")
-  }else{
+
+  const isDemoUser = updateData.name?.toLowerCase().includes("demo");
+
+  let role_id = "";
+  if (isDemoUser) {
+    role_id = await getRoleId("demo_user");
+  } else {
     role_id = await getRoleId("owner");
   }
 
   const { error: userClinicError } = await supabase
-  .from("user_clinic")
-  .update({
-    role_id,
-    updated_at: new Date().toISOString(),
-  })
-  .eq("clinic_id", id); // condition for which row(s) to update
-
+    .from("user_clinic")
+    .update({
+      role_id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("clinic_id", id); // condition for which row(s) to update
 
   if (userClinicError) {
     console.error("Failed to create user-clinic relationship:", userClinicError);
     throw userClinicError;
   }
 
-
   // Prepare update data
   const updateObject: any = {
     ...updateData,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   };
 
   // Process dashboard_theme if provided
@@ -272,11 +263,7 @@ export const updateClinic = async (data: UpdateClinicProps): Promise<Clinic> => 
  * Get a clinic by ID
  */
 export const getClinicById = async (id: string): Promise<Clinic> => {
-  const { data, error } = await supabase
-    .from('clinic')
-    .select('*')
-    .eq('id', id)
-    .single();
+  const { data, error } = await supabase.from("clinic").select("*").eq("id", id).single();
 
   if (error) {
     throw error;
@@ -294,18 +281,16 @@ export const getClinicById = async (id: string): Promise<Clinic> => {
 /**
  * Fetch clinics with pagination and search
  */
-export const fetchClinics = async (page: number = 1, perPage: number = 10, search: string = '') => {
+export const fetchClinics = async (page: number = 1, perPage: number = 10, search: string = "") => {
   // Calculate range for pagination
   const from = (page - 1) * perPage;
   const to = from + perPage - 1;
 
-  let query = supabase
-    .from('clinic')
-    .select('*', { count: 'exact' });
+  let query = supabase.from("clinic").select("*", { count: "exact" });
 
   // Add search filter if provided
   if (search) {
-    query = query.ilike('name', `%${search}%`);
+    query = query.ilike("name", `%${search}%`);
   }
 
   // Execute the query with range
@@ -330,8 +315,8 @@ export const fetchClinics = async (page: number = 1, perPage: number = 10, searc
     pagination: {
       total: count || 0,
       page,
-      perPage
-    }
+      perPage,
+    },
   };
 };
 
@@ -339,10 +324,7 @@ export const fetchClinics = async (page: number = 1, perPage: number = 10, searc
  * Delete a clinic
  */
 export const deleteClinic = async (id: string): Promise<{ success: boolean }> => {
-  const { error } = await supabase
-    .from('clinic')
-    .delete()
-    .eq('id', id);
+  const { error } = await supabase.from("clinic").delete().eq("id", id);
 
   if (error) {
     throw error;

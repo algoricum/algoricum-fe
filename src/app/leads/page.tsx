@@ -1,23 +1,22 @@
 "use client";
-
-import type React from "react";
-import { useState, useEffect, useRef } from "react";
-import DashboardLayout from "@/layouts/DashboardLayout";
-import { UserPlus, CheckCircle, Clock, SearchIcon, ChevronDown } from "lucide-react";
 import { Header } from "@/components/common";
-import { Modal } from "antd";
-import { StatCard } from "./StatCard";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import LeadGenerationForm from "@/components/Leads/LeadGenerationForm";
+import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   fetchLeadsForClinic,
-  getCurrentUserClinic,
-  updateLeadStatus,
   formatStatus,
+  getCurrentUserClinic,
   getStatusColor,
-  LEAD_STATUSES,
   INTEREST_LEVELS,
+  LEAD_STATUSES,
+  updateLeadStatus,
 } from "@/utils/supabase/leads-helper";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { Modal } from "antd";
+import { CheckCircle, ChevronDown, Clock, SearchIcon, UserPlus } from "lucide-react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import { StatCard } from "./StatCard";
 
 interface Lead {
   id: string;

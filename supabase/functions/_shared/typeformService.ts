@@ -1,6 +1,6 @@
 // supabase/functions/typeform-integration/typeformService.ts
-import { supabase } from "./supabaseClient.ts";
 import { corsHeaders } from "./cors.ts";
+import { supabase } from "./supabaseClient.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const TYPEFORM_CLIENT_ID = Deno.env.get("TYPEFORM_CLIENT_ID")!;
@@ -21,8 +21,7 @@ export async function startAuth(url: URL) {
   const state = encodeURIComponent(`${clinic_id}|${redirectURL}`);
   const redirectTo = `${supabaseUrl}/functions/v1/typeform-integration/auth/callback`;
 
-  const authUrl =
-    `https://api.typeform.com/oauth/authorize?client_id=${TYPEFORM_CLIENT_ID}&redirect_uri=${redirectTo}&scope=responses:read forms:read webhooks:write webhooks:read&state=${state}`;
+  const authUrl = `https://api.typeform.com/oauth/authorize?client_id=${TYPEFORM_CLIENT_ID}&redirect_uri=${redirectTo}&scope=responses:read forms:read webhooks:write webhooks:read&state=${state}`;
 
   return new Response(JSON.stringify({ url: authUrl }), {
     headers: { "Content-Type": "application/json", ...corsHeaders() },
@@ -48,10 +47,7 @@ export async function handleCallback(url: URL) {
   params.append("code", code);
   params.append("client_id", TYPEFORM_CLIENT_ID);
   params.append("client_secret", TYPEFORM_CLIENT_SECRET);
-  params.append(
-    "redirect_uri",
-    `${supabaseUrl}/functions/v1/typeform-integration/auth/callback`,
-  );
+  params.append("redirect_uri", `${supabaseUrl}/functions/v1/typeform-integration/auth/callback`);
 
   const tokenRes = await fetch("https://api.typeform.com/oauth/token", {
     method: "POST",
@@ -69,11 +65,7 @@ export async function handleCallback(url: URL) {
   expires_at.setSeconds(expires_at.getSeconds() + tokenData.expires_in);
 
   // Ensure Typeform integration exists
-  const { data: integration } = await supabase
-    .from("integrations")
-    .select("id")
-    .eq("name", "Typeform")
-    .single();
+  const { data: integration } = await supabase.from("integrations").select("id").eq("name", "Typeform").single();
 
   if (!integration) {
     return new Response("Integration not configured", { status: 500 });
@@ -109,11 +101,7 @@ export async function updateForms(req: Request) {
     return new Response("Missing clinic_id or forms[]", { status: 400 });
   }
 
-  const { data: integration } = await supabase
-    .from("integrations")
-    .select("id")
-    .eq("name", "Typeform")
-    .single();
+  const { data: integration } = await supabase.from("integrations").select("id").eq("name", "Typeform").single();
 
   const { data: connection } = await supabase
     .from("integration_connections")
@@ -136,27 +124,21 @@ export async function updateForms(req: Request) {
     for (const formId of added) {
       // Register webhook
       try {
-        const resp = await fetch(
-          `https://api.typeform.com/forms/${formId}/webhooks/${clinic_id}`,
-          {
-            method: "PUT",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              url:
-                `${supabaseUrl}/functions/v1/typeform-integration/webhook?clinic_id=${clinic_id}`,
-              enabled: true,
-            }),
+        const resp = await fetch(`https://api.typeform.com/forms/${formId}/webhooks/${clinic_id}`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
           },
-        );
+          body: JSON.stringify({
+            url: `${supabaseUrl}/functions/v1/typeform-integration/webhook?clinic_id=${clinic_id}`,
+            enabled: true,
+          }),
+        });
 
         if (!resp.ok) {
           const errText = await resp.text();
-          console.error(
-            `❌ Failed to register webhook for form ${formId}: ${resp.status} ${errText}`,
-          );
+          console.error(`❌ Failed to register webhook for form ${formId}: ${resp.status} ${errText}`);
         } else {
           console.log(`✅ Webhook registered for form ${formId}`);
         }
@@ -166,12 +148,9 @@ export async function updateForms(req: Request) {
 
       // Fetch old responses for this form
       try {
-        const res = await fetch(
-          `https://api.typeform.com/forms/${formId}/responses`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          },
-        );
+        const res = await fetch(`https://api.typeform.com/forms/${formId}/responses`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
         if (res.ok) {
           const respData = await res.json();
@@ -201,9 +180,7 @@ export async function updateForms(req: Request) {
           }
           console.log(`📥 Imported old responses for form ${formId}`);
         } else {
-          console.error(
-            `❌ Failed fetching old responses for ${formId}: ${res.status}`,
-          );
+          console.error(`❌ Failed fetching old responses for ${formId}: ${res.status}`);
         }
       } catch (fetchErr) {
         console.error("🔥 Error fetching old responses:", fetchErr);
@@ -214,13 +191,10 @@ export async function updateForms(req: Request) {
   }
 
   for (const formId of removed) {
-    await fetch(
-      `https://api.typeform.com/forms/${formId}/webhooks/${clinic_id}`,
-      {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
-    );
+    await fetch(`https://api.typeform.com/forms/${formId}/webhooks/${clinic_id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
   }
 
   await supabase
@@ -276,11 +250,7 @@ export async function handleWebhook(req: Request, url: URL) {
 export async function getForms(req: Request) {
   try {
     const { clinic_id } = await req.json();
-    const { data: integration } = await supabase
-      .from("integrations")
-      .select("id")
-      .eq("name", "Typeform")
-      .single();
+    const { data: integration } = await supabase.from("integrations").select("id").eq("name", "Typeform").single();
     const { data: connection } = await supabase
       .from("integration_connections")
       .select("auth_data")
@@ -289,13 +259,10 @@ export async function getForms(req: Request) {
       .single();
 
     if (!connection?.auth_data?.access_token) {
-      return new Response(
-        JSON.stringify({ error: "No Typeform token found" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders() },
-        },
-      );
+      return new Response(JSON.stringify({ error: "No Typeform token found" }), {
+        status: 400,
+        headers: { ...corsHeaders() },
+      });
     }
 
     const typeformRes = await fetch("https://api.typeform.com/forms", {

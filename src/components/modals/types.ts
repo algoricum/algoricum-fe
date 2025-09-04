@@ -5,9 +5,8 @@ export interface ModalProps {
   accountInfo?: any;
   onOk: () => void;
   onCancel: () => void;
-   
+
   onConnect?: (
-     
     token?:
       | string
       | {
@@ -21,16 +20,16 @@ export interface ModalProps {
   onDisconnect?: () => void;
   treeData?: any[];
   selectedWorksheets?: any[];
-   
+
   onSelectWorksheets?: (value: any[]) => void;
   selectedForms?: any[];
-   
+
   onSelectForms?: (value: any[]) => void;
 }
 
 export interface CsvUploadModalProps {
   open: boolean;
-   
+
   onOk: (leads: any) => void;
   onCancel: () => void;
 }

@@ -1,5 +1,4 @@
 "use client";
-// import contentMenuItems from "@/constants/contentMenuItems";
 import { Flex } from "antd";
 import Sider from "antd/es/layout/Sider";
 import { usePathname, useRouter } from "next/navigation";

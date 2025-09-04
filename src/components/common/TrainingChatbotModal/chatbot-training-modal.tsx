@@ -1,13 +1,12 @@
 "use client";
-
-import type React from "react";
-import { useState, useEffect } from "react";
-import { X, Upload, Bot, FileText, DollarSign, Star } from "lucide-react";
-import { getAssistantByClinicId, getClincApiKey, getClinicData } from "@/utils/supabase/clinic-helper";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { getUserData } from "@/utils/supabase/user-helper";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+import { getAssistantByClinicId, getClincApiKey, getClinicData } from "@/utils/supabase/clinic-helper";
+import { getUserData } from "@/utils/supabase/user-helper";
+import { Bot, DollarSign, FileText, Star, Upload, X } from "lucide-react";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 interface ChatbotTrainingModalProps {
   open: boolean;

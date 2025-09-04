@@ -1,16 +1,16 @@
 // hooks/useClinicCheck.ts
-import { SupabaseClient } from "@supabase/supabase-js";
 import { getUserActiveClinic } from "@/utils/supabase/clinic-relationships";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 export function useClinicCheck() {
   return {
     checkAndRedirectIfNoClinic: async (
       supabase: SupabaseClient,
       userId: string,
-       
+
       router: { push: (url: string) => void },
       targetUrl: string = "/dashboard",
-       
+
       setClinicData?: (data: any) => void,
     ) => {
       try {
@@ -46,11 +46,9 @@ export function useClinicCheck() {
 }
 
 export async function ensureUserHasClinic(
-  
   supabase: SupabaseClient,
   userId: string,
-  
-   
+
   redirectFunction: (url: string) => void,
   targetUrl: string = "/dashboard",
 ): Promise<boolean> {

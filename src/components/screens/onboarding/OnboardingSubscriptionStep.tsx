@@ -1,16 +1,13 @@
 "use client";
-
-import { useEffect, useState } from "react";
-import { Button, Card, Typography, Skeleton, Tabs } from "antd";
-// import { CheckCircle } from 'lucide-react';
-import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
-import { createClient } from "@/utils/supabase/config/client";
 import { ErrorToast } from "@/helpers/toast";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
+import { Button, Card, Skeleton, Tabs, Typography } from "antd";
+import { useEffect, useState } from "react";
 const supabase = createClient();
 
 interface OnboardingSubscriptionStepProps {
-   
   onNext: (data?: any) => void;
 }
 
@@ -96,7 +93,7 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
       features?: string[];
     }[];
     subscribingId: string | null;
-     
+
     handleSubscribe: (priceId: string) => void;
   }
 

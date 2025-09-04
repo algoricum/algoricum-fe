@@ -1,7 +1,7 @@
+import { EmailResult } from "@/interfaces/createStaffApi/types";
+import { emailTemplate } from "@/utils/emailTemplate";
 import FormData from "form-data";
 import Mailgun from "mailgun.js";
-import { emailTemplate } from "@/utils/emailTemplate";
-import {EmailResult} from "@/interfaces/createStaffApi/types";
 
 /**
  * Send welcome email with credentials using Mailgun
