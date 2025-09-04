@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ErrorToast } from "@/helpers/toast";
+import { handleSubscribe } from "@/utils/stripe";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
 import { Button, Select, Switch, Typography } from "antd";
+import { useEffect, useState } from "react";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
-import { createClient } from "@/utils/supabase/config/client";
-import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { ErrorToast } from "@/helpers/toast";
-import { handleSubscribe } from "@/utils/stripe";
 
 interface StaffHoursStepProps {
-   
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
@@ -157,8 +156,8 @@ setSubscribingId(sub.id)    }
 
   return (
     <div className="max-w-4xl">
-        <Title level={1} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
-Clinic Profile
+      <Title level={1} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
+        Clinic Profile
       </Title>
       <Title level={5} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
         Welcome! Let’s set up your clinic so that we can start following up with leads right away.

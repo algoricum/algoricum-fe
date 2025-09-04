@@ -112,7 +112,7 @@ export default function MainOnboarding() {
         const stored = localStorage.getItem(key);
         return stored ? JSON.parse(stored) : null;
       } catch (error) {
-        console.error('Error parsing JSON:', error);
+        console.error("Error parsing JSON:", error);
         ErrorToast("Error reading from localStorage");
         return null;
       }
@@ -137,7 +137,7 @@ export default function MainOnboarding() {
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      console.error('Error writing to localStorage:', error);
+      console.error("Error writing to localStorage:", error);
       ErrorToast("Error writing to localStorage");
     }
   };
@@ -151,7 +151,7 @@ export default function MainOnboarding() {
       localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
       localStorage.removeItem("oauth_form_data"); // Clear any OAuth form data
     } catch (error) {
-      console.error('Error clearing localStorage:', error);
+      console.error("Error clearing localStorage:", error);
       ErrorToast("Error clearing localStorage");
     }
   };
@@ -561,7 +561,7 @@ export default function MainOnboarding() {
         ErrorToast("Logout failed. Please try again.");
       }
     } catch (error) {
-      console.error('Error during logout:', error);
+      console.error("Error during logout:", error);
       ErrorToast("Logout failed. Please try again.");
     }
   };

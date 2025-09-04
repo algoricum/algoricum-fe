@@ -1,22 +1,21 @@
 "use client";
-
-import type React from "react";
-import { useState, useEffect, useRef } from "react";
-import DashboardLayout from "@/layouts/DashboardLayout";
-import { Calendar, CheckCircle, Clock, SearchIcon, Plus, MoreVertical, Edit, Trash2, Mail, PhoneIcon } from "lucide-react";
+import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
+import { DeleteConfirmationModal } from "@/components/appointments/delete-confirmation-modal";
+import { EditStatusModal } from "@/components/appointments/edit-status-modal";
+import { StatCard } from "@/components/appointments/stat-card";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import { appointmentHelper, type MeetingSchedule } from "@/utils/appointment-helper";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { Form } from "antd";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import { appointmentHelper, type MeetingSchedule } from "@/utils/appointment-helper";
 import { createClient } from "@/utils/supabase/config/client";
+import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
+import { Form } from "antd";
 import dayjs from "dayjs";
+import { Calendar, CheckCircle, Clock, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import "react-phone-number-input/style.css";
-import { StatCard } from "@/components/appointments/stat-card";
-import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
-import { EditStatusModal } from "@/components/appointments/edit-status-modal";
-import { DeleteConfirmationModal } from "@/components/appointments/delete-confirmation-modal";
 
 export default function AppointmentsPage() {
   const [appointmentsData, setAppointmentsData] = useState<MeetingSchedule[]>([]);
@@ -47,7 +46,6 @@ export default function AppointmentsPage() {
       try {
         const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
         setAppointmentsData(meetings);
-        
       } catch (error) {
         console.error("Error loading appointments:", error);
         ErrorToast("Failed to load appointments. Please try again.");
@@ -68,7 +66,6 @@ export default function AppointmentsPage() {
           return;
         }
         setClinicId(clinic_id);
-        
       } catch (error) {
         console.error("Error fetching clinic ID:", error);
         ErrorToast("Failed to fetch clinic information.");
@@ -184,7 +181,7 @@ export default function AppointmentsPage() {
 
   const handleEditStatus = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedAppointment) {
       return;
     }
@@ -205,7 +202,6 @@ export default function AppointmentsPage() {
   };
 
   const handleDeleteAppointment = async () => {
-    
     if (!selectedAppointment) {
       return;
     }
@@ -244,11 +240,9 @@ export default function AppointmentsPage() {
     setSelectedAppointment(appointment);
     setShowEditStatusModal(true);
     setActiveDropdown(null);
-    
   };
 
   const openDeleteConfirmation = (appointment: MeetingSchedule) => {
-    
     setSelectedAppointment(appointment);
     setShowDeleteConfirmation(true);
     setActiveDropdown(null);

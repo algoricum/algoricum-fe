@@ -1,12 +1,12 @@
 // components/LeadCard.tsx - Updated for new schema
-"use client"
-import { Lead, formatStatus, getStatusColor, getInterestColor, getUrgencyColor } from "@/utils/supabase/leads-helper"
-import { formatDistanceToNow } from "date-fns"
+"use client";
+import { Lead, formatStatus, getInterestColor, getStatusColor, getUrgencyColor } from "@/utils/supabase/leads-helper";
+import { formatDistanceToNow } from "date-fns";
 
 interface LeadCardProps {
-  lead: Lead
-  isSelected: boolean
-  onClick: () => void
+  lead: Lead;
+  isSelected: boolean;
+  onClick: () => void;
 }
 
 const LeadCard = ({ lead, isSelected, onClick }: LeadCardProps) => {
@@ -24,10 +24,13 @@ const LeadCard = ({ lead, isSelected, onClick }: LeadCardProps) => {
           </div>
           <div
             className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-              lead.status === "new" ? "bg-green-500" : 
-              lead.status === "responded" ? "bg-blue-500" :
-              lead.status === "booked" ? "bg-purple-500" :
-              "bg-gray-400"
+              lead.status === "new"
+                ? "bg-green-500"
+                : lead.status === "responded"
+                  ? "bg-blue-500"
+                  : lead.status === "booked"
+                    ? "bg-purple-500"
+                    : "bg-gray-400"
             }`}
           />
         </div>
@@ -42,20 +45,17 @@ const LeadCard = ({ lead, isSelected, onClick }: LeadCardProps) => {
 
           {/* Status and indicators */}
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(lead.status)}`}>
-              {formatStatus(lead.status)}
-            </span>
-            
+            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(lead.status)}`}>{formatStatus(lead.status)}</span>
+
             {lead.interest_level && (
               <span className={`px-2 py-1 text-xs font-medium rounded-full bg-gray-100 ${getInterestColor(lead.interest_level)}`}>
                 {lead.interest_level.charAt(0).toUpperCase() + lead.interest_level.slice(1)} Interest
               </span>
             )}
-            
+
             {lead.urgency && (
               <span className={`px-2 py-1 text-xs font-medium rounded-full bg-gray-100 ${getUrgencyColor(lead.urgency)}`}>
-                {lead.urgency === 'this_month' ? 'This Month' : 
-                 lead.urgency.charAt(0).toUpperCase() + lead.urgency.slice(1)}
+                {lead.urgency === "this_month" ? "This Month" : lead.urgency.charAt(0).toUpperCase() + lead.urgency.slice(1)}
               </span>
             )}
           </div>
@@ -74,17 +74,15 @@ const LeadCard = ({ lead, isSelected, onClick }: LeadCardProps) => {
                 </>
               )}
             </div>
-            
+
             {lead.lastActivity && (
-              <span className="text-xs text-gray-400">
-                {formatDistanceToNow(lead.lastActivity, { addSuffix: false })}
-              </span>
+              <span className="text-xs text-gray-400">{formatDistanceToNow(lead.lastActivity, { addSuffix: false })}</span>
             )}
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default LeadCard
+export default LeadCard;

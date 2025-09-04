@@ -1,13 +1,13 @@
 "use client";
 
-import { Modal, Alert, Button, Typography, Spin, Input } from "antd";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { LinkOutlined } from "@ant-design/icons";
+import { Alert, Button, Input, Modal, Spin, Typography } from "antd";
+import Image from "next/image";
 import type React from "react";
 import { useState } from "react";
-import Image from "next/image";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
-import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 
 
 const { Text } = Typography;

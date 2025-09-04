@@ -1,17 +1,15 @@
 "use client";
-
-import type React from "react";
-
-import { useState, useRef, useEffect } from "react";
-import { Input, Button } from "antd";
-import { SendOutlined, SmileOutlined, PaperClipOutlined } from "@ant-design/icons";
-import MessageBubble from "./MessageBubble";
 import { Lead } from "@/utils/supabase/leads-helper";
+import { PaperClipOutlined, SendOutlined, SmileOutlined } from "@ant-design/icons";
+import { Button, Input } from "antd";
 import Image from "next/image";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import MessageBubble from "./MessageBubble";
 
 interface MessagesPanelProps {
   lead: Lead | null;
-   
+
   onSendMessage: (content: string) => void;
 }
 

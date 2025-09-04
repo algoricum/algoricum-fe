@@ -1,39 +1,38 @@
 // Split into exported functions so index.ts can import them
-import {  corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const FACEBOOK_APP_ID = Deno.env.get("FACEBOOK_APP_ID")!;
 const FACEBOOK_APP_SECRET = Deno.env.get("FACEBOOK_APP_SECRET")!;
 const FACEBOOK_API_VERSION = Deno.env.get("FACEBOOK_API_VERSION") || "v18.0";
-const FACEBOOK_GLOBAL_WEBHOOK_VERIFY_TOKEN =
-  Deno.env.get("FACEBOOK_GLOBAL_WEBHOOK_VERIFY_TOKEN") || generateRandomToken(20);
+const FACEBOOK_GLOBAL_WEBHOOK_VERIFY_TOKEN = Deno.env.get("FACEBOOK_GLOBAL_WEBHOOK_VERIFY_TOKEN") || generateRandomToken(20);
 
 // -------------------- AUTH HANDLERS --------------------
-export async function handleAuthStart(req: Request, url: URL) { 
-   const clinic_id = url.searchParams.get("clinic_id");
-    const redirectTo = url.searchParams.get("redirect_to") || "";
-  
-    if (!clinic_id) {
-      return new Response(JSON.stringify({ error: "clinic_id is required" }), {
-        status: 400,
-        headers: { ...corsHeaders(), "Content-Type": "application/json" },
-      });
-    }
-  
-    const redirectUri = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/callback`; // must be registered in FB App Valid OAuth Redirect URIs
-  
-    const state = encodeURIComponent(`${clinic_id}|${redirectTo}`);
-  
-    const fbAuthUrl = new URL(`https://www.facebook.com/${FACEBOOK_API_VERSION}/dialog/oauth`);
-    fbAuthUrl.searchParams.set("client_id", FACEBOOK_APP_ID);
-    fbAuthUrl.searchParams.set("redirect_uri", redirectUri);
-    fbAuthUrl.searchParams.set("scope", "pages_show_list,pages_read_engagement,leads_retrieval,pages_manage_metadata,pages_manage_ads");
-    fbAuthUrl.searchParams.set("response_type", "code");
-    fbAuthUrl.searchParams.set("state", state);
-  
-    // Redirect the user to Facebook login
-    return Response.redirect(fbAuthUrl.toString(), 302);
- }
+export async function handleAuthStart(req: Request, url: URL) {
+  const clinic_id = url.searchParams.get("clinic_id");
+  const redirectTo = url.searchParams.get("redirect_to") || "";
+
+  if (!clinic_id) {
+    return new Response(JSON.stringify({ error: "clinic_id is required" }), {
+      status: 400,
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
+    });
+  }
+
+  const redirectUri = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/callback`; // must be registered in FB App Valid OAuth Redirect URIs
+
+  const state = encodeURIComponent(`${clinic_id}|${redirectTo}`);
+
+  const fbAuthUrl = new URL(`https://www.facebook.com/${FACEBOOK_API_VERSION}/dialog/oauth`);
+  fbAuthUrl.searchParams.set("client_id", FACEBOOK_APP_ID);
+  fbAuthUrl.searchParams.set("redirect_uri", redirectUri);
+  fbAuthUrl.searchParams.set("scope", "pages_show_list,pages_read_engagement,leads_retrieval,pages_manage_metadata,pages_manage_ads");
+  fbAuthUrl.searchParams.set("response_type", "code");
+  fbAuthUrl.searchParams.set("state", state);
+
+  // Redirect the user to Facebook login
+  return Response.redirect(fbAuthUrl.toString(), 302);
+}
 export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: any) {
   const params = url.searchParams;
   const code = params.get("code");
@@ -65,40 +64,40 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
   if (!tokenRes.ok) {
     const txt = await tokenRes.text();
     console.error("Token exchange failed:", txt);
-     if (redirectTo) {
-    try {
-      const redirectUrl = new URL(redirectTo);
-      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
-      return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders(),
-        Location: redirectUrl.toString(),
-      },
-    });
-    } catch {
-      // if invalid redirect, fall through to JSON
+    if (redirectTo) {
+      try {
+        const redirectUrl = new URL(redirectTo);
+        redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...corsHeaders(),
+            Location: redirectUrl.toString(),
+          },
+        });
+      } catch {
+        // if invalid redirect, fall through to JSON
+      }
     }
-  }
   }
   const tokenJson = await tokenRes.json();
   const shortLivedAccessToken = tokenJson.access_token;
   if (!shortLivedAccessToken) {
     if (redirectTo) {
-    try {
-      const redirectUrl = new URL(redirectTo);
-      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
-      return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders(),
-        Location: redirectUrl.toString(),
-      },
-    });
-    } catch {
-      // if invalid redirect, fall through to JSON
+      try {
+        const redirectUrl = new URL(redirectTo);
+        redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...corsHeaders(),
+            Location: redirectUrl.toString(),
+          },
+        });
+      } catch {
+        // if invalid redirect, fall through to JSON
+      }
     }
-  }
   }
 
   // Exchange to long-lived token
@@ -112,21 +111,21 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
   if (!longRes.ok) {
     const txt = await longRes.text();
     console.error("Long token exchange failed:", txt);
-     if (redirectTo) {
-    try {
-      const redirectUrl = new URL(redirectTo);
-      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
-      return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders(),
-        Location: redirectUrl.toString(),
-      },
-    });
-    } catch {
-      // if invalid redirect, fall through to JSON
+    if (redirectTo) {
+      try {
+        const redirectUrl = new URL(redirectTo);
+        redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...corsHeaders(),
+            Location: redirectUrl.toString(),
+          },
+        });
+      } catch {
+        // if invalid redirect, fall through to JSON
+      }
     }
-  }
   }
 
   const longJson = await longRes.json();
@@ -143,42 +142,42 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
   if (!accountsRes.ok) {
     const txt = await accountsRes.text();
     console.error("Failed to fetch pages:", txt);
-   if (redirectTo) {
-    try {
-      const redirectUrl = new URL(redirectTo);
-      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
-      return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders(),
-        Location: redirectUrl.toString(),
-      },
-    });
-    } catch {
-      // if invalid redirect, fall through to JSON
+    if (redirectTo) {
+      try {
+        const redirectUrl = new URL(redirectTo);
+        redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...corsHeaders(),
+            Location: redirectUrl.toString(),
+          },
+        });
+      } catch {
+        // if invalid redirect, fall through to JSON
+      }
     }
-  }
   }
 
   const accountsJson = await accountsRes.json();
   const pages = Array.isArray(accountsJson.data) ? accountsJson.data : [];
   console.log("Fetched pages:", accountsRes);
   if (!pages.length) {
-   if (redirectTo) {
-    try {
-      const redirectUrl = new URL(redirectTo);
-      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
-      return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders(),
-        Location: redirectUrl.toString(),
-      },
-    });
-    } catch {
-      // if invalid redirect, fall through to JSON
+    if (redirectTo) {
+      try {
+        const redirectUrl = new URL(redirectTo);
+        redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...corsHeaders(),
+            Location: redirectUrl.toString(),
+          },
+        });
+      } catch {
+        // if invalid redirect, fall through to JSON
+      }
     }
-  }
   }
 
   const results: any[] = [];
@@ -216,7 +215,7 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
       const leadFormId = form.id;
       // generate verify token per connection (clinic-specific)
       const webhookVerifyToken = generateRandomToken(30);
-      
+
       // Create unique webhook URL for this clinic
       const uniqueWebhookUrl = `${SUPABASE_URL}/functions/v1/facebook-lead-form/webhook/${clinic_id}`;
 
@@ -263,9 +262,9 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
         // Update the connection to mark webhook creation as failed
         await supabaseAdmin
           .from("facebook_lead_form_connections")
-          .update({ 
+          .update({
             sync_status: "webhook_failed",
-            updated_at: new Date().toISOString() 
+            updated_at: new Date().toISOString(),
           })
           .eq("clinic_id", clinic_id)
           .eq("facebook_page_id", pageId)
@@ -296,7 +295,7 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
   } catch (error) {
     console.error("❌ Failed to fetch past leads after auth:", error);
   }
-      
+
   const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
   // redirect back to UI if provided
   if (redirectTo) {
@@ -304,25 +303,25 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
       const redirectUrl = new URL(redirectTo);
       redirectUrl.searchParams.set("facebook_lead_form_status", "success");
       return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders(),
-        Location: redirectUrl.toString(),
-      },
-    });
+        status: 302,
+        headers: {
+          ...corsHeaders(),
+          Location: redirectUrl.toString(),
+        },
+      });
     } catch {
       // if invalid redirect, fall through to JSON
     }
   }
-   const redirectUrl = new URL(`${APP_URL}/onboarding`);
-    redirectUrl.searchParams.set("facebook_lead_form_status", "success");
-    return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders(),
-        Location: redirectUrl.toString(),
-      },
-    });
+  const redirectUrl = new URL(`${APP_URL}/onboarding`);
+  redirectUrl.searchParams.set("facebook_lead_form_status", "success");
+  return new Response(null, {
+    status: 302,
+    headers: {
+      ...corsHeaders(),
+      Location: redirectUrl.toString(),
+    },
+  });
 }
 
 // -------------------- WEBHOOK CREATION ----------------------
@@ -330,40 +329,38 @@ async function createOrUpdatePageWebhook(pageId: string, pageAccessToken: string
   // First, try to get existing webhooks for the page
   const getWebhooksUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
   getWebhooksUrl.searchParams.set("access_token", pageAccessToken);
-  
+
   try {
     const getResponse = await fetch(getWebhooksUrl.toString());
     if (getResponse.ok) {
       const webhooks = await getResponse.json();
       console.log(`Existing webhooks for page ${pageId}:`, webhooks);
-      
+
       // Check if our callback URL already exists
-      const existingWebhook = webhooks.data?.find((webhook: any) => 
-        webhook.callback_url === callbackUrl
-      );
-      
+      const existingWebhook = webhooks.data?.find((webhook: any) => webhook.callback_url === callbackUrl);
+
       if (existingWebhook) {
         console.log(`Webhook already exists for page ${pageId}, updating...`);
         // Update existing webhook
         const updateUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
         const updateResponse = await fetch(updateUrl.toString(), {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "Content-Type": "application/x-www-form-urlencoded",
           },
           body: new URLSearchParams({
             access_token: pageAccessToken,
             callback_url: callbackUrl,
             verify_token: verifyToken,
-            fields: 'leadgen',
-          }).toString()
+            fields: "leadgen",
+          }).toString(),
         });
-        
+
         if (!updateResponse.ok) {
           const errorText = await updateResponse.text();
           throw new Error(`Failed to update webhook: ${errorText}`);
         }
-        
+
         console.log(`✅ Updated webhook for page ${pageId}`);
         return;
       }
@@ -371,34 +368,34 @@ async function createOrUpdatePageWebhook(pageId: string, pageAccessToken: string
   } catch (error) {
     console.warn(`Could not fetch existing webhooks for page ${pageId}:`, error);
   }
-  
+
   // Create new webhook
   const createUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
   const createResponse = await fetch(createUrl.toString(), {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
       access_token: pageAccessToken,
       callback_url: callbackUrl,
       verify_token: verifyToken,
-      fields: 'leadgen',
-    }).toString()
+      fields: "leadgen",
+    }).toString(),
   });
-  
+
   if (!createResponse.ok) {
     const errorText = await createResponse.text();
     throw new Error(`Failed to create webhook: ${errorText}`);
   }
-  
+
   const result = await createResponse.json();
   console.log(`✅ Created new webhook for page ${pageId}:`, result);
 }
 
 // -------------------- UPDATED WEBHOOK HANDLERS ----------------------
 // Updated webhook verification to handle clinic-specific webhooks
-export async function verifyFacebookWebhook(req: Request, clinicId?: string, supabaseAdmin?: any) { 
+export async function verifyFacebookWebhook(req: Request, clinicId?: string, supabaseAdmin?: any) {
   try {
     const url = new URL(req.url);
     const mode = url.searchParams.get("hub.mode");
@@ -414,13 +411,13 @@ export async function verifyFacebookWebhook(req: Request, clinicId?: string, sup
           .eq("clinic_id", clinicId)
           .eq("webhook_verify_token", token)
           .single();
-        
+
         if (connection) {
           console.log(`Webhook verified for clinic ${clinicId}`);
           return new Response(challenge || "OK", { status: 200 });
         }
       }
-      
+
       // Fallback to global token verification
       if (token === FACEBOOK_GLOBAL_WEBHOOK_VERIFY_TOKEN) {
         console.log("Webhook verified with global token");
@@ -465,7 +462,7 @@ export async function handleFacebookWebhook(req: Request, supabaseAdmin: any, cl
           .eq("facebook_page_id", page_id_from_payload)
           .eq("lead_form_id", formId)
           .in("sync_status", ["active", "pending"]);
-        
+
         // If clinic_id is provided (from URL path), filter by it
         if (clinicId) {
           query = query.eq("clinic_id", clinicId);
@@ -474,10 +471,10 @@ export async function handleFacebookWebhook(req: Request, supabaseAdmin: any, cl
         const { data: connections, error: connErr } = await query;
 
         if (connErr || !connections || connections.length === 0) {
-          console.warn("No active connection for webhook lead", { 
-            page_id_from_payload, 
-            formId, 
-            clinicId: clinicId || 'any' 
+          console.warn("No active connection for webhook lead", {
+            page_id_from_payload,
+            formId,
+            clinicId: clinicId || "any",
           });
           continue;
         }
@@ -500,7 +497,7 @@ export async function handleFacebookWebhook(req: Request, supabaseAdmin: any, cl
 }
 
 // -------------------- FETCH LEADS ----------------------
-export async function fetchFacebookLeadFormResponses(reqOrClinicId: Request | string, supabaseAdmin: any) { 
+export async function fetchFacebookLeadFormResponses(reqOrClinicId: Request | string, supabaseAdmin: any) {
   // Accept either direct clinic_id (string) or Request body
   let clinic_id: string;
   if (typeof reqOrClinicId === "string") {
@@ -509,185 +506,186 @@ export async function fetchFacebookLeadFormResponses(reqOrClinicId: Request | st
     const body = await reqOrClinicId.json();
     clinic_id = body?.clinic_id;
   }
-   try {
-      if (!clinic_id)
-        return new Response(JSON.stringify({ error: "clinic_id is required" }), {
-          status: 400,
-          headers: { ...corsHeaders(), "Content-Type": "application/json" },
-        });
-  
-      const { data: connections, error: connErr } = await supabaseAdmin
-        .from("facebook_lead_form_connections")
-        .select("*")
-        .eq("clinic_id", clinic_id)
-        .in("sync_status", ["active", "pending"]);
-  
-      if (connErr) {
-        console.error("Failed to fetch connections", connErr);
-        return new Response(JSON.stringify({ error: "Failed to fetch connections", details: connErr.message }), {
-          status: 500,
-          headers: { ...corsHeaders(), "Content-Type": "application/json" },
-        });
-      }
-      if (!connections || connections.length === 0)
-        return new Response(JSON.stringify({ message: "No active connections found" }), {
-          status: 404,
-          headers: { ...corsHeaders(), "Content-Type": "application/json" },
-        });
-  
-      // find lead source id
-      const { data: leadSource, error: leadSourceError } = await supabaseAdmin
-        .from("lead_source")
-        .select("id")
-        .eq("name", "Facebook Lead Forms")
-        .single();
-  
-      if (leadSourceError || !leadSource) {
-        console.error("Lead source missing", leadSourceError);
-        return new Response(JSON.stringify({ error: 'Lead source "Facebook Lead Forms" not found' }), {
-          status: 400,
-          headers: { ...corsHeaders(), "Content-Type": "application/json" },
-        });
-      }
-  
-      let totalProcessed = 0,
-        totalCreated = 0;
-      const errors: string[] = [];
-  
-      for (const connection of connections) {
-        try {
-          const pageToken = connection.page_access_token;
-          const leadFormId = connection.lead_form_id;
-          const leadsUrl = `https://graph.facebook.com/${FACEBOOK_API_VERSION}/${leadFormId}/leads?access_token=${encodeURIComponent(pageToken)}&fields=id,created_time,field_data`;
-          if (connection.last_sync_at) {
-            // const since = Math.floor(new Date(connection.last_sync_at).getTime() / 1000)
-            // leadsUrl += `&since=${since}`
-          }
-  
-          let nextUrl: string | null = leadsUrl;
-          let pageCount = 0;
-          while (nextUrl) {
-            pageCount++;
-            const resp = await fetch(nextUrl);
-            if (!resp.ok) {
-              const txt = await resp.text();
-              console.error("Facebook API error:", txt);
-              errors.push(`Connection ${connection.id}: Facebook API error ${txt}`);
-              // mark failed
-              await supabaseAdmin
-                .from("facebook_lead_form_connections")
-                .update({ sync_status: "failed", updated_at: new Date().toISOString() })
-                .eq("id", connection.id);
-              break;
-            }
-            const pageJson = await resp.json();
-            console.log("response", pageJson);
-            const leads = Array.isArray(pageJson.data)
-              ? pageJson.data.map(lead => ({
-                  id: lead.id,
-                  created_time: lead.created_time,
-                  ...Object.fromEntries((lead.field_data || []).map(f => [f.name, f.values?.[0] ?? null])),
-                }))
-              : [];
-            for (const leadData of leads) {
-              try {
-                let firstName: string | null = null;
-                let lastName: string | null = null;
-                let email: string | null = null;
-                let phone: string | null = null;
-                const formData: Record<string, any> = {};
-  
-                for (const [key, value] of Object.entries(leadData)) {
-                  const fname = key.toLowerCase();
-                  const fval = Array.isArray(value) ? value[0] : value;
-                  formData[fname] = fval;
-  
-                  if (fname === "first_name") firstName = fval;
-                  if (fname === "last_name") lastName = fval;
-                  if (fname === "email") email = fval;
-                  if (fname === "phone" || fname === "phone_number") phone = fval;
-                  if (fname === "full_name" && !firstName && !lastName && fval) {
-                    const parts = (fval as string).split(" ");
-                    firstName = parts[0] || null;
-                    lastName = parts.slice(1).join(" ") || null;
-                  }
-                  console.log("formData", formData);
-                }
-  
-                if (!email) {
-                  console.log("Skipping lead without email", leadData.id);
-                  continue;
-                }
-  
-                const { data: existingLead } = await supabaseAdmin
-                  .from("lead")
-                  .select("id")
-                  .eq("email", email)
-                  .eq("clinic_id", connection.clinic_id)
-                  .single();
-                if (!existingLead) {
-                  const { error: insertErr } = await supabaseAdmin.from("lead").insert({
-                    first_name: firstName,
-                    last_name: lastName,
-                    email,
-                    phone,
-                    status: "New",
-                    source_id: leadSource.id,
-                    clinic_id: connection.clinic_id,
-                    form_data: formData,
-                    created_at: leadData.created_time || new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                  });
-                  console.log("insertErr", insertErr);
-                  if (insertErr) {
-                    console.error("Insert error", insertErr);
-                    errors.push(`Failed to insert lead ${email}: ${insertErr.message}`);
-                  } else totalCreated++;
-                } else {
-                  // already exists
-                }
-                totalProcessed++;
-              } catch (leadErr) {
-                console.error("Lead item error", leadErr);
-                errors.push(`lead ${leadData.id}: ${String(leadErr)}`);
-              }
-            }
-  
-            nextUrl = pageJson.paging && pageJson.paging.next ? pageJson.paging.next : null;
-            if (pageCount > 1000) break;
-          }
-  
-          await supabaseAdmin
-            .from("facebook_lead_form_connections")
-            .update({ last_sync_at: new Date().toISOString(), sync_status: "active", updated_at: new Date().toISOString() })
-            .eq("id", connection.id);
-        } catch (connErr) {
-          console.error("Connection processing error", connErr);
-          errors.push(`connection ${connection.id}: ${String(connErr)}`);
-          await supabaseAdmin
-            .from("facebook_lead_form_connections")
-            .update({ sync_status: "failed", updated_at: new Date().toISOString() })
-            .eq("id", connection.id);
-        }
-      }
-  
-      return new Response(
-        JSON.stringify({
-          message: "Processing complete",
-          summary: { total_processed: totalProcessed, leads_created: totalCreated, connections_processed: connections.length, errors },
-        }),
-        { status: 200, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
-      );
-    } catch (err) {
-      console.error("fetchFacebookLeadFormResponses error:", err);
-      return new Response(JSON.stringify({ error: "Internal server error" }), {
+  try {
+    if (!clinic_id)
+      return new Response(JSON.stringify({ error: "clinic_id is required" }), {
+        status: 400,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
+      });
+
+    const { data: connections, error: connErr } = await supabaseAdmin
+      .from("facebook_lead_form_connections")
+      .select("*")
+      .eq("clinic_id", clinic_id)
+      .in("sync_status", ["active", "pending"]);
+
+    if (connErr) {
+      console.error("Failed to fetch connections", connErr);
+      return new Response(JSON.stringify({ error: "Failed to fetch connections", details: connErr.message }), {
         status: 500,
         headers: { ...corsHeaders(), "Content-Type": "application/json" },
       });
     }
+    if (!connections || connections.length === 0)
+      return new Response(JSON.stringify({ message: "No active connections found" }), {
+        status: 404,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
+      });
+
+    // find lead source id
+    const { data: leadSource, error: leadSourceError } = await supabaseAdmin
+      .from("lead_source")
+      .select("id")
+      .eq("name", "Facebook Lead Forms")
+      .single();
+
+    if (leadSourceError || !leadSource) {
+      console.error("Lead source missing", leadSourceError);
+      return new Response(JSON.stringify({ error: 'Lead source "Facebook Lead Forms" not found' }), {
+        status: 400,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
+      });
+    }
+
+    let totalProcessed = 0,
+      totalCreated = 0;
+    const errors: string[] = [];
+
+    for (const connection of connections) {
+      try {
+        const pageToken = connection.page_access_token;
+        const leadFormId = connection.lead_form_id;
+        let leadsUrl = `https://graph.facebook.com/${FACEBOOK_API_VERSION}/${leadFormId}/leads?access_token=${encodeURIComponent(pageToken)}&fields=id,created_time,field_data`;
+        if (connection.last_sync_at) {
+          const since = Math.floor(new Date(connection.last_sync_at).getTime() / 1000);
+          console.log("since", since);
+          leadsUrl += `&since=${since}`;
+        }
+
+        let nextUrl: string | null = leadsUrl;
+        let pageCount = 0;
+        while (nextUrl) {
+          pageCount++;
+          const resp = await fetch(nextUrl);
+          if (!resp.ok) {
+            const txt = await resp.text();
+            console.error("Facebook API error:", txt);
+            errors.push(`Connection ${connection.id}: Facebook API error ${txt}`);
+            // mark failed
+            await supabaseAdmin
+              .from("facebook_lead_form_connections")
+              .update({ sync_status: "failed", updated_at: new Date().toISOString() })
+              .eq("id", connection.id);
+            break;
+          }
+          const pageJson = await resp.json();
+          console.log("response", pageJson);
+          const leads = Array.isArray(pageJson.data)
+            ? pageJson.data.map(lead => ({
+                id: lead.id,
+                created_time: lead.created_time,
+                ...Object.fromEntries((lead.field_data || []).map(f => [f.name, f.values?.[0] ?? null])),
+              }))
+            : [];
+          for (const leadData of leads) {
+            try {
+              let firstName: string | null = null;
+              let lastName: string | null = null;
+              let email: string | null = null;
+              let phone: string | null = null;
+              const formData: Record<string, any> = {};
+
+              for (const [key, value] of Object.entries(leadData)) {
+                const fname = key.toLowerCase();
+                const fval = Array.isArray(value) ? value[0] : value;
+                formData[fname] = fval;
+
+                if (fname === "first_name") firstName = fval;
+                if (fname === "last_name") lastName = fval;
+                if (fname === "email") email = fval;
+                if (fname === "phone" || fname === "phone_number") phone = fval;
+                if (fname === "full_name" && !firstName && !lastName && fval) {
+                  const parts = (fval as string).split(" ");
+                  firstName = parts[0] || null;
+                  lastName = parts.slice(1).join(" ") || null;
+                }
+                console.log("formData", formData);
+              }
+
+              if (!email) {
+                console.log("Skipping lead without email", leadData.id);
+                continue;
+              }
+
+              const { data: existingLead } = await supabaseAdmin
+                .from("lead")
+                .select("id")
+                .eq("email", email)
+                .eq("clinic_id", connection.clinic_id)
+                .single();
+              if (!existingLead) {
+                const { error: insertErr } = await supabaseAdmin.from("lead").insert({
+                  first_name: firstName,
+                  last_name: lastName,
+                  email,
+                  phone,
+                  status: "New",
+                  source_id: leadSource.id,
+                  clinic_id: connection.clinic_id,
+                  form_data: formData,
+                  created_at: leadData.created_time || new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                });
+                console.log("insertErr", insertErr);
+                if (insertErr) {
+                  console.error("Insert error", insertErr);
+                  errors.push(`Failed to insert lead ${email}: ${insertErr.message}`);
+                } else totalCreated++;
+              } else {
+                // already exists
+              }
+              totalProcessed++;
+            } catch (leadErr) {
+              console.error("Lead item error", leadErr);
+              errors.push(`lead ${leadData.id}: ${String(leadErr)}`);
+            }
+          }
+
+          nextUrl = pageJson.paging && pageJson.paging.next ? pageJson.paging.next : null;
+          if (pageCount > 1000) break;
+        }
+
+        await supabaseAdmin
+          .from("facebook_lead_form_connections")
+          .update({ last_sync_at: new Date().toISOString(), sync_status: "active", updated_at: new Date().toISOString() })
+          .eq("id", connection.id);
+      } catch (connErr) {
+        console.error("Connection processing error", connErr);
+        errors.push(`connection ${connection.id}: ${String(connErr)}`);
+        await supabaseAdmin
+          .from("facebook_lead_form_connections")
+          .update({ sync_status: "failed", updated_at: new Date().toISOString() })
+          .eq("id", connection.id);
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        message: "Processing complete",
+        summary: { total_processed: totalProcessed, leads_created: totalCreated, connections_processed: connections.length, errors },
+      }),
+      { status: 200, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
+    );
+  } catch (err) {
+    console.error("fetchFacebookLeadFormResponses error:", err);
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
+    });
+  }
 }
 
-async function processFacebookLead(leadgenId: string, connection: any, supabaseAdmin: any) { 
+async function processFacebookLead(leadgenId: string, connection: any, supabaseAdmin: any) {
   try {
     const pageToken = connection.page_access_token;
     const leadUrl = `https://graph.facebook.com/${FACEBOOK_API_VERSION}/${leadgenId}?access_token=${encodeURIComponent(pageToken)}&fields=id,created_time,field_data`;

@@ -6,7 +6,6 @@ export interface FormData {
 }
 
 export interface IntegrationsStepProps {
-   
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: Partial<FormData>;
@@ -19,9 +18,8 @@ export interface ModalProps {
   accountInfo?: any;
   onOk: () => void;
   onCancel: () => void;
-   
+
   onConnect?: (
-     
     token?:
       | string
       | {
@@ -35,10 +33,10 @@ export interface ModalProps {
   onDisconnect?: () => void;
   treeData?: any[];
   selectedWorksheets?: any[];
-   
+
   onSelectWorksheets?: (value: any[]) => void;
   selectedForms?: any[];
-   
+
   onSelectForms?: (value: any[]) => void;
 }
 
@@ -62,21 +60,18 @@ export interface PreviousQuestionsProps {
   ONBOARDING_LEADS_FILE_NAME: string;
 }
 
-
 export interface CurrentInputProps {
   currentQuestion: any;
   currentValue: any;
-   
+
   handleInputChange: (value: any) => void;
   isSubmitting: boolean;
 }
 
-
 export type ConnectionStatus = "disconnected" | "connecting" | "connected";
 
-
 export type Props = {
-  buttonLoading:boolean;
+  buttonLoading: boolean;
   // Hubspot
   showHubspotModal: boolean;
   hubspotStatus: ConnectionStatus;
@@ -108,7 +103,7 @@ export type Props = {
   googleFormAccountInfo: any;
   googleFormTreeData: any[];
   selectedGoogleFormWorksheets: string[];
-   
+
   onSelectGoogleFormWorksheets: (values: string[]) => void;
   onGoogleFormOk: () => void;
   onGoogleFormCancel: () => void;
@@ -116,7 +111,7 @@ export type Props = {
   onGoogleFormSyncLeads: () => void;
   onGoogleFormDisconnect: () => void;
 
-    // Google Lead Form
+  // Google Lead Form
   showGoogleLeadFormModal: boolean;
   googleLeadFormStatus: ConnectionStatus;
   googleLeadFormAccountInfo: any;
@@ -126,7 +121,7 @@ export type Props = {
   onGoogleLeadFormSyncLeads: () => void;
   onGoogleLeadFormDisconnect: () => void;
 
-   // Facebook Lead Form
+  // Facebook Lead Form
   showFacebookLeadFormModal: boolean;
   facebookLeadFormStatus: ConnectionStatus;
   facebookLeadFormAccountInfo: any;
@@ -140,7 +135,7 @@ export type Props = {
   typeformAccountInfo: any;
   typeformTreeData: any[];
   selectedTypeformForms: string[];
-   
+
   onSelectTypeformForms: (values: string[]) => void;
   onTypeformOk: () => void;
   onTypeformCancel: () => void;
@@ -148,23 +143,23 @@ export type Props = {
   onTypeformSyncLeads: () => void;
   onTypeformDisconnect: () => void;
 
-   // Jotform 
+  // Jotform
   showJotformModal: boolean;
   jotformStatus: ConnectionStatus;
   jotformTreeData: any[];
   selectedJotformForms: string[];
-   
+
   onSelectJotformForms: (values: string[]) => void;
   onJotformOk: () => void;
   onJotformCancel: () => void;
-   
+
   onJotformConnect: (token: any) => void;
   onJotformSyncLeads: () => void;
   onJotformDisconnect: () => void;
 
-    // CSV Upload
+  // CSV Upload
   showManualLeadsModal: boolean;
-   
+
   onCsvUploadOk: (leads: any[]) => void;
   onCsvUploadCancel: () => void;
 
@@ -173,20 +168,20 @@ export type Props = {
   onCustomCrmOk: () => void;
   onCustomCrmCancel: () => void;
 
-   // NexHealth
+  // NexHealth
   showNexHealthModal: boolean;
   nextHealthStatus: ConnectionStatus;
   onNexHealthOk: () => void;
   onNexHealthCancel: () => void;
-   
-  onNexHealthConnect: (token:string) => void;
+
+  onNexHealthConnect: (token: string) => void;
 
   // Gravity Form
   showGravityFormModal: boolean;
   gravityFormStatus: ConnectionStatus;
   onGravityFormOk: () => void;
   onGravityFormCancel: () => void;
-   
-  onGravityFormConnect: (token:any) => void;
+
+  onGravityFormConnect: (token: any) => void;
   onGravityFormDisconnect: () => void;
 };

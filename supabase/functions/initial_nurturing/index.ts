@@ -77,7 +77,7 @@ async function processNurturingInitial(supabase: any) {
 
 
 // Main Edge Function
-serve(async (req) => {
+serve(async req => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'x-client-info, apikey, content-type',
@@ -92,15 +92,17 @@ serve(async (req) => {
   logInfo(`Request method: ${req.method}`)
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing Supabase environment variables')
+      throw new Error("Missing Supabase environment variables");
     }
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-    logInfo('Supabase client created successfully')
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    logInfo("Supabase client created successfully");
+
+    const contentType = req.headers.get("content-type") || "";
 
     // Process initial nurturing
     logInfo('Starting initial nurturing processing')
@@ -120,9 +122,18 @@ serve(async (req) => {
       }
     )
 
+    logInfo("Initial contact processing completed", {
+      processed: result.processed,
+      errors: result.errors,
+    });
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error: any) {
-    logError('Function error', error)
-    
+    logError("Function error", error);
+
     return new Response(
       JSON.stringify({
         success: false,
@@ -130,10 +141,10 @@ serve(async (req) => {
         summary: { sent: 0, skipped: 0, errors: 1 },
         timestamp: new Date().toISOString()
       }),
-      { 
+      {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
-})
+});

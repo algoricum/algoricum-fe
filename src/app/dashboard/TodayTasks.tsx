@@ -1,9 +1,8 @@
 "use client";
-
-import React, { useEffect, useState } from "react";
-import { Plus, Calendar, X } from "lucide-react";
-import dayjs from "dayjs";
 import { createClient } from "@/utils/supabase/config/client";
+import dayjs from "dayjs";
+import { Calendar, Plus, X } from "lucide-react";
+import React, { useEffect, useState } from "react";
 
 interface Task {
   id: string;
@@ -23,8 +22,6 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
     priority: "low",
     time: "",
   });
-
-  
 
   const fetchTasks = async () => {
     const start = dayjs().startOf("day").toISOString();
@@ -103,9 +100,10 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
                   <p className={`text-sm break-words pr-2 ${task.completed ? "line-through text-gray-500" : "text-gray-900"} flex-1`}>
                     {task.task}
                   </p>
-<span className="text-xs text-gray-500 whitespace-nowrap">
-  {new Date(task.due_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-</span>                </div>
+                  <span className="text-xs text-gray-500 whitespace-nowrap">
+                    {new Date(task.due_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>{" "}
+                </div>
               </div>
             </div>
           ))
@@ -133,7 +131,7 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
-             
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
                 <input

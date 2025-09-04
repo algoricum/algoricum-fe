@@ -1,6 +1,5 @@
 import { Providers } from "@/redux/providers";
 import type { Metadata } from "next";
-// import Script from "next/script";
 import { ReactNode } from "react";
 import "react-toastify/dist/ReactToastify.css";
 import "./globals.css";

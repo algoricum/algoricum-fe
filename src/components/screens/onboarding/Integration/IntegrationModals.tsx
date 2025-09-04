@@ -1,3 +1,5 @@
+import { Props } from "@/app/types/types";
+import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
 import React from "react";
 import {
   CustomCrmModal,
@@ -12,8 +14,6 @@ import {
   PipedriveModal,
   TypeformModal,
 } from "../../../modals/Modals";
-import CsvUploadModal  from "@/components/common/CSV/CsvUploadModal";
-import { Props } from "@/app/types/types";
 
 const IntegrationsModals: React.FC<Props> = ({
   buttonLoading,

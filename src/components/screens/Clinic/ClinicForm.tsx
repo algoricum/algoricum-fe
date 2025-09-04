@@ -5,7 +5,7 @@ import { Flex, Form } from "antd";
 
 interface CreateWorkSpaceProps {
   form: any;
-   
+
   mutate: (values: CreateClinicProps) => void;
   isLoading: boolean;
 }

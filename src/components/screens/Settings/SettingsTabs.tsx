@@ -1,10 +1,9 @@
 "use client";
+import { Flex } from "antd";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-// import LeadCapturingForm from "./LeadCapturingForm";
 import ChatbotSettings from "./ChatbotSettings";
 import ClinicSetting from "./ClinicSetting";
-import { Flex } from "antd";
 
 const SettingsTabs = () => {
   const router = useRouter();

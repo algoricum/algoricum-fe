@@ -1,25 +1,25 @@
 // supabase/functions/pipedrive/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import {
   handleOAuthCallback,
   initializeOAuth,
   syncAllLeads,
   syncLeadsForClinic
-} from '../_shared/pipedrive-service.ts'
+} from '../_shared/pipedrive-service.ts';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 const frontendUrl = Deno.env.get('FRONTEND_URL')
 
-serve(async (req) => {
-  console.log(`Function called: ${req.method} ${req.url}`)
-  
-  if (req.method === 'OPTIONS') {
-    console.log('CORS preflight request handled')
-    return new Response('ok', { headers: corsHeaders })
+serve(async req => {
+  console.log(`Function called: ${req.method} ${req.url}`);
+
+  if (req.method === "OPTIONS") {
+    console.log("CORS preflight request handled");
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -51,14 +51,13 @@ serve(async (req) => {
       console.error(`Full URL: ${req.url}`)
       throw new Error(`Invalid endpoint: ${lastSegment} with method: ${req.method}`)
     }
-
   } catch (error) {
-    console.error('Main function error:', {
+    console.error("Main function error:", {
       message: error.message,
       stack: error.stack,
       url: req.url,
-      method: req.method
-    })
+      method: req.method,
+    });
     return new Response(
       JSON.stringify({
         success: false,
@@ -67,18 +66,18 @@ serve(async (req) => {
       {
         status: 400,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
-    )
+      },
+    );
   }
-})
+});
 
 // Handle OAuth initialization
 async function handleOAuthInit(req: Request) {
-  console.log('Starting OAuth initialization')
-  
+  console.log("Starting OAuth initialization");
+
   try {
     const authHeader = req.headers.get('authorization')
     
@@ -106,9 +105,9 @@ async function handleOAuthInit(req: Request) {
           authUrl: result.authUrl 
         }),
         {
-          headers: { 
-            'Content-Type': 'application/json',
-            ...corsHeaders 
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders,
           },
         }
       )
@@ -126,11 +125,11 @@ async function handleOAuthInit(req: Request) {
       {
         status: 400,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...corsHeaders,
         },
-      }
-    )
+      },
+    );
   }
 }
 

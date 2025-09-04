@@ -1,9 +1,7 @@
 "use client";
-
-import type React from "react";
-
-import { Search, Plus, X } from "lucide-react";
 import { Button } from "antd";
+import { Plus, Search, X } from "lucide-react";
+import type React from "react";
 
 interface StaffFiltersProps {
   searchTerm: string;
@@ -12,11 +10,11 @@ interface StaffFiltersProps {
   availableRoles: Array<{ value: string; label: string }>;
   totalStaff: number;
   filteredStaff: number;
-   
+
   onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-   
+
   onRoleChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-   
+
   onStatusChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   onClearSearch: () => void;
   onClearFilters: () => void;

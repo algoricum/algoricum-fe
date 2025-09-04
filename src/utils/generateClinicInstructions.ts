@@ -24,79 +24,79 @@ interface ClinicData {
 
 const formatBusinessHours = (hours?: BusinessHours): string => {
   if (!hours) return "Please contact us for our current hours";
-  
+
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  
+
   const openDays = days
     .filter(day => hours[day]?.isOpen)
     .map(day => {
       const { openTime, closeTime } = hours[day];
       return `${day}: ${openTime} - ${closeTime}`;
     });
-  
+
   return openDays.length > 0 ? openDays.join("\n") : "Please contact us for our current hours";
 };
 
 const getResponseStyle = (tone?: string, sentenceLength?: string, formality?: string): string => {
   const styles = [];
-  
+
   // Keep it natural and conversational regardless of settings
   styles.push("Sound natural and conversational, like you're speaking face-to-face with someone who walked into the clinic");
-  
+
   // Adjust based on tone
   switch (tone) {
-    case 'friendly':
+    case "friendly":
       styles.push("Be warm and welcoming");
       break;
-    case 'professional':
+    case "professional":
       styles.push("Be professional but approachable");
       break;
-    case 'casual':
+    case "casual":
       styles.push("Be relaxed and easy-going");
       break;
     default:
       styles.push("Be professional yet friendly");
   }
-  
+
   // Adjust based on formality level
   switch (formality) {
-    case 'very-formal':
+    case "very-formal":
       styles.push("Use formal language and proper medical terminology");
       break;
-    case 'formal':
+    case "formal":
       styles.push("Maintain professional language while being approachable");
       break;
-    case 'neutral':
+    case "neutral":
       styles.push("Use clear, everyday language that's easy to understand");
       break;
-    case 'casual':
+    case "casual":
       styles.push("Use conversational, friendly language like talking to a friend");
       break;
-    case 'very-casual':
+    case "very-casual":
       styles.push("Be relaxed and informal, use everyday expressions");
       break;
     default:
       styles.push("Use clear, professional yet friendly language");
   }
-  
+
   // Adjust length
   switch (sentenceLength) {
-    case 'short':
+    case "short":
       styles.push("Keep responses brief and direct");
       break;
-    case 'long':
+    case "long":
       styles.push("Provide detailed explanations when helpful");
       break;
     default:
       styles.push("Match response length to what's most helpful");
   }
-  
+
   return styles.join(". ");
 };
 
 export const generateClinicInstructions = (clinic: ClinicData): string => {
-  const { 
-    name, 
+  const {
+    name,
     address,
     phone,
     email,
@@ -105,35 +105,39 @@ export const generateClinicInstructions = (clinic: ClinicData): string => {
     tone_selector = "professional",
     sentence_length = "medium",
     formality_level = "neutral",
-    has_uploaded_document = false
+    has_uploaded_document = false,
   } = clinic;
-  
+
   const responseStyle = getResponseStyle(tone_selector, sentence_length, formality_level);
   const businessHours = formatBusinessHours(business_hours);
   const hasBookingLink = calendly_link && calendly_link !== "Not specified";
-  
+
   // Helper function to get response variations based on length
   const getResponseVariations = (short: string, medium: string, long: string) => {
-    switch(sentence_length) {
-      case 'short': return short;
-      case 'medium': return medium;
-      case 'long': return long;
-      default: return medium;
+    switch (sentence_length) {
+      case "short":
+        return short;
+      case "medium":
+        return medium;
+      case "long":
+        return long;
+      default:
+        return medium;
     }
   };
-  
+
   return `You are the virtual assistant for ${name}. Be conversational, engaging, and confident - like texting a knowledgeable friend who works there.
 
 CLINIC INFO:
 Name: ${name}
-${address ? `Location: ${address}` : ''}
-${phone ? `Phone: ${phone}` : ''}
-${email ? `Email: ${email}` : ''}
+${address ? `Location: ${address}` : ""}
+${phone ? `Phone: ${phone}` : ""}
+${email ? `Email: ${email}` : ""}
 
 Hours:
 ${businessHours}
 
-${hasBookingLink ? `Booking: ${calendly_link}` : ''}
+${hasBookingLink ? `Booking: ${calendly_link}` : ""}
 
 RESPONSE STYLE - BE ENGAGING:
 • Sound like you're texting a friend - casual but knowledgeable
@@ -307,12 +311,16 @@ FIRST-TIMERS (No Booking Link):
   "Most people haven't when they start! That's totally normal and we're really good at guiding first-timers through everything step by step so you feel comfortable."
 )}"
 
-${has_uploaded_document ? `
+${
+  has_uploaded_document
+    ? `
 USING CLINIC DOCUMENT:
 - Reference specific services and policies naturally
 - Don't say "according to our document" - just give the info
 - If something's not covered: "Let me connect you with our team for that"
-` : ''}
+`
+    : ""
+}
 
 FOLLOW-UP SEQUENCE PATTERNS:
 When a lead doesn't book immediately, use these follow-up patterns (customize content based on clinic document):
@@ -386,28 +394,32 @@ EMAIL RESPONSE RULES:
 • Simply end your email content where the message naturally concludes
 
 FOLLOW-UP CUSTOMIZATION RULES:
-${has_uploaded_document ? `
+${
+  has_uploaded_document
+    ? `
 - Extract real patient stories and testimonials from clinic document
 - Use clinic-specific services, procedures, and terminology
 - Reference actual policies, pricing, and unique selling points
 - Incorporate clinic's proven results and specialties
 - Adapt tone to match clinic's established voice from document
 - Use clinic's actual before/after results and success metrics
-` : `
+`
+    : `
 - Use generic aesthetic clinic examples (Botox, fillers, laser treatments)
 - Reference common concerns (aging, confidence, self-image)
 - Use standard medical spa terminology
 - Keep examples broad and adaptable
 - Focus on universal psychological triggers and decision-making patterns
-`}
+`
+}
 
 TONE EXAMPLES:
 ❌ Corporate: "Thank you for your inquiry regarding our services..."
 ✅ Engaging: "${getResponseVariations(
-  "Cool, let's talk!",
-  "Cool, let's talk about what you need!",
-  "Cool, let's talk about exactly what you need and how we can help you get there!"
-)}"
+    "Cool, let's talk!",
+    "Cool, let's talk about what you need!",
+    "Cool, let's talk about exactly what you need and how we can help you get there!",
+  )}"
 
 ❌ Pushy: "You should book now before prices go up!"
 ✅ Confident: "${getResponseVariations(

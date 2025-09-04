@@ -65,9 +65,9 @@ export const dashboardHeaderLinks = [
     label: "Leads",
   },
   {
-    href:"/billing",
+    href: "/billing",
     label: "Billing",
-  }
+  },
 ];
 
 export const publicRoutes = ["/login", "/signup", "/forgot-password", "/clinic", "/verify-otp", "/reset-password"];
@@ -139,30 +139,30 @@ export const CLINIC_FIELDS: [string, string][] = [
   ["Clinic Type", "clinic_type"],
 ];
 
-  export const questions = [
-    {
-      id: "selectedCrm",
-      type: "select",
-      question: "Do you use a CRM to manage your leads?",
-      options: ["HubSpot", "Pipedrive", "GoHighLevel", "NextHealth", "None of these"],
-    },
-    {
-      id: "adsConnections",
-      type: "select",
-      question: "Are you running ads that generate leads?",
-      options: ["Facebook Lead Ads", "Google Ads Lead Forms", "None of these"],
-    },
-    {
-      id: "leadCaptureForms",
-      type: "select",
-      question: "Do you collect leads through lead capture forms?",
-      options: ["Google Forms", "Typeform", "Jotform", "Gravity Forms", "None of these"],
-    },
-    {
-      id: "uploadLeads",
-      type: "radio",
-      question: "Do you want to upload any other leads via CSV?",
-      subtitle: "Importing your current leads means we can start following up immediately. No waiting, no missed opportunities.",
-      options: ["Yes", "No"],
-    },
-  ];
+export const questions = [
+  {
+    id: "selectedCrm",
+    type: "select",
+    question: "Do you use a CRM to manage your leads?",
+    options: ["HubSpot", "Pipedrive", "GoHighLevel", "NextHealth", "None of these"],
+  },
+  {
+    id: "adsConnections",
+    type: "select",
+    question: "Are you running ads that generate leads?",
+    options: ["Facebook Lead Ads", "Google Ads Lead Forms", "None of these"],
+  },
+  {
+    id: "leadCaptureForms",
+    type: "select",
+    question: "Do you collect leads through lead capture forms?",
+    options: ["Google Forms", "Typeform", "Jotform", "Gravity Forms", "None of these"],
+  },
+  {
+    id: "uploadLeads",
+    type: "radio",
+    question: "Do you want to upload your existing leads via CSV?",
+    subtitle: "Importing your current leads means we can start following up immediately. No waiting, no missed opportunities.",
+    options: ["Yes", "No"],
+  },
+];

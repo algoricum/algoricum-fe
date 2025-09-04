@@ -2,13 +2,13 @@ import { corsHeaders } from "./cors.ts";
 const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID");
 const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
 const googleRedirectUri = Deno.env.get("GOOGLE_REDIRECT_URI");
-    const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
+const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
 
 // Initiate OAuth Flow
 export async function initiateOAuthFlow(req) {
   try {
     const body = await req.json();
-    const { clinic_id, user_id,redirectTo } = body;
+    const { clinic_id, user_id, redirectTo } = body;
 
     if (!clinic_id) {
       return new Response(
@@ -83,14 +83,14 @@ export async function initiateOAuthFlow(req) {
 
 // Handle OAuth Callback
 export async function handleOAuthCallback(req, supabase) {
-  let redirectUri:string;
+  let redirectUri: string;
   try {
-        let stateData;
+    let stateData;
     const url = new URL(req.url);
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     const error = url.searchParams.get("error");
-if (!code || !state) {
+    if (!code || !state) {
       const redirectUrl = new URL(`${APP_URL}onboarding`);
       redirectUrl.searchParams.set("google_form_status", "error");
       redirectUrl.searchParams.set("error", "missing_parameters");
@@ -106,9 +106,9 @@ if (!code || !state) {
 
     try {
       stateData = JSON.parse(atob(state));
-      redirectUri=stateData.redirectTo
+      redirectUri = stateData.redirectTo;
     } catch (e) {
-      console.error('Error parsing state:', e.message);
+      console.error("Error parsing state:", e.message);
       const redirectUrl = new URL(`${APP_URL}onboarding`);
       redirectUrl.searchParams.set("google_form_status", "error");
       redirectUrl.searchParams.set("error", "invalid_state");
@@ -134,8 +134,6 @@ if (!code || !state) {
         },
       });
     }
-
-    
 
     // Exchange code for tokens
     const tokenUrl = "https://oauth2.googleapis.com/token";
@@ -205,7 +203,7 @@ if (!code || !state) {
     }
 
     // Redirect to success page with connection ID
-      const redirectUrl = new URL(`${redirectUri}`);
+    const redirectUrl = new URL(`${redirectUri}`);
     redirectUrl.searchParams.set("google_form_status", "success");
     redirectUrl.searchParams.set("connection_id", connection.id);
 
@@ -218,7 +216,7 @@ if (!code || !state) {
     });
   } catch (error) {
     console.error("OAuth callback error:", error);
-      const redirectUrl = new URL(`${APP_URL}`);
+    const redirectUrl = new URL(`${APP_URL}`);
     redirectUrl.searchParams.set("google_form_status", "error");
     redirectUrl.searchParams.set("error", "unexpected_error");
 
@@ -596,11 +594,7 @@ export async function syncSheetsData(connection, sheets, supabase) {
   const errors = [];
 
   // Get Google Forms lead source
-  const { data: leadSource, error: leadSourceError } = await supabase
-    .from("lead_source")
-    .select("id")
-    .eq("name", "Google Forms")
-    .single();
+  const { data: leadSource, error: leadSourceError } = await supabase.from("lead_source").select("id").eq("name", "Google Forms").single();
 
   if (leadSourceError || !leadSource) {
     throw new Error('Lead source "Google Forms" not found in database');

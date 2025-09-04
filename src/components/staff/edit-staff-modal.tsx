@@ -1,11 +1,9 @@
 "use client";
-
-import type React from "react";
-
-import { X } from "lucide-react";
-import { Button } from "antd";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { ErrorToast} from "@/helpers/toast";
+import { ErrorToast } from "@/helpers/toast";
+import { Button } from "antd";
+import { X } from "lucide-react";
+import type React from "react";
 
 interface Staff {
   id: string;
@@ -31,9 +29,9 @@ interface EditStaffModalProps {
   selectedStaff: Staff | null;
   editStaff: EditStaff;
   onClose: () => void;
-   
+
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>; // Changed to async
-   
+
   onInputChange: (field: keyof EditStaff, value: string) => void;
 }
 

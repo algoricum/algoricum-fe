@@ -1,13 +1,13 @@
 "use client";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import getLeadSourceId from "@/utils/lead_source";
+import { createClient } from "@/utils/supabase/config/client";
+import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { Calendar, Mail, Phone, Stethoscope, User, Users } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { createClient } from "@/utils/supabase/config/client";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
-import getLeadSourceId from "@/utils/lead_source";
-import { User, Mail, Phone, Stethoscope, Users, Calendar } from "lucide-react";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
 
 type FormField = {
   id: string;
@@ -21,7 +21,6 @@ type FormField = {
 
 type FormData = { [key: string]: string | number };
 
- 
 type Props = { clinicId: string; onSuccess?: (newLead?: any) => void };
 
 const validatePhoneNumber = (phone: string | undefined): boolean => {
@@ -41,7 +40,7 @@ const validatePhoneNumber = (phone: string | undefined): boolean => {
 
     return true;
   } catch (error) {
-    console.error('Error validating phone number:', error);
+    console.error("Error validating phone number:", error);
     return false;
   }
 };

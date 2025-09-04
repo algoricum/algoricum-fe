@@ -1,19 +1,19 @@
 "use client";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"; // Import your LoadingSpinner
 import footerItems from "@/constants/footerItems";
+import menuItems from "@/constants/menuItems";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { signOut } from "@/utils/supabase/auth-helper";
+import { createClient } from "@/utils/supabase/config/client";
+import type { User } from "@supabase/supabase-js";
 import { X } from "lucide-react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import type React from "react";
-import { useCallback, useState, useEffect } from "react";
-import { signOut } from "@/utils/supabase/auth-helper";
-import menuItems from "@/constants/menuItems";
-import { createClient } from "@/utils/supabase/config/client";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"; // Import your LoadingSpinner
-import type { User } from "@supabase/supabase-js";
-import Image from "next/image";
+import { useCallback, useEffect, useState } from "react";
 interface SidebarProps {
   sidebarOpen: boolean;
-   
+
   setSidebarOpen: (open: boolean) => void;
 }
 
