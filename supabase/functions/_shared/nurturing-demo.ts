@@ -1241,7 +1241,7 @@ Use the SMS template for Day ${leadAge} and personalize it with ${clinic.clinic_
             smsBody += `\n\n${bookingButton}`
           }
           
-          if (!smsBody.includes(unsubscribeLink)) {
+          if (!smsBody.includes(unsubscribeLink) && !smsBody.includes(unsubscribeButton)) {
             smsBody += `\n${unsubscribeButton}`
           }
           
