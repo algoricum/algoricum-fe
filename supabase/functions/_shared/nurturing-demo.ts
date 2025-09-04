@@ -500,24 +500,28 @@ async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email
   try {
     // Get ALL clinics with their settings
     const { data: clinics, error: clinicError } = await supabase
-      .from('clinic')
-      .select(`
-        id,
-        name,
-        openai_api_key,
-        assistant_prompt,
-        assistant_model,
-        chatbot_name,
-        mailgun_domain,
-        mailgun_email,
-        calendly_link,
-        twilio_config(
-          twilio_account_sid,
-          twilio_auth_token,
-          twilio_phone_number,
-          status
-        )
-      `)
+    .from("clinic")
+    .select(`
+      id,
+      name,
+      openai_api_key,
+      assistant_prompt,
+      assistant_model,
+      chatbot_name,
+      mailgun_domain,
+      mailgun_email,
+      calendly_link,
+      clinic_type,
+      twilio_config(
+        twilio_account_sid,
+        twilio_auth_token,
+        twilio_phone_number,
+        status
+      ),
+      assistants(
+        assistant_name
+      )
+    `);
 
     if (clinicError) {
       logError('Failed to fetch clinics', clinicError)
@@ -1044,7 +1048,7 @@ async function generateIntelligentResponse(
 
   try {
     const conversationContext = conversationHistory
-      .map(msg => `${msg.sender_type === 'user' ? `${lead.first_name || 'Patient'}` : clinic.assistants.assistant_name || 'Assistant'}: ${msg.message}`)
+      .map(msg => `${msg.sender_type === 'user' ? `${lead.first_name || 'Patient'}` : clinic.assistants?.[0]?.assistant_name || 'Assistant'}: ${msg.message}`)
       .join('\n')
 
     const leadCreatedAt = new Date(lead.created_at)
@@ -1131,7 +1135,7 @@ Make it sound like you're genuinely checking in with someone you care about, not
       let smsTemplate = ''
       
       if (leadAge === 0) {
-        smsTemplate = `Hey ${lead.first_name || '[First Name]'}, it's ${clinic.assistants.assistant_name || '[Avatar]'} at ${clinic.name}. I can hold a spot for ${clinic.clinic_type} this month. Do you want me to save it, or should I stop bugging you?`
+        smsTemplate = `Hey ${lead.first_name || '[First Name]'}, it's ${clinic.assistants?.[0]?.assistant_name || '[Avatar]'} at ${clinic.name}. I can hold a spot for ${clinic.clinic_type} this month. Do you want me to save it, or should I stop bugging you?`
       } else if (leadAge === 2) {
         smsTemplate = `Curious - are you still weighing ${clinic.clinic_type} or just feeling it out? Most people I talk to start here. I can help either way.`
       } else if (leadAge === 5) {
@@ -1280,7 +1284,7 @@ Use the SMS template for Day ${leadAge} and personalize it with ${clinic.clinic_
   } else {
     let smsMessage = ''
     if (leadAge === 0) {
-      smsMessage = `Hey ${lead.first_name || 'there'}, it's ${clinic.assistants.assistant_name || 'the team'} at ${clinic.name}. I can hold a spot for ${clinic.clinic_type} this month. Do you want me to save it, or should I stop bugging you?`
+      smsMessage = `Hey ${lead.first_name || 'there'}, it's ${clinic.assistants?.[0]?.assistant_name || 'the team'} at ${clinic.name}. I can hold a spot for ${clinic.clinic_type} this month. Do you want me to save it, or should I stop bugging you?`
     } else if (leadAge === 2) {
       smsMessage = `Curious - are you still weighing ${clinic.clinic_type} or just feeling it out? Most people I talk to start here. I can help either way.`
     } else if (leadAge === 5) {

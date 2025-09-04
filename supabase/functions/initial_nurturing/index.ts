@@ -69,22 +69,30 @@ async function processInitialContact(supabase: any) {
     
     // Get all clinics with active Twilio settings
     const { data: clinics, error: clinicError } = await supabase
-      .from('clinic')
+      .from("clinic")
       .select(`
-        id,
+         id,
         name,
         openai_api_key,
         assistant_prompt,
         assistant_model,
         chatbot_name,
+        mailgun_domain,
+        mailgun_email,
+        calendly_link,
+        clinic_type,
         twilio_config!inner(
           twilio_account_sid,
           twilio_auth_token,
           twilio_phone_number,
           status
+        ),
+        assistants (
+          assistant_name
         )
       `)
-      .eq('twilio_config.status', 'active')
+      .eq("twilio_config.status", "active");
+
 
     if (clinicError) {
       logError('Error fetching clinics with Twilio settings', clinicError)

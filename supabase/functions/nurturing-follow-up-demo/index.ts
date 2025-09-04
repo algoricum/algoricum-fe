@@ -123,23 +123,32 @@ async function processNurturingFollowups(supabase: any) {
     logInfo(`Processing ${FOLLOWUP_RULES.length} follow-up rules:`, FOLLOWUP_RULES.map(r => r.name))
     
     // Get all clinics with their SMS settings only (email settings fetched by shared function)
-    const { data: clinics, error: clinicError } = await supabase
-      .from('clinic')
+    
+    
+       const { data: clinics, error: clinicError } = await supabase
+      .from("clinic")
       .select(`
-        id,
+         id,
         name,
         openai_api_key,
         assistant_prompt,
         assistant_model,
         chatbot_name,
+        mailgun_domain,
+        mailgun_email,
         calendly_link,
-        twilio_config(
+        clinic_type,
+        twilio_config!inner(
           twilio_account_sid,
           twilio_auth_token,
           twilio_phone_number,
           status
+        ),
+        assistants (
+          assistant_name
         )
       `)
+      .eq("twilio_config.status", "active");
 
     if (clinicError) {
       logError('Error fetching clinics', clinicError)
