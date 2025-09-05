@@ -22,7 +22,7 @@ const VerifyOTPPage = () => {
   const fromLogin = searchParams.get("fromLogin") === "true";
 
   const [otp, setOtp] = useState("");
-  const [resendTimer, setResendTimer] = useState(60);
+  const [resendTimer, setResendTimer] = useState(120);
   const [user, setUser] = useState<any>(null);
   const [userEmail, setUserEmail] = useState<string>("");
   const supabase = createClient();

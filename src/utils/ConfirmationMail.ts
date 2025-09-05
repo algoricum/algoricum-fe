@@ -2,7 +2,7 @@ export function algoricumGoLiveTemplate({ name, dashboardUrl }: { name: string; 
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 24px; background: #f9f9f9; color: #2d3748;">
       <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 8px; padding: 40px;">
-        <h2 style="color: #4c1d95;">Congrats, ${name}!</h2>
+        <h2 style="color: #4c1d95;">${name}-Your setup is complete!</h2>
         <p>Welcome to <strong>Algoricum</strong>.</p>
         <p>
           Starting now, every new inquiry gets fast, consistent follow‑up — without you lifting a finger.
@@ -28,7 +28,7 @@ export function algoricumGoLiveTemplate({ name, dashboardUrl }: { name: string; 
   `;
 
   const text = `
-Congrats, ${name}!
+${name}-your setup is complete!
 
 Welcome to Algoricum.
 

@@ -70,7 +70,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "visit_reason",
       field_name: "Visit Reason",
       field_type: "textarea",
-      is_required: true,
+      is_required: false, // Changed from true to false
       field_order: 5,
     },
     {
@@ -78,7 +78,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "consultation_type",
       field_name: "Consultation Type",
       field_type: "textarea",
-      is_required: true,
+      is_required: false,
       field_order: 6,
     },
     {
@@ -86,7 +86,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "services_interest",
       field_name: "Service Interest",
       field_type: "textarea",
-      is_required: true,
+      is_required: false,
       field_order: 7,
     },
   ];
@@ -260,10 +260,10 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
             style={isServiceOrConsultation ? { width: "360px", height: "196px" } : {}}
             placeholder={
               f.field_id === "visit_reason"
-                ? "Please describe your health concern or reason for visit..."
+                ? "Please describe your health concern or reason for visit... (optional)"
                 : f.field_id === "consultation_type"
-                  ? "Describe your consultation preferences..."
-                  : "Tell us about your service interests..."
+                  ? "Describe your consultation preferences... (optional)"
+                  : "Tell us about your service interests... (optional)"
             }
           />
         </div>
@@ -346,7 +346,9 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-semibold text-gray-700">What brings you to our clinic today?</label>
+            <label className="block text-sm font-semibold text-gray-700">
+              What brings you to our clinic today? <span className="text-gray-400 text-xs">(optional)</span>
+            </label>
             {renderField(staticFields[4])}
             {errors.visit_reason && <p className="text-red-500 text-sm font-medium">{errors.visit_reason}</p>}
           </div>
@@ -354,7 +356,9 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {staticFields.slice(5, 7).map(f => (
               <div key={f.field_id} className="space-y-1">
-                <label className="block text-sm font-semibold text-gray-700">{f.field_name}</label>
+                <label className="block text-sm font-semibold text-gray-700">
+                  {f.field_name} <span className="text-gray-400 text-xs">(optional)</span>
+                </label>
                 {renderField(f)}
                 {errors[f.field_id] && <p className="text-red-500 text-sm font-medium">{errors[f.field_id]}</p>}
               </div>

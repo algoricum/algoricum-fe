@@ -32,18 +32,18 @@ interface Lead {
 }
 
 // Define getInterestColor locally if not in leads-helper
-const getInterestColor = (interestLevel: string): string => {
-  switch (interestLevel.toLowerCase()) {
-    case "high":
-      return "text-green-600";
-    case "medium":
-      return "text-yellow-600";
-    case "low":
-      return "text-red-600";
-    default:
-      return "text-gray-500";
-  }
-};
+// const getInterestColor = (interestLevel: string): string => {
+//   switch (interestLevel.toLowerCase()) {
+//     case "high":
+//       return "text-green-600";
+//     case "medium":
+//       return "text-yellow-600";
+//     case "low":
+//       return "text-red-600";
+//     default:
+//       return "text-gray-500";
+//   }
+// };
 
 export default function LeadsPage() {
   const [leadsData, setLeadsData] = useState<Lead[]>([]);
@@ -342,7 +342,6 @@ export default function LeadsPage() {
                   <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Lead</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Contact</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Status</th>
-                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Interest</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Created</th>
                 </tr>
               </thead>
@@ -400,11 +399,6 @@ export default function LeadsPage() {
                             )}
                           </button>
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`font-medium ${getInterestColor(lead.interest_level || "")}`}>
-                          {lead.interest_level ? lead.interest_level.charAt(0).toUpperCase() + lead.interest_level.slice(1) : "Not set"}
-                        </span>
                       </td>
                       <td className="px-6 py-4 text-gray-900">{new Date(lead.created_at).toLocaleDateString()}</td>
                     </tr>

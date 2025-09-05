@@ -116,20 +116,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       placeholder: "Upload services, pricing, and testimonials documents",
       required: true, // At least services document is required
     },
-    {
-      id: "primaryContactName",
-      type: "text",
-      question: "What's your primary contact name?",
-      placeholder: "Enter your name",
-      required: true,
-    },
-    // {
-    //   id: "primaryContactEmail",
-    //   type: "email",
-    //   question: "What's your email address?",
-    //   placeholder: "Enter your email",
-    //   required: true,
-    // },
   ];
 
   // File upload configurations
