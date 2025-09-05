@@ -78,7 +78,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "consultation_type",
       field_name: "Consultation Type",
       field_type: "textarea",
-      is_required: false, // Changed from true to false
+      is_required: false, 
       field_order: 6,
     },
     {
@@ -86,7 +86,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "services_interest",
       field_name: "Service Interest",
       field_type: "textarea",
-      is_required: false, // Changed from true to false
+      is_required: false, 
       field_order: 7,
     },
   ];
