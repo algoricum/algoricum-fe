@@ -132,7 +132,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    const processingTime = Date.now() - startTime;
     console.error('❌ SMS processor error:', error);
     
     // Always return valid TwiML even on error
@@ -458,16 +457,17 @@ async function generateAIResponse(
                        'Not provided';
     console.log('📱 Extracted phone number:', phoneNumber);
 
-    // Get booking and unsubscribe links
-    const bookingLink = clinicData.calendly_link || 'https://calendly.com/book';
-    const unsubscribeLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
-    const bookingButton = `📅 Book here: ${bookingLink}`;
-    const unsubscribeButton = `To stop texts: ${unsubscribeLink}`;
+    // Check if user is asking about booking/scheduling
+    const isBookingInquiry = messageBody.toLowerCase().includes('book') || 
+                            messageBody.toLowerCase().includes('schedule') || 
+                            messageBody.toLowerCase().includes('appointment') ||
+                            messageBody.toLowerCase().includes('meeting') ||
+                            messageBody.toLowerCase().includes('time') ||
+                            messageBody.toLowerCase().includes('available');
     
-    console.log('🔗 Generated links:', {
-      bookingLink: bookingLink,
-      unsubscribeLink: unsubscribeLink
-    });
+    const bookingLink = clinicData.calendly_link || 'https://calendly.com/book';
+    
+    // Links removed for SMS responses
 
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     console.log('🔑 OpenAI API Key check:', {
@@ -478,7 +478,7 @@ async function generateAIResponse(
 
     if (!openaiApiKey) {
       console.error('❌ OpenAI API key not found');
-      const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!\n${bookingButton}\n${unsubscribeButton}`;
+      const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!`;
       return { success: true, response: fallbackResponse };
     }
 
@@ -550,7 +550,7 @@ async function generateAIResponse(
 TONE REQUIREMENTS:
 - Sound casual and friendly - like texting a knowledgeable friend
 - Be helpful and informative about their specific question
-- Keep main message under 160 characters (links don't count toward limit)
+- Keep main message under 160 characters
 - Use personality when appropriate
 - Avoid special characters that might not display well in SMS
 
@@ -561,20 +561,19 @@ Lead Information:
 - Clinic Name: ${clinicData.name}
 - Clinic Phone: ${clinicData.phone_number || 'Not provided'}
 
+${isBookingInquiry ? `Context Information (for your knowledge only - DO NOT include in response):
+- Booking available at: ${bookingLink}` : ''}
+
 Previous Conversation:
 ${conversationContext || 'No previous conversation'}
 
-REQUIRED ELEMENTS:
-- MUST include booking button: ${bookingButton}
-- MUST include unsubscribe option: ${unsubscribeButton}
-- Respond helpfully to their specific message/question
-- Keep the main response conversational and under 160 characters
+IMPORTANT: Do NOT include any links, booking information, or unsubscribe options in your SMS response. Keep it conversational and helpful only.
 
-Generate a helpful SMS response that answers their question and includes all required elements.`;
+Generate a helpful SMS response that answers their question and keeps the response conversational and under 160 characters.`;
 
     const userPrompt = `Current SMS Message: ${messageBody}
 
-Please generate a helpful SMS response that addresses their message and includes all required elements.`;
+Please generate a helpful SMS response that addresses their message.`;
 
     console.log('📝 Prompts prepared:', {
       systemPromptLength: systemPrompt.length,
@@ -651,12 +650,15 @@ RESPOND AS THE CLINIC DIRECTLY - not as someone helping write a response.
 
 Search your knowledge base files for accurate pricing and service details. Give specific prices from your documents when asked about treatment costs.
 
+${isBookingInquiry ? `Context Information (for your knowledge only):
+- Booking is available at: ${bookingLink}
+- DO NOT include this link in your response - provide helpful guidance about booking without the actual link` : ''}
+
 SMS Requirements:
 - Keep main message under 160 characters 
-- Include: ${bookingButton}
-- Include: ${unsubscribeButton}
 - Be conversational and helpful
 - Use specific pricing from your files, not generic responses
+- NO links, booking info, or unsubscribe options in response
         `.trim(),
         max_completion_tokens: 500, // Increased for file search operations
         temperature: 0.8
@@ -851,27 +853,6 @@ SMS Requirements:
         let aiResponse = assistantMessage.content[0].text.value.trim();
         console.log('📝 Raw AI response:', aiResponse);
 
-        // Ensure booking and unsubscribe links are included
-        const hasBookingLink = aiResponse.includes(bookingLink);
-        const hasUnsubscribeLink = aiResponse.includes(unsubscribeLink) || 
-                                  aiResponse.toLowerCase().includes('stop texts') || 
-                                  aiResponse.toLowerCase().includes('unsubscribe');
-
-        console.log('🔗 Link validation:', {
-          hasBookingLink,
-          hasUnsubscribeLink,
-          originalLength: aiResponse.length
-        });
-
-        if (!hasBookingLink) {
-          aiResponse += `\n${bookingButton}`;
-          console.log('➕ Added booking button');
-        }
-        if (!hasUnsubscribeLink) {
-          aiResponse += `\n${unsubscribeButton}`;
-          console.log('➕ Added unsubscribe button');
-        }
-
         console.log('✅ AI SMS response generated successfully via Assistants API');
         console.log('📤 Final response length:', aiResponse.length);
         return { success: true, response: aiResponse };
@@ -913,12 +894,7 @@ SMS Requirements:
     }
     
     // Final fallback
-    const bookingLink = clinicData.calendly_link || 'https://calendly.com/book';
-    const unsubscribeLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
-    const bookingButton = `📅 Book here: ${bookingLink}`;
-    const unsubscribeButton = `To stop texts: ${unsubscribeLink}`;
-    
-    const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!\n${bookingButton}\n${unsubscribeButton}`;
+    const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!`;
     return { success: true, response: fallbackResponse };
   } finally {
     console.log('🏁 === Ending generateAIResponse ===');
@@ -940,17 +916,22 @@ async function generateFallbackResponse(
                        leadData.notes?.match(/\+?\d{1,3}[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0] || 
                        'Not provided';
 
+    // Check if user is asking about booking/scheduling
+    const isBookingInquiry = messageBody.toLowerCase().includes('book') || 
+                            messageBody.toLowerCase().includes('schedule') || 
+                            messageBody.toLowerCase().includes('appointment') ||
+                            messageBody.toLowerCase().includes('meeting') ||
+                            messageBody.toLowerCase().includes('time') ||
+                            messageBody.toLowerCase().includes('available');
+    
     const bookingLink = clinicData.calendly_link || 'https://calendly.com/book';
-    const unsubscribeLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
-    const bookingButton = `📅 Book here: ${bookingLink}`;
-    const unsubscribeButton = `To stop texts: ${unsubscribeLink}`;
 
     const prompt = `You are the virtual assistant for ${clinicData.name}, a medical clinic responding via SMS. Generate a helpful, conversational SMS response to this patient's message.
 
 TONE REQUIREMENTS:
 - Sound casual and friendly - like texting a knowledgeable friend
 - Be helpful and informative about their specific question
-- Keep main message under 160 characters (links don't count toward limit)
+- Keep main message under 160 characters
 - Use personality when appropriate
 - Avoid special characters that might not display well in SMS
 
@@ -961,18 +942,17 @@ Lead Information:
 - Clinic Name: ${clinicData.name}
 - Clinic Phone: ${clinicData.phone_number || 'Not provided'}
 
+${isBookingInquiry ? `Context Information (for your knowledge only - DO NOT include in response):
+- Booking available at: ${bookingLink}` : ''}
+
 Current SMS Message: ${messageBody}
 
 Previous Conversation:
 ${conversationContext || 'No previous conversation'}
 
-REQUIRED ELEMENTS:
-- MUST include booking button: ${bookingButton}
-- MUST include unsubscribe option: ${unsubscribeButton}
-- Respond helpfully to their specific message/question
-- Keep the main response conversational and under 160 characters
+IMPORTANT: Do NOT include any links, booking information, or unsubscribe options in your SMS response. Keep it conversational and helpful only.
 
-Generate a helpful SMS response that answers their question and includes all required elements.`;
+Generate a helpful SMS response that answers their question and keeps the response conversational and under 160 characters.`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -999,7 +979,7 @@ Generate a helpful SMS response that answers their question and includes all req
 
     if (!response.ok) {
       console.error('❌ OpenAI API error:', response.status, response.statusText);
-      const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!\n${bookingButton}\n${unsubscribeButton}`;
+      const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!`;
       return { success: true, response: fallbackResponse };
     }
 
@@ -1008,21 +988,8 @@ Generate a helpful SMS response that answers their question and includes all req
 
     if (!aiResponse) {
       console.error('❌ No response generated by AI');
-      const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!\n${bookingButton}\n${unsubscribeButton}`;
+      const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!`;
       return { success: true, response: fallbackResponse };
-    }
-
-    // Ensure booking and unsubscribe links are included
-    const hasBookingLink = aiResponse.includes(bookingLink);
-    const hasUnsubscribeLink = aiResponse.includes(unsubscribeLink) || 
-                              aiResponse.toLowerCase().includes('stop texts') || 
-                              aiResponse.toLowerCase().includes('unsubscribe');
-
-    if (!hasBookingLink) {
-      aiResponse += `\n${bookingButton}`;
-    }
-    if (!hasUnsubscribeLink) {
-      aiResponse += `\n${unsubscribeButton}`;
     }
 
     console.log('✅ AI SMS response generated successfully via fallback');
@@ -1030,12 +997,8 @@ Generate a helpful SMS response that answers their question and includes all req
 
   } catch (error) {
     console.error('❌ Error in fallback response generation:', error);
-    const bookingLink = clinicData.calendly_link || 'https://calendly.com/book';
-    const unsubscribeLink = `${Deno.env.get('SUPABASE_URL')}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
-    const bookingButton = `📅 Book here: ${bookingLink}`;
-    const unsubscribeButton = `To stop texts: ${unsubscribeLink}`;
     
-    const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!\n${bookingButton}\n${unsubscribeButton}`;
+    const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!`;
     return { success: true, response: fallbackResponse };
   }
 }

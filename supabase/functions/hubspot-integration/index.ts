@@ -94,8 +94,8 @@ function mapHubSpotContactToLead(contact: any, clinic_id: string, source_id: str
     phone: getFirstValidValue(propertyMappings.phone),
     status: 'New',
     source_id,
-    created_at: props.createdate ? new Date(props.createdate).toISOString() : null,
-    updated_at: props.lastmodifieddate ? new Date(props.lastmodifieddate).toISOString() : null
+    created_at: new Date(props.createdate).toISOString(),
+    updated_at: new Date(props.lastmodifieddate).toISOString()
   };
 
   if (!mappedLead.email && !mappedLead.phone) {

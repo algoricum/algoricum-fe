@@ -127,36 +127,71 @@ serve(async (req) => {
     const authHeader = btoa(`${twilioAccountSid}:${twilioAuthToken}`)
     console.log('Twilio auth header created');
 
-    // Step 1: Search for available numbers
-    let searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/AvailablePhoneNumbers/US/Local.json?SmsEnabled=true&Limit=5`
+    // Step 1: Search for available numbers in both US and Canada
+    const countries = ['US', 'CA'];
+    let allAvailableNumbers = [];
     
     // Extract area code from phone_number if provided
     const areaCodeMatch = phone_number.match(/^\+1(\d{3})/)
-    if (areaCodeMatch) {
-      searchUrl += `&AreaCode=${areaCodeMatch[1]}`
-      console.log('Area code extracted from phone_number', { areaCode: areaCodeMatch[1] });
+    const areaCode = areaCodeMatch ? areaCodeMatch[1] : null;
+    
+    if (areaCode) {
+      console.log('Area code extracted from phone_number', { areaCode });
     } else {
       console.log('No area code provided in phone_number, proceeding without area code filter');
     }
-    console.log('Searching for available Twilio numbers', { searchUrl });
 
-    const searchResponse = await fetch(searchUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${authHeader}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
+    // Search in both countries
+    for (const country of countries) {
+      let searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/AvailablePhoneNumbers/${country}/Local.json?SmsEnabled=true&Limit=10`;
+      
+      if (areaCode) {
+        searchUrl += `&AreaCode=${areaCode}`;
       }
-    })
+      
+      console.log(`Searching for available Twilio numbers in ${country}`, { searchUrl });
 
-    const searchData = await searchResponse.json()
-    console.log('Twilio number search response', {
-      status: searchResponse.status,
-      ok: searchResponse.ok,
-      availableNumbersCount: searchData.available_phone_numbers?.length || 0,
+      try {
+        const searchResponse = await fetch(searchUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${authHeader}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        });
+
+        const searchData = await searchResponse.json();
+        console.log(`Twilio number search response for ${country}`, {
+          status: searchResponse.status,
+          ok: searchResponse.ok,
+          availableNumbersCount: searchData.available_phone_numbers?.length || 0,
+        });
+
+        if (searchData.available_phone_numbers && searchData.available_phone_numbers.length > 0) {
+          // Add country info to each number for tracking
+          const numbersWithCountry = searchData.available_phone_numbers.map(num => ({
+            ...num,
+            country: country
+          }));
+          allAvailableNumbers.push(...numbersWithCountry);
+          console.log(`Added ${numbersWithCountry.length} numbers from ${country}`);
+        }
+      } catch (error) {
+        console.log(`Error searching ${country} numbers:`, error.message);
+        // Continue with other countries if one fails
+      }
+    }
+
+    console.log('Total available numbers found', { 
+      total: allAvailableNumbers.length,
+      byCountry: countries.map(country => ({
+        country,
+        count: allAvailableNumbers.filter(num => num.country === country).length
+      }))
     });
 
-    if (!searchData.available_phone_numbers || searchData.available_phone_numbers.length === 0) {
-      console.log('No available phone numbers found, updating twilio_config to failed if exists', { twilio_config_id });
+    if (allAvailableNumbers.length === 0) {
+      console.log('No available phone numbers found in any country, updating twilio_config to failed if exists', { twilio_config_id });
       if (twilio_config_id) {
         await supabaseClient
           .from('twilio_config')
@@ -164,7 +199,7 @@ serve(async (req) => {
           .eq('id', twilio_config_id)
       }
       return new Response(
-        JSON.stringify({ error: 'No available phone numbers found' }),
+        JSON.stringify({ error: 'No available phone numbers found in US or Canada' }),
         { 
           status: 404, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -172,14 +207,28 @@ serve(async (req) => {
       )
     }
 
-    // Get the first available number
-    const selectedNumber = searchData.available_phone_numbers[0].phone_number
-    console.log('Selected Twilio phone number', { selectedNumber });
+    // Prioritize numbers: if area code provided, prefer numbers from same area code
+    let selectedNumber;
+    if (areaCode) {
+      // Try to find a number matching the area code first
+      const matchingAreaCode = allAvailableNumbers.find(num => 
+        num.phone_number.includes(areaCode)
+      );
+      selectedNumber = matchingAreaCode || allAvailableNumbers[0];
+    } else {
+      selectedNumber = allAvailableNumbers[0];
+    }
+    
+    console.log('Selected Twilio phone number', { 
+      selectedNumber: selectedNumber.phone_number,
+      country: selectedNumber.country,
+      matchedAreaCode: areaCode && selectedNumber.phone_number.includes(areaCode)
+    });
 
     // Step 2: Purchase the number with SMS processor webhook (including clinic_id)
     const purchaseUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers.json`
     const purchaseBody = new URLSearchParams({
-      PhoneNumber: selectedNumber,
+      PhoneNumber: selectedNumber.phone_number,
       SmsUrl: smsWebhookUrl, // Now includes clinic_id parameter
       SmsMethod: 'POST',
       // Optional: Add status callback URL for delivery receipts (also with clinic_id)
@@ -187,7 +236,7 @@ serve(async (req) => {
     })
     console.log('Purchasing Twilio phone number', {
       purchaseUrl,
-      phoneNumber: selectedNumber,
+      phoneNumber: selectedNumber.phone_number,
       smsUrl: smsWebhookUrl,
     });
 
@@ -235,7 +284,7 @@ serve(async (req) => {
     // Step 3: Update or insert into twilio_config
     const twilioConfigData = {
       clinic_id,
-      phone_number: "+12264074828",
+      phone_number: phone_number,
       twilio_account_sid: twilioAccountSid,
       twilio_auth_token: twilioAuthToken,
       twilio_phone_number: purchaseData.phone_number,
