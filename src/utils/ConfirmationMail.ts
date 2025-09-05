@@ -34,7 +34,7 @@ export function algoricumGoLiveTemplate({
   `;
 
   const text = `
-Congrats, ${name}!
+${name}-your setup is complete!
 
 Welcome to Algoricum.
 
