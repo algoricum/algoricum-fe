@@ -75,6 +75,17 @@ const VerifyOTPPage = () => {
         return;
       }
 
+      try {
+        await supabase
+          .from('user')
+          .upsert({ 
+            is_email_verified: true 
+          })
+          .eq('id', user.id);
+      } catch (error) {
+        console.error("Failed to update email verification status:", error);
+      }
+
       // Check if user has a clinic
       const { data: userClinic } = await supabase
         .from("user_clinic")
