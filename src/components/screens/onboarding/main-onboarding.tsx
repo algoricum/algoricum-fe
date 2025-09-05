@@ -290,7 +290,7 @@ export default function MainOnboarding() {
         email: mappedData.emailAddress || user.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink || "https://calendly.com/abdullah-salman-hashlogics/30min?month=2025-09",
+        calendly_link: mappedData.calendlyLink || "https://tinyurl.com/35c3wr42",
         tone_selector: mappedData.toneSelector,
         sentence_length: mappedData.sentenceLength,
         formality_level: mappedData.formalityLevel,
