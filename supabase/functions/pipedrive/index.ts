@@ -873,12 +873,12 @@ async function handleSyncAllLeads(req: Request) {
     let totalSynced = 0
     const results = []
 
-    // Calculate 15 minutes ago timestamp for filtering recent leads
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+    // Calculate 5 minutes ago timestamp for filtering recent leads
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
     for (const integration of integrations) {
       try {
-        const result = await syncPipedriveIntegration(integration, requestId, fifteenMinutesAgo)
+        const result = await syncPipedriveIntegration(integration, requestId, fiveMinutesAgo)
         totalSynced += result.synced_count
         results.push({
           clinic_id: integration.clinic_id,
@@ -911,7 +911,7 @@ async function handleSyncAllLeads(req: Request) {
         success: true,
         total_synced: totalSynced,
         processed_integrations: integrations.length,
-        fifteen_minutes_ago: fifteenMinutesAgo,
+        five_minutes_ago: fiveMinutesAgo,
         results
       }),
       {
@@ -1047,15 +1047,27 @@ async function syncPipedriveIntegration(
     console.log(`[${requestId}] Created new lead source with ID: ${sourceId}`)
   }
 
-  // Fetch leads from Pipedrive with optional date filtering
+  // Calculate 4 months ago for filtering old records
+  const fourMonthsAgo = new Date()
+  fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4)
+  const fourMonthsAgoStr = fourMonthsAgo.toISOString().slice(0, 19).replace('T', ' ')
+  
+  // Fetch leads from Pipedrive with date filtering
   let leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=500')
   
-  // Add date filter for cron jobs (15 minutes ago)
+  // Always filter records older than 4 months
+  leadsUrl += `&start_date=${encodeURIComponent(fourMonthsAgoStr)}`
+  console.log(`[${requestId}] Filtering leads created after: ${fourMonthsAgoStr}`)
+  
+  // Add additional date filter for cron jobs (recent records)
   if (modifiedSince) {
     // Convert to Pipedrive date format (YYYY-MM-DD HH:MM:SS)
-    const startDate = new Date(modifiedSince).toISOString().slice(0, 19).replace('T', ' ')
-    leadsUrl += `&start_date=${encodeURIComponent(startDate)}`
-    console.log(`[${requestId}] Filtering leads modified since: ${startDate}`)
+    const recentDate = new Date(modifiedSince).toISOString().slice(0, 19).replace('T', ' ')
+    // Use the more recent of the two dates
+    const finalStartDate = new Date(modifiedSince) > fourMonthsAgo ? recentDate : fourMonthsAgoStr
+    leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=500')
+    leadsUrl += `&start_date=${encodeURIComponent(finalStartDate)}`
+    console.log(`[${requestId}] Using final start date: ${finalStartDate}`)
   }
   
   console.log(`[${requestId}] Fetching leads from: ${leadsUrl}`)
@@ -1129,7 +1141,10 @@ async function syncPipedriveIntegration(
   if (leadsToInsert.length > 0) {
     const { data: insertedLeads, error: insertError } = await supabase
       .from('lead')
-      .upsert(leadsToInsert)
+      .upsert(leadsToInsert, {
+        onConflict: 'clinic_id,email', // Prevent duplicates based on clinic + email
+        ignoreDuplicates: true // Skip duplicates instead of erroring
+      })
       .select('id')
 
     if (insertError) {
