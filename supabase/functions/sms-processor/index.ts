@@ -853,6 +853,16 @@ SMS Requirements:
         let aiResponse = assistantMessage.content[0].text.value.trim();
         console.log('📝 Raw AI response:', aiResponse);
 
+        aiResponse = aiResponse.replace(/【[^】]*】/g, '');
+        
+        aiResponse = aiResponse.replace(/\[LEAD_ASSESSMENT\][\s\S]*?\[\/LEAD_ASSESSMENT\]/gi, '');
+        
+        if (isBookingInquiry && !aiResponse.includes(bookingLink)) {
+          aiResponse += `\n\nBook here: ${bookingLink}`;
+        }
+        
+        aiResponse = aiResponse.trim();
+
         console.log('✅ AI SMS response generated successfully via Assistants API');
         console.log('📤 Final response length:', aiResponse.length);
         return { success: true, response: aiResponse };
@@ -991,6 +1001,16 @@ Generate a helpful SMS response that answers their question and keeps the respon
       const fallbackResponse = `Hey ${leadData.first_name || 'there'}! Thanks for reaching out to ${clinicData.name}. Happy to help!`;
       return { success: true, response: fallbackResponse };
     }
+
+    aiResponse = aiResponse.replace(/【[^】]*】/g, '');
+    
+    aiResponse = aiResponse.replace(/\[LEAD_ASSESSMENT\][\s\S]*?\[\/LEAD_ASSESSMENT\]/gi, '');
+    
+    if (isBookingInquiry && !aiResponse.includes(bookingLink)) {
+      aiResponse += `\n\nBook here: ${bookingLink}`;
+    }
+    
+    aiResponse = aiResponse.trim();
 
     console.log('✅ AI SMS response generated successfully via fallback');
     return { success: true, response: aiResponse };
