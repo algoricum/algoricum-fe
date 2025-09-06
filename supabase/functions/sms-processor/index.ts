@@ -254,11 +254,12 @@ async function processSMSMessage(
       }
       
       const newLeadData = {
-        email: `${senderPhone.replace(/\D/g, '')}@sms.lead`,
+        email: '',
         first_name: `SMS Lead ${senderPhone.slice(-4)}`,
         last_name: null,
         clinic_id: clinicData.id,
         source_id: defaultSourceId,
+        phone: senderPhone,
         status: 'New',
         interest_level: null,
         urgency: null,
