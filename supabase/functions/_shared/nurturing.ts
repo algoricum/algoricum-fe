@@ -2,9 +2,7 @@
 
 import { processAllLeads, type FollowUpRule } from './nurturing-service.ts'
 
-// Complete follow-up rules
 const FOLLOW_UP_RULES: FollowUpRule[] = [
-  // SMS FLOW
   {
     name: 'sms_5min_initial',
     timeFromCreated: 5 * 60 * 1000, // 5 minutes
@@ -184,7 +182,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   }
 ]
 
-// Production follow-up function that uses standard timing
 async function processProductionLeads(supabase: any, communicationType?: 'sms' | 'email') {
   return processAllLeads(supabase, communicationType, FOLLOW_UP_RULES)
 }

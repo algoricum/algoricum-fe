@@ -1,5 +1,9 @@
 // _shared/nurturing-service.ts
 
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+const MAILGUN_API_KEY = Deno.env.get('MAILGUN_API_KEY')
+
 interface Lead {
   id: string
   first_name?: string
@@ -30,10 +34,6 @@ interface Conversation {
 interface Clinic {
   id: string
   name: string
-  openai_api_key?: string
-  assistant_prompt?: string
-  assistant_model?: string
-  chatbot_name?: string
   mailgun_domain?: string
   mailgun_email?: string
   calendly_link?: string
@@ -96,10 +96,6 @@ async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email
       .select(`
         id,
         name,
-        openai_api_key,
-        assistant_prompt,
-        assistant_model,
-        chatbot_name,
         mailgun_domain,
         mailgun_email,
         calendly_link,
@@ -605,9 +601,8 @@ async function generateIntelligentResponse(
 ): Promise<string | { subject: string, body: string }> {
   logInfo(`Generating intelligent response for lead ${lead.id} in clinic ${clinic.name}`)
   
-  const OPENAI_API_KEY = clinic.openai_api_key || Deno.env.get('OPENAI_API_KEY')
+  const openaiKey = OPENAI_API_KEY
   const bookingLink = clinic.calendly_link;
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
   const unsubscribeLink = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${lead.id}&clinic_id=${clinic.id}`
 
   const bookingButton = isEmail 
@@ -622,7 +617,7 @@ async function generateIntelligentResponse(
     ? `<br><br><hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;"><div style="text-align: center; font-size: 12px; color: #6b7280;">If you no longer wish to receive these emails, you can ${unsubscribeButton}.</div>`
     : unsubscribeButton
 
-  if (!OPENAI_API_KEY) {
+  if (!openaiKey) {
     logInfo('No OpenAI API key found, using fallback message')
     const fallbackMessage = isEmail 
       ? `Hey ${lead.first_name || 'there'}, thanks for your interest in ${clinic.name}! Just wanted to check in - any questions I can help with?<br><br>Ready to take the next step? ${bookingButton}`
@@ -704,11 +699,11 @@ Make it sound natural and casual, not like a marketing message. Include both boo
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${openaiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: clinic.assistant_model || 'gpt-4o-mini',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -936,8 +931,6 @@ async function sendEmail(
       };
     }
 
-    const MAILGUN_API_KEY = Deno.env.get('MAILGUN_API_KEY');
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     
     if (!MAILGUN_API_KEY) {
       logError('MAILGUN_API_KEY environment variable not set');

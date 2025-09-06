@@ -138,11 +138,11 @@ export async function generateAIResponse(
       return { success: true, response: fallbackResponse }
     }
 
-    // Get the assistant ID for this clinic
+    // Get the assistant ID and instructions for this clinic
     logInfo('🔍 Searching for assistant for clinic:', clinicData.id)
     const { data: assistantData, error: assistantError } = await supabaseClient
       .from('assistants')
-      .select('openai_assistant_id, assistant_name, model')
+      .select('openai_assistant_id, assistant_name, model, instructions')
       .eq('clinic_id', clinicData.id)
       .limit(1)
       .single()
@@ -151,7 +151,9 @@ export async function generateAIResponse(
       error: assistantError,
       assistantData: assistantData,
       assistantId: assistantData?.openai_assistant_id,
-      assistantName: assistantData?.assistant_name
+      assistantName: assistantData?.assistant_name,
+      hasInstructions: !!assistantData?.instructions,
+      instructionsLength: assistantData?.instructions?.length || 0
     })
 
     if (assistantError || !assistantData?.openai_assistant_id) {
@@ -201,6 +203,9 @@ export async function generateAIResponse(
       return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse)
     }
 
+    // Get clinic-specific instructions
+    const clinicInstructions = assistantData?.instructions || ''
+    
     // Create appropriate prompt based on communication type
     let userPrompt: string
     let additionalInstructions: string
@@ -213,53 +218,39 @@ Message: ${options.messageBody}
 
 Please generate a helpful email response that addresses their message.`
 
-      additionalInstructions = `
+      additionalInstructions = `${clinicInstructions}
+
+CURRENT MESSAGE CONTEXT:
 You are responding directly to this email from a patient: "${options.messageBody}"
 Subject: ${options.subject || 'No Subject'}
 
 Patient: ${leadData.first_name || 'Email Lead'} (${leadData.email || 'No email'})
 Context: ${conversationContext ? 'Ongoing conversation - see history' : 'First time contacting us'}
 
-RESPOND AS THE CLINIC DIRECTLY - not as someone helping write a response.
-
-Search your knowledge base files for accurate pricing and service details. Give specific prices from your documents when asked about treatment costs.
-
 ${isBookingInquiry ? `Context Information (for your knowledge only):
 - Booking is available at: ${bookingLink}
 - You may include booking information in email responses` : ''}
 
-Email Requirements:
-- Be professional and comprehensive
-- Use specific pricing from your files, not generic responses
-- Include booking links if appropriate for the inquiry
-- Format as a proper email response
-      `.trim()
+RESPONSE FORMAT: Email response - be professional and comprehensive.`.trim()
     } else {
       // SMS-specific prompt
       userPrompt = `Current SMS Message: ${options.messageBody}
 
 Please generate a helpful SMS response that addresses their message.`
 
-      additionalInstructions = `
+      additionalInstructions = `${clinicInstructions}
+
+CURRENT MESSAGE CONTEXT:
 You are responding directly to this SMS from a patient: "${options.messageBody}"
 
 Patient: ${leadData.first_name || 'SMS Lead'} (${phoneNumber})
 Context: ${conversationContext ? 'Ongoing conversation - see history' : 'First time contacting us'}
 
-RESPOND AS THE CLINIC DIRECTLY - not as someone helping write a response.
-
-Search your knowledge base files for accurate pricing and service details. Give specific prices from your documents when asked about treatment costs.
-
 ${isBookingInquiry ? `Context Information (for your knowledge only):
 - Booking is available at: ${bookingLink}
 - DO NOT include this link in your response - provide helpful guidance about booking without the actual link` : ''}
 
-SMS Requirements:
-- Keep main message under 160 characters 
-- Be conversational and helpful
-- Use specific pricing from your files, not generic responses
-- NO links, booking info, or unsubscribe options in response
-      `.trim()
+RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conversational and helpful, NO links or unsubscribe options.`.trim()
     }
 
     logInfo('📝 Prompts prepared:', {

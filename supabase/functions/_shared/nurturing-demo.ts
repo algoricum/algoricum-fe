@@ -2,7 +2,6 @@
 
 import { processAllLeads, type FollowUpRule } from './nurturing-service.ts'
 
-// Demo follow-up rules - ONLY ADDED tolerance windows, everything else stays the same
 const FOLLOW_UP_RULES: FollowUpRule[] = [
   // SMS FLOW - All set to 3 minutes
   {
@@ -209,7 +208,6 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   }
 ]
 
-// Demo follow-up function that uses 3-minute timing for testing
 async function processScheduledFollowUps(supabase: any, communicationType?: 'sms' | 'email') {
   return processAllLeads(supabase, communicationType, FOLLOW_UP_RULES)
 }
