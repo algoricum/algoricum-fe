@@ -249,25 +249,18 @@ serve(async (req) => {
       method: req.method
     })
     
-    // Route based on path and method
     if (lastSegment === 'pipedrive' && req.method === 'POST') {
       console.log('Routing to OAuth initialization (direct POST)')
       return await handleOAuthInit(req)
     } else if (lastSegment === 'oauth-callback' && req.method === 'GET') {
       console.log('Routing to OAuth callback')
       return await handleOAuthCallback(req)
-    } else if (lastSegment === 'leads' && req.method === 'GET') {
-      console.log('Routing to get leads')
-      return await handleGetLeads(req)
     } else if (lastSegment === 'sync-leads' && req.method === 'POST') {
       console.log('Routing to sync leads')
       return await handleSyncLeads(req)
     } else if (lastSegment === 'sync-all-leads' && req.method === 'POST') {
       console.log('Routing to sync all leads (cron)')
       return await handleSyncAllLeads(req)
-    } else if (lastSegment === 'webhook' && req.method === 'POST') {
-      console.log('Routing to webhook handler')
-      return await handleWebhook(req)
     } else {
       console.error(`Invalid endpoint: ${lastSegment} with method: ${req.method}`)
       console.error(`Full URL: ${req.url}`)
@@ -1162,169 +1155,5 @@ async function syncPipedriveIntegration(
     total_fetched: pipedriveLeads.length,
     total_persons: personsMap.size,
     token_refreshed: tokenRefreshed
-  }
-}
-
-// Handle getting leads (for API access)
-async function handleGetLeads(req: Request) {
-  console.log('Starting get leads handler')
-  
-  try {
-    // Get JWT token from request
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader) {
-      throw new Error('No authorization header')
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    
-    // Check environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
-    const clientId = Deno.env.get('PIPEDRIVE_CLIENT_ID')!
-    const clientSecret = Deno.env.get('PIPEDRIVE_CLIENT_SECRET')!
-    
-    // Initialize Supabase client
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
-    })
-
-    // Get user from token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
-    if (userError || !user) {
-      throw new Error('Invalid user token')
-    }
-
-    // Get clinic_id from request
-    const url = new URL(req.url)
-    const clinicId = url.searchParams.get('clinic_id')
-    
-    if (!clinicId) {
-      throw new Error('Missing clinic_id parameter')
-    }
-
-    // Get Pipedrive integration with token refresh logic
-    const { data: integration, error: integrationError } = await supabase
-      .from('pipedrive_integration')
-      .select(`
-        *,
-        clinic!inner(owner_id)
-      `)
-      .eq('clinic_id', clinicId)
-      .eq('clinic.owner_id', user.id)
-      .eq('is_active', true)
-      .single()
-
-    if (integrationError || !integration) {
-      throw new Error('Pipedrive integration not found or unauthorized')
-    }
-
-    // Check if token is expired and refresh if needed
-    let accessToken = integration.access_token
-    const tokenExpired = integration.expires_at && new Date(integration.expires_at) <= new Date()
-    
-    if (tokenExpired && integration.refresh_token) {
-      console.log('Token expired, refreshing...')
-      
-      const refreshResponse = await fetch('https://oauth.pipedrive.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: integration.refresh_token,
-          client_id: clientId,
-          client_secret: clientSecret,
-        }),
-      })
-
-      if (refreshResponse.ok) {
-        const refreshData = await refreshResponse.json()
-        accessToken = refreshData.access_token
-        
-        // Update token in database
-        await supabase
-          .from('pipedrive_integration')
-          .update({
-            access_token: refreshData.access_token,
-            refresh_token: refreshData.refresh_token || integration.refresh_token,
-            expires_at: refreshData.expires_in 
-              ? new Date(Date.now() + (refreshData.expires_in * 1000)).toISOString()
-              : null,
-          })
-          .eq('id', integration.id)
-      }
-    }
-
-    // Fetch leads from Pipedrive
-    const leadsUrl = buildPipedriveUrl(integration.api_domain, 'leads?limit=200')
-    const leadsResponse = await fetch(leadsUrl, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    })
-
-    if (!leadsResponse.ok) {
-      throw new Error(`Pipedrive API error: ${leadsResponse.status}`)
-    }
-
-    const leadsData = await leadsResponse.json()
-
-    // Also fetch deals
-    const dealsUrl = buildPipedriveUrl(integration.api_domain, 'deals?limit=100&status=open')
-    const dealsResponse = await fetch(dealsUrl, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    })
-
-    let dealsData = { data: [] }
-    if (dealsResponse.ok) {
-      dealsData = await dealsResponse.json()
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        leads: leadsData.data || [],
-        deals: dealsData.data || [],
-        total_leads: leadsData.additional_data?.pagination?.total || 0,
-        total_deals: dealsData.additional_data?.pagination?.total || 0,
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      }
-    )
-  } catch (error) {
-    console.error('Get leads error:', error)
-    throw error
-  }
-}
-
-// Handle webhook from Pipedrive
-async function handleWebhook(req: Request) {
-  console.log('Starting webhook handling')
-  
-  try {
-    const webhookData = await req.json()
-    console.log('Webhook received:', {
-      event: webhookData.event,
-      object: webhookData.object,
-      company_id: webhookData.meta?.company_id
-    })
-
-    // You can add webhook handling logic here
-    // For example, sync specific lead updates, new deals, etc.
-    
-    return new Response(
-      JSON.stringify({ success: true, received: true }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      }
-    )
-  } catch (error) {
-    console.error('Webhook error:', error)
-    throw error
   }
 }
