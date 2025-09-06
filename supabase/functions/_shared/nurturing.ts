@@ -1,6 +1,6 @@
 // _shared/nurturing.ts
 
-import { processAllLeads, handleTwilioWebhook, handleEmailWebhook, type FollowUpRule } from './nurturing-service.ts'
+import { processAllLeads, type FollowUpRule } from './nurturing-service.ts'
 
 // Complete follow-up rules
 const FOLLOW_UP_RULES: FollowUpRule[] = [
@@ -192,7 +192,5 @@ async function processProductionLeads(supabase: any, communicationType?: 'sms' |
 // Export all functions
 export { 
   processProductionLeads as processAllLeads, 
-  FOLLOW_UP_RULES, 
-  handleTwilioWebhook,
-  handleEmailWebhook
+  FOLLOW_UP_RULES
 }

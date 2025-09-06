@@ -104,13 +104,13 @@ async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email
         mailgun_email,
         calendly_link,
         clinic_type,
-        twilio_config (
+        twilio_config(
           twilio_account_sid,
           twilio_auth_token,
           twilio_phone_number,
           status
         ),
-        assistants:assistants!assistants_clinic_id_fkey (*),
+        assistants(*)
       `);
 
     if (clinicError) {
@@ -647,71 +647,24 @@ async function generateIntelligentResponse(
     const leadCreatedAt = new Date(lead.created_at)
     const leadAge = Math.floor((new Date().getTime() - leadCreatedAt.getTime()) / (24 * 60 * 60 * 1000))
     
+    // Get instructions from clinic.assistants.instructions 
+    const assistantInstructions = clinic.assistants?.[0]?.instructions || ''
+    
     let systemPrompt = ''
     let userPrompt = ''
 
     if (isEmail) {
-      // Email logic from original nurturing.ts
-      let emailPattern = 'STORY'
-      let patternGuidance = ''
-      
-      if (leadAge >= 21 && leadAge < 24) {
-        emailPattern = 'STORY'
-        patternGuidance = `Use the STORY pattern - share clinic-specific success stories or case studies. Format: Challenge → Solution → Results → Lesson. Example subjects: "The [clinic-specific] story that changed everything" / "What [patient story] taught us about [service]". End with: "If you're ready to take a decisive step for yourself with ${clinic.clinic_type}, reply and I'll help you explore what that could look like."`
-      } else if (leadAge >= 24 && leadAge < 27) {
-        emailPattern = 'EDUCATION'
-        patternGuidance = `Use the EDUCATION pattern - share clinic-specific insights, research, or "why we ignore problems that matter most". Format: Observation → Explanation → Connection to Service → Solution. Example subjects: "Why [clinic insight] matters for ${clinic.clinic_type}" / "The psychology behind [service decision]". End with: "If ${clinic.clinic_type} has been on your mind, reply and I'll help you understand how this applies to your situation."`
-      } else if (leadAge >= 27 && leadAge < 30) {
-        emailPattern = 'PSYCHOLOGY'
-        patternGuidance = `Use the PSYCHOLOGY pattern - use behavioral insights related to decision-making and clinic services. Examples: "The myth of perfect time" / "What surgeons know about confidence". Connect psychological principles to taking action on self-care. End with: "If ${clinic.clinic_type} has been on your 'someday' list, maybe it's time to challenge that assumption."`
-      } else if (leadAge >= 30 && leadAge < 45) {
-        emailPattern = 'MOMENTUM'
-        patternGuidance = `Use the MOMENTUM pattern - focus on taking action, building confidence, overcoming hesitation. Use clinic expertise and patient success patterns. Examples: "The 10-minute rule for doing anything hard" / "How to build confidence through action". End with: "If you want help taking that first step with ${clinic.clinic_type}, just reply."`
-      } else if (leadAge >= 45 && leadAge < 60) {
-        emailPattern = 'SOCIAL PROOF'
-        patternGuidance = `Use the SOCIAL PROOF pattern - share patient feedback patterns. Format: "Over the years, we've heard a lot from patients who finally decided to make a change..." Include common responses: "I wish I'd done this sooner" / "I was nervous for nothing" / "I thought I'd have to have it all figured out". End with: "If you want to talk through what that looks like for ${clinic.clinic_type}, just reply."`
-      } else if (leadAge >= 60 && leadAge < 100) {
-        emailPattern = 'URGENCY'
-        patternGuidance = `Use the URGENCY/SCARCITY pattern - "The quiet cost of putting yourself last" / "The invisible opportunity cost". Focus on what waiting costs vs. benefits of action. End with: "If you've been pushing ${clinic.clinic_type} to the bottom of the list, maybe it's time to ask: What would change if I put myself first?"`
-      } else if (leadAge >= 100) {
-        emailPattern = 'FINAL SEQUENCE'
-        patternGuidance = `Use the FINAL SEQUENCE pattern - Direct close: "Are you still curious about ${clinic.clinic_type}, or should I close your file?" / One-year challenge: "Picture yourself one year from today..." / Final offer: "This is my last email. If you want to finally explore ${clinic.clinic_type}, reply."`
-      }
-
-      systemPrompt = `You are the virtual assistant for ${clinic.name}. Generate a conversational, engaging follow-up email that sounds like texting a knowledgeable friend who works there.
-
-CRITICAL TONE REQUIREMENTS:
-- Sound like you're texting a friend - casual but knowledgeable
-- Create gentle urgency without being pushy
-- Use personality and light humor when appropriate
-- Be direct and honest - cut through the fluff
-- Make people feel like they're talking to a real person
-- NEVER use corporate language
-
-❌ AVOID: "Thank you for your inquiry regarding our services..." / "We appreciate your continued interest..." / "I hope this message finds you well..."
-✅ USE: "Hey [Name], quick story that might hit home..." / "Been thinking about our conversation..." / "Real talk for a sec..."
-
-EMAIL PATTERN TO USE: ${emailPattern}
-${patternGuidance}
+      systemPrompt = `${assistantInstructions}
 
 REQUIRED ELEMENTS:
 - MUST include booking link naturally embedded in text: ${bookingButton}
 - DO NOT add unsubscribe text in body - it will be added automatically in footer
 
-EMAIL STRUCTURE:
-- Subject: Conversational, intriguing (like "The story that changed everything" or "Why most people wait")
-- Opening: Casual greeting using pattern guidance above
-- Body: 2-3 short paragraphs, conversational tone, specific to the pattern
-- Call-to-action: Natural booking suggestion followed by the embedded booking link
-- Close: Natural call-to-action like "If this is resonating, just reply" or specific to pattern guidance
-- DO NOT include unsubscribe text in the body - it's added automatically
-- Keep under 250 words total
-
 Format your response as:
 SUBJECT: [conversational subject line]
 BODY: [casual, engaging email content with embedded booking link]`
 
-      userPrompt = `Generate a ${emailPattern} pattern follow-up email for ${lead.first_name || 'this patient'} (${leadAge} days old) at ${clinic.name}.
+      userPrompt = `Generate a follow-up email for ${lead.first_name || 'this patient'} (${leadAge} days old) at ${clinic.name}.
 
 Previous conversation:
 ${conversationContext || 'No previous conversation - this is a follow-up email in our nurturing sequence.'}
@@ -725,45 +678,11 @@ Patient Details:
 Make it sound like you're genuinely checking in with someone you care about, not sending a marketing email. Include the booking link naturally embedded in text. Do not include any unsubscribe text - it will be added automatically.`
 
     } else {
-      // SMS Follow-up patterns based on specific day intervals
-      let smsTemplate = ''
-      
-      if (leadAge === 0) {
-        smsTemplate = `Hey ${lead.first_name || '[First Name]'}, it's ${clinic.assistants?.[0]?.assistant_name || '[Avatar]'} at ${clinic.name}. I can hold a spot for ${clinic.clinic_type} this month. Do you want me to save it, or should I stop bugging you?`
-      } else if (leadAge === 2) {
-        smsTemplate = `Curious - are you still weighing ${clinic.clinic_type} or just feeling it out? Most people I talk to start here. I can help either way.`
-      } else if (leadAge === 5) {
-        smsTemplate = `Talked to someone last week who felt the same about ${clinic.clinic_type}. They booked, and now wish they had done it sooner. Want me to share what helped them decide?`
-      } else if (leadAge === 10) {
-        smsTemplate = `We've only got a few ${clinic.clinic_type} openings next week. Want me to hold one for you, or should I circle back later?`
-      } else if (leadAge === 20) {
-        smsTemplate = `Still curious about ${clinic.clinic_type}, or should I hit pause for now? Totally fine either way. Just let me know.`
-      } else {
-        // Fallback for other days
-        smsTemplate = `Hey ${lead.first_name || 'there'}! Still curious about ${clinic.clinic_type} or should I circle back later? No pressure!`
-      }
-
-      systemPrompt = `You are the virtual assistant for ${clinic.name}. Generate a conversational SMS that sounds like texting a knowledgeable friend who works there.
-
-CRITICAL TONE REQUIREMENTS:
-- Sound casual and friendly - like texting a friend
-- Create gentle urgency without being pushy
-- Be direct and honest - cut through the fluff
-- Keep under 160 characters for main message (links don't count toward limit)
-- Use personality when appropriate
-
-❌ AVOID: "Thank you for your interest in our services"
-✅ USE: Natural, conversational language
-
-SMS TEMPLATE FOR DAY ${leadAge}: "${smsTemplate}"
+      systemPrompt = `${assistantInstructions}
 
 REQUIRED ELEMENTS:
 - MUST include booking button: ${bookingButton}
 - MUST include unsubscribe option: "${unsubscribeButton}"
-- Use the template above but personalize with actual service names and patient details
-
-Replace references to services with ${clinic.clinic_type} and personalize based on conversation history.
-Always end with booking button and unsubscribe option.
 
 Keep the main message conversational and under 160 characters, then add the links.`
 
@@ -778,7 +697,7 @@ Patient Details:
 - Interest Level: ${lead.interest_level || 'unknown'}
 - Urgency: ${lead.urgency || 'unknown'}
 
-Use the SMS template for Day ${leadAge} and personalize it with ${clinic.clinic_type} and details from the conversation. Make it sound natural and casual, not like a marketing message. Include both booking and unsubscribe options.`
+Make it sound natural and casual, not like a marketing message. Include both booking and unsubscribe options.`
     }
 
     logInfo('Calling OpenAI API for intelligent response generation')
@@ -853,45 +772,14 @@ Use the SMS template for Day ${leadAge} and personalize it with ${clinic.clinic_
   }
 
   logInfo('Using fallback intelligent response')
-  const leadAge = Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (24 * 60 * 60 * 1000))
   
   if (isEmail) {
-    let fallbackSubject = ''
-    let fallbackBody = ''
-    
-    if (leadAge >= 21 && leadAge < 30) {
-      fallbackSubject = `Quick story from ${clinic.name}`
-      fallbackBody = `Hey ${lead.first_name || 'there'},<br><br>Quick story that might hit home - had a patient last month who was in the exact same spot as you. They were curious but hesitant about ${clinic.clinic_type}.<br><br>Long story short: they finally booked, and the first thing they said afterward was "I wish I'd done this sooner."<br><br>If you're ready to take a decisive step for yourself, ${bookingButton}<br><br>Just reply if you want to explore what that could look like.${unsubscribeFooter}`
-    } else if (leadAge >= 30 && leadAge < 60) {
-      fallbackSubject = `The 10-minute rule`
-      fallbackBody = `Hey ${lead.first_name || 'there'},<br><br>Been thinking about something - most people spend months thinking about taking action, but the actual decision takes about 10 minutes.<br><br>The hardest part isn't the ${clinic.clinic_type} itself. It's just making the call.<br><br>If you want help taking that first step, ${bookingButton}<br><br>Just reply and we can talk through it.${unsubscribeFooter}`
-    } else if (leadAge >= 60 && leadAge < 100) {
-      fallbackSubject = `What waiting costs`
-      fallbackBody = `Hey ${lead.first_name || 'there'},<br><br>Real talk - I've been thinking about the invisible cost of putting ourselves last on the list.<br><br>Every month we wait is another month we could have been feeling better about ourselves.<br><br>If you've been pushing ${clinic.clinic_type} to the bottom of the list, maybe it's time to ask: What would change if I put myself first?<br><br>${bookingButton}${unsubscribeFooter}`
-    } else if (leadAge >= 100) {
-      fallbackSubject = `My last email`
-      fallbackBody = `Hey ${lead.first_name || 'there'},<br><br>This is my last email. Are you still curious about ${clinic.clinic_type}, or should I close your file?<br><br>No pressure either way - just want to know if you want to finally explore what this could look like for you.<br><br>If so: ${bookingButton}<br><br>If not, no worries at all.${unsubscribeFooter}`
-    } else {
-      fallbackSubject = `Quick follow-up from ${clinic.name}`
-      fallbackBody = `Hey ${lead.first_name || 'there'},<br><br>Just wanted to check in - still thinking about ${clinic.clinic_type}, or do you have any questions I can help with?<br><br>Most people I talk to are in the same spot - curious but not sure about the next step. Happy to chat through whatever's on your mind.<br><br>Ready to take the next step? ${bookingButton}<br><br>Just reply if you want to talk!${unsubscribeFooter}`
-    }
+    const fallbackSubject = `Quick follow-up from ${clinic.name}`
+    const fallbackBody = `Hey ${lead.first_name || 'there'},<br><br>Just wanted to check in - still thinking about ${clinic.clinic_type}, or do you have any questions I can help with?<br><br>Ready to take the next step? ${bookingButton}<br><br>Just reply if you want to talk!${unsubscribeFooter}`
     
     return { subject: fallbackSubject, body: fallbackBody }
   } else {
-    let smsMessage = ''
-    if (leadAge === 0) {
-      smsMessage = `Hey ${lead.first_name || 'there'}, it's ${clinic.assistants?.[0]?.assistant_name || 'the team'} at ${clinic.name}. I can hold a spot for ${clinic.clinic_type} this month. Do you want me to save it, or should I stop bugging you?`
-    } else if (leadAge === 2) {
-      smsMessage = `Curious - are you still weighing ${clinic.clinic_type} or just feeling it out? Most people I talk to start here. I can help either way.`
-    } else if (leadAge === 5) {
-      smsMessage = `Talked to someone last week who felt the same about ${clinic.clinic_type}. They booked, and now wish they had done it sooner. Want me to share what helped them decide?`
-    } else if (leadAge === 10) {
-      smsMessage = `We've only got a few ${clinic.clinic_type} openings next week. Want me to hold one for you, or should I circle back later?`
-    } else if (leadAge === 20) {
-      smsMessage = `Still curious about ${clinic.clinic_type}, or should I hit pause for now? Totally fine either way. Just let me know.`
-    } else {
-      smsMessage = `Hey ${lead.first_name || 'there'}! Still curious about ${clinic.clinic_type} or should I circle back later? No pressure!`
-    }
+    const smsMessage = `Hey ${lead.first_name || 'there'}! Still curious about ${clinic.clinic_type} or should I circle back later? No pressure!`
     
     return `${smsMessage}\n\n${bookingButton}\n${unsubscribeButton}`
   }
