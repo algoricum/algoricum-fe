@@ -358,7 +358,8 @@ async function processRuleForLead(
       lead,
       clinic,
       conversationHistory,
-      rule.communicationType === 'email'
+      rule.communicationType === 'email',
+      rule
     )
 
     // Send message
@@ -597,7 +598,8 @@ async function generateIntelligentResponse(
   lead: Lead,
   clinic: Clinic,
   conversationHistory: Conversation[],
-  isEmail: boolean = false
+  isEmail: boolean = false,
+  rule?: FollowUpRule
 ): Promise<string | { subject: string, body: string }> {
   logInfo(`Generating intelligent response for lead ${lead.id} in clinic ${clinic.name}`)
   
@@ -640,7 +642,11 @@ async function generateIntelligentResponse(
       .join('\n')
 
     const leadCreatedAt = new Date(lead.created_at)
-    const leadAge = Math.floor((new Date().getTime() - leadCreatedAt.getTime()) / (24 * 60 * 60 * 1000))
+    const leadAge = rule ? 
+       (rule.timeFromCreated < 24 * 60 * 60 * 1000) ? 
+        parseInt(rule.name.match(/(\d+)day/)?.[1] || '1') :
+        Math.floor(rule.timeFromCreated / (24 * 60 * 60 * 1000)) :
+      Math.floor((new Date().getTime() - leadCreatedAt.getTime()) / (24 * 60 * 60 * 1000))
     
     // Get instructions from clinic.assistants.instructions 
     const assistantInstructions = clinic.assistants?.[0]?.instructions || ''
