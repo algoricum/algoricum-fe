@@ -8,6 +8,7 @@ import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { createStaffUser } from "../../utils/supabase/config/staff";
 import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { getRoleId } from "@/redux/slices/clinic.slice";
 import type { JSX } from "react/jsx-runtime";
 import {
   getClinicStaff,
@@ -222,11 +223,19 @@ export default function StaffPageRefactored(): JSX.Element {
         ErrorToast("No clinic found. Please make sure you have a clinic set up.");
         return;
       }
+
+      const roleId = await getRoleId("receptionist"); // Fetch role ID from Redux store or other source
+
+      if (!roleId) {
+        ErrorToast("No role found. Please make sure roles are set up correctly.");
+        return;
+      }
+
       const response: CreateStaffResponse = await createStaffUser({
         email: newStaff.email,
         name: newStaff.name,
         clinicId: clinic_id,
-        roleId: "074a8cb5-03ea-422c-8786-da5ef8fd5d00",
+        roleId
       });
       if (response.error) {
         ErrorToast(response.error.message || "Failed to create staff member");
