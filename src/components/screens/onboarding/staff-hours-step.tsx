@@ -93,15 +93,6 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
           }
         });
         break;
-      case "mon-sun-8-8":
-        DAYS_OF_WEEK.forEach(day => {
-          if (day !== "Sunday") {
-            newHours[day] = { enabled: true, start: "6:00 AM", end: "10:00 PM" };
-          } else {
-            newHours[day] = { enabled: true, start: "6:00 AM", end: "10:00 PM" };
-          }
-        });
-        break;
     }
 
     setBusinessHours(newHours);
@@ -194,7 +185,7 @@ Clinic Profile
           >
             Mon-Sat, 8AM-8PM
           </Button>
-          <Button className="rounded-lg border border-gray-300 bg-white text-gray-700 px-4 py-2 h-auto"  onClick={() => handlePreset("mon-sun-8-8")}>Custom</Button>
+          <Button className="rounded-lg border border-gray-300 bg-white text-gray-700 px-4 py-2 h-auto">Custom</Button>
         </div>
       </div>
 
