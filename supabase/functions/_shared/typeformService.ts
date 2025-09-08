@@ -183,10 +183,14 @@ export async function updateForms(req: Request) {
                 answers[normalized] = ans[ans.type];
               }
             }
-
+const { data: source } = await supabase
+    .from("lead_source")
+    .select("id")
+    .eq("name", "Others")
+    .single();
             await supabase.from("lead").insert({
               clinic_id,
-              source_id: "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c", // lead_source FK
+              source_id: source.id, // lead_source FK
               first_name: answers.first_name || null,
               last_name: answers.last_name || null,
               email: answers.email || null,
@@ -250,10 +254,14 @@ export async function handleWebhook(req: Request, url: URL) {
       answers[normalized] = ans[ans.type];
     }
   }
-
+const { data: source } = await supabase
+    .from("lead_source")
+    .select("id")
+    .eq("name", "Others")
+    .single();
   const webhok = await supabase.from("lead").insert({
     clinic_id,
-    source_id: "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c",
+    source_id: source.id,
     first_name: answers.first_name || null,
     last_name: answers.last_name || null,
     email: answers.email || null,

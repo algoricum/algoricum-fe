@@ -34,8 +34,9 @@ import {
   ONBOARDING_LEADS_FILE_NAME,
 } from "@/constants/localStorageKeys";
 // import { log } from "console";
-import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
+// import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
+import { handleSubscribe } from "@/utils/stripe";
 
 const { Text } = Typography;
 const supabase = createClient();
@@ -68,7 +69,46 @@ export default function MainOnboarding() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
+  
+    const checkSubscription = async (id: string) => {
+    const { data: sub } = await supabase
+      .from("stripe_subscriptions")
+      .select("id,status")
+      .eq("clinic_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+      if(!sub){
+        
+        const { data: planData } = await supabase.from("plans").select("*").limit(1);
+        if(planData && planData[0]?.price_id){
+          
+          console.log("asdf",!sub,planData)
+          await handleSubscribe(planData[0]?.price_id,id)
+        }
+      }
+  };
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      const clinic = await getClinicData();
+      console.log(".......Clinic data:.....", clinic);
+      if (!clinic) {
+        ErrorToast("Clinic data not found.");
+        return;
+      }
 
+
+      
+      
+      await checkSubscription(clinic.id);
+    };
+    if(currentStepIndex>1){
+
+      fetchInitialData();
+    }
+
+    
+  }, [currentStepIndex]);
   // Only use BASE_STEPS for sidebar and navigation
   const STEPS = BASE_STEPS;
   const currentStep = STEPS[currentStepIndex];
@@ -322,7 +362,7 @@ export default function MainOnboarding() {
         clinicName: mappedData.legalBusinessName,
         clinicType: mappedData.clinicType,
         primaryContactEmail: mappedData.emailAddress,
-        clinicPhone: mappedData.phoneNumber,
+        clinicPhone: clinicInfoData.clinicPhone || mappedData.phoneNumber,
         businessAddress: mappedData.clinicAddress,
       };
 
@@ -545,7 +585,7 @@ export default function MainOnboarding() {
           />
         );
       case "staff-hours":
-        return <StaffHoursStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
+        return <StaffHoursStep onNext={(handleStepComplete)} onPrev={handleStepPrevious} initialData={stepData} />;
       // case "tone-identity":
       //   return <ToneIdentityStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       // case "ai-assistant":
@@ -556,8 +596,8 @@ export default function MainOnboarding() {
       //   return <ChatbotSetupStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       case "integrations":
         return <IntegrationsStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
-      case "billing":
-        return <OnboardingSubscriptionStep onNext={handleStepComplete} />;
+      // case "billing":
+      //   return <OnboardingSubscriptionStep onNext={handleStepComplete} />;
 
       default:
         return <div>Unknown step</div>;

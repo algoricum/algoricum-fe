@@ -1,5 +1,5 @@
 "use client";
-
+import { createClient } from "@/utils/supabase/config/client";
 import { useState, useEffect, useCallback } from "react";
 import { Button, Typography } from "antd";
 import { IntegrationsStepProps, FormData, ConnectionStatus } from "../../../../app/types/types";
@@ -38,9 +38,12 @@ const { Title } = Typography;
 import { PreviousQuestions } from "./PreviousQuestions";
 import CurrentInput from "./CurrentInput";
 import IntegrationsModals from "./IntegrationModals";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
 
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
-
+  const [loading,setLoading]=useState(true)
+  const supabase = createClient();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [buttonsLoading, setButtonsLoading] = useState(false);
@@ -90,12 +93,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   });
 
   const filteredQuestions =
-    formData.selectedCrm === "HubSpot" ||
-    formData.selectedCrm === "Pipedrive" ||
-    formData.selectedCrm === "GoHighLevel" ||
-    formData.selectedCrm === "NextHealth"
-      ? [questions[0], questions[3]]
-      : questions;
+    (formData.selectedCrm === "GoHighLevel" ||
+    formData.selectedCrm === "NextHealth")
+      ? [questions[0], questions[3]]:(formData.selectedCrm === "HubSpot" ||
+    formData.selectedCrm === "Pipedrive") ?
+      [questions[0]] : questions;
 
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
@@ -506,8 +508,44 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       onPrev();
     }
   };
-
+    const checkSubscription = async (id: string) => {
+      const { data: sub } = await supabase
+        .from("stripe_subscriptions")
+        .select("id,status")
+        .eq("clinic_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+  
+      if (sub?.status === "active" || sub?.status === "trialing") {
+  setLoading(false)    }
+  
+    };
+    useEffect(() => {
+      const fetchInitialData = async () => {
+        const clinic = await getClinicData();
+        console.log(".......Clinic data:.....", clinic);
+        if (!clinic) {
+          ErrorToast("Clinic data not found.");
+          return;
+        }
+  
+  
+        
+        
+        await checkSubscription(clinic.id);
+      };
+      
+      fetchInitialData();
+    }, []);
+if(loading){
+  return(
+    <LoadingSpinner message="Loading ..." size="lg" />
+  )
+}
+if(!loading){
   return (
+     
     <div className="max-w-4xl">
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
@@ -582,7 +620,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             <Button
               type="primary"
               onClick={handleNext}
-              disabled={(currentQuestion.type === "radio" || currentQuestion.type === "select" ? !currentValue : false) || isSubmitting}
+              disabled={
+                (filteredQuestions?.length > 1 && currentQuestion.type === "radio" || currentQuestion.type === "select" ? !currentValue : false) ||
+                isSubmitting
+              }
               loading={isSubmitting && currentQuestionIndex === filteredQuestions?.length - 1}
               className="bg-purple-500 border-purple-500 h-13 text-base font-medium rounded-xl px-8"
             >
@@ -750,7 +791,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           } catch (error) {
             console.error("Error:", error);
             setButtonsLoading(false);
-            ErrorToast("Error: "+ error)
+            ErrorToast("Error: " + error);
             setShowCompletionButtons(false);
             setFormData(prev => ({ ...prev, adsConnections: "" }));
             localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
@@ -780,7 +821,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         typeformTreeData={TypeformTreeData}
         selectedTypeformForms={selectedTypeformForms}
         onSelectTypeformForms={setSelectedTypeformForms}
-        onTypeformConnect={()=>connectToTypeform(setButtonsLoading)}
+        onTypeformConnect={() => connectToTypeform(setButtonsLoading)}
         onTypeformOk={() => {
           if (typeformStatus === "connected" && typeformLeadsSynced) {
             setShowTypeformModal(false);
@@ -826,7 +867,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           }
           SuccessToast("Jotform connected successfully");
           setJotformStatus("connected");
-          setButtonsLoading(false)
+          setButtonsLoading(false);
         }}
         onJotformSyncLeads={() => {
           syncJotformLeads(selectedJotformForms);
@@ -859,7 +900,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         showManualLeadsModal={showManualLeadsModal}
         onCsvUploadOk={leads => {
           setShowManualLeadsModal(false);
-          handleCsvUpload(leads,false);
+          handleCsvUpload(leads, false);
           if (localStorage.getItem(ONBOARDING_LEADS_FILE_NAME) && leads) {
             SuccessToast("Leads saved successfully");
           }
@@ -877,7 +918,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // NexHealth
         showNexHealthModal={showNexHealthModal}
         nextHealthStatus={nextHealthStatus}
-        onNexHealthConnect={(token: any) => connectToNextHealth(token,setButtonsLoading)}
+        onNexHealthConnect={(token: any) => connectToNextHealth(token, setButtonsLoading)}
         onNexHealthOk={() => {
           if (nextHealthStatus === "connected") {
             setShowNexHealthModal(false);
@@ -900,9 +941,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // Gravity Form
         showGravityFormModal={showGravityFormModal}
         gravityFormStatus={gravityFormStatus}
-        onGravityFormConnect={(token: any) => connnectToGravityForm(token,setButtonsLoading)}
+        onGravityFormConnect={(token: any) => connnectToGravityForm(token, setButtonsLoading)}
         onGravityFormOk={() => {
-          if (gravityFormStatus === "connected" ) {
+          if (gravityFormStatus === "connected") {
             setShowGravityFormModal(false);
             autoProgressToNext();
           } else {
@@ -924,5 +965,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // ... pass the rest for other modals
       />
     </div>
-  );
+  )
+}
 }

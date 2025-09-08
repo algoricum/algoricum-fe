@@ -13,7 +13,10 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
         const { data, error } = await supabase
           .from("hubspot_connections")
           .select("*")
-          .eq("user_id", clinicId) // ⚠️ if this should be clinic_id, adjust here
+          .eq("clinic_id", clinicId) // ⚠️ if this should be clinic_id, adjust here
+          .neq("access_token", "")
+          .neq("refresh_token", "")
+          .eq("connection_status", "connected")
           .limit(1)
           .maybeSingle();
         if (error) {
@@ -23,14 +26,22 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
         connection = data;
         break;
       }
-
+      
       case "Pipedrive": {
-        const { data, error } = await supabase.from("pipedrive_integration").select("*").eq("clinic_id", clinicId).maybeSingle();
+        const { data, error } = await supabase
+        .from("pipedrive_integration")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .neq("access_token", "")
+        .neq("refresh_token", "")
+        .eq("is_active", true)
+        .maybeSingle();
         if (error) {
           console.error(`Error checking Pipedrive status:`, error);
           return "disconnected";
         }
         connection = data;
+        console.error("dsf", data);
         break;
       }
 
@@ -61,7 +72,6 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
           .eq("clinic_id", clinicId)
           .limit(1)
           .maybeSingle();
-
 
         if (error) {
           console.error(`Error checking Facebook Lead Forms status:`, error);
@@ -112,38 +122,25 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
   }
 };
 
-
-export const deleteIntegrationConnections = async (
-  clinicId: string,
-  integrationName: string,
-): Promise<boolean> => {
+export const deleteIntegrationConnections = async (clinicId: string, integrationName: string): Promise<boolean> => {
   try {
     let error = null;
 
     switch (integrationName) {
       case "Hubspot": {
-        const { error: deleteError } = await supabase
-          .from("hubspot_connections")
-          .delete()
-          .eq("user_id", clinicId); // ⚠️ change to clinic_id if schema uses that
+        const { error: deleteError } = await supabase.from("hubspot_connections").delete().eq("clinic_id", clinicId); // ⚠️ change to clinic_id if schema uses that
         error = deleteError;
         break;
       }
 
       case "Pipedrive": {
-        const { error: deleteError } = await supabase
-          .from("pipedrive_integration")
-          .delete()
-          .eq("clinic_id", clinicId);
+        const { error: deleteError } = await supabase.from("pipedrive_integration").delete().eq("clinic_id", clinicId);
         error = deleteError;
         break;
       }
 
       case "Google Lead Forms": {
-        const { error: deleteError } = await supabase
-          .from("google_lead_form_connections")
-          .delete()
-          .eq("clinic_id", clinicId);
+        const { error: deleteError } = await supabase.from("google_lead_form_connections").delete().eq("clinic_id", clinicId);
         error = deleteError;
         break;
       }
@@ -153,36 +150,26 @@ export const deleteIntegrationConnections = async (
           .from("google_form_connections")
           .select("*")
           .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false })
+          .order("created_at", { ascending: false })
           .limit(1)
           .single();
-        if(!connection) return true;
-        const { error: deleteError } = await supabase
-          .from("google_form_sheets")
-          .delete()
-          .eq("connection_id", connection?.id);
-          
-        const { error: deletedError } = await supabase
-          .from("google_form_connections")
-          .delete()
-          .eq("id", connection?.id);
+        if (!connection) return true;
+        const { error: deleteError } = await supabase.from("google_form_sheets").delete().eq("connection_id", connection?.id);
 
-        error = deleteError,deletedError;
+        const { error: deletedError } = await supabase.from("google_form_connections").delete().eq("id", connection?.id);
+
+        ((error = deleteError), deletedError);
         break;
       }
 
       case "Facebook Lead Forms": {
-        const { error: deleteError } = await supabase
-          .from("facebook_lead_form_connections")
-          .delete()
-          .eq("clinic_id", clinicId);
+        const { error: deleteError } = await supabase.from("facebook_lead_form_connections").delete().eq("clinic_id", clinicId);
         error = deleteError;
         break;
       }
 
       default: {
-        
-        const {data:integration}=await supabase.from("integrations").select("*").eq("name", integrationName).single();
+        const { data: integration } = await supabase.from("integrations").select("*").eq("name", integrationName).single();
         const { error: deleteError } = await supabase
           .from("integration_connections")
           .delete()
