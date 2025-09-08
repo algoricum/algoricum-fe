@@ -611,13 +611,14 @@ async function generateIntelligentResponse(
     ? `<a href="${bookingLink}" style="color: #10b981; text-decoration: none; font-weight: bold;">Let's schedule a quick chat!</a>`
     : `📅 Book here: ${bookingLink}`
 
+  // Only create unsubscribe elements for emails (NEVER for SMS per instructions)
   const unsubscribeButton = isEmail 
     ? `<a href="${unsubscribeLink}" style="color: #6b7280; text-decoration: none; font-size: 12px;">unsubscribe here</a>`
-    : `To stop texts: ${unsubscribeLink}`
+    : null
 
   const unsubscribeFooter = isEmail 
     ? `<br><br><hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;"><div style="text-align: center; font-size: 12px; color: #6b7280;">If you no longer wish to receive these emails, you can ${unsubscribeButton}.</div>`
-    : unsubscribeButton
+    : null
 
   if (!openaiKey) {
     logInfo('No OpenAI API key found, using fallback message')
@@ -750,17 +751,7 @@ Make it sound natural and casual, not like a marketing message. Include both boo
           }
         } else {
           let smsBody = generatedContent.trim()
-          
-          // Check if booking link is missing and add it
-          if (!smsBody.includes(bookingLink)) {
-            smsBody += `\n\n${bookingButton}`
-          }
-          
-          // Check if unsubscribe link is missing and add it (only once)
-          if (!smsBody.includes(unsubscribeLink)) {
-            smsBody += `\n${unsubscribeButton}`
-          }
-          
+                    
           logInfo('Successfully generated intelligent SMS response via OpenAI')
           return smsBody
         }
