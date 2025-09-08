@@ -2,7 +2,7 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { Input, Button, Typography, Upload } from "antd";
-import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input/max";
 import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 import { FileTextOutlined, DollarCircleOutlined, StarOutlined } from "@ant-design/icons";

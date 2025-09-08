@@ -185,7 +185,6 @@ Clinic Profile
           >
             Mon-Sat, 8AM-8PM
           </Button>
-          <Button className="rounded-lg border border-gray-300 bg-white text-gray-700 px-4 py-2 h-auto">Custom</Button>
         </div>
       </div>
 
