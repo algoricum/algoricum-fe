@@ -65,18 +65,40 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
   if (!tokenRes.ok) {
     const txt = await tokenRes.text();
     console.error("Token exchange failed:", txt);
-    return new Response(JSON.stringify({ error: "Failed to exchange code for token", details: txt }), {
-      status: 500,
-      headers: { ...corsHeaders(), "Content-Type": "application/json" },
+     if (redirectTo) {
+    try {
+      const redirectUrl = new URL(redirectTo);
+      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+      return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders(),
+        Location: redirectUrl.toString(),
+      },
     });
+    } catch {
+      // if invalid redirect, fall through to JSON
+    }
+  }
   }
   const tokenJson = await tokenRes.json();
   const shortLivedAccessToken = tokenJson.access_token;
   if (!shortLivedAccessToken) {
-    return new Response(JSON.stringify({ error: "No access_token returned by Facebook" }), {
-      status: 500,
-      headers: { ...corsHeaders(), "Content-Type": "application/json" },
+    if (redirectTo) {
+    try {
+      const redirectUrl = new URL(redirectTo);
+      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+      return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders(),
+        Location: redirectUrl.toString(),
+      },
     });
+    } catch {
+      // if invalid redirect, fall through to JSON
+    }
+  }
   }
 
   // Exchange to long-lived token
@@ -90,10 +112,21 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
   if (!longRes.ok) {
     const txt = await longRes.text();
     console.error("Long token exchange failed:", txt);
-    return new Response(JSON.stringify({ error: "Failed to exchange for long-lived token", details: txt }), {
-      status: 500,
-      headers: { ...corsHeaders(), "Content-Type": "application/json" },
+     if (redirectTo) {
+    try {
+      const redirectUrl = new URL(redirectTo);
+      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+      return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders(),
+        Location: redirectUrl.toString(),
+      },
     });
+    } catch {
+      // if invalid redirect, fall through to JSON
+    }
+  }
   }
 
   const longJson = await longRes.json();
@@ -110,20 +143,42 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
   if (!accountsRes.ok) {
     const txt = await accountsRes.text();
     console.error("Failed to fetch pages:", txt);
-    return new Response(JSON.stringify({ error: "Failed to fetch pages", details: txt }), {
-      status: 500,
-      headers: { ...corsHeaders(), "Content-Type": "application/json" },
+   if (redirectTo) {
+    try {
+      const redirectUrl = new URL(redirectTo);
+      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+      return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders(),
+        Location: redirectUrl.toString(),
+      },
     });
+    } catch {
+      // if invalid redirect, fall through to JSON
+    }
+  }
   }
 
   const accountsJson = await accountsRes.json();
   const pages = Array.isArray(accountsJson.data) ? accountsJson.data : [];
   console.log("Fetched pages:", accountsRes);
   if (!pages.length) {
-    return new Response(JSON.stringify({ message: "No pages found for the user" }), {
-      status: 200,
-      headers: { ...corsHeaders(), "Content-Type": "application/json" },
+   if (redirectTo) {
+    try {
+      const redirectUrl = new URL(redirectTo);
+      redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+      return new Response(null, {
+      status: 302,
+      headers: {
+        ...corsHeaders(),
+        Location: redirectUrl.toString(),
+      },
     });
+    } catch {
+      // if invalid redirect, fall through to JSON
+    }
+  }
   }
 
   const results: any[] = [];
