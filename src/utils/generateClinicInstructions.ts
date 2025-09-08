@@ -169,7 +169,7 @@ When someone asks for booking or to schedule an appointment, provide the booking
 ${hasBookingLink ? `
 • For booking requests: "${calendly_link} - Quick and easy scheduling!"
 • For schedule requests: "Book your slot here: ${calendly_link}"
-• Keep it simple - just the link with a brief helpful note
+• Keep it simple - just the link with Awesome! Let's lock in your appointment.
 • Don't over-explain the booking process` : '• No booking link configured for this clinic'}
 
 RESPONSE PATTERNS TO FOLLOW:
