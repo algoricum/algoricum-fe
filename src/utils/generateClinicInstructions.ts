@@ -188,7 +188,10 @@ MANDATORY CLEANUP - ALWAYS REMOVE FROM ALL RESPONSES:
 • Remove any document-generated links or citations
 • Remove technical formatting markers like 【†source】
 • Remove reference indicators or footnote markers
-• Keep responses clean and natural without metadata
+• NEVER include signature lines like "Best, [Your Name]" or "${name}"
+• NEVER include footer text like "You're receiving this because you showed interest in services at ${name}"
+• NEVER add closing signatures, name placeholders, or manual footers
+• Keep responses clean and natural without metadata or signatures
 
 BOOKING INTEREST (High Intent - Include Link):
 - "I want to book" → "${getResponseVariations(
@@ -366,13 +369,13 @@ FINAL SEQUENCE (Day 100+):
 - Final offer: "This is my last email. If you want to finally explore [Service], reply."
 - Footer: Standard unsubscribe footer (see below)
 
-EMAIL FOOTER TEMPLATE:
----
-You're receiving this because you showed interest in [Service] at ${name}.
-
-Not interested anymore? [Unsubscribe here]({{unsubscribe_link}})
-
-${email ? email : ''}
+EMAIL RESPONSE RULES:
+• End email content naturally without signatures or footers
+• Do NOT include "Best regards," "Sincerely," or any closing signatures
+• Do NOT include clinic name at the end
+• Do NOT include placeholder text like "[Your Name]" 
+• Do NOT add manual unsubscribe text (system handles this automatically)
+• Simply end your email content where the message naturally concludes
 
 FOLLOW-UP CUSTOMIZATION RULES:
 ${has_uploaded_document ? `

@@ -658,16 +658,12 @@ async function generateIntelligentResponse(
       .map(msg => `${msg.sender_type === 'user' ? `${lead.first_name || 'Patient'}` : clinic.assistants?.[0]?.assistant_name || 'Assistant'}: ${msg.message}`)
       .join('\n')
 
-    // For email patterns, normalize time units: 
-    // - Extract day number from rule name (works for both demo and production)
-    // - Fallback to calculated days if rule name doesn't contain day number
     const leadAge = rule ? 
       parseInt(rule.name.match(/(\d+)day/)?.[1] || '0') || // Primary: extract from rule name
       Math.floor(rule.timeFromCreated / (24 * 60 * 60 * 1000)) || // Production: actual days
       Math.floor(rule.timeFromCreated / 1000) || // Demo: seconds as days  
       1 : 1 // Final fallback
     
-    // Get instructions from clinic.assistants.instructions 
     const assistantInstructions = clinic.assistants?.[0]?.instructions || ''
     
     logInfo(`DEBUG: Lead age: ${leadAge}, Rule: ${rule?.name}`)
@@ -679,7 +675,20 @@ async function generateIntelligentResponse(
     let userPrompt = ''
 
     if (isEmail) {
-      systemPrompt = assistantInstructions
+      systemPrompt = `${assistantInstructions}
+
+CRITICAL EMAIL FORMATTING RULES:
+• End your email content naturally - do NOT add signatures, "Best regards," or closing lines
+• Do NOT include clinic name, "[Your Name]" or any placeholder signatures at the end
+• Do NOT include unsubscribe text (system handles this automatically)
+• Include booking links when appropriate for email follow-ups
+• Simply end where your message naturally concludes
+• Keep content focused and conversational without formal closings
+
+BOOKING LINK FOR EMAILS:
+${bookingLink ? `Available booking link: ${bookingLink}` : 'No booking link configured'}
+When including booking links in emails, use this HTML format:
+<a href="${bookingLink}" style="color: #10b981; text-decoration: none; font-weight: bold;">Schedule your consultation</a>`
 
       userPrompt = `Generate a follow-up email for ${lead.first_name || 'this patient'} (${leadAge} days old) at ${clinic.name}.
 
@@ -701,7 +710,9 @@ IMPORTANT: Follow the specific EMAIL FOLLOW-UP PATTERN from your instructions ba
 - Day 60+: URGENCY/SCARCITY PATTERN about opportunity cost
 - Day 100+: FINAL SEQUENCE with direct close
 
-Generate according to the specific pattern for this lead age. Format as specified in your instructions with proper subject line and body content.`
+Generate according to the specific pattern for this lead age. Format as specified in your instructions with proper subject line and body content.
+
+REMEMBER: End naturally without signatures, footers, or closing formalities. The system will add unsubscribe links automatically.`
 
     } else {
       systemPrompt = `${assistantInstructions}
@@ -1058,7 +1069,7 @@ async function sendEmail(
                                     <p style="margin: 0 0 10px 0;">You're receiving this because you showed interest in our services.</p>
                                     <p style="margin: 0;">
                                         Not interested anymore? 
-                                        <a href="${SUPABASE_URL}/functions/v1/unsubscribe-lead?leadId=${leadId}" 
+                                        <a href="${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadId}&clinic_id=${clinicId}" 
                                            style="color: #64748b; text-decoration: underline;">
                                             Unsubscribe here
                                         </a>
@@ -1078,7 +1089,7 @@ async function sendEmail(
     // Create plain text version
     let emailBody = body;
     if (leadId && SUPABASE_URL) {
-      const unsubscribeUrl = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?leadId=${leadId}`;
+      const unsubscribeUrl = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadId}&clinic_id=${clinicId}`;
       
       const textFooter = `\n\n---\n${clinicName}\n${address ? `${address}\n` : ''}${phone ? `Phone: ${phone}\n` : ''}\n\nYou're receiving this because you showed interest in our services.\nNot interested anymore? Unsubscribe here: ${unsubscribeUrl}`;
       
