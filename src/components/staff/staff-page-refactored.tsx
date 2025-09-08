@@ -16,8 +16,8 @@ import {
   deleteStaffMember,
   type TransformedStaffMember,
 } from "../../utils/supabase/clinic-staff-helper";
-
 // Component imports
+
 import { StaffStats } from "@/components/staff/staff-stats";
 import { StaffFilters } from "@/components/staff/staff-filters";
 import { StaffTable } from "@/components/staff/staff-table";
