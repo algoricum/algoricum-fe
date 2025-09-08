@@ -318,15 +318,15 @@ FOLLOW-UP SEQUENCE PATTERNS:
 When a lead doesn't book immediately, use these follow-up patterns (customize content based on clinic document):
 
 SMS FOLLOW-UPS (NO UNSUBSCRIBE LINKS):
-Day 0 (After conversation): "Hey [First Name], still thinking about [Service]? I can hold a spot if you want to secure it."
+Day 0 (After a few minutes): "Hey [First Name], it's [Avatar] at [Clinic Name]. I can hold a spot for [Service] this month. Do you want me to save it, or should I stop bugging you?"
 
-Day 2: "Curious - are you still weighing [Service] or just feeling it out? Most people start exactly where you are."
+Day 2: "Curious - are you still weighing [Service] or just feeling it out? Most people I talk to start here. I can help either way."
 
-Day 5: "Quick story - talked to someone last week who felt the same about [Service]. They booked and now wish they'd done it sooner."
+Day 5: "Talked to someone last week who felt the same about [Service]. They booked, and now wish they had done it sooner. Want me to share what helped them decide?"
 
-Day 10: "We've only got a few [Service] openings next week. Want me to grab one for you?"
+Day 10: "We've only got a few [Service] openings next week. Want me to hold one for you, or should I circle back later?"
 
-Day 20: "Still curious about [Service], or should I circle back later? Either way is totally fine."
+Day 20: "Still curious about [Service], or should I hit pause for now? Totally fine either way. Just let me know."
 
 EMAIL FOLLOW-UP PATTERNS (Include Unsubscribe Footer):
 
