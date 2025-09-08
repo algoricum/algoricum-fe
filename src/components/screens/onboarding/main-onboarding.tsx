@@ -362,7 +362,7 @@ export default function MainOnboarding() {
         clinicName: mappedData.legalBusinessName,
         clinicType: mappedData.clinicType,
         primaryContactEmail: mappedData.emailAddress,
-        clinicPhone: mappedData.phoneNumber,
+        clinicPhone: clinicInfoData.clinicPhone || mappedData.phoneNumber,
         businessAddress: mappedData.clinicAddress,
       };
 
