@@ -1,5 +1,5 @@
 "use client";
-
+import { createClient } from "@/utils/supabase/config/client";
 import { useState, useEffect, useCallback } from "react";
 import { Button, Typography } from "antd";
 import { IntegrationsStepProps, FormData, ConnectionStatus } from "../../../../app/types/types";
@@ -38,9 +38,12 @@ const { Title } = Typography;
 import { PreviousQuestions } from "./PreviousQuestions";
 import CurrentInput from "./CurrentInput";
 import IntegrationsModals from "./IntegrationModals";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
 
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
-
+  const [loading,setLoading]=useState(true)
+  const supabase = createClient();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [buttonsLoading, setButtonsLoading] = useState(false);
@@ -505,8 +508,44 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       onPrev();
     }
   };
-
+    const checkSubscription = async (id: string) => {
+      const { data: sub } = await supabase
+        .from("stripe_subscriptions")
+        .select("id,status")
+        .eq("clinic_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+  
+      if (sub?.status === "active" || sub?.status === "trialing") {
+  setLoading(false)    }
+  
+    };
+    useEffect(() => {
+      const fetchInitialData = async () => {
+        const clinic = await getClinicData();
+        console.log(".......Clinic data:.....", clinic);
+        if (!clinic) {
+          ErrorToast("Clinic data not found.");
+          return;
+        }
+  
+  
+        
+        
+        await checkSubscription(clinic.id);
+      };
+      
+      fetchInitialData();
+    }, []);
+if(loading){
+  return(
+    <LoadingSpinner message="Loading ..." size="lg" />
+  )
+}
+if(!loading){
   return (
+     
     <div className="max-w-4xl">
       <div>
         <Title level={1} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
@@ -926,5 +965,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // ... pass the rest for other modals
       />
     </div>
-  );
+  )
+}
 }
