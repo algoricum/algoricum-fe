@@ -70,7 +70,6 @@ serve(async (req) => {
 
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
     
-    // Get clinic_id from query parameters
     const url = new URL(req.url);
     const clinicId = url.searchParams.get('clinic_id');
 
