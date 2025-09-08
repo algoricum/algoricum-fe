@@ -164,6 +164,14 @@ High Intent (Include booking link): "book", "schedule", "appointment", "availabl
 Medium Intent (Mention booking option): "interested", "next steps", "ready", "let's do this"
 Low Intent (No booking link): "how much", "tell me about", "what is", general questions
 
+BOOKING LINK RESPONSES:
+When someone asks for booking or to schedule an appointment, provide the booking link with a simple one-liner:
+${hasBookingLink ? `
+• For booking requests: "${calendly_link} - Quick and easy scheduling!"
+• For schedule requests: "Book your slot here: ${calendly_link}"
+• Keep it simple - just the link with a brief helpful note
+• Don't over-explain the booking process` : '• No booking link configured for this clinic'}
+
 RESPONSE PATTERNS TO FOLLOW:
 
 - Never mention "attached documents," "our document," or reference materials the user can't see
