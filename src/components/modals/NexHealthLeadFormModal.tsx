@@ -76,7 +76,10 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({ open, status, acc
                   <strong>API Integration Guide</strong>
                   <br />• Sign up for a NexHealth developer account (if not already created).
                   <br />• Visit{" "}
-                  <a href="https://developers.nexhealth.com/api-key" target="_blank" rel="noopener noreferrer" className="underline">NexHealth API Key</a> and Copy API Key.
+                  <a href="https://developers.nexhealth.com/api-key" target="_blank" rel="noopener noreferrer" className="underline">
+                    NexHealth API Key
+                  </a>{" "}
+                  and Copy API Key.
                   <br />• Paste here. We&apos;ll automatically sync your patients
                   <br />• Takes less than 30 seconds!
                 </Text>
