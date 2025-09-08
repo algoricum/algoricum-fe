@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Select, Switch, Typography } from "antd";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
+import { createClient } from "@/utils/supabase/config/client";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { ErrorToast } from "@/helpers/toast";
+import { handleSubscribe } from "@/utils/stripe";
 
 interface StaffHoursStepProps {
   // eslint-disable-next-line no-unused-vars
@@ -12,6 +16,7 @@ interface StaffHoursStepProps {
   onPrev?: () => void;
   initialData?: any;
 }
+const supabase = createClient();
 
 const TIME_OPTIONS = [
   "6:00 AM",
@@ -63,6 +68,8 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
       Sunday: { enabled: false, start: "9:00 AM", end: "5:00 PM" },
     },
   );
+  const [clinicId, setClinicId] = useState<string | null>(null);
+  const [subscribingId, setSubscribingId] = useState<string | null>(null);
 
   const handlePreset = (preset: string) => {
     const newHours = { ...businessHours };
@@ -86,6 +93,15 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
           }
         });
         break;
+      case "mon-sun-8-8":
+        DAYS_OF_WEEK.forEach(day => {
+          if (day !== "Sunday") {
+            newHours[day] = { enabled: true, start: "6:00 AM", end: "10:00 PM" };
+          } else {
+            newHours[day] = { enabled: true, start: "6:00 AM", end: "10:00 PM" };
+          }
+        });
+        break;
     }
 
     setBusinessHours(newHours);
@@ -104,8 +120,47 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
       [day]: { ...prev[day], [timeType]: time },
     }));
   };
+  const checkSubscription = async (id: string) => {
+    const { data: sub } = await supabase
+      .from("stripe_subscriptions")
+      .select("id,status")
+      .eq("clinic_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  const handleNext = () => {
+    if (sub?.status === "active" || sub?.status === "trialing") {
+setSubscribingId(sub.id)    }
+
+  };
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      const clinic = await getClinicData();
+      console.log(".......Clinic data:.....", clinic);
+      if (!clinic) {
+        ErrorToast("Clinic data not found.");
+        return;
+      }
+
+      setClinicId(clinic.id);
+
+      
+      
+      await checkSubscription(clinic.id);
+    };
+    
+    fetchInitialData();
+  }, []);
+  
+  const handleNext = async() => {
+    if(!subscribingId){
+
+      const { data: planData } = await supabase.from("plans").select("*").limit(1);
+      if(planData && planData[0]?.price_id){
+     
+      await handleSubscribe(planData[0]?.price_id,clinicId)
+    }
+  }
     onNext({ businessHours });
   };
 
@@ -139,7 +194,7 @@ Clinic Profile
           >
             Mon-Sat, 8AM-8PM
           </Button>
-          <Button className="rounded-lg border border-gray-300 bg-white text-gray-700 px-4 py-2 h-auto">Custom</Button>
+          <Button className="rounded-lg border border-gray-300 bg-white text-gray-700 px-4 py-2 h-auto"  onClick={() => handlePreset("mon-sun-8-8")}>Custom</Button>
         </div>
       </div>
 
