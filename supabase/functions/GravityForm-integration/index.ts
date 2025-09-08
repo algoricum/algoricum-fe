@@ -19,6 +19,20 @@ serve(async (req) => {
     if(!clinic_id){
       return new Response(JSON.stringify({ error: "Missing clinic_id" }), { status: 400, headers: { ...corsHeaders() } });
     }
+    if (!consumerKey || !consmerSecret || !baseURL) {
+      console.log("Missing consumerKey, consumerSecret or baseURL");
+      return new Response(
+        JSON.stringify({ error: "Missing consumerKey, consumerSecret or baseURL" }),
+        { status: 400, headers: { ...corsHeaders() } }
+      );
+    }
+    if (!form_ids || !Array.isArray(form_ids)) {
+      return new Response(
+        JSON.stringify({ error: "form_ids array required" }),
+        { status: 400, headers: { ...corsHeaders() } }
+      );
+    }
+    console.log(clinic_id,consmerSecret,consumerKey,baseURL,form_ids)
 const { data: integration } = await supabase
     .from("integrations")
     .select("id")
@@ -33,18 +47,6 @@ const { data: integration } = await supabase
     auth_data: { form_ids, consumerKey,consmerSecret, baseURL },
     status: "active",
   }, { onConflict: ["clinic_id", "integration_id"] });
-    if (!consumerKey || !consmerSecret || !baseURL) {
-      return new Response(
-        JSON.stringify({ error: "Missing consumerKey, consumerSecret or baseURL" }),
-        { status: 400, headers: { ...corsHeaders() } }
-      );
-    }
-    if (!form_ids || !Array.isArray(form_ids)) {
-      return new Response(
-        JSON.stringify({ error: "form_ids array required" }),
-        { status: 400, headers: { ...corsHeaders() } }
-      );
-    }
 
     const results: any[] = [];
     const allRows: any[] = [];
@@ -61,9 +63,14 @@ const { data: integration } = await supabase
         form_title: structure.title,
         entries: normalizedEntries,
       });
+      const { data: source } = await supabase
+    .from("lead_source")
+    .select("id")
+    .eq("name", "Others")
+    .single();
        const rows = normalizedEntries.map((p: any) => ({
         clinic_id,
-        source_id: "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c", // fixed UUID for Gravity
+        source_id: source.id, // fixed UUID for Gravity
         first_name: p.first_name,
         last_name: p.last_name,
         email: p.email,

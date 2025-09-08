@@ -110,6 +110,15 @@ const ForgotPasswordPage = () => {
     },
   );
 
+  const handleFieldFocus = (fieldName: string) => {
+    form.setFields([
+      {
+        name: fieldName,
+        errors: [],
+      },
+    ]);
+  };
+
   const onFinish = (values: any) => {
     if (isResetMode) {
       // Reset password mode
@@ -135,13 +144,24 @@ const ForgotPasswordPage = () => {
         </Text>
       </Flex>
 
-      <Form form={form} name={isResetMode ? "password-setup" : "forgot-password"} layout="vertical" className="w-full" onFinish={onFinish}>
+      <Form
+        form={form}
+        name={isResetMode ? "password-setup" : "forgot-password"}
+        layout="vertical"
+        className="w-full"
+        onFinish={onFinish}
+        validateTrigger="onBlur"
+        onFinishFailed={errorInfo => {
+          console.log("Form validation failed:", errorInfo);
+        }}
+      >
         <Flex vertical gap={isResetMode ? 18 : 24}>
           {!isResetMode ? (
             // Forgot Password Form
             <>
               <Form.Item
                 name="email"
+                validateTrigger={["onBlur", "onSubmit"]}
                 rules={[
                   {
                     required: true,
@@ -153,7 +173,7 @@ const ForgotPasswordPage = () => {
                   },
                 ]}
               >
-                <Input prefix={<MailIcon />} className="w-full" placeholder="Email" />
+                <Input prefix={<MailIcon />} className="w-full" placeholder="Email" onFocus={() => handleFieldFocus("email")} />
               </Form.Item>
 
               <Form.Item>
@@ -182,19 +202,21 @@ const ForgotPasswordPage = () => {
               <Form.Item
                 name="password"
                 label="New Password"
+                validateTrigger={["onBlur", "onSubmit"]}
                 rules={[
                   { required: true, message: "Please input your new password" },
                   { min: 8, message: "Password must contain at least 8 characters" },
                   { max: 32, message: "Password can be maximum 32 characters long" },
                 ]}
               >
-                <PasswordInput prefix={<PasswordIcon />} placeholder="New Password" />
+                <PasswordInput prefix={<PasswordIcon />} placeholder="New Password" onFocus={() => handleFieldFocus("password")} />
               </Form.Item>
 
               <Form.Item
                 name="confirmPassword"
                 label="Confirm Password"
                 dependencies={["password"]}
+                validateTrigger={["onBlur", "onSubmit"]}
                 rules={[
                   { required: true, message: "Please confirm your password" },
                   ({ getFieldValue }) => ({
@@ -205,7 +227,11 @@ const ForgotPasswordPage = () => {
                   }),
                 ]}
               >
-                <PasswordInput prefix={<PasswordIcon />} placeholder="Confirm Password" />
+                <PasswordInput
+                  prefix={<PasswordIcon />}
+                  placeholder="Confirm Password"
+                  onFocus={() => handleFieldFocus("confirmPassword")}
+                />
               </Form.Item>
 
               <Form.Item>

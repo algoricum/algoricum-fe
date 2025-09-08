@@ -89,9 +89,14 @@ export async function fetchPatients(token: string, subdomain: string, location_i
 }
 
 export async function insertPatientsAsLeads(clinic_id: string, patients: any[]) {
+  const { data: source } = await supabase
+      .from("lead_source")
+      .select("id")
+      .eq("name", "Others")
+      .single();
   const rows = patients.map((p) => ({
     clinic_id,
-    source_id: "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c",
+    source_id: source.id,
     first_name: p.first_name,
     last_name: p.last_name,
     email: p.email,
