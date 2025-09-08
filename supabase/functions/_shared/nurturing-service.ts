@@ -81,7 +81,6 @@ function logError(message: string, error?: any) {
   console.error(`[${timestamp}] SHARED ERROR: ${message}`, error)
 }
 
-// MAIN PROCESSING FUNCTION - Processes ALL clinics
 async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email', followUpRules?: FollowUpRule[]) {
   logInfo(`=== Starting processAllLeads - Type: ${communicationType || 'all'} ===`)
   
@@ -369,6 +368,23 @@ async function processRuleForLead(
       // Save to history
       await saveMessageToHistory(threadId, messageContent, rule.name, supabase)
 
+      // Update lead status from "New" to "Engaged" for the first SMS rule only
+      if (rule.name === 'sms_5min_initial' && lead.status === 'New') {
+        try {
+          await supabase
+            .from('lead')
+            .update({ 
+              status: 'Engaged', 
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', lead.id)
+          
+          logInfo(`Updated lead ${lead.id} status from "New" to "Engaged" after first SMS`)
+        } catch (statusError) {
+          logError(`Failed to update lead ${lead.id} status to "Engaged"`, statusError)
+        }
+      }
+
       return {
         leadId: lead.id,
         action: 'sent',
@@ -411,13 +427,13 @@ async function determineFollowUpsForLead(lead: Lead, supabase: any, followUpRule
   // Sort rules by time ascending
   const sortedRules = followUpRules.sort((a, b) => a.timeFromCreated - b.timeFromCreated)
   
-  logInfo(`Checking follow-ups for lead ${lead.id}, age: ${Math.round(timeSinceCreated / (24 * 60 * 60 * 1000))} days`)
+  logInfo(`Checking follow-ups for lead ${lead.id}, age: ${Math.round(timeSinceCreated / (24 * 60 * 60 * 1000))} days (${Math.round(timeSinceCreated / 1000)}s)`)
   
   // Find the NEXT due follow-up (not all overdue ones)
   for (const rule of sortedRules) {
     // Check if enough time has passed since lead creation
     if (timeSinceCreated < rule.timeFromCreated) {
-      logInfo(`Lead ${lead.id}: ${rule.name} not due yet (need ${Math.round(rule.timeFromCreated / (24 * 60 * 60 * 1000))} days)`)
+      logInfo(`Lead ${lead.id}: ${rule.name} not due yet (need ${Math.round(rule.timeFromCreated / 1000)}s, lead age: ${Math.round(timeSinceCreated / 1000)}s)`)
       continue
     }
     
@@ -682,13 +698,14 @@ Make it sound like you're genuinely checking in with someone you care about, not
     } else {
       systemPrompt = `${assistantInstructions}
 
-REQUIRED ELEMENTS:
-- MUST include booking button: ${bookingButton}
-- MUST include unsubscribe option: "${unsubscribeButton}"
+CRITICAL SMS RULES:
+- ONLY include booking links when user shows clear booking intent ("I want to book", "Schedule me", "What's available?")
+- NEVER include unsubscribe links in SMS responses
+- Keep messages conversational and under 160 characters
 
-Keep the main message conversational and under 160 characters, then add the links.`
+Generate a natural, casual SMS follow-up message without automatic links.`
 
-      userPrompt = `Generate an SMS follow-up for ${lead.first_name || 'this patient'} (Day ${leadAge}) at ${clinic.name}.
+      userPrompt = `Generate a casual SMS follow-up for ${lead.first_name || 'this patient'} (Day ${leadAge}) at ${clinic.name}.
 
 Previous conversation:
 ${conversationContext || 'No previous conversation - this is a follow-up SMS in our nurturing sequence.'}
@@ -699,7 +716,7 @@ Patient Details:
 - Interest Level: ${lead.interest_level || 'unknown'}
 - Urgency: ${lead.urgency || 'unknown'}
 
-Make it sound natural and casual, not like a marketing message. Include both booking and unsubscribe options.`
+Make it sound natural and friendly. DO NOT include booking links or unsubscribe text unless there's clear booking intent in the conversation history.`
     }
 
     logInfo('Calling OpenAI API for intelligent response generation')

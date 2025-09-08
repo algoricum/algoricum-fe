@@ -5,7 +5,7 @@ import { processAllLeads, type FollowUpRule } from './nurturing-service.ts'
 const FOLLOW_UP_RULES: FollowUpRule[] = [
   {
     name: 'sms_5min_initial',
-    timeFromCreated: 1 * 60 * 1000, // 5 minutes
+    timeFromCreated: 30 * 1000, // 5 minutes
     leadStatus: ['New'],
     communicationType: 'sms',
     onlyOnce: true
