@@ -2,9 +2,9 @@
 
 import type React from "react";
 import { useRef, useState } from "react";
-import { Modal, Typography, Popover } from "antd";
+import { Modal, Typography } from "antd";
 import Papa from "papaparse";
-import { CheckCircleOutlined, ExclamationCircleOutlined, EyeOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
 
@@ -22,9 +22,6 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
   const [csvValidationError, setCsvValidationError] = useState<string | null>(null);
   const [, setValidationWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Constants for displaying valid values (no validation, just for user reference)
-  const VALID_INTEREST_LEVELS = ["high", "medium", "low"];
 
   // Add header normalization function
   const normalizeHeaders = (data: any[]): any[] => {
@@ -206,17 +203,6 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
     }
   };
 
-  // Helper function to render the content for the Popover
-  const renderValidValuesContent = (values: string[]) => (
-    <div className="flex flex-wrap gap-1 p-2 max-w-xs">
-      {values.map(value => (
-        <span key={value} className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs whitespace-nowrap">
-          {value}
-        </span>
-      ))}
-    </div>
-  );
-
   // Custom cancel handler to clear state
   const handleCancelAndClearState = () => {
     setCsvLeads([]);
@@ -247,153 +233,65 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
         className: "bg-purple-500 border-purple-500",
         disabled: csvLeads.length === 0 || !!csvValidationError,
       }}
-      width={1000}
+      width={600}
       centered
       bodyStyle={{ maxHeight: "70vh", overflowY: "auto" }}
     >
       <div className="py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Left Column - Requirements and Format Info */}
-          <div className="space-y-4">
-            {/* CSV Format Requirements */}
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <Text className="text-sm font-semibold text-blue-800 mb-3 flex items-center">📋 Required CSV Format</Text>
-              <div className="text-sm text-blue-700 space-y-2">
-                <div>
-                  <strong className="text-blue-800">Required Columns:</strong>
-                  <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
-                    <li>
-                      <span className="font-medium">email</span> - Must not be empty
-                    </li>
-                    <li>
-                      <span className="font-medium">phone</span> - Must not be empty
-                    </li>
-                  </ul>
-                </div>
-                <div>
-                  <strong className="text-blue-800">Optional Columns:</strong>
-                  <ul className="ml-4 mt-1 space-y-1 list-disc list-inside">
-                    <li>first_name, last_name, notes</li>
-                    <li>status: &quot;New&quot; (default)</li>
-                    <li className="flex items-center flex-wrap">
-                      interest_level (
-                      <Popover content={renderValidValuesContent(VALID_INTEREST_LEVELS)} title="Valid Interest Levels" trigger="hover">
-                        <span className="inline-flex items-center gap-1 text-blue-700 cursor-help hover:underline mx-1">
-                          Valid Values <EyeOutlined className="text-blue-500" />
-                        </span>
-                      </Popover>
-                      ) - Default: &quot;medium&quot;
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Header Normalization Information */}
-            <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-              <Text className="text-sm font-semibold text-yellow-800 mb-3 block">🔄 Auto Header Normalization</Text>
-              <div className="text-sm text-yellow-700 space-y-2">
-                <p>We automatically normalize common variations:</p>
-                <div className="space-y-1">
-                  <div>
-                    <strong>Email:</strong> E-mail, EMAIL, mail → <code className="bg-yellow-100 px-1 rounded">email</code>
-                  </div>
-                  <div>
-                    <strong>Phone:</strong> Phone, telephone, mobile → <code className="bg-yellow-100 px-1 rounded">phone</code>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <div className="text-center space-y-4">
+          <div className="max-w-lg mx-auto mb-6">
+            <Text className="text-gray-600 text-sm leading-relaxed">
+              Please upload a CSV file with required columns: <strong>email</strong> and <strong>phone</strong>. Optional columns include
+              first_name, last_name, notes, status, and interest_level. We automatically normalize common header variations and apply
+              default values where needed.
+            </Text>
           </div>
 
-          {/* Right Column - Default Values and Example */}
-          <div className="space-y-4">
-            {/* Default Values Information */}
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <Text className="text-sm font-semibold text-green-800 mb-3 block">💡 Default Values</Text>
-              <div className="text-sm text-green-700 space-y-2">
-                <p>Empty or invalid optional columns use these defaults:</p>
-                <ul className="ml-4 space-y-1 list-disc list-inside">
-                  <li>
-                    <strong>interest_level:</strong> &quot;medium&quot;
-                  </li>
-                  <li>
-                    <strong>status:</strong> &quot;New&quot; (for all CSV leads)
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Enhanced Example */}
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <Text className="text-sm font-semibold text-gray-700 mb-3 block">📄 Example CSV Format</Text>
-              <div className="text-xs text-gray-600 bg-white p-3 rounded border font-mono overflow-x-auto">
-                first_name,last_name,E-mail,Phone,interest_level,notes
-                <br />
-                John,Doe,john.doe@email.com,+1234567890,high,Interested
-                <br />
-                Jane,Smith,jane.smith@email.com,+1234567891,medium,Follow up
-                <br />
-                Bob,Johnson,bob.johnson@email.com,+1234567892,,Contact soon
-              </div>
-              <div className="text-xs text-gray-500 mt-2 space-y-1">
-                <div>📧 Email & 📱 Phone columns are required</div>
-                <div>💡 Optional columns can be empty</div>
-                <div>✨ Invalid values get replaced with defaults</div>
-              </div>
-            </div>
+          <div className="max-w-md mx-auto">
+            <input
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              onChange={e => {
+                if (e.target.files && e.target.files.length > 0) {
+                  handleCsvLeads(e.target.files[0]);
+                } else {
+                  setCsvLeads([]);
+                  setCsvValidationError(null);
+                  setValidationWarnings([]);
+                }
+              }}
+              className="block w-full text-sm text-gray-500 border border-gray-300 rounded-lg
+                file:mr-4 file:py-3 file:px-6
+                file:rounded-l-lg file:border-0
+                file:text-sm file:font-semibold
+                file:bg-purple-500 file:text-white
+                hover:file:bg-purple-600 file:cursor-pointer
+                cursor-pointer"
+            />
           </div>
-        </div>
 
-        <div className="border-t pt-6">
-          <div className="text-center space-y-4">
-            <div className="max-w-2xl mx-auto">
-              <Text className="text-lg font-semibold text-gray-800 mb-4 block">📁 Select Your CSV File</Text>
-              <input
-                type="file"
-                accept=".csv"
-                ref={fileInputRef}
-                onChange={e => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    handleCsvLeads(e.target.files[0]);
-                  } else {
-                    setCsvLeads([]);
-                    setCsvValidationError(null);
-                    setValidationWarnings([]);
-                  }
-                }}
-                className="block w-full text-sm text-gray-500 border border-gray-300 rounded-lg
-                  file:mr-4 file:py-3 file:px-6
-                  file:rounded-l-lg file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-purple-500 file:text-white
-                  hover:file:bg-purple-600 file:cursor-pointer
-                  cursor-pointer"
-              />
+          {/* Success Message */}
+          {csvLeads.length > 0 && !csvValidationError && (
+            <div className="max-w-md mx-auto p-4 bg-green-50 rounded-lg border border-green-200">
+              <Text className="text-green-700 text-sm font-medium">
+                <CheckCircleOutlined className="mr-2" />✅ File validated successfully! Found {csvLeads.length} leads ready to upload.
+              </Text>
             </div>
+          )}
 
-            {/* Success Message */}
-            {csvLeads.length > 0 && !csvValidationError && (
-              <div className="max-w-2xl mx-auto p-4 bg-green-50 rounded-lg border border-green-200">
-                <Text className="text-green-700 text-sm font-medium">
-                  <CheckCircleOutlined className="mr-2" />✅ File validated successfully! Found {csvLeads.length} leads ready to upload.
-                </Text>
-              </div>
-            )}
-
-            {/* Error Message */}
-            {csvValidationError && (
-              <div className="max-w-2xl mx-auto p-4 bg-red-50 rounded-lg border border-red-200">
-                <Text className="text-red-700 text-sm">
-                  <ExclamationCircleOutlined className="mr-2" />
-                  <strong>Validation Error:</strong>
-                  <div className="mt-2 text-left">
-                    <pre className="whitespace-pre-wrap text-xs bg-red-100 p-2 rounded">{csvValidationError}</pre>
-                  </div>
-                </Text>
-              </div>
-            )}
-          </div>
+          {/* Error Message */}
+          {csvValidationError && (
+            <div className="max-w-md mx-auto p-4 bg-red-50 rounded-lg border border-red-200">
+              <Text className="text-red-700 text-sm">
+                <ExclamationCircleOutlined className="mr-2" />
+                <strong>Validation Error:</strong>
+                <div className="mt-2 text-left">
+                  <pre className="whitespace-pre-wrap text-xs bg-red-100 p-2 rounded">{csvValidationError}</pre>
+                </div>
+              </Text>
+            </div>
+          )}
         </div>
       </div>
     </Modal>

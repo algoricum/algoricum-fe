@@ -1,7 +1,7 @@
 "use client";
 
 import { Modal, Alert, Button, Typography, Spin, Input, Select } from "antd";
-import { CalendarOutlined, LinkOutlined } from "@ant-design/icons";
+import { LinkOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import type React from "react";
 import { useEffect, useState } from "react";
 import CryptoJS from "crypto-js";
@@ -10,9 +10,12 @@ import Image from "next/image";
 import { ErrorToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
 import { getClinicId } from "@/utils/integration-utils";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
+import { commonAlertStyles } from "./utils";
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 const supabase = createClient();
+
 export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel, onConnect, buttonLoading }) => {
   const [consumerKey, setConsumerKey] = useState("");
   const [consumerSecret, setConsumerSecret] = useState("");
@@ -54,14 +57,11 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
         .sort()
         .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParams[key])}`)
         .join("&");
-
       // Step 2: create base string
       const baseString = [method.toUpperCase(), encodeURIComponent(endpoint), encodeURIComponent(paramString)].join("&");
-
       // Step 3: sign it with consumerSecret + "&"
       const signingKey = `${encodeURIComponent(consumerSecret)}&`;
       const signature = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA1(baseString, signingKey));
-
       // Step 4: add signature to params
       const finalUrl = `${endpoint}?${paramString}&oauth_signature=${encodeURIComponent(signature)}`;
 
@@ -72,7 +72,6 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       }
       const data = await res.json();
       const formsArray = Object.values(data);
-
       setForms(formsArray);
       // if (Array.isArray(data)) {
       //   setForms(data);
@@ -87,6 +86,7 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       setLoadingForms(false);
     }
   };
+
   async function getIntegrationData() {
     const clinicId = await getClinicId();
     const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Gravity Form").single();
@@ -103,14 +103,14 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
     }
     await fetchForms();
     setSelectedForms(auth_data.auth_data.form_ids);
-
-
   }
+
   useEffect(() => {
     if (status === "connecting") {
       getIntegrationData();
     }
   }, [open, status]);
+
   const handleConnect = async () => {
     if (!selectedForms.length) return;
     onConnect?.({
@@ -120,12 +120,13 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       baseURL,
     });
   };
+
   return (
     <Modal
       title={
         <div className="flex items-center">
           <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3">
-            <Image src="/GravityForm.png" alt="Google" width={50} height={50} />{" "}
+            <Image src="/GravityForm.png" alt="Gravity Forms" width={50} height={50} />
           </div>
           <span className="text-xl font-semibold">Connect to Gravity Forms</span>
         </div>
@@ -133,74 +134,130 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       open={open}
       onCancel={onCancel}
       footer={null}
-      width={600}
+      width={1000}
       centered
     >
-      <div className="py-6">
+      <div className="py-4">
         {(status === "disconnected" || status === "connecting") && (
           <>
             <Alert
               message="Connect your Gravity Forms Account"
               description="Enter your API credentials and Base URL to fetch available forms."
               type="info"
-              showIcon
-              className="mb-6"
+              className="mb-4 !bg-gray-100 !border-gray-300 !text-gray-800"
+              style={{
+                ...commonAlertStyles,
+                backgroundColor: "#f9fafb",
+                borderColor: "#d1d5db",
+                color: "#1f2937",
+              }}
             />
 
-            <Input placeholder="Consumer Key" value={consumerKey} onChange={e => setConsumerKey(e.target.value)} className="mb-3 h-12" />
-            <Input.Password
-              placeholder="Consumer Secret"
-              value={consumerSecret}
-              onChange={e => setConsumerSecret(e.target.value)}
-              className="mb-3 h-12"
-            />
-            <Input
-              placeholder="Base URL (e.g. https://yoursite.com)"
-              value={baseURL}
-              onChange={e => setBaseURL(e.target.value)}
-              className="mb-4 h-12"
-            />
+            <div className="flex gap-6">
+              {/* Left Column - Form Inputs */}
+              <div className="flex-1">
+                <div className="space-y-3">
+                  <Input placeholder="Consumer Key" value={consumerKey} onChange={e => setConsumerKey(e.target.value)} className="h-11" />
+                  <Input.Password
+                    placeholder="Consumer Secret"
+                    value={consumerSecret}
+                    onChange={e => setConsumerSecret(e.target.value)}
+                    className="h-11"
+                  />
+                  <Input
+                    placeholder="Base URL (e.g. https://yoursite.com)"
+                    value={baseURL}
+                    onChange={e => setBaseURL(e.target.value)}
+                    className="h-11"
+                  />
 
-            <Button
-              type="default"
-              onClick={fetchForms}
-              disabled={!consumerKey || !consumerSecret || !validateUrl(baseURL)}
-              className="mb-4 hover:bg-gray-50"
-            >
-              Fetch Forms
-            </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      type="default"
+                      onClick={fetchForms}
+                      disabled={!consumerKey || !consumerSecret || !validateUrl(baseURL)}
+                      className="hover:bg-gray-50 h-11 flex-1"
+                    >
+                      {loadingForms ? <Spin size="small" /> : "Fetch Forms"}
+                    </Button>
+                  </div>
 
-            {loadingForms && <Spin className="block mx-auto mb-4" />}
+                  <Select
+                    disabled={loadingForms || !forms.length}
+                    mode="multiple"
+                    style={{ width: "100%" }}
+                    placeholder="Select Forms"
+                    value={selectedForms}
+                    onChange={vals => setSelectedForms(vals)}
+                    className="hover:bg-gray-50"
+                    size="large"
+                  >
+                    {forms.map((form: any) => (
+                      <Select.Option key={form.id} value={form.id}>
+                        {form.title}
+                      </Select.Option>
+                    ))}
+                  </Select>
 
-            {
-              <Select
-                disabled={loadingForms || !forms.length}
-                mode="multiple"
-                style={{ width: "100%" }}
-                placeholder="Select Forms"
-                value={selectedForms}
-                onChange={vals => setSelectedForms(vals)}
-                className="mb-4 hover:bg-gray-50"
-              >
-                {forms.map((form: any) => (
-                  <Select.Option key={form.id} value={form.id}>
-                    {form.title}
-                  </Select.Option>
-                ))}
-              </Select>
-            }
+                  <Button
+                    loading={buttonLoading}
+                    type="primary"
+                    size="large"
+                    icon={<LinkOutlined />}
+                    onClick={handleConnect}
+                    disabled={!selectedForms.length}
+                    className="bg-green-600 border-green-600 hover:bg-green-700 h-12 w-full text-lg font-medium"
+                  >
+                    Connect Selected Forms
+                  </Button>
+                </div>
+              </div>
 
-            <Button
-              loading={buttonLoading}
-              type="primary"
-              size="large"
-              icon={<LinkOutlined />}
-              onClick={handleConnect}
-              disabled={!selectedForms.length}
-              className="bg-green-600 border-green-600 hover:bg-gray-50 h-12 px-8 text-lg font-medium"
-            >
-              Connect Selected Forms
-            </Button>
+              {/* Right Column - Instructions */}
+              <div className="flex-1">
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg h-full">
+                  <Title level={5} className="!mb-3 flex items-center">
+                    <InfoCircleOutlined className="mr-2 text-blue-500" />
+                    How to Connect
+                  </Title>
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <Text strong>Step 1:</Text> Log in to your <Text code>WordPress Admin Dashboard</Text> and navigate to{" "}
+                      <Text code>Forms → Settings → REST API</Text>.
+                    </div>
+                    <div>
+                      <Text strong>Step 2:</Text> Generate a new <strong>API Key</strong> and copy your <Text strong>Consumer Key</Text> and{" "}
+                      <Text strong>Consumer Secret</Text>.
+                    </div>
+                    <div>
+                      <Text strong>Step 3:</Text> Enter your <Text code>WordPress Base URL</Text> (e.g.{" "}
+                      <Text code>https://yourwebsite.com</Text>).
+                    </div>
+                    <div>
+                      <Text strong>Step 4:</Text> Click <Text code>Fetch Forms</Text> to load all available Gravity Forms.
+                    </div>
+                    <div>
+                      <Text strong>Step 5:</Text> Select one or more forms and click <Text code>Connect Selected Forms</Text>.
+                    </div>
+                    <div className="pt-2 border-t border-gray-300 mt-4">
+                      <Text type="secondary">
+                        ⚡ <strong>Tip:</strong> Ensure your WordPress site uses HTTPS and the Gravity Forms plugin is active.
+                      </Text>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <BookingLinkComponent
+                bgColor="bg-orange-50"
+                borderColor="border-orange-400"
+                textColor="orange-700"
+                buttonBgColor="orange-400"
+                hoverBgColor="orange-600"
+              />
+            </div>
           </>
         )}
 
@@ -216,16 +273,14 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
             <div className="flex flex-col items-center">
               <Text className="text-gray-600">⚡ Your Gravity Forms integration is ready! Need further help? Book a support meeting.</Text>
               <br />
-              <Button
-                type="primary"
-                size="small"
-                icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
-                className="mt-2 bg-green-600 border-green-600 hover:bg-green-700"
-              >
-                Book a Support Meeting
-              </Button>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-orange-50"
+              borderColor="border-orange-400"
+              textColor="orange-700"
+              buttonBgColor="orange-400"
+              hoverBgColor="orange-600"
+            />
           </>
         )}
       </div>

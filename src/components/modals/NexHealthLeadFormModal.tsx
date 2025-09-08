@@ -1,12 +1,14 @@
 "use client";
 
 import { Modal, Alert, Button, Typography, Spin, Input } from "antd";
-import { CalendarOutlined, LinkOutlined } from "@ant-design/icons";
+import { LinkOutlined } from "@ant-design/icons";
 import type React from "react";
 import { useState } from "react";
 import Image from "next/image";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
+
 
 const { Text } = Typography;
 
@@ -69,16 +71,24 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({ open, status, acc
                 Connect to NexHealth
               </Button>
 
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg text-left">
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg text-left">
                 <Text className="text-sm text-gray-600">
-                  <strong>What happens next:</strong>
-                  <br />• You&apos;ll be redirected to NexHealth
-                  <br />• Grant permission to access your institution data
-                  <br />• We&apos;ll automatically sync your patients
+                  <strong>API Integration Guide</strong>
+                  <br />• Sign up for a NexHealth developer account (if not already created).
+                  <br />• Visit{" "}
+                  <a href="https://developers.nexhealth.com/api-key" target="_blank" rel="noopener noreferrer" className="underline">NexHealth API Key</a> and Copy API Key.
+                  <br />• Paste here. We&apos;ll automatically sync your patients
                   <br />• Takes less than 30 seconds!
                 </Text>
               </div>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-gray-50"
+              borderColor="border-gray-500"
+              textColor="gray-700"
+              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
+              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
 
@@ -105,16 +115,14 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({ open, status, acc
             <div className="mt-4 text-center">
               <Text className="text-gray-600">⚡ Your NexHealth integration is ready! Need further help? Book a support meeting.</Text>
               <br />
-              <Button
-                type="primary"
-                size="small"
-                icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
-                className="mt-2 bg-blue-600 border-blue-600 hover:bg-blue-700"
-              >
-                Book a Support Meeting
-              </Button>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-gray-50"
+              borderColor="border-gray-500"
+              textColor="gray-700"
+              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
+              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
       </div>

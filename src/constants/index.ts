@@ -161,7 +161,7 @@ export const CLINIC_FIELDS: [string, string][] = [
     {
       id: "uploadLeads",
       type: "radio",
-      question: "Do you want to upload your existing leads via CSV?",
+      question: "Do you want to upload any other leads via CSV?",
       subtitle: "Importing your current leads means we can start following up immediately. No waiting, no missed opportunities.",
       options: ["Yes", "No"],
     },

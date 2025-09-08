@@ -23,7 +23,7 @@ export async function sendGoLiveEmail({
     const mailData = {
       from: `Algoricum <no-reply@algoricum.com>`,
       to: [email],
-      subject: "Congrats! Algoricum is live for your clinic",
+      subject:  `${name}- your setup is complete!`,
       html,
       text,
     };
