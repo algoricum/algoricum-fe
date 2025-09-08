@@ -1,5 +1,6 @@
 // _shared/reply-response.ts
-// Shared AI response generation functionality for both SMS and Email processors
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 
 interface LeadData {
   id: string
@@ -124,6 +125,7 @@ export async function generateAIResponse(
                             options.messageBody.toLowerCase().includes('available')
     
     const bookingLink = clinicData.calendly_link || 'https://calendly.com/book'
+    const unsubscribeLink = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`
     
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
     logInfo('🔑 OpenAI API Key check:', {
@@ -220,6 +222,14 @@ Please generate a helpful email response that addresses their message.`
 
       additionalInstructions = `${clinicInstructions}
 
+
+      CRITICAL EMAIL FORMATTING RULES:
+• End your email content naturally - do NOT add signatures, "Best regards," or closing lines
+• Do NOT include clinic name, "[Your Name]" or any placeholder signatures at the end
+• Do NOT include unsubscribe text (system handles this automatically)
+• Simply end where your message naturally concludes
+• Keep content focused and conversational without formal closings
+
 CURRENT MESSAGE CONTEXT:
 You are responding directly to this email from a patient: "${options.messageBody}"
 Subject: ${options.subject || 'No Subject'}
@@ -227,11 +237,20 @@ Subject: ${options.subject || 'No Subject'}
 Patient: ${leadData.first_name || 'Email Lead'} (${leadData.email || 'No email'})
 Context: ${conversationContext ? 'Ongoing conversation - see history' : 'First time contacting us'}
 
-${isBookingInquiry ? `Context Information (for your knowledge only):
-- Booking is available at: ${bookingLink}
-- You may include booking information in email responses` : ''}
+CLINIC INFORMATION (include when asked):
+- Clinic Name: ${clinicData.name}
+- Phone: ${clinicData.phone_number || 'Contact us for phone number'}
+${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ''}
 
-RESPONSE FORMAT: Email response - be professional and comprehensive.`.trim()
+${isBookingInquiry ? `BOOKING INFORMATION:
+- Booking link: ${bookingLink}
+- For booking links in emails, use HTML format: <a href="${bookingLink}" style="color: #10b981; text-decoration: none; font-weight: bold;">Schedule your consultation</a>` : ''}
+
+UNSUBSCRIBE INFORMATION:
+- Unsubscribe link: ${unsubscribeLink}
+- Every email automatically includes unsubscribe footer - do not add manual unsubscribe text
+
+RESPONSE FORMAT: Email response - be professional and comprehensive. End naturally without signatures or footers.`.trim()
     } else {
       // SMS-specific prompt
       userPrompt = `Current SMS Message: ${options.messageBody}
@@ -564,6 +583,7 @@ async function generateFallbackResponse(
                             options.messageBody.toLowerCase().includes('available')
     
     const bookingLink = clinicData.calendly_link || 'https://calendly.com/book'
+    const unsubscribeLink = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`
 
     let prompt: string
 
@@ -571,12 +591,23 @@ async function generateFallbackResponse(
       // Email fallback prompt
       prompt = `You are the AI assistant for ${clinicData.name}, a medical clinic responding via email. Generate a helpful, professional email response to this patient's message.
 
+CRITICAL EMAIL FORMATTING RULES:
+• End your email content naturally - do NOT add signatures, "Best regards," or closing lines
+• Do NOT include clinic name, "[Your Name]" or any placeholder signatures at the end
+• Do NOT include unsubscribe text (system handles this automatically)
+• Simply end where your message naturally concludes
+• Keep content focused and conversational without formal closings
+
 Lead Information:
 - Name: ${leadData.first_name || ''} ${leadData.last_name || ''}
 - Email: ${leadData.email || 'Not provided'}
 - Phone: ${phoneNumber}
 - Status: ${leadData.status || 'unknown'}
+
+CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
+- Phone: ${clinicData.phone_number || 'Contact us for phone number'}
+${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ''}
 
 Current Email:
 Subject: ${options.subject || 'No Subject'}
@@ -585,11 +616,15 @@ Message: ${options.messageBody}
 Previous Conversation:
 ${conversationContext || 'No previous conversation'}
 
-${isBookingInquiry ? `Context Information:
-- Booking available at: ${bookingLink}
-- Include booking information in your response if appropriate` : ''}
+${isBookingInquiry ? `BOOKING INFORMATION:
+- Booking link: ${bookingLink}
+- For booking links in emails, use HTML format: <a href="${bookingLink}" style="color: #10b981; text-decoration: none; font-weight: bold;">Schedule your consultation</a>` : ''}
 
-Generate a professional email response that answers their question and is helpful and informative.`
+UNSUBSCRIBE INFORMATION:
+- Unsubscribe link: ${unsubscribeLink}
+- Every email automatically includes unsubscribe footer - do not add manual unsubscribe text
+
+Generate a professional email response that answers their question and is helpful and informative. End naturally without signatures or footers.`
     } else {
       // SMS fallback prompt
       prompt = `You are the virtual assistant for ${clinicData.name}, a medical clinic responding via SMS. Generate a helpful, conversational SMS response to this patient's message.

@@ -445,7 +445,9 @@ async function processEmailReply(
         recipientEmail, 
         subject, 
         aiResponse.response, 
-        conversationRecord.id
+        conversationRecord.id,
+        leadData,
+        clinicData
       );
       
       if (emailSent.success) {
@@ -498,13 +500,16 @@ async function sendEmailResponse(
   fromEmail: string,
   originalSubject: string,
   responseMessage: string,
-  conversationId: string
+  conversationId: string,
+  leadData?: any,
+  clinicData?: any
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     console.log('📧 Sending email via Mailgun...');
     
     const mailgunApiKey = Deno.env.get('MAILGUN_API_KEY');
     const mailgunDomain = Deno.env.get('MAILGUN_BASE_DOMAIN');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     
     if (!mailgunApiKey || !mailgunDomain) {
       console.error('❌ Mailgun credentials not found');
@@ -515,11 +520,121 @@ async function sendEmailResponse(
       ? originalSubject 
       : `Re: ${originalSubject}`;
 
+    // Clean up response message - remove subject if it appears in body
+    let cleanedMessage = responseMessage;
+    if (cleanedMessage.toLowerCase().includes('subject:')) {
+      cleanedMessage = cleanedMessage.replace(/^subject:.*?\n\n?/i, '').trim();
+    }
+
+    // Remove unwanted closing signatures and dynamic clinic name
+    const clinicName = clinicData?.name || '';
+    cleanedMessage = cleanedMessage
+      .replace(/Looking forward to hearing from you!?\s*$/gi, '')
+      .replace(/Looking forward to helping you.*?\s*$/gi, '')
+      .replace(/Best,?\s*$/gi, '')
+      .replace(/Sincerely,?\s*$/gi, '')
+      .replace(/Best regards,?\s*$/gi, '')
+      .trim();
+    
+    // Remove clinic name dynamically if it appears at the end
+    if (clinicName) {
+      const clinicNameRegex = new RegExp(`\\s*${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'gi');
+      const clinicNameNewLineRegex = new RegExp(`\\n\\s*${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'gi');
+      cleanedMessage = cleanedMessage
+        .replace(clinicNameRegex, '')
+        .replace(clinicNameNewLineRegex, '');
+    }
+    
+    // Remove any manual unsubscribe footer if AI included it
+    cleanedMessage = cleanedMessage
+      .replace(/\s*You're receiving this because you showed interest in our services\.\s*Not interested anymore\? Unsubscribe here\s*$/gi, '')
+      .trim();
+
+    // Create professional HTML email template (same as nurturing-service.ts)
+    const primaryColor = '#2563eb';
+    const clinicDisplayName = clinicName || 'Our Clinic';
+    const logo_url = 'https://ozmytbghfvrfhbjvabor.supabase.co/storage/v1/object/public/clinic-logos/39d699cb-f712-431c-ba38-9e718310e2bb-iy9cs5ln.png';
+    
+    const logoSection = logo_url ? 
+      `<img src="${logo_url}" alt="${clinicDisplayName} Logo" style="max-height: 60px; margin-bottom: 30px; display: block;">` :
+      `<h1 style="color: ${primaryColor}; font-size: 28px; font-weight: bold; margin: 0 0 30px 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${clinicDisplayName}</h1>`;
+
+    // Convert message to HTML
+    const contentBody = cleanedMessage.replace(/\n/g, '<br>');
+
+    const professionalHtmlTemplate = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${replySubject}</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f8fafc;">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f8fafc; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                        <!-- Header with Logo -->
+                        <tr>
+                            <td style="padding: 40px 40px 20px 40px; text-align: center; border-bottom: 1px solid #e2e8f0;">
+                                ${logoSection}
+                            </td>
+                        </tr>
+                        
+                        <!-- Main Content -->
+                        <tr>
+                            <td style="padding: 40px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 16px; color: #334155;">
+                                ${contentBody}
+                            </td>
+                        </tr>
+                        
+                        <!-- Contact Information -->
+                        <tr>
+                            <td style="padding: 30px 40px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+                                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #64748b; text-align: center;">
+                                            <strong style="color: ${primaryColor}; font-size: 16px; display: block; margin-bottom: 10px;">${clinicDisplayName}</strong>
+                                            ${clinicData?.address ? `<div style="margin-bottom: 8px;">${clinicData.address}</div>` : ''}
+                                            ${clinicData?.phone ? `<div style="margin-bottom: 8px;">Phone: <a href="tel:${clinicData.phone}" style="color: ${primaryColor}; text-decoration: none;">${clinicData.phone}</a></div>` : ''}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        
+                        <!-- Unsubscribe Footer -->
+                        ${leadData?.id && SUPABASE_URL ? `
+                        <tr>
+                            <td style="padding: 20px 40px; background-color: #f1f5f9; border-top: 1px solid #e2e8f0; text-align: center;">
+                                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 12px; color: #94a3b8;">
+                                    <p style="margin: 0 0 10px 0;">You're receiving this because you showed interest in our services.</p>
+                                    <p style="margin: 0;">
+                                        Not interested anymore? 
+                                        <a href="${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData?.id}" 
+                                           style="color: #64748b; text-decoration: underline;">
+                                            Unsubscribe here
+                                        </a>
+                                    </p>
+                                </div>
+                            </td>
+                        </tr>
+                        ` : ''}
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    `;
+
     const formData = new FormData();
     formData.append('from', fromEmail);
     formData.append('to', toEmail);
     formData.append('subject', replySubject);
-    formData.append('text', responseMessage);
+    formData.append('text', cleanedMessage);
+    formData.append('html', professionalHtmlTemplate);
     formData.append('h:X-Conversation-ID', conversationId);
 
     const response = await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
