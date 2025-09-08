@@ -658,29 +658,28 @@ async function generateIntelligentResponse(
       .map(msg => `${msg.sender_type === 'user' ? `${lead.first_name || 'Patient'}` : clinic.assistants?.[0]?.assistant_name || 'Assistant'}: ${msg.message}`)
       .join('\n')
 
-    const leadCreatedAt = new Date(lead.created_at)
+    // For email patterns, normalize time units: 
+    // - Extract day number from rule name (works for both demo and production)
+    // - Fallback to calculated days if rule name doesn't contain day number
     const leadAge = rule ? 
-       (rule.timeFromCreated < 24 * 60 * 60 * 1000) ? 
-        parseInt(rule.name.match(/(\d+)day/)?.[1] || '1') :
-        Math.floor(rule.timeFromCreated / (24 * 60 * 60 * 1000)) :
-      Math.floor((new Date().getTime() - leadCreatedAt.getTime()) / (24 * 60 * 60 * 1000))
+      parseInt(rule.name.match(/(\d+)day/)?.[1] || '0') || // Primary: extract from rule name
+      Math.floor(rule.timeFromCreated / (24 * 60 * 60 * 1000)) || // Production: actual days
+      Math.floor(rule.timeFromCreated / 1000) || // Demo: seconds as days  
+      1 : 1 // Final fallback
     
     // Get instructions from clinic.assistants.instructions 
     const assistantInstructions = clinic.assistants?.[0]?.instructions || ''
+    
+    logInfo(`DEBUG: Lead age: ${leadAge}, Rule: ${rule?.name}`)
+    logInfo(`DEBUG: Instructions length: ${assistantInstructions.length}`)
+    logInfo(`DEBUG: Instructions contain PSYCHOLOGY PATTERN: ${assistantInstructions.includes('PSYCHOLOGY PATTERN')}`)
+    logInfo(`DEBUG: Instructions contain EMAIL FOLLOW-UP PATTERNS: ${assistantInstructions.includes('EMAIL FOLLOW-UP PATTERNS')}`)
     
     let systemPrompt = ''
     let userPrompt = ''
 
     if (isEmail) {
-      systemPrompt = `${assistantInstructions}
-
-REQUIRED ELEMENTS:
-- MUST include booking link naturally embedded in text: ${bookingButton}
-- DO NOT add unsubscribe text in body - it will be added automatically in footer
-
-Format your response as:
-SUBJECT: [conversational subject line]
-BODY: [casual, engaging email content with embedded booking link]`
+      systemPrompt = assistantInstructions
 
       userPrompt = `Generate a follow-up email for ${lead.first_name || 'this patient'} (${leadAge} days old) at ${clinic.name}.
 
@@ -693,7 +692,16 @@ Patient Details:
 - Interest Level: ${lead.interest_level || 'unknown'}
 - Urgency: ${lead.urgency || 'unknown'}
 
-Make it sound like you're genuinely checking in with someone you care about, not sending a marketing email. Include the booking link naturally embedded in text. Do not include any unsubscribe text - it will be added automatically.`
+IMPORTANT: Follow the specific EMAIL FOLLOW-UP PATTERN from your instructions based on the lead age (${leadAge} days). Use the appropriate pattern:
+- Day 21+: STORY PATTERN with clinic success stories
+- Day 24+: EDUCATION PATTERN with insights
+- Day 27+: PSYCHOLOGY PATTERN with behavioral insights  
+- Day 30+: MOMENTUM PATTERN focusing on action
+- Day 45+: SOCIAL PROOF PATTERN with patient feedback
+- Day 60+: URGENCY/SCARCITY PATTERN about opportunity cost
+- Day 100+: FINAL SEQUENCE with direct close
+
+Generate according to the specific pattern for this lead age. Format as specified in your instructions with proper subject line and body content.`
 
     } else {
       systemPrompt = `${assistantInstructions}
@@ -737,26 +745,41 @@ Make it sound natural and friendly. DO NOT include booking links or unsubscribe 
       })
     })
 
+    logInfo('OpenAI API response status:', { status: response.status, statusText: response.statusText })
+    
     if (response.ok) {
       const data = await response.json()
+      logInfo('OpenAI API response data received')
       const generatedContent = data.choices[0]?.message?.content
+      
+      logInfo('Generated content preview:', generatedContent?.substring(0, 200))
       
       if (generatedContent) {
         if (isEmail) {
           const lines = generatedContent.split('\n')
           let subject = ''
           let body = ''
-          let isBody = false
+          let foundSubject = false
 
-          for (const line of lines) {
-            if (line.startsWith('SUBJECT:')) {
-              subject = line.replace('SUBJECT:', '').trim()
-            } else if (line.startsWith('BODY:')) {
-              body = line.replace('BODY:', '').trim()
-              isBody = true
-            } else if (isBody && line.trim()) {
-              body += '\n' + line
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i]
+            
+            if (line.toLowerCase().startsWith('subject:')) {
+              subject = line.replace(/^subject:\s*/i, '').trim()
+              foundSubject = true
+            } else if (foundSubject && line.trim()) {
+              // After finding subject, everything else is body content
+              body += (body ? '\n' : '') + line
+            } else if (foundSubject && !line.trim() && body) {
+              // Preserve empty lines within body content
+              body += '\n'
             }
+          }
+          
+          // Fallback: if no "Subject:" prefix found, treat first line as subject
+          if (!subject && lines.length > 0) {
+            subject = lines[0].trim()
+            body = lines.slice(1).join('\n').trim()
           }
 
           body += `\n\n${unsubscribeFooter}`
@@ -774,7 +797,12 @@ Make it sound natural and friendly. DO NOT include booking links or unsubscribe 
         }
       }
     } else {
-      logError('OpenAI API call failed', await response.text())
+      const errorText = await response.text()
+      logError('OpenAI API call failed', { 
+        status: response.status, 
+        statusText: response.statusText,
+        error: errorText 
+      })
     }
   } catch (error) {
     logError('Error generating intelligent response with OpenAI', error)
@@ -970,11 +998,15 @@ async function sendEmail(
       `<h1 style="color: ${primaryColor}; font-size: 28px; font-weight: bold; margin: 0 0 30px 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${clinicName}</h1>`;
 
     // Convert body content to HTML with better formatting
-    const contentBody = body
-      .replace(/\n\n/g, '</p><p style="margin: 0 0 20px 0; line-height: 1.6;">')
-      .replace(/\n/g, '<br>')
-      .replace(/^/, '<p style="margin: 0 0 20px 0; line-height: 1.6;">')
-      .replace(/$/, '</p>');
+    const isAlreadyHTML = body.includes('<br>') || body.includes('<p>') || body.includes('<div>');
+    
+    const contentBody = isAlreadyHTML 
+      ? body  // Use as-is if already HTML formatted
+      : body
+          .replace(/\n\n/g, '</p><p style="margin: 0 0 20px 0; line-height: 1.6;">')
+          .replace(/\n/g, '<br>')
+          .replace(/^/, '<p style="margin: 0 0 20px 0; line-height: 1.6;">')
+          .replace(/$/, '</p>');
 
     const professionalHtmlTemplate = `
     <!DOCTYPE html>
