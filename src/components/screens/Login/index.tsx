@@ -43,9 +43,10 @@ const LoginPage = () => {
         return;
       }
       // Check multiple possible fields for email verification
-      const isEmailVerified = user.email_confirmed_at !== null && user.email_confirmed_at !== undefined;
+      const isEmailVerified = user.is_email_verified !== null && user.is_email_verified !== undefined;
+
       console.log("Email verification status:", {
-        email_confirmed_at: user.email_confirmed_at,
+        is_email_verified: user.is_email_verified,
         isEmailVerified,
       }); // Debug log
       if (!isEmailVerified) {

@@ -70,7 +70,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "visit_reason",
       field_name: "Visit Reason",
       field_type: "textarea",
-      is_required: true,
+      is_required: false, // Changed from true to false
       field_order: 5,
     },
     {
@@ -78,7 +78,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "consultation_type",
       field_name: "Consultation Type",
       field_type: "textarea",
-      is_required: true,
+      is_required: false, 
       field_order: 6,
     },
     {
@@ -86,7 +86,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "services_interest",
       field_name: "Service Interest",
       field_type: "textarea",
-      is_required: true,
+      is_required: false, 
       field_order: 7,
     },
   ];
@@ -145,49 +145,48 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!validateForm()) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
 
-  setSubmitting(true);
-  const source_id = await getLeadSourceId("Others");
+    setSubmitting(true);
+    const source_id = await getLeadSourceId("Others");
 
-  try {
-    const submissionData = {
-      clinic_id: clinicId,
-      source_id: source_id,
-      first_name: formData.first_name || null,
-      last_name: formData.last_name || null,
-      email: formData.email || null,
-      phone: phoneNumber || null,
-      form_data: {
-        service_interest: formData.services_interest || null,
-        visit_reason: formData.visit_reason || null,
-        consultation_type: formData.consultation_type || null,
-      },
-      interest_level: "medium",
-      urgency: "curious",
-      status: "New",
-    };
+    try {
+      const submissionData = {
+        clinic_id: clinicId,
+        source_id: source_id,
+        first_name: formData.first_name || null,
+        last_name: formData.last_name || null,
+        email: formData.email || null,
+        phone: phoneNumber || null,
+        form_data: {
+          service_interest: formData.services_interest || null,
+          visit_reason: formData.visit_reason || null,
+          consultation_type: formData.consultation_type || null,
+        },
+        interest_level: "medium",
+        urgency: "curious",
+        status: "New",
+      };
 
-    const { data, error: insertError } = await supabase.from("lead").insert([submissionData]).select().single();
+      const { data, error: insertError } = await supabase.from("lead").insert([submissionData]).select().single();
 
-    if (insertError?.code === "23505") {
-      throw new Error("Lead with this email already registered in this clinic");
+      if (insertError?.code === "23505") {
+        throw new Error("Lead with this email already registered in this clinic");
+      }
+
+      SuccessToast(" Lead created successfully ");
+
+      onSuccess?.(data);
+      setSubmitted(true);
+    } catch (err) {
+      const error = err as Error;
+      ErrorToast(`${error}`);
+    } finally {
+      setSubmitting(false);
     }
-    
-     SuccessToast(" Lead created successfully ")
-
-    onSuccess?.(data);
-    setSubmitted(true);
-  } catch (err) {
-    const error = err as Error;
-    ErrorToast(`${error}`)
-
-  } finally {
-    setSubmitting(false);
-  }
-};
+  };
 
   const getFieldIcon = (fieldId: string) => {
     switch (fieldId) {
@@ -261,10 +260,10 @@ const handleSubmit = async (e: React.FormEvent) => {
             style={isServiceOrConsultation ? { width: "360px", height: "196px" } : {}}
             placeholder={
               f.field_id === "visit_reason"
-                ? "Please describe your health concern or reason for visit..."
+                ? "Please describe your health concern or reason for visit... (optional)"
                 : f.field_id === "consultation_type"
-                  ? "Describe your consultation preferences..."
-                  : "Tell us about your service interests..."
+                  ? "Describe your consultation preferences... (optional)"
+                  : "Tell us about your service interests... (optional)"
             }
           />
         </div>
@@ -347,7 +346,9 @@ const handleSubmit = async (e: React.FormEvent) => {
           </div>
 
           <div className="space-y-1">
-            <label className="block text-sm font-semibold text-gray-700">What brings you to our clinic today?</label>
+            <label className="block text-sm font-semibold text-gray-700">
+              What brings you to our clinic today? <span className="text-gray-400 text-xs">(optional)</span>
+            </label>
             {renderField(staticFields[4])}
             {errors.visit_reason && <p className="text-red-500 text-sm font-medium">{errors.visit_reason}</p>}
           </div>
@@ -355,7 +356,9 @@ const handleSubmit = async (e: React.FormEvent) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {staticFields.slice(5, 7).map(f => (
               <div key={f.field_id} className="space-y-1">
-                <label className="block text-sm font-semibold text-gray-700">{f.field_name}</label>
+                <label className="block text-sm font-semibold text-gray-700">
+                  {f.field_name} <span className="text-gray-400 text-xs">(optional)</span>
+                </label>
                 {renderField(f)}
                 {errors[f.field_id] && <p className="text-red-500 text-sm font-medium">{errors[f.field_id]}</p>}
               </div>

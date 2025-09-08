@@ -22,7 +22,7 @@ const VerifyOTPPage = () => {
   const fromLogin = searchParams.get("fromLogin") === "true";
 
   const [otp, setOtp] = useState("");
-  const [resendTimer, setResendTimer] = useState(60);
+  const [resendTimer, setResendTimer] = useState(120);
   const [user, setUser] = useState<any>(null);
   const [userEmail, setUserEmail] = useState<string>("");
   const supabase = createClient();
@@ -73,6 +73,17 @@ const VerifyOTPPage = () => {
         ErrorToast("User not found. Please try logging in again.");
         router.push("/login");
         return;
+      }
+
+      try {
+        await supabase
+          .from('user')
+          .upsert({ 
+            is_email_verified: true 
+          })
+          .eq('id', user.id);
+      } catch (error) {
+        console.error("Failed to update email verification status:", error);
       }
 
       // Check if user has a clinic
