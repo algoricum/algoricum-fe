@@ -20,6 +20,15 @@ const SignupPage = () => {
   const { push } = useRouter();
   const [form] = Form.useForm();
 
+  const handleFieldFocus = (fieldName: string) => {
+    form.setFields([
+      {
+        name: fieldName,
+        errors: [],
+      },
+    ]);
+  };
+
   const { mutate, isLoading } = useMutation((data: SignupProps) => signUp(data.name, data.email, data.password), {
     onSuccess: (data: any) => {
       if (!data?.user) return;
@@ -29,11 +38,7 @@ const SignupPage = () => {
       SuccessToast("OTP sent successfully. Please verify your email");
     },
     onError: (error: any) => {
-      ErrorToast(
-        error?.message ||
-        error?.error_description ||
-        "An error occurred while signing up"
-      );
+      ErrorToast(error?.message || error?.error_description || "An error occurred while signing up");
     },
   });
 
@@ -45,10 +50,21 @@ const SignupPage = () => {
     <Flex vertical gap={36} className="w-full">
       <div>
         <h1 className="text-2xl font-bold mb-1 font">Create Your Algoricum Account</h1>
-        <p className="text-sm text-gray-600">Start optimizing your clinic’s lead flow with AI-powered tools.</p>
+        <p className="text-sm text-gray-600">Start optimizing your clinic&apos;s lead flow with AI-powered tools.</p>
       </div>
 
-      <Form form={form} name="signup" layout="vertical" className="w-full" initialValues={{ remember: true }} onFinish={onFinish}>
+      <Form
+        form={form}
+        name="signup"
+        layout="vertical"
+        className="w-full"
+        initialValues={{ remember: true }}
+        onFinish={onFinish}
+        validateTrigger="onBlur"
+        onFinishFailed={() => {
+          form.validateFields();
+        }}
+      >
         <Flex vertical gap={36}>
           <Flex vertical gap={2}>
             <Form.Item
@@ -56,8 +72,9 @@ const SignupPage = () => {
               label="Full Name"
               className="flex-1 w-full"
               rules={[{ required: true, message: "Please input your name" }]}
+              validateTrigger={["onBlur", "onSubmit"]}
             >
-              <Input className="w-full" placeholder="Name" />
+              <Input className="w-full" placeholder="Name" onFocus={() => handleFieldFocus("name")} />
             </Form.Item>
 
             <Form.Item
@@ -74,8 +91,9 @@ const SignupPage = () => {
                   message: "Invalid email address",
                 },
               ]}
+              validateTrigger={["onBlur", "onSubmit"]}
             >
-              <Input prefix={<MailIcon />} className="w-full" placeholder="Email" />
+              <Input prefix={<MailIcon />} className="w-full" placeholder="Email" onFocus={() => handleFieldFocus("email")} />
             </Form.Item>
 
             <Form.Item
@@ -92,8 +110,14 @@ const SignupPage = () => {
                   message: "Password can be maximum 32 characters long",
                 },
               ]}
+              validateTrigger={["onBlur", "onSubmit"]}
             >
-              <PasswordInput prefix={<PasswordIcon />} className="w-full" placeholder="Password" />
+              <PasswordInput
+                prefix={<PasswordIcon />}
+                className="w-full"
+                placeholder="Password"
+                onFocus={() => handleFieldFocus("password")}
+              />
             </Form.Item>
 
             <Form.Item
@@ -111,11 +135,13 @@ const SignupPage = () => {
                   },
                 }),
               ]}
+              validateTrigger={["onBlur", "onSubmit"]}
             >
               <PasswordInput
                 prefix={<PasswordIcon />}
                 className="w-full"
                 placeholder="Confirm Password"
+                onFocus={() => handleFieldFocus("confirmPassword")}
                 onPaste={e => e.preventDefault()}
                 onCopy={e => e.preventDefault()}
                 onCut={e => e.preventDefault()}

@@ -4,7 +4,7 @@ import { User as SupabaseUser, Session } from "@supabase/supabase-js";
 import type { User } from "@/interfaces/services_type";
 import { clearAll, setAccessToken } from "@/helpers/storage-helper";
 import { setUserData } from "./user-helper";
-import { SuccessToast} from "@/helpers/toast";
+import { SuccessToast } from "@/helpers/toast";
 
 const supabase = createClient();
 
@@ -153,13 +153,11 @@ export const resetPasswordRequest = async (email: string): Promise<void> => {
     if (resetError) {
       throw resetError;
     }
-
   } catch (error: any) {
     console.error(`Forgot password error: ${error.message}`);
     throw error;
   }
 };
-
 
 /**
  * Update user password
@@ -175,7 +173,6 @@ export const updatePassword = async (password: string): Promise<void> => {
     throw error;
   }
 };
-
 
 export const updateLoggedStatus = async (newPassword: string) => {
   const { error: updateError } = await supabase.auth.updateUser({
@@ -260,4 +257,19 @@ export const setupAuthListener = (onSignIn: (_user: User, _token: string) => voi
   return () => {
     subscription.unsubscribe();
   };
+};
+
+export const checkUserStatus = async (user_id: string): Promise<boolean> => {
+  try {
+    // Fetch user data
+    const { data: user, error } = await supabase.from("user_clinic").select("is_active").eq("user_id", user_id).maybeSingle();
+    if (error) throw error;
+    if (!user) {
+      return false; // User has no clinic relationship = inactive
+    }
+    return user.is_active; // Return true if user is active, false otherwise
+  } catch (error: any) {
+    console.error("Error checking user status:", error.message);
+    return false; // Return false on error (safe default for middleware)
+  }
 };

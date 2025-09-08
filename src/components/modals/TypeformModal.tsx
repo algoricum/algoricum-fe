@@ -1,11 +1,11 @@
 "use client";
 
 import { Modal, Alert, Button, TreeSelect, Typography, Spin } from "antd";
-import { CalendarOutlined } from "@ant-design/icons";
 import type React from "react";
 import Image from "next/image";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 
 const { Text } = Typography;
 
@@ -83,6 +83,13 @@ export const TypeformModal: React.FC<ModalProps> = ({
                 </Text>
               </div>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-gray-50"
+              borderColor="border-gray-500"
+              textColor="gray-700"
+              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
+              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
         {status === "connecting" && (
@@ -145,16 +152,14 @@ export const TypeformModal: React.FC<ModalProps> = ({
             <div className="mt-4 text-center">
               <Text className="text-gray-600">⚡ Your Typeform integration is ready! Need help?</Text>
               <br />
-              <Button
-                type="primary"
-                size="small"
-                icon={<CalendarOutlined />}
-                onClick={() => window.open("https://calendly.com/abdullah-salman-hashlogics/30min", "_blank")}
-                className="mt-2 bg-purple-600 border-purple-600 hover:bg-purple-700"
-              >
-                Book a Support Meeting
-              </Button>
             </div>
+            <BookingLinkComponent
+              bgColor="bg-gray-50"
+              borderColor="border-gray-500"
+              textColor="gray-700"
+              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
+              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+            />
           </>
         )}
       </div>

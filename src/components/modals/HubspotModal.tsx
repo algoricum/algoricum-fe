@@ -5,6 +5,9 @@ import type React from "react";
 import Image from "next/image";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
+
+
 
 const { Text } = Typography;
 
@@ -59,6 +62,13 @@ export const HubspotModal: React.FC<ModalProps> = ({ open, status, accountInfo, 
               </Text>
             </div>
           </div>
+          <BookingLinkComponent
+            bgColor="bg-orange-50"
+            borderColor="border-orange-400"
+            textColor="orange-700"
+            buttonBgColor="orange-400" // Normal button color (matches your Tailwind)
+            hoverBgColor="orange-600" // Hover color (matches your Tailwind)
+          />
         </>
       )}
       {status === "connecting" && (

@@ -42,7 +42,7 @@ const supabase = createClient();
 const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
-  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
+  // { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
   // { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
   // { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
   // { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
@@ -290,7 +290,7 @@ export default function MainOnboarding() {
         email: mappedData.emailAddress || user.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink || `${process.env.NEXT_PUBLIC_URL}/schedule-meeting?clinic_id=${clinic.id}`,
+        calendly_link: mappedData.calendlyLink || "https://tinyurl.com/35c3wr42",
         tone_selector: mappedData.toneSelector,
         sentence_length: mappedData.sentenceLength,
         formality_level: mappedData.formalityLevel,
