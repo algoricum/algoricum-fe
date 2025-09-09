@@ -92,8 +92,8 @@ export function StaffFilters({
           icon={<Plus className="h-4 w-4" />}
           onClick={onAddStaff}
           style={{
-            backgroundColor: "#9564e9",
-            borderColor: "#9564e9",
+            backgroundColor: "#9333ea",
+            borderColor: "#9333ea",
             boxShadow: "0 4px 12px rgba(149, 100, 233, 0.3)",
             borderRadius: 8,
             height: 44,
