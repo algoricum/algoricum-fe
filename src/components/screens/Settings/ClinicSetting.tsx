@@ -198,7 +198,7 @@ const ClinicSetting = () => {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 px-3">
       {/* Clinic Profile & Logo */}
       <div className="flex flex-col lg:flex-row gap-6 flex-wrap border border-gray-200 p-6 bg-Gray100 rounded-[20px]">
         <div className="flex-1 min-w-[280px] rounded-[20px]">
