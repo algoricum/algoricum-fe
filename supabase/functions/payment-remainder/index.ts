@@ -225,8 +225,7 @@ async function processRemindersForDay(reminderConfig: any, subscriptions: any[])
     try {
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://eypitkzntyiyvwrndkgy.supabase.co";
       const SUPABASE_ANON_KEY =
-        Deno.env.get("SUPABASE_ANON_KEY") ||
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5cGl0a3pudHlpeXZ3cm5ka2d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYwMTEyNTUsImV4cCI6MjA2MTU4NzI1NX0.KNuo0SGqJKEtJj5-vPz2D6kdtYB54XXBjkqYqdkaBQI";
+        Deno.env.get("SUPABASE_ANON_KEY") || "";
 
       const checkoutResponse = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
         method: "POST",
