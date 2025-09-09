@@ -53,7 +53,7 @@ interface CreateStaffResponse {
   error?: { message?: string };
 }
 
-export default function StaffPageRefactored(): JSX.Element {
+export default function StaffPage(): JSX.Element {
   // State management
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [staffData, setStaffData] = useState<Staff[]>([]);

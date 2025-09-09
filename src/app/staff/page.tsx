@@ -1,5 +1,5 @@
-import StaffPageRefactored from "@/components/staff/staff-page-refactored";
+import StaffPage from "@/components/staff/staff-page";
 
 export default function Page() {
-  return <StaffPageRefactored />;
+  return <StaffPage />;
 }
