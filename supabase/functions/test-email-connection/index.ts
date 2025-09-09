@@ -1,7 +1,14 @@
 // supabase/functions/email-processor/index.ts
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { generateAIResponse, saveAIResponseToConversation, type ClinicData, type GenerateAIResponseOptions, type LeadData } from '../_shared/reply-response.ts';
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import {
+  generateAIResponse,
+  saveAIResponseToConversation,
+  type ClinicData,
+  type GenerateAIResponseOptions,
+  type LeadData,
+} from "../_shared/reply-response.ts";
+import { detectBookingRequestAndCreateSchedule, type BookingDetectionOptions } from "../_shared/booking-detection-service.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -316,6 +323,35 @@ async function processEmailReply(webhookData: any, supabaseClient: any): Promise
       leadData = createdLead;
       console.log(`✅ Created new lead: ${leadData.id}`);
 
+      // Check for booking request in new lead's first email using shared service
+      const bookingOptions: BookingDetectionOptions = {
+        messageBody: messageBody,
+        subject: subject,
+        leadData: {
+          id: leadData.id,
+          first_name: leadData.first_name,
+          last_name: leadData.last_name,
+          email: leadData.email,
+          phone: leadData.phone,
+          notes: leadData.notes,
+        },
+        clinicData: {
+          id: clinicData.id,
+          name: clinicData.name,
+          calendly_link: clinicData.calendly_link,
+        },
+        communicationType: "email",
+      };
+
+      const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
+      const isBookingRequest = bookingResult.isBookingRequest;
+
+      if (bookingResult.meetingScheduleCreated) {
+        console.log(`✅ Booking service created meeting schedule: ${bookingResult.meetingScheduleId} for new lead`);
+      } else if (bookingResult.error) {
+        console.error(`❌ Booking service error for new lead: ${bookingResult.error}`);
+      }
+
       // For new leads, just return success without creating conversation thread
       return {
         success: true,
@@ -326,10 +362,39 @@ async function processEmailReply(webhookData: any, supabaseClient: any): Promise
           sender: senderEmail,
           lead_created: true,
           action: "lead_created_only",
+          booking_requested: isBookingRequest,
         },
       };
     } else {
       console.log(`✅ Found existing lead: ${leadData.id}`);
+    }
+
+    // Check for booking/appointment keywords and create meeting_schedule if detected using shared service
+    const existingLeadBookingOptions: BookingDetectionOptions = {
+      messageBody: messageBody,
+      subject: subject,
+      leadData: {
+        id: leadData.id,
+        first_name: leadData.first_name,
+        last_name: leadData.last_name,
+        email: leadData.email,
+        phone: leadData.phone,
+        notes: leadData.notes,
+      },
+      clinicData: {
+        id: clinicData.id,
+        name: clinicData.name,
+        calendly_link: clinicData.calendly_link,
+      },
+      communicationType: "email",
+    };
+
+    const existingLeadBookingResult = await detectBookingRequestAndCreateSchedule(existingLeadBookingOptions, supabaseClient);
+
+    if (existingLeadBookingResult.meetingScheduleCreated) {
+      console.log(`✅ Booking service created meeting schedule: ${existingLeadBookingResult.meetingScheduleId} for existing lead`);
+    } else if (existingLeadBookingResult.error) {
+      console.error(`❌ Booking service error for existing lead: ${existingLeadBookingResult.error}`);
     }
 
     // Check if this is a reply to a previous email
@@ -418,31 +483,31 @@ async function processEmailReply(webhookData: any, supabaseClient: any): Promise
     }
 
     // Generate and send AI response
-    console.log('🤖 Generating AI response...');
+    console.log("🤖 Generating AI response...");
     const aiResponse = await generateAIResponse(
-      leadData as LeadData, 
+      leadData as LeadData,
       {
         messageBody: messageBody,
         subject: subject,
         threadId: threadId,
-        callerService: 'test-email-connection'
-      } as GenerateAIResponseOptions, 
-      supabaseClient, 
-      clinicData as ClinicData
+        callerService: "test-email-connection",
+      } as GenerateAIResponseOptions,
+      supabaseClient,
+      clinicData as ClinicData,
     );
-    
+
     if (aiResponse.success) {
-      console.log('📧 Sending AI response via email...');
+      console.log("📧 Sending AI response via email...");
       const emailSent = await sendEmailResponse(
-        senderEmail, 
-        recipientEmail, 
-        subject, 
-        aiResponse.response, 
+        senderEmail,
+        recipientEmail,
+        subject,
+        aiResponse.response,
         conversationRecord.id,
         leadData,
-        clinicData
+        clinicData,
       );
-      
+
       if (emailSent.success) {
         console.log("💾 Saving AI response to conversation...");
         await saveAIResponseToConversation(threadId, aiResponse.response, emailSent.messageId, supabaseClient);
@@ -480,7 +545,6 @@ async function processEmailReply(webhookData: any, supabaseClient: any): Promise
   }
 }
 
-
 // Your existing email sending function (unchanged)
 async function sendEmailResponse(
   toEmail: string,
@@ -489,15 +553,15 @@ async function sendEmailResponse(
   responseMessage: string,
   conversationId: string,
   leadData?: any,
-  clinicData?: any
+  clinicData?: any,
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    console.log('📧 Sending email via Mailgun...');
-    
-    const mailgunApiKey = Deno.env.get('MAILGUN_API_KEY');
-    const mailgunDomain = Deno.env.get('MAILGUN_BASE_DOMAIN');
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-    
+    console.log("📧 Sending email via Mailgun...");
+
+    const mailgunApiKey = Deno.env.get("MAILGUN_API_KEY");
+    const mailgunDomain = Deno.env.get("MAILGUN_BASE_DOMAIN");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+
     if (!mailgunApiKey || !mailgunDomain) {
       console.error("❌ Mailgun credentials not found");
       return { success: false, error: "Mailgun credentials not configured" };
@@ -507,45 +571,47 @@ async function sendEmailResponse(
 
     // Clean up response message - remove subject if it appears in body
     let cleanedMessage = responseMessage;
-    if (cleanedMessage.toLowerCase().includes('subject:')) {
-      cleanedMessage = cleanedMessage.replace(/^subject:.*?\n\n?/i, '').trim();
+    if (cleanedMessage.toLowerCase().includes("subject:")) {
+      cleanedMessage = cleanedMessage.replace(/^subject:.*?\n\n?/i, "").trim();
     }
 
     // Remove unwanted closing signatures and dynamic clinic name
-    const clinicName = clinicData?.name || '';
+    const clinicName = clinicData?.name || "";
     cleanedMessage = cleanedMessage
-      .replace(/Looking forward to hearing from you!?\s*$/gi, '')
-      .replace(/Looking forward to helping you.*?\s*$/gi, '')
-      .replace(/Best,?\s*$/gi, '')
-      .replace(/Sincerely,?\s*$/gi, '')
-      .replace(/Best regards,?\s*$/gi, '')
+      .replace(/Looking forward to hearing from you!?\s*$/gi, "")
+      .replace(/Looking forward to helping you.*?\s*$/gi, "")
+      .replace(/Best,?\s*$/gi, "")
+      .replace(/Sincerely,?\s*$/gi, "")
+      .replace(/Best regards,?\s*$/gi, "")
       .trim();
-    
+
     // Remove clinic name dynamically if it appears at the end
     if (clinicName) {
-      const clinicNameRegex = new RegExp(`\\s*${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'gi');
-      const clinicNameNewLineRegex = new RegExp(`\\n\\s*${clinicName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'gi');
-      cleanedMessage = cleanedMessage
-        .replace(clinicNameRegex, '')
-        .replace(clinicNameNewLineRegex, '');
+      const clinicNameRegex = new RegExp(`\\s*${clinicName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "gi");
+      const clinicNameNewLineRegex = new RegExp(`\\n\\s*${clinicName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "gi");
+      cleanedMessage = cleanedMessage.replace(clinicNameRegex, "").replace(clinicNameNewLineRegex, "");
     }
-    
+
     // Remove any manual unsubscribe footer if AI included it
     cleanedMessage = cleanedMessage
-      .replace(/\s*You're receiving this because you showed interest in our services\.\s*Not interested anymore\? Unsubscribe here\s*$/gi, '')
+      .replace(
+        /\s*You're receiving this because you showed interest in our services\.\s*Not interested anymore\? Unsubscribe here\s*$/gi,
+        "",
+      )
       .trim();
 
     // Create professional HTML email template (same as nurturing-service.ts)
-    const primaryColor = '#2563eb';
-    const clinicDisplayName = clinicName || 'Our Clinic';
-    const logo_url = 'https://ozmytbghfvrfhbjvabor.supabase.co/storage/v1/object/public/clinic-logos/39d699cb-f712-431c-ba38-9e718310e2bb-iy9cs5ln.png';
-    
-    const logoSection = logo_url ? 
-      `<img src="${logo_url}" alt="${clinicDisplayName} Logo" style="max-height: 60px; margin-bottom: 30px; display: block;">` :
-      `<h1 style="color: ${primaryColor}; font-size: 28px; font-weight: bold; margin: 0 0 30px 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${clinicDisplayName}</h1>`;
+    const primaryColor = "#2563eb";
+    const clinicDisplayName = clinicName || "Our Clinic";
+    const logo_url =
+      "https://ozmytbghfvrfhbjvabor.supabase.co/storage/v1/object/public/clinic-logos/39d699cb-f712-431c-ba38-9e718310e2bb-iy9cs5ln.png";
+
+    const logoSection = logo_url
+      ? `<img src="${logo_url}" alt="${clinicDisplayName} Logo" style="max-height: 60px; margin-bottom: 30px; display: block;">`
+      : `<h1 style="color: ${primaryColor}; font-size: 28px; font-weight: bold; margin: 0 0 30px 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${clinicDisplayName}</h1>`;
 
     // Convert message to HTML
-    const contentBody = cleanedMessage.replace(/\n/g, '<br>');
+    const contentBody = cleanedMessage.replace(/\n/g, "<br>");
 
     const professionalHtmlTemplate = `
     <!DOCTYPE html>
@@ -581,8 +647,8 @@ async function sendEmailResponse(
                                     <tr>
                                         <td style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #64748b; text-align: center;">
                                             <strong style="color: ${primaryColor}; font-size: 16px; display: block; margin-bottom: 10px;">${clinicDisplayName}</strong>
-                                            ${clinicData?.address ? `<div style="margin-bottom: 8px;">${clinicData.address}</div>` : ''}
-                                            ${clinicData?.phone ? `<div style="margin-bottom: 8px;">Phone: <a href="tel:${clinicData.phone}" style="color: ${primaryColor}; text-decoration: none;">${clinicData.phone}</a></div>` : ''}
+                                            ${clinicData?.address ? `<div style="margin-bottom: 8px;">${clinicData.address}</div>` : ""}
+                                            ${clinicData?.phone ? `<div style="margin-bottom: 8px;">Phone: <a href="tel:${clinicData.phone}" style="color: ${primaryColor}; text-decoration: none;">${clinicData.phone}</a></div>` : ""}
                                         </td>
                                     </tr>
                                 </table>
@@ -590,7 +656,9 @@ async function sendEmailResponse(
                         </tr>
                         
                         <!-- Unsubscribe Footer -->
-                        ${leadData?.id && SUPABASE_URL ? `
+                        ${
+                          leadData?.id && SUPABASE_URL
+                            ? `
                         <tr>
                             <td style="padding: 20px 40px; background-color: #f1f5f9; border-top: 1px solid #e2e8f0; text-align: center;">
                                 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 12px; color: #94a3b8;">
@@ -605,7 +673,9 @@ async function sendEmailResponse(
                                 </div>
                             </td>
                         </tr>
-                        ` : ''}
+                        `
+                            : ""
+                        }
                     </table>
                 </td>
             </tr>
@@ -615,12 +685,12 @@ async function sendEmailResponse(
     `;
 
     const formData = new FormData();
-    formData.append('from', fromEmail);
-    formData.append('to', toEmail);
-    formData.append('subject', replySubject);
-    formData.append('text', cleanedMessage);
-    formData.append('html', professionalHtmlTemplate);
-    formData.append('h:X-Conversation-ID', conversationId);
+    formData.append("from", fromEmail);
+    formData.append("to", toEmail);
+    formData.append("subject", replySubject);
+    formData.append("text", cleanedMessage);
+    formData.append("html", professionalHtmlTemplate);
+    formData.append("h:X-Conversation-ID", conversationId);
 
     const response = await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, {
       method: "POST",
@@ -648,4 +718,3 @@ async function sendEmailResponse(
     return { success: false, error: error.message };
   }
 }
-
