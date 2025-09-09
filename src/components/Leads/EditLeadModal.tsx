@@ -45,7 +45,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
     urgency: "",
     notes: "",
   });
-  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const supabase = createClient();
@@ -62,7 +62,6 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
         urgency: lead.urgency || "",
         notes: lead.notes || "",
       });
-      setPhoneNumber(lead.phone || "");
       setErrors({});
     }
   }, [lead, isOpen]);
@@ -87,7 +86,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
       }
     }
 
-    if (phoneNumber && !isValidPhoneNumber(phoneNumber)) {
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
       newErrors.phone = "Please enter a valid phone number";
     }
 
@@ -108,7 +107,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
           first_name: formData.first_name,
           last_name: formData.last_name,
           email: formData.email,
-          phone: phoneNumber,
+          phone: formData.phone,
           status: formData.status,
           // interest_level: formData.interest_level || "medium",
           // urgency: formData.urgency || "this_month",
@@ -124,7 +123,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
         last_name: formData.last_name,
         name: `${formData.first_name} ${formData.last_name}`.trim(),
         email: formData.email,
-        phone: phoneNumber,
+        phone: formData.phone,
         status: formData.status,
         interest_level: formData.interest_level,
         urgency: formData.urgency,
@@ -151,7 +150,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
   };
 
   const handlePhoneChange = (value: string | undefined) => {
-    setPhoneNumber(value || "");
+
     setFormData(prev => ({ ...prev, phone: value || "" }));
     if (errors.phone) {
       setErrors(prev => ({ ...prev, phone: "" }));
@@ -241,7 +240,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
               international
               countryCallingCodeEditable={false}
               defaultCountry="US"
-              value={phoneNumber}
+              value={formData.phone}
               onChange={handlePhoneChange}
               placeholder="Enter phone number"
               style={{
