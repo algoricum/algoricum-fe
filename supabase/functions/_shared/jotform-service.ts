@@ -80,7 +80,7 @@ export async function processSubmissions(submissions: any[], clinic_id: string) 
   for (const sub of submissions) {
     const answers = sub.answers || {};
     const leadInfo = extractLeadInfo(answers);
-
+    const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
     const leadData = {
       first_name: leadInfo.firstName || null,
       last_name: leadInfo.lastName || null,
@@ -88,7 +88,7 @@ export async function processSubmissions(submissions: any[], clinic_id: string) 
       phone: leadInfo.phone || null,
       form_data: answers,
       clinic_id,
-      source_id: "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c",
+      source_id: source.id,
       created_at: new Date().toISOString(),
     };
 

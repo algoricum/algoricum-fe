@@ -13,7 +13,10 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
         const { data, error } = await supabase
           .from("hubspot_connections")
           .select("*")
-          .eq("user_id", clinicId) // ⚠️ if this should be clinic_id, adjust here
+          .eq("clinic_id", clinicId) // ⚠️ if this should be clinic_id, adjust here
+          .neq("access_token", "")
+          .neq("refresh_token", "")
+          .eq("connection_status", "connected")
           .limit(1)
           .maybeSingle();
         if (error) {
@@ -25,12 +28,20 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
       }
 
       case "Pipedrive": {
-        const { data, error } = await supabase.from("pipedrive_integration").select("*").eq("clinic_id", clinicId).maybeSingle();
+        const { data, error } = await supabase
+          .from("pipedrive_integration")
+          .select("*")
+          .eq("clinic_id", clinicId)
+          .neq("access_token", "")
+          .neq("refresh_token", "")
+          .eq("is_active", true)
+          .maybeSingle();
         if (error) {
           console.error(`Error checking Pipedrive status:`, error);
           return "disconnected";
         }
         connection = data;
+        console.error("dsf", data);
         break;
       }
 
@@ -117,7 +128,7 @@ export const deleteIntegrationConnections = async (clinicId: string, integration
 
     switch (integrationName) {
       case "Hubspot": {
-        const { error: deleteError } = await supabase.from("hubspot_connections").delete().eq("user_id", clinicId); // ⚠️ change to clinic_id if schema uses that
+        const { error: deleteError } = await supabase.from("hubspot_connections").delete().eq("clinic_id", clinicId);
         error = deleteError;
         break;
       }

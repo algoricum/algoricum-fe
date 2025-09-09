@@ -84,7 +84,7 @@ serve(async req => {
     }
 
     // 3. Manual Sync (can be called later)
-    if (pathname === "/sync-leads" && req.method === "GET") {
+    if (pathname.endsWith("/sync-leads") && req.method === "GET") {
       const clinic_id = url.searchParams.get("clinic_id");
       if (!clinic_id) return new Response("Missing clinic_id", { status: 400 });
 

@@ -66,7 +66,7 @@ const ScheduleMeetingForm = ({ supabase, clinicId, onSuccess }: ScheduleMeetingF
             email: values.email,
             phone: phoneNumber || values.phone_number,
             status: "Booked",
-            clinicId: clinicId,
+            clinic_id: clinicId,
             interest: "medium",
             lead_source: leadSourceData?.id,
           },

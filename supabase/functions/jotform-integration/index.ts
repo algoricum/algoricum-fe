@@ -37,6 +37,7 @@ serve(async req => {
 
         const parsedRequest = JSON.parse(rawRequest.toString());
         const leadInfo = extractLeadInfo(parsedRequest);
+        const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
 
         const leadData = {
           first_name: leadInfo.firstName || null,
@@ -45,7 +46,7 @@ serve(async req => {
           phone: leadInfo.phone || null,
           form_data: { ...parsedRequest, jotform_submission_id: submissionID, jotform_form_id: formID },
           clinic_id,
-          source_id: "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c",
+          source_id: source.id,
           created_at: new Date().toISOString(),
         };
 

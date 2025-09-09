@@ -258,3 +258,18 @@ export const setupAuthListener = (onSignIn: (_user: User, _token: string) => voi
     subscription.unsubscribe();
   };
 };
+
+export const checkUserStatus = async (user_id: string): Promise<boolean> => {
+  try {
+    // Fetch user data
+    const { data: user, error } = await supabase.from("user_clinic").select("is_active").eq("user_id", user_id).maybeSingle();
+    if (error) throw error;
+    if (!user) {
+      return false; // User has no clinic relationship = inactive
+    }
+    return user.is_active; // Return true if user is active, false otherwise
+  } catch (error: any) {
+    console.error("Error checking user status:", error.message);
+    return false; // Return false on error (safe default for middleware)
+  }
+};

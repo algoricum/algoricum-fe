@@ -28,7 +28,7 @@ serve(async req => {
         name,
         email,
         phone,
-        email_config,
+        mailgun_email,
         assistants (
           id,
           openai_assistant_id,
@@ -37,7 +37,7 @@ serve(async req => {
         )
       `,
       )
-      .not("email_config", "is", null);
+      .not("mailgun_email", "is", null);
 
     if (clinicsError) {
       console.error("Failed to fetch clinics:", clinicsError);
@@ -79,7 +79,7 @@ serve(async req => {
       try {
         console.log(`🏥 Processing clinic: ${clinic.name} (ID: ${clinic.id})`);
 
-        if (!clinic.email_config) {
+        if (!clinic.mailgun_email) {
           console.log(`⚠️ Skipping ${clinic.name} - no email configuration`);
           continue;
         }
@@ -96,7 +96,7 @@ serve(async req => {
 
         // Prepare the payload exactly like your button does, but with cron_job flag
         const payload = {
-          ...clinic.email_config, // This contains all SMTP/IMAP settings
+          ...clinic.mailgun_email, // This contains all SMTP/IMAP settings
           clinic_id: clinic.id,
           assistant_id: assistant.id,
           cron_job: true, // This tells your function it's a cron job, not manual test

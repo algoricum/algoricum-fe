@@ -69,6 +69,10 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     testimonialsDocument: initialData.testimonialsDocument || [],
   });
 
+  // NEW: Track which fields have been touched/interacted with
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+
   const [consentData, setConsentData] = useState({
     acceptedTermsandConditions: initialData.acceptedBAA || false,
     acceptedPrivacyPolicy: initialData.acceptedLeadConsent || false,
@@ -76,6 +80,11 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
 
   const handleConsentChange = (field: keyof typeof consentData, value: boolean) => {
     setConsentData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // NEW: Function to mark a field as touched
+  const markFieldAsTouched = (fieldId: string) => {
+    setTouchedFields(prev => new Set([...prev, fieldId]));
   };
 
   // Updated questions array - file uploads are now handled as one step
@@ -168,6 +177,9 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
 
   // Enhanced handleFileChange to handle different document types
   const handleFileChange = async (info: any, documentType: string) => {
+    // Mark documents field as touched when user interacts with file upload
+    markFieldAsTouched("documents");
+
     const fileList = normFile(info);
 
     // Filter & validate
@@ -237,6 +249,9 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
   };
 
   const handleInputChange = (value: string) => {
+    // Mark current field as touched when user types
+    markFieldAsTouched(currentQuestion.id);
+
     setFormData(prev => ({
       ...prev,
       [currentQuestion.id]: value,
@@ -244,14 +259,31 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
   };
 
   const handlePhoneChange = (value: string | undefined) => {
+    // Mark phone field as touched when user interacts
+    markFieldAsTouched("clinicPhone");
+
     setFormData(prev => ({
       ...prev,
       clinicPhone: value || "",
     }));
   };
 
-  // Enhanced getFieldError function to handle multiple file types
-  const getFieldError = () => {
+  // NEW: Handle field blur (when user leaves a field)
+  const handleFieldBlur = (fieldId: string) => {
+    markFieldAsTouched(fieldId);
+  };
+
+  // UPDATED: Enhanced getFieldError function to only show errors for touched fields or after submit attempt
+  const getFieldError = (showError: boolean = false) => {
+    const fieldId = currentQuestion.id;
+
+    // Only show error if field has been touched, submit was attempted, or explicitly requested
+    const shouldShowError = showError || touchedFields.has(fieldId) || attemptedSubmit;
+
+    if (!shouldShowError) {
+      return null;
+    }
+
     if (currentQuestion.type === "files") {
       // Check if at least services document is uploaded (required)
       const servicesFiles = formData.servicesDocument || [];
@@ -285,7 +317,11 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
   };
 
   const handleNext = () => {
-    const error = getFieldError();
+    // Mark that user attempted to submit
+    setAttemptedSubmit(true);
+    markFieldAsTouched(currentQuestion.id);
+
+    const error = getFieldError(true); // Force show error
 
     if (error) {
       alert(error);
@@ -299,6 +335,8 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
 
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
+      // Reset submit attempt for next field
+      setAttemptedSubmit(false);
     } else {
       onNext({ ...formData, ...consentData });
     }
@@ -307,6 +345,8 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
+      // Reset submit attempt when going back
+      setAttemptedSubmit(false);
     } else if (onPrev) {
       onPrev();
     }
@@ -443,9 +483,9 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
 
   const isCurrentFieldValid = () => {
     if (currentQuestionIndex === questions.length - 1) {
-      return !getFieldError() && consentData.acceptedPrivacyPolicy && consentData.acceptedTermsandConditions;
+      return !getFieldError(true) && consentData.acceptedPrivacyPolicy && consentData.acceptedTermsandConditions;
     }
-    return !getFieldError();
+    return !getFieldError(true);
   };
 
   // New function to render all three file uploads side by side
@@ -541,7 +581,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     );
   };
 
-  // Enhanced renderCurrentInput to handle the new files type
+  // UPDATED: Enhanced renderCurrentInput to handle the new files type and add blur handlers
   const renderCurrentInput = () => {
     const error = getFieldError();
     const hasError = !!error;
@@ -557,6 +597,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             placeholder={currentQuestion.placeholder}
             value={currentValue as string}
             onChange={e => handleInputChange(e.target.value)}
+            onBlur={() => handleFieldBlur(currentQuestion.id)}
             rows={4}
             className={`text-xs p-3 rounded-xl border-2 bg-white w-full mb-2 ${hasError ? "border-red-500" : "border-gray-200"}`}
             autoFocus
@@ -569,15 +610,17 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     if (currentQuestion.type === "phone") {
       return (
         <div className="mb-6">
-          <PhoneInput
-            placeholder={currentQuestion.placeholder}
-            value={currentValue as string}
-            onChange={handlePhoneChange}
-            defaultCountry="US"
-            international={true}
-            countryCallingCodeEditable={false}
-            className={`phone-input-custom ${hasError ? "phone-input-error" : ""} p-2 rounded-xl border-2 bg-white`}
-          />
+          <div onBlur={() => handleFieldBlur(currentQuestion.id)}>
+            <PhoneInput
+              placeholder={currentQuestion.placeholder}
+              value={currentValue as string}
+              onChange={handlePhoneChange}
+              defaultCountry="US"
+              international={true}
+              countryCallingCodeEditable={false}
+              className={`phone-input-custom ${hasError ? "phone-input-error" : ""} p-2 rounded-xl border-2 bg-white`}
+            />
+          </div>
           {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
           {currentValue && !hasError && <p className="text-green-600 text-sm mt-2">✓ Valid phone number</p>}
         </div>
@@ -591,6 +634,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
           placeholder={currentQuestion.placeholder}
           value={currentValue as string}
           onChange={e => handleInputChange(e.target.value)}
+          onBlur={() => handleFieldBlur(currentQuestion.id)}
           className={`text-xs p-3 rounded-xl border-2 bg-white w-full mb-2 ${hasError ? "border-red-500" : "border-gray-200"}`}
           autoFocus
         />

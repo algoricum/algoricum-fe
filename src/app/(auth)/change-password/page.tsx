@@ -34,8 +34,11 @@ const PasswordSetupPage = () => {
             description: "No active session found. Please request a new reset link.",
           });
         }
-      } catch (error) {
-        console.error("Error verifying session:", error);
+      } catch (error: any) {
+        console.error({
+          message: "Error",
+          description: `Failed to verify session. ${error.message}`,
+        });
       }
     };
     verifySession();
@@ -64,6 +67,20 @@ const PasswordSetupPage = () => {
     mutate(values.password);
   };
 
+  const onFinishFailed = () => {
+    // This will trigger validation and show errors for all fields
+    form.validateFields();
+  };
+
+  const handleFieldFocus = (fieldName: string) => {
+    form.setFields([
+      {
+        name: fieldName,
+        errors: [],
+      },
+    ]);
+  };
+
   if (loadingSession) return <p className="text-center mt-10">Loading...</p>;
 
   return (
@@ -74,24 +91,34 @@ const PasswordSetupPage = () => {
           <Text className="text-Gray600 text-center">{`Enter your new password below.`}</Text>
         </Flex>
 
-        <Form form={form} name="password-setup" layout="vertical" className="w-full" onFinish={onFinish}>
+        <Form
+          form={form}
+          name="password-setup"
+          layout="vertical"
+          className="w-full"
+          onFinish={onFinish}
+          onFinishFailed={onFinishFailed}
+          validateTrigger="onBlur"
+        >
           <Flex vertical gap={18}>
             <Form.Item
               name="password"
               label="New Password"
+              validateTrigger="onBlur"
               rules={[
                 { required: true, message: "Please input your new password" },
                 { min: 8, message: "Password must contain at least 8 characters" },
                 { max: 32, message: "Password can be maximum 32 characters long" },
               ]}
             >
-              <PasswordInput prefix={<PasswordIcon />} placeholder="New Password" />
+              <PasswordInput prefix={<PasswordIcon />} placeholder="New Password" onFocus={() => handleFieldFocus("password")} />
             </Form.Item>
 
             <Form.Item
               name="confirmPassword"
               label="Confirm Password"
               dependencies={["password"]}
+              validateTrigger="onBlur"
               rules={[
                 { required: true, message: "Please confirm your password" },
                 ({ getFieldValue }) => ({
@@ -102,7 +129,7 @@ const PasswordSetupPage = () => {
                 }),
               ]}
             >
-              <PasswordInput prefix={<PasswordIcon />} placeholder="Confirm Password" />
+              <PasswordInput prefix={<PasswordIcon />} placeholder="Confirm Password" onFocus={() => handleFieldFocus("confirmPassword")} />
             </Form.Item>
 
             <Form.Item>
