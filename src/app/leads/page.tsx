@@ -1,7 +1,11 @@
 "use client";
+
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { DeleteLeadModal } from "@/components/Leads/DeleteLeadModal";
+import { EditLeadModal } from "@/components/Leads/EditLeadModal";
 import LeadGenerationForm from "@/components/Leads/LeadGenerationForm";
+import { StatCard } from "@/components/Leads/StatCard";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   fetchLeadsForClinic,
@@ -10,13 +14,12 @@ import {
   getStatusColor,
   INTEREST_LEVELS,
   LEAD_STATUSES,
-  updateLeadStatus,
 } from "@/utils/supabase/leads-helper";
 import { Modal } from "antd";
-import { CheckCircle, ChevronDown, Clock, SearchIcon, UserPlus } from "lucide-react";
+import { Edit, MoreVertical, SearchIcon, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { StatCard } from "./StatCard";
+import { leadsStatsConfig } from "./statsUtil";
 
 interface Lead {
   id: string;
@@ -27,23 +30,11 @@ interface Lead {
   phone: string | null;
   status: string;
   interest_level: string | null;
+  urgency: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
-
-// Define getInterestColor locally if not in leads-helper
-// const getInterestColor = (interestLevel: string): string => {
-//   switch (interestLevel.toLowerCase()) {
-//     case "high":
-//       return "text-green-600";
-//     case "medium":
-//       return "text-yellow-600";
-//     case "low":
-//       return "text-red-600";
-//     default:
-//       return "text-gray-500";
-//   }
-// };
 
 export default function LeadsPage() {
   const [leadsData, setLeadsData] = useState<Lead[]>([]);
@@ -54,10 +45,14 @@ export default function LeadsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [clinicId, setClinicId] = useState<string | null>(null);
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
-  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   useEffect(() => {
     loadData();
@@ -75,6 +70,8 @@ export default function LeadsPage() {
         phone: newLead.phone,
         status: newLead.status,
         interest_level: newLead.interest_level,
+        urgency: newLead.urgency,
+        notes: newLead.notes,
         created_at: newLead.created_at,
         updated_at: newLead.updated_at,
       };
@@ -85,7 +82,7 @@ export default function LeadsPage() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setOpenDropdownId(null);
+        setActiveDropdown(null);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -110,35 +107,18 @@ export default function LeadsPage() {
     }
   };
 
-  const handleUpdateStatus = async (leadId: string, newStatus: string) => {
-    if (updatingStatus === leadId) return;
-    try {
-      setUpdatingStatus(leadId);
-      setOpenDropdownId(null);
-      await updateLeadStatus(leadId, { status: newStatus });
-      setLeadsData(prev =>
-        prev.map(lead => (lead.id === leadId ? { ...lead, status: newStatus, updated_at: new Date().toISOString() } : lead)),
-      );
-    } catch (err) {
-      console.error("Error updating status:", err);
-      setError(err instanceof Error ? err.message : "Failed to update status");
-    } finally {
-      setUpdatingStatus(null);
-    }
-  };
-
-  const toggleDropdown = (e: React.MouseEvent, leadId: string) => {
+  const toggleActionMenu = (e: React.MouseEvent, leadId: string) => {
     e.stopPropagation();
-    if (openDropdownId === leadId) {
-      setOpenDropdownId(null);
+    if (activeDropdown === leadId) {
+      setActiveDropdown(null);
     } else {
       const rect = e.currentTarget.getBoundingClientRect();
-      const dropdownHeight = 200; // Approximate dropdown height
+      const dropdownHeight = 120; // Approximate dropdown height
       const viewportHeight = window.innerHeight;
       const viewportWidth = window.innerWidth;
 
       let top = rect.bottom + 8;
-      let left = rect.right - 192;
+      let left = rect.right - 192; // 192px is dropdown width (w-48)
 
       // Check if dropdown would go below viewport
       if (rect.bottom + dropdownHeight > viewportHeight) {
@@ -154,8 +134,28 @@ export default function LeadsPage() {
       }
 
       setDropdownPosition({ top, left });
-      setOpenDropdownId(leadId);
+      setActiveDropdown(leadId);
     }
+  };
+
+  const handleEditLead = (lead: Lead) => {
+    setSelectedLead(lead);
+    setEditModalOpen(true);
+    setActiveDropdown(null);
+  };
+
+  const handleDeleteLead = (lead: Lead) => {
+    setSelectedLead(lead);
+    setDeleteModalOpen(true);
+    setActiveDropdown(null);
+  };
+
+  const handleUpdateLead = (updatedLead: Lead) => {
+    setLeadsData(prev => prev.map(lead => (lead.id === updatedLead.id ? updatedLead : lead)));
+  };
+
+  const handleConfirmDelete = (leadId: string) => {
+    setLeadsData(prev => prev.filter(lead => lead.id !== leadId));
   };
 
   const filteredLeads = leadsData.filter(lead => {
@@ -171,13 +171,6 @@ export default function LeadsPage() {
     }
     return true;
   });
-
-  const totalLeads = leadsData.length;
-  const bookedLeads = leadsData.filter(l => l.status.toLowerCase() === "booked").length;
-  const coldLeads = leadsData.filter(l => l.status.toLowerCase() === "cold").length;
-  const engagedLeads = leadsData.filter(l => l.status.toLowerCase() === "engaged").length;
-  const newLeads = leadsData.filter(l => l.status.toLowerCase() === "new").length;
-  const convertedLeads = leadsData.filter(l => l.status.toLowerCase() === "converted").length;
 
   const FiltersBar = () => (
     <div className="pt-4 px-4 pb-2">
@@ -293,42 +286,9 @@ export default function LeadsPage() {
       <div>
         <div className="my-6 px-4 w-full">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full">
-            <StatCard
-              icon={<UserPlus className="h-6 w-6 text-blue-600 md:h-7 md:w-7" />}
-              iconBg="bg-blue-100"
-              title="Total Leads"
-              value={totalLeads}
-            />
-            <StatCard
-              icon={<CheckCircle className="h-6 w-6 text-green-600 md:h-7 md:w-7" />}
-              iconBg="bg-green-100"
-              title="Booked"
-              value={bookedLeads}
-            />
-            <StatCard
-              icon={<Clock className="h-6 w-6 text-yellow-600 md:h-7 md:w-7" />}
-              iconBg="bg-yellow-100"
-              title="New"
-              value={newLeads}
-            />
-            <StatCard
-              icon={<CheckCircle className="h-6 w-6 text-purple-600 md:h-7 md:w-7" />}
-              iconBg="bg-purple-100"
-              title="Converted"
-              value={convertedLeads}
-            />
-            <StatCard
-              icon={<SearchIcon className="h-6 w-6 text-gray-600 md:h-7 md:w-7" />}
-              iconBg="bg-gray-100"
-              title="Cold"
-              value={coldLeads}
-            />
-            <StatCard
-              icon={<ChevronDown className="h-6 w-6 text-orange-600 md:h-7 md:w-7" />}
-              iconBg="bg-orange-100"
-              title="Engaged"
-              value={engagedLeads}
-            />
+            {leadsStatsConfig.map(stat => (
+              <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(leadsData)} />
+            ))}
           </div>
         </div>
 
@@ -343,6 +303,7 @@ export default function LeadsPage() {
                   <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Contact</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Status</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Created</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wide text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -377,30 +338,24 @@ export default function LeadsPage() {
                       </td>
                       <td className="px-6 py-4 text-gray-900">{lead.phone || "No phone"}</td>
                       <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset ${getStatusColor(lead.status)}`}
+                        >
+                          {formatStatus(lead.status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-900">{new Date(lead.created_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-4">
                         <div className="relative">
                           <button
-                            onClick={e => toggleDropdown(e, lead.id)}
-                            disabled={updatingStatus === lead.id}
-                            className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset transition-all duration-200 hover:opacity-80 disabled:opacity-50 ${getStatusColor(
-                              lead.status,
-                            )}`}
+                            onClick={e => toggleActionMenu(e, lead.id)}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 transition-colors duration-200"
                             type="button"
                           >
-                            {updatingStatus === lead.id ? (
-                              <span className="flex items-center">
-                                <span className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-current border-t-transparent"></span>
-                                Updating...
-                              </span>
-                            ) : (
-                              <>
-                                {formatStatus(lead.status)}
-                                <ChevronDown className="ml-1 h-3 w-3" />
-                              </>
-                            )}
+                            <MoreVertical className="w-4 h-4 text-gray-500" />
                           </button>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-900">{new Date(lead.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))
                 )}
@@ -409,10 +364,10 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        {openDropdownId && (
-          <div className="fixed inset-0 z-[9999]" onClick={() => setOpenDropdownId(null)}>
+        {activeDropdown && (
+          <div className="fixed inset-0 z-[9999]" onClick={() => setActiveDropdown(null)}>
             {filteredLeads.map(lead => {
-              if (lead.id !== openDropdownId) return null;
+              if (lead.id !== activeDropdown) return null;
               return (
                 <div
                   key={lead.id}
@@ -425,33 +380,22 @@ export default function LeadsPage() {
                   onClick={e => e.stopPropagation()}
                 >
                   <div className="py-1">
-                    {LEAD_STATUSES.map(status => (
-                      <button
-                        key={status}
-                        onClick={() => handleUpdateStatus(lead.id, status)}
-                        className={`w-full px-4 py-2 text-left text-sm transition-colors duration-200 hover:bg-gray-50 ${
-                          lead.status === status ? "bg-purple-50 font-medium text-purple-700" : "text-gray-700"
-                        }`}
-                        type="button"
-                      >
-                        <span
-                          className={`mr-2 inline-block h-2 w-2 rounded-full ${
-                            getStatusColor(status).includes("bg-green")
-                              ? "bg-green-500"
-                              : getStatusColor(status).includes("bg-yellow")
-                                ? "bg-yellow-500"
-                                : getStatusColor(status).includes("bg-blue")
-                                  ? "bg-blue-500"
-                                  : getStatusColor(status).includes("bg-purple")
-                                    ? "bg-purple-500"
-                                    : getStatusColor(status).includes("bg-red")
-                                      ? "bg-red-500"
-                                      : "bg-gray-500"
-                          }`}
-                        ></span>
-                        {formatStatus(status)}
-                      </button>
-                    ))}
+                    <button
+                      onClick={() => handleEditLead(lead)}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
+                      type="button"
+                    >
+                      <Edit className="w-4 h-4 text-blue-500" />
+                      Edit Lead
+                    </button>
+                    <button
+                      onClick={() => handleDeleteLead(lead)}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
+                      type="button"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                      Delete Lead
+                    </button>
                   </div>
                 </div>
               );
@@ -462,6 +406,26 @@ export default function LeadsPage() {
         <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} width={800}>
           {clinicId && <LeadGenerationForm clinicId={clinicId} onSuccess={handleClose} />}
         </Modal>
+
+        <EditLeadModal
+          lead={selectedLead}
+          isOpen={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false);
+            setSelectedLead(null);
+          }}
+          onUpdate={handleUpdateLead}
+        />
+
+        <DeleteLeadModal
+          lead={selectedLead}
+          isOpen={deleteModalOpen}
+          onClose={() => {
+            setDeleteModalOpen(false);
+            setSelectedLead(null);
+          }}
+          onDelete={handleConfirmDelete}
+        />
       </div>
     </DashboardLayout>
   );
