@@ -81,16 +81,17 @@ function logError(message: string, error?: any) {
   console.error(`[${timestamp}] SHARED ERROR: ${message}`, error)
 }
 
-async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email', followUpRules?: FollowUpRule[]) {
+async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email', followUpRules?: FollowUpRule[], clinicIds?: string[]) {
   logInfo(`=== Starting processAllLeads - Type: ${communicationType || 'all'} ===`)
+  logInfo(`Clinic filter: ${clinicIds ? `${clinicIds.length} specific clinics` : 'all clinics'}`)
   
   const allResults: ProcessingResult[] = []
   let totalProcessed = 0
   let totalErrors = 0
   
   try {
-    // Get ALL clinics with their settings
-    const { data: clinics, error: clinicError } = await supabase
+    // Get clinics with their settings - filter by clinicIds if provided
+    let clinicQuery = supabase
       .from("clinic")
       .select(`
         id,
@@ -107,6 +108,13 @@ async function processAllLeads(supabase: any, communicationType?: 'sms' | 'email
         ),
         assistants(*)
       `);
+    
+    // Apply clinic filter if provided
+    if (clinicIds && clinicIds.length > 0) {
+      clinicQuery = clinicQuery.in('id', clinicIds);
+    }
+    
+    const { data: clinics, error: clinicError } = await clinicQuery;
 
     if (clinicError) {
       logError('Failed to fetch clinics', clinicError)
@@ -658,15 +666,20 @@ async function generateIntelligentResponse(
       .map(msg => `${msg.sender_type === 'user' ? `${lead.first_name || 'Patient'}` : clinic.assistants?.[0]?.assistant_name || 'Assistant'}: ${msg.message}`)
       .join('\n')
 
+    const isDemo = rule && rule.toleranceWindow !== undefined
+    
     const leadAge = rule ? 
       parseInt(rule.name.match(/(\d+)day/)?.[1] || '0') || // Primary: extract from rule name
-      Math.floor(rule.timeFromCreated / (24 * 60 * 60 * 1000)) || // Production: actual days
-      Math.floor(rule.timeFromCreated / 1000) || // Demo: seconds as days  
-      1 : 1 // Final fallback
+      (isDemo 
+        ? Math.floor(rule.timeFromCreated / (60 * 1000)) // Demo: minutes as days
+        : Math.floor(rule.timeFromCreated / (24 * 60 * 60 * 1000)) // Production: actual days
+      ) ||
+      1 : 1 
     
     const assistantInstructions = clinic.assistants?.[0]?.instructions || ''
     
-    logInfo(`DEBUG: Lead age: ${leadAge}, Rule: ${rule?.name}`)
+    logInfo(`DEBUG: Rule details - Name: ${rule?.name}, timeFromCreated: ${rule?.timeFromCreated}ms`)
+    logInfo(`DEBUG: IsDemo: ${isDemo}, Lead age calculated: ${leadAge}`)
     logInfo(`DEBUG: Instructions length: ${assistantInstructions.length}`)
     logInfo(`DEBUG: Instructions contain PSYCHOLOGY PATTERN: ${assistantInstructions.includes('PSYCHOLOGY PATTERN')}`)
     logInfo(`DEBUG: Instructions contain EMAIL FOLLOW-UP PATTERNS: ${assistantInstructions.includes('EMAIL FOLLOW-UP PATTERNS')}`)
@@ -1060,24 +1073,6 @@ async function sendEmail(
                                 </table>
                             </td>
                         </tr>
-                        
-                        <!-- Unsubscribe Footer -->
-                        ${leadId && SUPABASE_URL ? `
-                        <tr>
-                            <td style="padding: 20px 40px; background-color: #f1f5f9; border-top: 1px solid #e2e8f0; text-align: center;">
-                                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 12px; color: #94a3b8;">
-                                    <p style="margin: 0 0 10px 0;">You're receiving this because you showed interest in our services.</p>
-                                    <p style="margin: 0;">
-                                        Not interested anymore? 
-                                        <a href="${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadId}&clinic_id=${clinicId}" 
-                                           style="color: #64748b; text-decoration: underline;">
-                                            Unsubscribe here
-                                        </a>
-                                    </p>
-                                </div>
-                            </td>
-                        </tr>
-                        ` : ''}
                     </table>
                 </td>
             </tr>

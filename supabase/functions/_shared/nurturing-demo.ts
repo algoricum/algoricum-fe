@@ -6,7 +6,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   // SMS FLOW - 3-minute gaps between each rule
   {
     name: 'sms_5min_initial',
-    timeFromCreated: 3 * 60 * 1000, // 3 minutes
+    timeFromCreated: 2 * 60 * 1000, // 3 minutes
     leadStatus: ['New'],
     communicationType: 'sms',
     onlyOnce: true,
@@ -14,7 +14,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'sms_2day_followup',
-    timeFromCreated: 6 * 60 * 1000, // 6 minutes
+    timeFromCreated: 4 * 60 * 1000, // 6 minutes
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true,
@@ -22,7 +22,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'sms_5day_followup',
-    timeFromCreated: 9 * 60 * 1000, // 9 minutes
+    timeFromCreated: 6 * 60 * 1000, // 9 minutes
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true,
@@ -30,7 +30,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'sms_10day_followup',
-    timeFromCreated: 12 * 60 * 1000, // 12 minutes
+    timeFromCreated: 8 * 60 * 1000, // 12 minutes
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true,
@@ -38,7 +38,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'sms_20day_followup',
-    timeFromCreated: 15 * 60 * 1000, // 15 minutes
+    timeFromCreated: 10 * 60 * 1000, // 15 minutes
     communicationType: 'sms',
     onlyOnce: true,
     checkLastActivity: true,
@@ -48,7 +48,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   // EMAIL FLOW - 3-minute gaps between each rule (starting after SMS flow)
   {
     name: 'email_21day_followup',
-    timeFromCreated: 18 * 60 * 1000, // 18 minutes
+    timeFromCreated: 12 * 60 * 1000, // 18 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -56,7 +56,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_24day_followup',
-    timeFromCreated: 21 * 60 * 1000, // 21 minutes
+    timeFromCreated: 14 * 60 * 1000, // 21 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -64,7 +64,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_27day_followup',
-    timeFromCreated: 24 * 60 * 1000, // 24 minutes
+    timeFromCreated: 16 * 60 * 1000, // 24 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -72,7 +72,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_30day_followup',
-    timeFromCreated: 27 * 60 * 1000, // 27 minutes
+    timeFromCreated: 18 * 60 * 1000, // 27 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -80,7 +80,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_33day_followup',
-    timeFromCreated: 30 * 60 * 1000, // 30 minutes
+    timeFromCreated: 20 * 60 * 1000, // 30 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -88,7 +88,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_36day_followup',
-    timeFromCreated: 33 * 60 * 1000, // 33 minutes
+    timeFromCreated: 22 * 60 * 1000, // 33 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -96,7 +96,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_39day_followup',
-    timeFromCreated: 36 * 60 * 1000, // 36 minutes
+    timeFromCreated: 24 * 60 * 1000, // 36 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -104,7 +104,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_42day_followup',
-    timeFromCreated: 39 * 60 * 1000, // 39 minutes
+    timeFromCreated: 26 * 60 * 1000, // 39 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -112,7 +112,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_45day_followup',
-    timeFromCreated: 42 * 60 * 1000, // 42 minutes
+    timeFromCreated: 28 * 60 * 1000, // 42 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -120,7 +120,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_50day_followup',
-    timeFromCreated: 45 * 60 * 1000, // 45 minutes
+    timeFromCreated: 30 * 60 * 1000, // 45 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -128,7 +128,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_55day_followup',
-    timeFromCreated: 48 * 60 * 1000, // 48 minutes
+    timeFromCreated: 32 * 60 * 1000, // 48 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -136,7 +136,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_60day_followup',
-    timeFromCreated: 51 * 60 * 1000, // 51 minutes
+    timeFromCreated: 34 * 60 * 1000, // 51 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -144,7 +144,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_70day_followup',
-    timeFromCreated: 54 * 60 * 1000, // 54 minutes
+    timeFromCreated: 38 * 60 * 1000, // 54 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -152,7 +152,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_80day_followup',
-    timeFromCreated: 57 * 60 * 1000, // 57 minutes
+    timeFromCreated: 40 * 60 * 1000, // 57 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -160,7 +160,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_90day_followup',
-    timeFromCreated: 60 * 60 * 1000, // 60 minutes (1 hour)
+    timeFromCreated: 42 * 60 * 1000, // 60 minutes (1 hour)
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -168,7 +168,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_100day_followup',
-    timeFromCreated: 63 * 60 * 1000, // 63 minutes
+    timeFromCreated: 44 * 60 * 1000, // 63 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -176,7 +176,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_110day_followup',
-    timeFromCreated: 66 * 60 * 1000, // 66 minutes
+    timeFromCreated: 46 * 60 * 1000, // 66 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -184,7 +184,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_115day_followup',
-    timeFromCreated: 69 * 60 * 1000, // 69 minutes
+    timeFromCreated: 48 * 60 * 1000, // 69 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -192,7 +192,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_118day_followup',
-    timeFromCreated: 72 * 60 * 1000, // 72 minutes
+    timeFromCreated: 50 * 60 * 1000, // 72 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -200,7 +200,7 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
   {
     name: 'email_120day_followup',
-    timeFromCreated: 75 * 60 * 1000, // 75 minutes
+    timeFromCreated: 52 * 60 * 1000, // 75 minutes
     communicationType: 'email',
     onlyOnce: true,
     checkLastActivity: true,
@@ -208,8 +208,8 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   }
 ]
 
-async function processScheduledFollowUps(supabase: any, communicationType?: 'sms' | 'email') {
-  return processAllLeads(supabase, communicationType, FOLLOW_UP_RULES)
+async function processScheduledFollowUps(supabase: any, communicationType?: 'sms' | 'email', clinicIds?: string[]) {
+  return processAllLeads(supabase, communicationType, FOLLOW_UP_RULES, clinicIds)
 }
 
 export {
