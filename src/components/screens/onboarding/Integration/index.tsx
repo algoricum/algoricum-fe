@@ -178,7 +178,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         onNext(finalData);
       }
       setAutoProgressing(false);
-    }, 1500);
+    }, 2000);
   }, [
     autoProgressing,
     currentQuestionIndex,
