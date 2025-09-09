@@ -42,6 +42,7 @@ import StandardPlanIcon from "./StandardPlanIcon";
 import TicketIcon from "./TicketIcon";
 import TwitterIcon from "./TwitterIcon";
 import UploadIcon from "./UploadIcon";
+import UserIcon from "./UserIcon";
 
 export {
   AllHelpCenterIcon,
@@ -88,4 +89,5 @@ export {
   TicketIcon,
   TwitterIcon,
   UploadIcon,
+  UserIcon,
 };
