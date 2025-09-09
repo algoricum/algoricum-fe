@@ -1,4 +1,3 @@
-// import { Sidebar } from "@/components/common";
 import MobileFooter from "@/components/common/MobileFooter";
 import { Flex, LayoutProps } from "antd";
 

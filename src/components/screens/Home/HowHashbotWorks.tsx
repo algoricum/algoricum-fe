@@ -11,8 +11,8 @@ const HowHashbotWorks = () => {
         <Flex gap={12} vertical align="center" className="max-w-[675px] text-center text-white">
           <p className="text-2xl sm:text-4xl font-helvetica-700">How Hashbot Works</p>
           <p className="text-sm">
-            Algoricum is a comprehensive support management platform powered by advanced AI that transforms the way businesses handle customer
-            support.
+            Algoricum is a comprehensive support management platform powered by advanced AI that transforms the way businesses handle
+            customer support.
           </p>
           <Button className="border-none">Start Your Free Trial</Button>
         </Flex>

@@ -1,55 +1,55 @@
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
-import {createClient} from "@/utils/supabase/config/client";
+import { ErrorToast, WarningToast } from "@/helpers/toast";
+import { Lead } from "@/interfaces/services_type";
+import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
 import getLeadSourceId from "@/utils/lead_source";
 import getNormalizedLead from "@/utils/normalizeLeadData";
-import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
-import { Lead } from "@/interfaces/services_type";
-import { ErrorToast ,WarningToast} from "@/helpers/toast";
-import Papa from 'papaparse';
+import { createClient } from "@/utils/supabase/config/client";
+import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
-import {getCurrentUserClinic} from "@/utils/supabase/leads-helper"
+import Papa from "papaparse";
 
 const supabase = createClient();
 
 // Upload CSV leads to Supabase lead table
 export const handleCsvLeadsUpload = async (clinic_id: string) => {
-    const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
+  const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
 
-    if (leadsFileName) {
-      const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
+  if (leadsFileName) {
+    const result = await downloadAndParseCSVWithPapa("lead-uploads", leadsFileName);
 
-      // Properly type and extract data
-      const leads: Partial<Lead>[] =
-        result && typeof result === "object" && "data" in result && Array.isArray((result as any).data)
-          ? (result as { data: Partial<Lead>[] }).data
-          : [];
+    // Properly type and extract data
+    const leads: Partial<Lead>[] =
+      result && typeof result === "object" && "data" in result && Array.isArray((result as any).data)
+        ? (result as { data: Partial<Lead>[] }).data
+        : [];
 
-      // Get source_id for 'File'
-      try {
-        const source_id = await getLeadSourceId("Csv_File ");
-        const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
-        const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
-        if (insertError) {
-          ErrorToast(insertError.message);
-        }
-      } catch (error) {
-        ErrorToast(`${error}`);
+    // Get source_id for 'File'
+    try {
+      const source_id = await getLeadSourceId("Csv_File ");
+      const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
+      const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
+      if (insertError) {
+        ErrorToast(insertError.message);
       }
-    } else {
-      console.log("Faizan csv handler is running but no leads file found");
+    } catch (error) {
+      ErrorToast(`${error}`);
+    }
+  } else {
+    console.log("Faizan csv handler is running but no leads file found");
   }
 };
 // Upload CSV file to Supabase storage and handle leads upload
 export const handleCsvUpload = async (leadsData: any, flag: boolean) => {
-try {
-    if (!leadsData ) {
-    WarningToast("No CSV file selected");
+  try {
+    if (!leadsData) {
+      WarningToast("No CSV file selected");
     }
 
     const user = await getUserData();
     if (!user) {
-    ErrorToast("User not found. Please log in again.");
-    return;
+      ErrorToast("User not found. Please log in again.");
+      return;
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -58,33 +58,32 @@ try {
 
     let csvData;
     if (Array.isArray(leadsData)) {
-        csvData = Papa.unparse(leadsData);
-        } else {
-        csvData = leadsData;
+      csvData = Papa.unparse(leadsData);
+    } else {
+      csvData = leadsData;
     }
 
     const { error } = await supabase.storage.from("lead-uploads").upload(filePath, csvData, {
-    cacheControl: "3600",
-    upsert: false,
+      cacheControl: "3600",
+      upsert: false,
     });
 
     if (error) {
-        console.error("Upload error:", error);
-        throw new Error(`Failed to upload CSV: ${error.message}`);
+      console.error("Upload error:", error);
+      throw new Error(`Failed to upload CSV: ${error.message}`);
     }
 
     localStorage.setItem(ONBOARDING_LEADS_FILE_NAME, filePath);
 
-    if(flag) {
-        const clinic_id = await getCurrentUserClinic();
-        if(clinic_id){
+    if (flag) {
+      const clinic_id = await getCurrentUserClinic();
+      if (clinic_id) {
         await handleCsvLeadsUpload(clinic_id);
-        }else{
-            ErrorToast("Clinic not found. Please check your clinic settings.");
-        }
+      } else {
+        ErrorToast("Clinic not found. Please check your clinic settings.");
+      }
     }
-
-} catch (error) {
+  } catch (error) {
     console.error("Error uploading CSV:", error);
-}
+  }
 };

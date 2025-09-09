@@ -1,13 +1,10 @@
 "use client";
-
 import React from "react";
 // components/HomePage/HomePage.jsx - Preview Component (No Functionality)
-import { Flex } from "antd";
-import { Input } from "antd";
 import { HomeOutlined, MessageOutlined } from "@ant-design/icons";
-import { Avatar } from "antd";
-import { useEffect, useState } from "react";
+import { Avatar, Flex, Input } from "antd";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 
 interface AvatarsProps {
   chatbotAvatar?: string | null;
@@ -44,12 +41,7 @@ interface ChatbotHeaderProps {
   chatbotAvatar?: string | null;
 }
 
-const ChatbotHeader = ({
-  primaryColor = "#2563EB",
-  chatbotName = "Ava",
-  logo,
-  chatbotAvatar,
-}: ChatbotHeaderProps) => {
+const ChatbotHeader = ({ primaryColor = "#2563EB", chatbotName = "Ava", logo, chatbotAvatar }: ChatbotHeaderProps) => {
   // Add key to force re-render when props change
   const headerKey = `header-${primaryColor}-${chatbotName}-${logo}-${chatbotAvatar}`;
 

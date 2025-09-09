@@ -1,7 +1,7 @@
 "use client";
-import { AlertTriangle } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { type MeetingSchedule, formatMeetingDate } from "@/utils/appointment-helper";
+import { AlertTriangle } from "lucide-react";
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;

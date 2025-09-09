@@ -80,11 +80,7 @@ export async function processSubmissions(submissions: any[], clinic_id: string) 
   for (const sub of submissions) {
     const answers = sub.answers || {};
     const leadInfo = extractLeadInfo(answers);
-const { data: source } = await supabase
-    .from("lead_source")
-    .select("id")
-    .eq("name", "Others")
-    .single();
+    const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
     const leadData = {
       first_name: leadInfo.firstName || null,
       last_name: leadInfo.lastName || null,
@@ -92,7 +88,7 @@ const { data: source } = await supabase
       phone: leadInfo.phone || null,
       form_data: answers,
       clinic_id,
-      source_id:source.id,
+      source_id: source.id,
       created_at: new Date().toISOString(),
     };
 
@@ -101,7 +97,15 @@ const { data: source } = await supabase
   }
 }
 
-export async function saveFormsHandler(selectedForms: string[], storedForms: any[], clinic_id: string, accessToken: string, authData: any, integration_id: string, JOTFORM_WEBHOOK_BASE_URL: string) {
+export async function saveFormsHandler(
+  selectedForms: string[],
+  storedForms: any[],
+  clinic_id: string,
+  accessToken: string,
+  authData: any,
+  integration_id: string,
+  JOTFORM_WEBHOOK_BASE_URL: string,
+) {
   const formsToAdd = selectedForms.filter(f => !storedForms.some((s: any) => s.form_id === f));
   const formsToRemove = storedForms.filter((s: any) => !selectedForms.includes(s.form_id));
 

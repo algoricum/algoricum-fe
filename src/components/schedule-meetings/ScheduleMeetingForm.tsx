@@ -1,12 +1,11 @@
 "use client";
-
-import { useState } from "react";
-import { Form, Input, Button, Card, TimePicker, DatePicker, message } from "antd";
-import { CalendarOutlined, ClockCircleOutlined, UserOutlined, MailOutlined, PhoneOutlined } from "@ant-design/icons";
+import { usePhoneValidation } from "@/hooks/usePhoneValidation";
+import { CalendarOutlined, ClockCircleOutlined, MailOutlined, PhoneOutlined, UserOutlined } from "@ant-design/icons";
+import { Button, Card, DatePicker, Form, Input, message, TimePicker } from "antd";
 import dayjs from "dayjs";
+import { useState } from "react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import { usePhoneValidation } from "@/hooks/usePhoneValidation";
 
 const { TextArea } = Input;
 
@@ -48,9 +47,8 @@ const ScheduleMeetingForm = ({ supabase, clinicId, onSuccess }: ScheduleMeetingF
             clinic_id: clinicId,
           },
         ],
-        { onConflict: "email" }, 
+        { onConflict: "email" },
       );
-
 
       // Fetch lead source id
       const { data: leadSourceData, error: leadSourceError } = await supabase

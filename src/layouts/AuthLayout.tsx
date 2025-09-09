@@ -1,8 +1,8 @@
-import { Logo } from "@/components/common"
-import { Flex, type LayoutProps } from "antd"
+import { Logo } from "@/components/common";
+import { Flex, type LayoutProps } from "antd";
 
 interface Props extends LayoutProps {
-  isBack?: boolean
+  isBack?: boolean;
 }
 
 const AuthLayout = ({ children, isBack }: Props) => {
@@ -24,7 +24,7 @@ const AuthLayout = ({ children, isBack }: Props) => {
           </Flex>
         </Flex>
       </div>
- 
+
       {/* Right side - Fixed hero image */}
       <div className="hidden md:block fixed top-0 right-0 w-1/2 h-screen">
         <div className="w-full h-full p-6">
@@ -41,7 +41,7 @@ const AuthLayout = ({ children, isBack }: Props) => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default AuthLayout
+export default AuthLayout;

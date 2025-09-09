@@ -1,10 +1,10 @@
 // utils/supabase/auth-helper.ts
-import { createClient } from "./config/client";
-import { User as SupabaseUser, Session } from "@supabase/supabase-js";
-import type { User } from "@/interfaces/services_type";
 import { clearAll, setAccessToken } from "@/helpers/storage-helper";
-import { setUserData } from "./user-helper";
 import { SuccessToast } from "@/helpers/toast";
+import type { User } from "@/interfaces/services_type";
+import { Session, User as SupabaseUser } from "@supabase/supabase-js";
+import { createClient } from "./config/client";
+import { setUserData } from "./user-helper";
 
 const supabase = createClient();
 
@@ -219,7 +219,7 @@ export const getSupabaseSession = async (): Promise<Session> => {
 /**
  * Set up authentication state change listener
  */
-// eslint-disable-next-line no-unused-vars
+
 export const setupAuthListener = (onSignIn: (_user: User, _token: string) => void, onSignOut: () => void): (() => void) => {
   const {
     data: { subscription },

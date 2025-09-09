@@ -1,10 +1,9 @@
 "use client";
-
-import { createClient } from "@supabase/supabase-js";
 import { Header } from "@/components/common";
-import ScheduleMeetingLayout from "@/layouts/ScheduleMeetingLayout";
-import { useSearchParams } from "next/navigation";
 import ScheduleMeetingForm from "@/components/schedule-meetings/ScheduleMeetingForm";
+import ScheduleMeetingLayout from "@/layouts/ScheduleMeetingLayout";
+import { createClient } from "@supabase/supabase-js";
+import { useSearchParams } from "next/navigation";
 
 const Page = () => {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);

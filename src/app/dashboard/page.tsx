@@ -1,25 +1,21 @@
 "use client";
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { handleCsvUpload } from "@/utils/csvUtils";
-import { Button } from "antd";
-
-import DashboardLayout from "@/layouts/DashboardLayout";
-import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
-import ConversionFunnel from "@/components/common/charts/conversion-funnel";
 import { Header } from "@/components/common";
+import ConversionFunnel from "@/components/common/charts/conversion-funnel";
+import SimpleBarChart from "@/components/common/charts/simple-bar-chart";
+import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import StatsGrid from "./StatsGrid";
-import TodayTasks from "./TodayTasks";
-// import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys"
-
+import ChatbotTrainingModal from "@/components/common/TrainingChatbotModal/chatbot-training-modal";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import { handleCsvUpload } from "@/utils/csvUtils";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
-
-import { X, Bot } from "lucide-react";
-import CsvUploadModal from "@/components/common/CSV/CsvUploadModal";
+import { Button } from "antd";
+import { Bot, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AiActivityLog from "./AiActivityLogs";
-import ChatbotTrainingModal from "@/components/common/TrainingChatbotModal/chatbot-training-modal";
+import StatsGrid from "./StatsGrid";
+import TodayTasks from "./TodayTasks";
 
 type LeadRow = {
   id: string;
@@ -43,7 +39,7 @@ export default function DashboardPage() {
   // Integrations state
   const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
   const [showTrainingModal, setShowTrainingModal] = useState(false);
-  const [showCsvBanner,] = useState(true);
+  const [showCsvBanner] = useState(true);
 
   // Modal state
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);

@@ -8,7 +8,6 @@ export const ErrorToast = (message: string) => {
   return toast.error(message || "Error");
 };
 
-
 export const InfoToast = (message: string) => {
   return toast.info(message || "Info");
 };

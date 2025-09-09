@@ -1,9 +1,9 @@
 // supabase/functions/typeform-integration/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { handleOptions, corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import * as service from "../_shared/typeformService.ts";
 
-serve(async (req) => {
+serve(async req => {
   const url = new URL(req.url);
   const path = url.pathname;
 

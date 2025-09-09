@@ -1,3 +1,0 @@
-{
-  "**/*.(ts|tsx)": ["npm run format:fix", "eslint . --ext .js,.jsx,.ts,.tsx"]
-}

@@ -7,7 +7,6 @@ import { MailIcon, PasswordIcon } from "@/icons";
 import { SignupProps } from "@/interfaces/services_type";
 import { saveUser } from "@/redux/accessors/user.accessors";
 import { signUp } from "@/utils/supabase/auth-helper";
-// import { createClient } from "@/utils/supabase/config/client";
 import { setUserData } from "@/utils/supabase/user-helper";
 import { Flex, Form, Typography } from "antd";
 import Link from "next/link";
@@ -16,7 +15,6 @@ import { useMutation } from "react-query";
 
 const { Text } = Typography;
 const SignupPage = () => {
-
   const { push } = useRouter();
   const [form] = Form.useForm();
 
@@ -33,7 +31,7 @@ const SignupPage = () => {
     onSuccess: (data: any) => {
       if (!data?.user) return;
       saveUser(data.user);
-      setUserData(data.user)
+      setUserData(data.user);
       push("/verify-otp");
       SuccessToast("OTP sent successfully. Please verify your email");
     },

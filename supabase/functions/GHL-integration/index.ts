@@ -11,7 +11,6 @@ const REDIRECT_URI = Deno.env.get("SUPABASE_URL")! + "/functions/v1/GHL-integrat
 const GHL_AUTH_URL = "https://marketplace.gohighlevel.com/oauth/chooselocation";
 const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
 
-
 serve(async req => {
   // Handle CORS
   const optionsResponse = handleOptions(req);
@@ -26,7 +25,7 @@ serve(async req => {
       const clinic_id = url.searchParams.get("clinic_id");
       const redirectTo = url.searchParams.get("redirectTo");
       if (!clinic_id) return new Response("Missing clinic_id", { status: 400 });
- const state = encodeURIComponent(`${clinic_id}|${redirectTo}`);
+      const state = encodeURIComponent(`${clinic_id}|${redirectTo}`);
       const authUrl = `${GHL_AUTH_URL}?response_type=code&redirect_uri=${encodeURIComponent(
         REDIRECT_URI,
       )}&client_id=${CLIENT_ID}&scope=forms.write+forms.readonly+users.readonly+locations.readonly+contacts.readonly&state=${state}`;
@@ -39,11 +38,11 @@ serve(async req => {
     // 2. Handle Callback
     if (pathname.endsWith("/auth/callback") && req.method === "GET") {
       const code = url.searchParams.get("code");
-  const stateRaw = url.searchParams.get("state") || "";
-  // parse state -> clinic_id|redirect_to
-  const decodedState = decodeURIComponent(stateRaw);
-  const [clinic_id, redirectToEncoded] = decodedState.split("|");
-  const redirectTo = redirectToEncoded ? decodeURIComponent(redirectToEncoded) : null;
+      const stateRaw = url.searchParams.get("state") || "";
+      // parse state -> clinic_id|redirect_to
+      const decodedState = decodeURIComponent(stateRaw);
+      const [clinic_id, redirectToEncoded] = decodedState.split("|");
+      const redirectTo = redirectToEncoded ? decodeURIComponent(redirectToEncoded) : null;
 
       if (!code || !clinic_id) return new Response("Missing code or clinic_id", { status: 400 });
 
@@ -71,9 +70,9 @@ serve(async req => {
       // Immediately import leads once connected
       await importLeads(clinic_id);
       let redirectUrl = new URL(`${APP_URL}/onboarding`);
-if(redirectTo){
-redirectUrl=new URL(redirectTo);
-}
+      if (redirectTo) {
+        redirectUrl = new URL(redirectTo);
+      }
       redirectUrl.searchParams.set("go_high_level_status", "success");
       return new Response(null, {
         status: 302,

@@ -5,17 +5,13 @@ const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
 const googleRedirectUri = Deno.env.get("GOOGLE_LEAD_REDIRECT_URI")!;
 const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
 
-
 /**
  * Step 0 - Start OAuth Flow
  */
-export async function startAuth(clinic_id: string,redirectTo:string) {
+export async function startAuth(clinic_id: string, redirectTo: string) {
   if (!clinic_id) throw new Error("Missing clinic_id");
   const state = encodeURIComponent(`${clinic_id}|${redirectTo}`);
-  const scopes = [
-    "https://www.googleapis.com/auth/adwords",
-    "https://www.googleapis.com/auth/userinfo.email",
-  ].join(" ");
+  const scopes = ["https://www.googleapis.com/auth/adwords", "https://www.googleapis.com/auth/userinfo.email"].join(" ");
 
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
     client_id: googleClientId,
@@ -33,7 +29,7 @@ export async function startAuth(clinic_id: string,redirectTo:string) {
 /**
  * Step 1 - Handle OAuth Callback
  */
-export async function handleOAuthCallback(code: string, clinic_id: string, redirectTo:any) {
+export async function handleOAuthCallback(code: string, clinic_id: string, redirectTo: any) {
   if (!code || !clinic_id) throw new Error("Missing code or clinic_id");
 
   // Exchange code for tokens
@@ -53,13 +49,15 @@ export async function handleOAuthCallback(code: string, clinic_id: string, redir
   if (tokens.error) throw new Error(tokens.error_description);
   const expiryDate = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
-  const { error } = await supabase.from("google_lead_form_connections").upsert({
-    clinic_id,
-    access_token: tokens.access_token,
-    refresh_token: tokens.refresh_token,
-    token_expiry: expiryDate,
-    
-  }, { onConflict: ["clinic_id"] });
+  const { error } = await supabase.from("google_lead_form_connections").upsert(
+    {
+      clinic_id,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_expiry: expiryDate,
+    },
+    { onConflict: ["clinic_id"] },
+  );
 
   if (error) throw new Error(error.message);
   return redirectTo;

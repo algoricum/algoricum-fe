@@ -1,13 +1,13 @@
 "use client";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import getLeadSourceId from "@/utils/lead_source";
+import { createClient } from "@/utils/supabase/config/client";
+import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { Calendar, Mail, Phone, Stethoscope, User, Users } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { createClient } from "@/utils/supabase/config/client";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
-import getLeadSourceId from "@/utils/lead_source";
-import { User, Mail, Phone, Stethoscope, Users, Calendar } from "lucide-react";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
 
 type FormField = {
   id: string;
@@ -21,7 +21,6 @@ type FormField = {
 
 type FormData = { [key: string]: string | number };
 
-// eslint-disable-next-line no-unused-vars
 type Props = { clinicId: string; onSuccess?: (newLead?: any) => void };
 
 const validatePhoneNumber = (phone: string | undefined): boolean => {
@@ -41,6 +40,7 @@ const validatePhoneNumber = (phone: string | undefined): boolean => {
 
     return true;
   } catch (error) {
+    console.error("Error validating phone number:", error);
     return false;
   }
 };
@@ -78,7 +78,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "consultation_type",
       field_name: "Consultation Type",
       field_type: "textarea",
-      is_required: false, 
+      is_required: false,
       field_order: 6,
     },
     {
@@ -86,7 +86,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "services_interest",
       field_name: "Service Interest",
       field_type: "textarea",
-      is_required: false, 
+      is_required: false,
       field_order: 7,
     },
   ];

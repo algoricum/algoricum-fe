@@ -1,10 +1,4 @@
-export function algoricumGoLiveTemplate({
-  name,
-  dashboardUrl,
-}: {
-  name: string;
-  dashboardUrl: string;
-}): { html: string; text: string } {
+export function algoricumGoLiveTemplate({ name, dashboardUrl }: { name: string; dashboardUrl: string }): { html: string; text: string } {
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 24px; background: #f9f9f9; color: #2d3748;">
       <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 8px; padding: 40px;">

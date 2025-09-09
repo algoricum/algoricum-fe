@@ -19,7 +19,6 @@ import SocialButton from "./SocialButton";
 import TextArea from "./TextArea";
 import TransformSupport from "./TransformSupport";
 
-
 export {
   ArticleHeader,
   AuthHeader,
@@ -40,5 +39,5 @@ export {
   Sidebar,
   SocialButton,
   TextArea,
-  TransformSupport
+  TransformSupport,
 };
