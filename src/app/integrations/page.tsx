@@ -442,8 +442,8 @@ export default function IntegrationsPage() {
 
   const connectedIntegrations = integrations.filter(i => i.connected);
   const availableIntegrations = integrations.filter(i => !i.connected);
-console.log("connectedIntegrations", connectedIntegrations)
-console.log("available ")
+  console.log("connectedIntegrations", connectedIntegrations)
+  console.log("available ")
   return (
     <DashboardLayout
       header={
