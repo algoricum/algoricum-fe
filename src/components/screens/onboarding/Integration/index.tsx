@@ -92,11 +92,12 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   });
 
   const filteredQuestions =
-    formData.selectedCrm === "GoHighLevel" || formData.selectedCrm === "NextHealth"
+    formData.selectedCrm === "GoHighLevel" ||
+    formData.selectedCrm === "NextHealth" ||
+    formData.selectedCrm === "HubSpot" ||
+    formData.selectedCrm === "Pipedrive"
       ? [questions[0], questions[3]]
-      : formData.selectedCrm === "HubSpot" || formData.selectedCrm === "Pipedrive"
-        ? [questions[0]]
-        : questions;
+      : questions;
 
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const currentValue = formData[currentQuestion?.id as keyof typeof formData];
@@ -178,7 +179,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         onNext(finalData);
       }
       setAutoProgressing(false);
-    }, 1500);
+    }, 2000);
   }, [
     autoProgressing,
     currentQuestionIndex,
