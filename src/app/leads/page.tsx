@@ -1,4 +1,5 @@
 "use client";
+
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { DeleteLeadModal } from "@/components/Leads/DeleteLeadModal";
@@ -15,9 +16,10 @@ import {
   LEAD_STATUSES,
 } from "@/utils/supabase/leads-helper";
 import { Modal } from "antd";
-import { CheckCircle, ChevronDown, Clock, Edit, MoreVertical, SearchIcon, Trash2, UserPlus } from "lucide-react";
+import { Edit, MoreVertical, SearchIcon, Trash2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { leadsStatsConfig } from "./statsUtil";
 
 interface Lead {
   id: string;
@@ -170,13 +172,6 @@ export default function LeadsPage() {
     return true;
   });
 
-  const totalLeads = leadsData.length;
-  const bookedLeads = leadsData.filter(l => l.status.toLowerCase() === "booked").length;
-  const coldLeads = leadsData.filter(l => l.status.toLowerCase() === "cold").length;
-  const engagedLeads = leadsData.filter(l => l.status.toLowerCase() === "engaged").length;
-  const newLeads = leadsData.filter(l => l.status.toLowerCase() === "new").length;
-  const convertedLeads = leadsData.filter(l => l.status.toLowerCase() === "converted").length;
-
   const FiltersBar = () => (
     <div className="pt-4 px-4 pb-2">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -291,42 +286,9 @@ export default function LeadsPage() {
       <div>
         <div className="my-6 px-4 w-full">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full">
-            <StatCard
-              icon={<UserPlus className="h-6 w-6 text-blue-600 md:h-7 md:w-7" />}
-              iconBg="bg-blue-100"
-              title="Total Leads"
-              value={totalLeads}
-            />
-            <StatCard
-              icon={<CheckCircle className="h-6 w-6 text-green-600 md:h-7 md:w-7" />}
-              iconBg="bg-green-100"
-              title="Booked"
-              value={bookedLeads}
-            />
-            <StatCard
-              icon={<Clock className="h-6 w-6 text-yellow-600 md:h-7 md:w-7" />}
-              iconBg="bg-yellow-100"
-              title="New"
-              value={newLeads}
-            />
-            <StatCard
-              icon={<CheckCircle className="h-6 w-6 text-purple-600 md:h-7 md:w-7" />}
-              iconBg="bg-purple-100"
-              title="Converted"
-              value={convertedLeads}
-            />
-            <StatCard
-              icon={<SearchIcon className="h-6 w-6 text-gray-600 md:h-7 md:w-7" />}
-              iconBg="bg-gray-100"
-              title="Cold"
-              value={coldLeads}
-            />
-            <StatCard
-              icon={<ChevronDown className="h-6 w-6 text-orange-600 md:h-7 md:w-7" />}
-              iconBg="bg-orange-100"
-              title="Engaged"
-              value={engagedLeads}
-            />
+            {leadsStatsConfig.map(stat => (
+              <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(leadsData)} />
+            ))}
           </div>
         </div>
 
