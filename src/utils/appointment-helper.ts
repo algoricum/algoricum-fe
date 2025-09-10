@@ -32,6 +32,7 @@ export interface CreateMeetingRequest {
 export interface UpdateMeetingRequest {
   username?: string;
   email?: string;
+  phone_number?: string | null;
   preferred_meeting_time?: string;
   meeting_link?: string;
   calendly_link?: string;
