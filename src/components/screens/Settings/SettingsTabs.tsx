@@ -26,7 +26,7 @@ const SettingsTabs = () => {
   };
 
   return (
-    <div className="flex flex-col mt-2">
+    <div className="flex flex-col mt-4 pl-2">
       <Flex className="border border-[#E8EAEC] rounded-[48px] p-2 gap-4 max-w-md inline-flex">
         {/* <TabButton isActive={activeTab === "lead"} onClick={() => handleTabChange("lead")} label="Custom Lead Capturing Form" /> */}
         <TabButton isActive={activeTab === "clinic-setting"} onClick={() => handleTabChange("clinic-setting")} label="Clinic Setting" />

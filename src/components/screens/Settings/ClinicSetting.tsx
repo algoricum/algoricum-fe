@@ -5,7 +5,8 @@ import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { createClient } from "@/utils/supabase/config/client";
-import { Button, Input, Select, Switch, Typography, Upload } from "antd";
+import { Button, Input, Select, Switch, Typography, Upload, message } from "antd";
+import { CopyOutlined } from "@ant-design/icons";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
@@ -18,6 +19,7 @@ const ClinicSetting = () => {
   const [loading, setLoading] = useState(true);
   const [clinic, setClinic] = useState<any>(null);
   const [fileList, setFileList] = useState<any[]>([]);
+  const [twilioPhoneNumber, setTwilioPhoneNumber] = useState<string>("");
   const [formData, setFormData] = useState<any>({
     legal_business_name: "",
     dba_name: "",
@@ -29,7 +31,39 @@ const ClinicSetting = () => {
     clinic_type: "",
     logo: null,
     business_hours: {},
+    mailgun_email: "", // Non-editable field
   });
+
+  // Function to fetch Twilio phone number
+  const fetchTwilioPhoneNumber = async (clinicId: string) => {
+    try {
+      const { data, error } = await supabase.from("twilio_config").select("twilio_phone_number").eq("clinic_id", clinicId).single();
+
+      if (data && !error) {
+        setTwilioPhoneNumber(data.twilio_phone_number || "");
+      }
+    } catch (error) {
+      console.error("Error fetching Twilio phone number:", error);
+    }
+  };
+
+  // Copy to clipboard function
+  const copyToClipboard = async (text: string, fieldName: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      message.success(`${fieldName} copied to clipboard!`);
+    } catch (error) {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      message.success(`${fieldName} copied to clipboard!`);
+      console.error("Failed to copy text: ", error);
+    }
+  };
 
   useEffect(() => {
     const fetchClinic = async () => {
@@ -67,10 +101,16 @@ const ClinicSetting = () => {
           clinic_type: data.clinic_type || "",
           logo: logoUrl,
           business_hours: normalizedHours,
+          mailgun_email: data.mailgun_email || "",
         });
 
         if (data.logo) {
           setFileList([{ uid: "-1", name: "Clinic Logo", status: "done", url: logoUrl }]);
+        }
+
+        // Fetch Twilio phone number
+        if (data.id) {
+          await fetchTwilioPhoneNumber(data.id);
         }
       }
       setLoading(false);
@@ -158,24 +198,86 @@ const ClinicSetting = () => {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 px-3">
       {/* Clinic Profile & Logo */}
       <div className="flex flex-col lg:flex-row gap-6 flex-wrap border border-gray-200 p-6 bg-Gray100 rounded-[20px]">
         <div className="flex-1 min-w-[280px] rounded-[20px]">
           <Title level={3}>Clinic Profile</Title>
-          {CLINIC_FIELDS.map(([label, key]) => (
-            <div key={key}>
-              <label className="font-medium">
-                {label === "Legal Business Name" ? "Clinic Name" : label === "DBA Name" ? "Primary Contact Name" : label}
-              </label>
-              <Input
-                value={formData[key] ?? ""}
-                onChange={e => handleChange(key, e.target.value)}
-                placeholder={label === "Legal Business Name" ? "Clinic Name" : label === "DBA Name" ? "Primary Contact Name" : label}
-                className="mb-4"
-              />
+
+          {/* Regular editable fields */}
+          {CLINIC_FIELDS.map(([label, key]) => {
+            // Skip DBA Name field (Primary Contact Name)
+            if (key === "dba_name") return null;
+
+            return (
+              <div key={key}>
+                <label className="font-medium">{label === "Legal Business Name" ? "Clinic Name" : label}</label>
+                <Input
+                  value={formData[key] ?? ""}
+                  onChange={e => handleChange(key, e.target.value)}
+                  placeholder={label === "Legal Business Name" ? "Clinic Name" : label}
+                  className="mb-4"
+                />
+              </div>
+            );
+          })}
+
+          {/* Non-editable fields with copy functionality */}
+          <div className="space-y-4 mt-6 pt-6 border-t border-gray-200">
+            <Title level={5} className="!text-gray-600 !mb-4">
+              Integration Details
+            </Title>
+
+            {/* Mailgun Email Field */}
+            <div>
+              <label className="font-medium text-gray-700">Mailgun Email</label>
+              <div className="relative">
+                <Input
+                  value={formData.mailgun_email || "Not configured"}
+                  readOnly
+                  className="mb-4 bg-gray-50 cursor-default"
+                  suffix={
+                    formData.mailgun_email && (
+                      <Button
+                        type="text"
+                        icon={<CopyOutlined />}
+                        size="small"
+                        onClick={() => copyToClipboard(formData.mailgun_email, "Mailgun Email")}
+                        className="text-brand-primary hover:!text-brand-secondary"
+                        title="Copy Mailgun Email"
+                      />
+                    )
+                  }
+                />
+              </div>
+              <p className="text-xs text-gray-500 -mt-3 mb-4">This email is used for automated email communications</p>
             </div>
-          ))}
+
+            {/* Twilio Phone Number Field */}
+            <div>
+              <label className="font-medium text-gray-700">Twilio Phone Number</label>
+              <div className="relative">
+                <Input
+                  value={twilioPhoneNumber || "Not configured"}
+                  readOnly
+                  className="mb-4 bg-gray-50 cursor-default"
+                  suffix={
+                    twilioPhoneNumber && (
+                      <Button
+                        type="text"
+                        icon={<CopyOutlined />}
+                        size="small"
+                        onClick={() => copyToClipboard(twilioPhoneNumber, "Twilio Phone Number")}
+                        className="text-brand-primary hover:!text-brand-secondary"
+                        title="Copy Twilio Phone Number"
+                      />
+                    )
+                  }
+                />
+              </div>
+              <p className="text-xs text-gray-500 -mt-3 mb-4">This phone number is used for SMS communications</p>
+            </div>
+          </div>
         </div>
 
         {/* Improved Logo Upload Section */}
