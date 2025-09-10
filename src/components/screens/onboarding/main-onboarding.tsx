@@ -22,6 +22,8 @@ import { useCallback, useEffect, useState } from "react";
 import BookingSetupStep from "./booking-setup-step";
 import ClinicInfoStep from "./clinic-info-step";
 import IntegrationsStep from "./Integration";
+// import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
+import { BOOKING_LINK } from "@/constants/";
 import StaffHoursStep from "./staff-hours-step";
 // import { log } from "console";
 // import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
@@ -323,7 +325,7 @@ export default function MainOnboarding() {
         email: mappedData.emailAddress || user.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink || "https://calendly.com/algoricum/onboarding",
+        calendly_link: mappedData.calendlyLink || BOOKING_LINK,
         tone_selector: mappedData.toneSelector,
         sentence_length: mappedData.sentenceLength,
         formality_level: mappedData.formalityLevel,
