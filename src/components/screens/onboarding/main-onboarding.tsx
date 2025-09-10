@@ -23,7 +23,6 @@ import BookingSetupStep from "./booking-setup-step";
 import ClinicInfoStep from "./clinic-info-step";
 import IntegrationsStep from "./Integration";
 // import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
-import { BOOKING_LINK } from "@/constants";
 import { handleSubscribe } from "@/utils/stripe";
 import StaffHoursStep from "./staff-hours-step";
 
@@ -269,12 +268,12 @@ export default function MainOnboarding() {
   }
 
   // Main submission function (updated to handle three document types)
-  const handleCompleteOnboarding = async (newAllData: any) => {
+  const handleCompleteOnboarding = async () => {
     try {
       setIsSubmitting(true);
 
       // Map the new flow data to the old structure
-      const mappedData = mapDataForSubmission(newAllData);
+      const mappedData = mapDataForSubmission(allData);
 
       // Get current user
       const user = await getUserData();
@@ -314,7 +313,7 @@ export default function MainOnboarding() {
         email: mappedData.emailAddress || user.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink || BOOKING_LINK,
+        calendly_link: mappedData.calendlyLink || "https://tinyurl.com/35c3wr42",
         tone_selector: mappedData.toneSelector,
         sentence_length: mappedData.sentenceLength,
         formality_level: mappedData.formalityLevel,
@@ -518,7 +517,7 @@ export default function MainOnboarding() {
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
-      handleCompleteOnboarding(newAllData);
+      handleCompleteOnboarding();
     }
   };
 
