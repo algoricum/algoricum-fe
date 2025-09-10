@@ -285,12 +285,12 @@ export default function MainOnboarding() {
   }
 
   // Main submission function (updated to handle three document types)
-  const handleCompleteOnboarding = async () => {
+  const handleCompleteOnboarding = async (newAllData: any) => {
     try {
       setIsSubmitting(true);
 
       // Map the new flow data to the old structure
-      const mappedData = mapDataForSubmission(allData);
+      const mappedData = mapDataForSubmission(newAllData);
 
       // Get current user
       const user = await getUserData();
@@ -534,7 +534,7 @@ export default function MainOnboarding() {
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
-      handleCompleteOnboarding();
+      handleCompleteOnboarding(newAllData);
     }
   };
 
