@@ -1,5 +1,6 @@
 "use client";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { BOOKING_LINK } from "@/constants";
 import {
   ONBOARDING_COMPLETED_STEPS_KEY,
   ONBOARDING_LEADS_FILE_NAME,
@@ -10,6 +11,8 @@ import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { useAuth } from "@/hooks/useAuth";
 import apiKeyService from "@/services/apiKey";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
+import generateClinicInstructions from "@/utils/generateClinicInstructions";
+import { handleSubscribe } from "@/utils/stripe";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getClinicData, updateClinic, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
@@ -21,13 +24,7 @@ import { useCallback, useEffect, useState } from "react";
 import BookingSetupStep from "./booking-setup-step";
 import ClinicInfoStep from "./clinic-info-step";
 import IntegrationsStep from "./Integration";
-// import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
-import { BOOKING_LINK } from "@/constants/";
-import { handleSubscribe } from "@/utils/stripe";
 import StaffHoursStep from "./staff-hours-step";
-// import { log } from "console";
-// import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
-import generateClinicInstructions from "@/utils/generateClinicInstructions";
 
 const { Text } = Typography;
 const supabase = createClient();
