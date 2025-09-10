@@ -23,10 +23,9 @@ import BookingSetupStep from "./booking-setup-step";
 import ClinicInfoStep from "./clinic-info-step";
 import IntegrationsStep from "./Integration";
 // import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
-import { BOOKING_LINK } from "@/constants/";
+import { BOOKING_LINK } from "@/constants";
 import { handleSubscribe } from "@/utils/stripe";
 import StaffHoursStep from "./staff-hours-step";
-import { BOOKING_LINK } from "@/constants";
 
 const { Text } = Typography;
 const supabase = createClient();
