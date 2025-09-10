@@ -26,6 +26,7 @@ import IntegrationsStep from "./Integration";
 import { BOOKING_LINK } from "@/constants/";
 import { handleSubscribe } from "@/utils/stripe";
 import StaffHoursStep from "./staff-hours-step";
+import { BOOKING_LINK } from "@/constants";
 
 const { Text } = Typography;
 const supabase = createClient();
