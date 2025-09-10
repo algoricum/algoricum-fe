@@ -3,7 +3,7 @@ import { CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icon
 import { Modal, Typography } from "antd";
 import Papa from "papaparse";
 import type React from "react";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 const { Text } = Typography;
 
@@ -21,6 +21,15 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
   const [csvValidationError, setCsvValidationError] = useState<string | null>(null);
   const [, setValidationWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setCsvLeads([]);
+    setCsvValidationError(null);
+    setValidationWarnings([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [open]);
 
   // Add header normalization function
   const normalizeHeaders = (data: any[]): any[] => {

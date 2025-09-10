@@ -7,14 +7,7 @@ import { EditLeadModal } from "@/components/Leads/EditLeadModal";
 import LeadGenerationForm from "@/components/Leads/LeadGenerationForm";
 import { StatCard } from "@/components/Leads/StatCard";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import {
-  fetchLeadsForClinic,
-  formatStatus,
-  getCurrentUserClinic,
-  getStatusColor,
-  INTEREST_LEVELS,
-  LEAD_STATUSES,
-} from "@/utils/supabase/leads-helper";
+import { fetchLeadsForClinic, formatStatus, getCurrentUserClinic, getStatusColor, LEAD_STATUSES } from "@/utils/supabase/leads-helper";
 import { Modal } from "antd";
 import { Edit, MoreVertical, SearchIcon, Trash2 } from "lucide-react";
 import type React from "react";
@@ -41,7 +34,6 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLeadStatus, setSelectedLeadStatus] = useState("all");
-  const [selectedInterestLevel, setSelectedInterestLevel] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [clinicId, setClinicId] = useState<string | null>(null);
@@ -160,7 +152,6 @@ export default function LeadsPage() {
 
   const filteredLeads = leadsData.filter(lead => {
     if (selectedLeadStatus !== "all" && lead.status !== selectedLeadStatus) return false;
-    if (selectedInterestLevel !== "all" && lead.interest_level !== selectedInterestLevel) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -171,55 +162,6 @@ export default function LeadsPage() {
     }
     return true;
   });
-
-  const FiltersBar = () => (
-    <div className="pt-4 px-4 pb-2">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:gap-4 md:pr-4">
-          <div className="relative md:w-[320px]">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search leads..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-10 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-          <select
-            value={selectedLeadStatus}
-            onChange={e => setSelectedLeadStatus(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 md:w-[220px]"
-          >
-            <option value="all">All Status</option>
-            {LEAD_STATUSES.map(status => (
-              <option key={status} value={status}>
-                {formatStatus(status)}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedInterestLevel}
-            onChange={e => setSelectedInterestLevel(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 md:w-[220px]"
-          >
-            <option value="all">All Interest</option>
-            {INTEREST_LEVELS.map(level => (
-              <option key={level} value={level}>
-                {level.charAt(0).toUpperCase() + level.slice(1)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          onClick={() => setShowLeadForm(true)}
-          className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-purple-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-purple-700 md:h-10 md:w-auto"
-        >
-          Generate Lead
-        </button>
-      </div>
-    </div>
-  );
 
   const ErrorBlock = () => (
     <div className="flex h-64 flex-col items-center justify-center">
@@ -292,7 +234,40 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        <FiltersBar />
+        <div className="pt-4 px-4 pb-2">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:gap-4 md:pr-4">
+              <div className="relative md:w-[320px]">
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search leads..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-10 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <select
+                value={selectedLeadStatus}
+                onChange={e => setSelectedLeadStatus(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 md:w-[220px]"
+              >
+                <option value="all">All Status</option>
+                {LEAD_STATUSES.map(status => (
+                  <option key={status} value={status}>
+                    {formatStatus(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => setShowLeadForm(true)}
+              className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-purple-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-purple-700 md:h-10 md:w-auto"
+            >
+              Generate Lead
+            </button>
+          </div>
+        </div>
 
         <div className="mx-4 rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="w-full overflow-x-auto overflow-y-visible">
