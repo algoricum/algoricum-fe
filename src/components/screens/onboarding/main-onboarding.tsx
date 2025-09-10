@@ -25,6 +25,7 @@ import IntegrationsStep from "./Integration";
 // import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
 import { handleSubscribe } from "@/utils/stripe";
 import StaffHoursStep from "./staff-hours-step";
+import { BOOKING_LINK } from "@/constants";
 
 const { Text } = Typography;
 const supabase = createClient();
@@ -313,7 +314,7 @@ export default function MainOnboarding() {
         email: mappedData.emailAddress || user.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink || "https://tinyurl.com/35c3wr42",
+        calendly_link: mappedData.calendlyLink || BOOKING_LINK,
         tone_selector: mappedData.toneSelector,
         sentence_length: mappedData.sentenceLength,
         formality_level: mappedData.formalityLevel,

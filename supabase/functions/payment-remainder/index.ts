@@ -58,7 +58,18 @@ function generateReminderEmail(clinicName: string, checkoutUrl: string, day: num
         return "Trial Reminder";
     }
   };
-
+  const getCTAText = (day: number) => {
+    switch (day) {
+      case 3:
+        return "Add Payment Info";
+      case 8:
+        return "Add Card";
+      case 12:
+        return "Add Card";
+      default:
+        return "Add Card";
+    }
+  };
   function getTrialEndDate(daysLeft: number): string {
     const now = new Date();
     const endDate = new Date(now.getTime() + daysLeft * 24 * 60 * 60 * 1000);
@@ -139,7 +150,7 @@ function generateReminderEmail(clinicName: string, checkoutUrl: string, day: num
             <div class="content">
                 ${getMainMessage(day, daysLeft)}
                 <div style="text-align: center;">
-                    <a href="${checkoutUrl}" class="cta-button">Add Payment Method</a>
+                    <a href="${checkoutUrl}" class="cta-button">${getCTAText(day)}</a>
                 </div>
                
                 <p>Algoricum</p>
