@@ -1,5 +1,5 @@
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
-import { ErrorToast, WarningToast } from "@/helpers/toast";
+import { ErrorToast, WarningToast, SuccessToast } from "@/helpers/toast";
 import { Lead } from "@/interfaces/services_type";
 import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
 import getLeadSourceId from "@/utils/lead_source";
@@ -12,7 +12,7 @@ import Papa from "papaparse";
 const supabase = createClient();
 
 // Upload CSV leads to Supabase lead table
-export const handleCsvLeadsUpload = async (clinic_id: string) => {
+export const handleCsvLeadsUpload = async (clinic_id: string, flag: boolean = false) => {
   const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
 
   if (leadsFileName) {
@@ -29,18 +29,24 @@ export const handleCsvLeadsUpload = async (clinic_id: string) => {
       const source_id = await getLeadSourceId("Csv_File ");
 
       if (!source_id) {
-        throw new Error("Lead source 'Csv_File' not found");
+        ErrorToast("Lead source 'Csv_File' not found");
       }
 
       const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
       const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
 
       if (insertError?.code === "23505") {
-        throw new Error("Upload failed as email address is already associated with a lead in this clinic.");
+        ErrorToast("Upload failed: This email address is already associated with a lead in this clinic.");
+        return;
       }
 
       if (insertError) {
-        throw insertError;
+        ErrorToast(`Upload failed: ${insertError.message}`);
+        return;
+      }
+
+      if (flag) {
+        SuccessToast("Leads uploaded successfully");
       }
     } catch (error) {
       ErrorToast(`${error}`);
@@ -88,7 +94,7 @@ export const handleCsvUpload = async (leadsData: any, flag: boolean) => {
     if (flag) {
       const clinic_id = await getCurrentUserClinic();
       if (clinic_id) {
-        await handleCsvLeadsUpload(clinic_id);
+        await handleCsvLeadsUpload(clinic_id, true);
       } else {
         ErrorToast("Clinic not found. Please check your clinic settings.");
       }
