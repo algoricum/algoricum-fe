@@ -92,10 +92,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   });
 
   const filteredQuestions =
-    formData.selectedCrm === "GoHighLevel" ||
-    formData.selectedCrm === "NextHealth" ||
-    formData.selectedCrm === "HubSpot" ||
-    formData.selectedCrm === "Pipedrive"
+    formData.selectedCrm === "GoHighLevel" || formData.selectedCrm === "NextHealth"
       ? [questions[0], questions[3]]
       : questions;
   const currentQuestion = filteredQuestions[currentQuestionIndex];
