@@ -27,16 +27,26 @@ export const handleCsvLeadsUpload = async (clinic_id: string) => {
     // Get source_id for 'File'
     try {
       const source_id = await getLeadSourceId("Csv_File ");
+
+      if (!source_id) {
+        throw new Error("Lead source 'Csv_File' not found");
+      }
+
       const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
       const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
+
+      if (insertError?.code === "23505") {
+        throw new Error("Upload failed as email address is already associated with a lead in this clinic.");
+      }
+
       if (insertError) {
-        ErrorToast(insertError.message);
+        throw insertError;
       }
     } catch (error) {
       ErrorToast(`${error}`);
     }
   } else {
-    console.log("Faizan csv handler is running but no leads file found");
+    WarningToast("No CSV file found for upload");
   }
 };
 // Upload CSV file to Supabase storage and handle leads upload
