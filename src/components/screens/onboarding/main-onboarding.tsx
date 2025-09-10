@@ -458,7 +458,7 @@ export default function MainOnboarding() {
         clinicId: updatedClinic.id,
       });
 
-      // Setup Twilio
+      // Setup Twilio phone number for cinic
       try {
         const session = await getSupabaseSession();
         if (!session.access_token) {
