@@ -1,5 +1,5 @@
 import { ONBOARDING_LEADS_FILE_NAME } from "@/constants/localStorageKeys";
-import { ErrorToast, WarningToast } from "@/helpers/toast";
+import { ErrorToast, WarningToast, SuccessToast } from "@/helpers/toast";
 import { Lead } from "@/interfaces/services_type";
 import downloadAndParseCSVWithPapa from "@/utils/downloadAndParseCSVWithPapa";
 import getLeadSourceId from "@/utils/lead_source";
@@ -12,7 +12,7 @@ import Papa from "papaparse";
 const supabase = createClient();
 
 // Upload CSV leads to Supabase lead table
-export const handleCsvLeadsUpload = async (clinic_id: string) => {
+export const handleCsvLeadsUpload = async (clinic_id: string, flag: boolean = false) => {
   const leadsFileName = localStorage.getItem(ONBOARDING_LEADS_FILE_NAME);
 
   if (leadsFileName) {
@@ -27,16 +27,31 @@ export const handleCsvLeadsUpload = async (clinic_id: string) => {
     // Get source_id for 'File'
     try {
       const source_id = await getLeadSourceId("Csv_File ");
+
+      if (!source_id) {
+        ErrorToast("Lead source 'Csv_File' not found");
+      }
+
       const leadsToInsert = getNormalizedLead(leads, source_id, clinic_id);
       const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
+
+      if (insertError?.code === "23505") {
+        throw new Error("Upload failed: This email address is already associated with a lead in this clinic.");
+      }
+
       if (insertError) {
-        ErrorToast(insertError.message);
+        throw new Error(`Upload failed: ${insertError.message}`);
+      }
+
+      if (flag) {
+        SuccessToast("Leads uploaded successfully");
       }
     } catch (error) {
+      // Catch and display any errors during the upload process
       ErrorToast(`${error}`);
     }
   } else {
-    console.log("Faizan csv handler is running but no leads file found");
+    WarningToast("No CSV file found for upload");
   }
 };
 // Upload CSV file to Supabase storage and handle leads upload
@@ -78,7 +93,7 @@ export const handleCsvUpload = async (leadsData: any, flag: boolean) => {
     if (flag) {
       const clinic_id = await getCurrentUserClinic();
       if (clinic_id) {
-        await handleCsvLeadsUpload(clinic_id);
+        await handleCsvLeadsUpload(clinic_id, true);
       } else {
         ErrorToast("Clinic not found. Please check your clinic settings.");
       }
