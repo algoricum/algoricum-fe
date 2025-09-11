@@ -3,8 +3,12 @@ import { Calendar } from "lucide-react";
 import React from "react";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 
 dayjs.extend(isBetween);
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 type LeadRow = {
   id: string;
@@ -38,27 +42,47 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ leadsData, filter }) =>
   let chartData: any[] = [];
 
   if (filter === "today") {
-    // Show hourly data for today
-    const hours = ["9AM", "10AM", "11AM", "12PM", "1PM", "2PM", "3PM", "4PM", "5PM"];
-    const today = dayjs().startOf("day");
-    const tomorrow = today.add(1, "day");
+    // Show hourly data for today - expanded to cover more hours
+    const hours = ["6AM", "7AM", "8AM", "9AM", "10AM", "11AM", "12PM", "1PM", "2PM", "3PM", "4PM", "5PM", "6PM", "7PM", "8PM"];
+    const today = dayjs();
 
     // First, get all leads created today
     const todayLeads = leadsData.filter(lead => {
       const leadDate = dayjs(lead.date);
-      return leadDate.isBetween(today, tomorrow, null, "[)");
+      return leadDate.isSame(today, "day");
     });
 
-    chartData = hours.map(hour => {
-      const hourNumber = hour.includes("PM") && hour !== "12PM" ? parseInt(hour) + 12 : hour === "12PM" ? 12 : parseInt(hour);
+    console.log("Today's date:", today.format("YYYY-MM-DD"));
+    console.log(
+      "All leads:",
+      leadsData.map(lead => ({
+        date: lead.date,
+        formatted: dayjs(lead.date).format("YYYY-MM-DD HH:mm:ss"),
+        hour: dayjs(lead.date).hour(),
+        isSameDay: dayjs(lead.date).isSame(today, "day"),
+      })),
+    );
+    console.log("Today's leads:", todayLeads);
 
-      const hourStart = today.hour(hourNumber);
-      const hourEnd = hourStart.add(1, "hour");
+    chartData = hours.map(hour => {
+      // Convert hour string to 24-hour format
+      let hourNumber: number;
+      if (hour.includes("PM") && hour !== "12PM") {
+        hourNumber = parseInt(hour.replace("PM", "")) + 12;
+      } else if (hour === "12PM") {
+        hourNumber = 12;
+      } else if (hour === "12AM") {
+        hourNumber = 0;
+      } else {
+        hourNumber = parseInt(hour.replace("AM", ""));
+      }
 
       // Filter today's leads by hour
       const hourLeads = todayLeads.filter(lead => {
         const leadDate = dayjs(lead.date);
-        return leadDate.isBetween(hourStart, hourEnd, null, "[)");
+        const leadHour = leadDate.hour();
+        console.log(`Checking lead hour ${leadHour} against slot ${hourNumber} for ${hour}`);
+        return leadHour === hourNumber;
       });
 
       return {
@@ -68,8 +92,6 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ leadsData, filter }) =>
       };
     });
 
-    // Debug: Log today's leads to console
-    console.log("Today's leads:", todayLeads);
     console.log("Chart data for today:", chartData);
   } else if (filter === "week") {
     // Show daily data for this week
