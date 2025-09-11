@@ -2,7 +2,7 @@
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import getLeadSourceId from "@/utils/lead_source";
 import { createClient } from "@/utils/supabase/config/client";
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { usePhoneValidation } from "@/hooks/usePhoneValidation";
 import { Calendar, Mail, Phone, Stethoscope, User, Users } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
@@ -22,28 +22,6 @@ type FormField = {
 type FormData = { [key: string]: string | number };
 
 type Props = { clinicId: string; onSuccess?: (newLead?: any) => void };
-
-const validatePhoneNumber = (phone: string | undefined): boolean => {
-  if (!phone) {
-    return false;
-  }
-
-  try {
-    if (!isValidPhoneNumber(phone)) {
-      return false;
-    }
-
-    const phoneNumberObj = parsePhoneNumber(phone);
-    if (!phoneNumberObj || !phoneNumberObj.isValid()) {
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error("Error validating phone number:", error);
-    return false;
-  }
-};
 
 const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
   const staticFields: FormField[] = [
@@ -78,7 +56,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "consultation_type",
       field_name: "Consultation Type",
       field_type: "textarea",
-      is_required: false, 
+      is_required: false,
       field_order: 6,
     },
     {
@@ -86,13 +64,14 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "services_interest",
       field_name: "Service Interest",
       field_type: "textarea",
-      is_required: false, 
+      is_required: false,
       field_order: 7,
     },
   ];
 
   const [formData, setFormData] = useState<FormData>({});
-  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const { phoneNumber, phoneError, handlePhoneChange, handlePhoneBlur, resetPhone } = usePhoneValidation();
+
   const [submitting, setSubmitting] = useState(false);
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -101,18 +80,6 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
   const handleInputChange = (id: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [id]: value }));
     if (errors[id]) setErrors(prev => ({ ...prev, [id]: "" }));
-  };
-
-  const handlePhoneChange = (value: string | undefined) => {
-    setPhoneNumber(value || "");
-    setFormData(prev => ({ ...prev, phone: value || "" }));
-    if (errors.phone) setErrors(prev => ({ ...prev, phone: "" }));
-  };
-
-  const handlePhoneBlur = () => {
-    if (phoneNumber && !validatePhoneNumber(phoneNumber)) {
-      setErrors(prev => ({ ...prev, phone: "Please enter a valid phone number" }));
-    }
   };
 
   const validateForm = () => {
@@ -135,14 +102,13 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       if (f.field_type === "tel") {
         if (f.is_required && !phoneNumber) {
           newErrors[f.field_id] = "Phone number is required";
-        } else if (phoneNumber && !validatePhoneNumber(phoneNumber)) {
-          newErrors[f.field_id] = "Please enter a valid phone number";
         }
+        // phoneError is automatically set by the hook, no need to call validatePhoneNumber manually
       }
     });
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0 && !phoneError; // Added phoneError check to form validation
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -186,7 +152,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       setSubmitting(false);
       setFormData({});
       setErrors({});
-      setPhoneNumber("");
+      resetPhone();
     }
   };
 
@@ -211,7 +177,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
   };
 
   const renderField = (f: FormField) => {
-    const error = errors[f.field_id];
+    const error = f.field_type === "tel" ? phoneError : errors[f.field_id];
     const baseCls = `w-full pl-12 pr-4 py-2.5 rounded-lg border-2 transition-all duration-300 bg-white
       ${
         error
@@ -319,7 +285,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
           <div className="space-y-1">
             <label className="block text-sm font-semibold text-gray-700">Contact Number</label>
             {renderField(staticFields[3])}
-            {errors.phone && <p className="text-red-500 text-sm font-medium">{errors.phone}</p>}
+            {phoneError && <p className="text-red-500 text-sm font-medium">{phoneError}</p>}
           </div>
 
           <div className="space-y-1">

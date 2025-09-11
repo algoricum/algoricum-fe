@@ -1,12 +1,14 @@
 "use client";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 import { ErrorToast, WarningToast } from "@/helpers/toast";
+import { usePhoneValidation } from "@/hooks/usePhoneValidation";
 import { createClient } from "@/utils/supabase/config/client";
 import { DollarCircleOutlined, FileTextOutlined, StarOutlined } from "@ant-design/icons";
 import { Button, Input, Typography, Upload } from "antd";
 import { useEffect, useState } from "react";
-import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input/max";
+import PhoneInput from "react-phone-number-input/max";
 import "react-phone-number-input/style.css";
+
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 const supabase = createClient();
@@ -23,45 +25,14 @@ const validateEmail = (email: string) => {
   return emailRegex.test(email);
 };
 
-// FIXED PHONE VALIDATION FUNCTION
-const validatePhoneNumber = (phoneNumber: string) => {
-  console.log("Validating phone:", phoneNumber); // Debug log
-
-  if (!phoneNumber || !phoneNumber.trim()) {
-    return { isValid: false, error: "Phone number is required" };
-  }
-
-  try {
-    // Use isValidPhoneNumber - this should work for +1 555 123 4567
-    const isValid = isValidPhoneNumber(phoneNumber);
-    console.log("Is valid result:", isValid);
-
-    if (isValid) {
-      return { isValid: true, error: null };
-    }
-
-    // If not valid, provide helpful error message
-    return {
-      isValid: false,
-      error: "Please enter a complete phone number for the selected country",
-    };
-  } catch (error) {
-    console.log("Validation error:", error);
-    return {
-      isValid: false,
-      error: "Please enter a valid phone number",
-    };
-  }
-};
-
 export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showAllQuestions = false }: ClinicInfoStepProps) {
+  const { phoneNumber, phoneError, handlePhoneChange, setPhoneNumber } = usePhoneValidation();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [formData, setFormData] = useState({
     clinicName: initialData.clinicName || "",
     clinicType: initialData.clinicType || "",
     primaryContactName: initialData.primaryContactName || "",
     // primaryContactEmail: initialData.primaryContactEmail || "",
-    clinicPhone: initialData.clinicPhone || "",
     businessAddress: initialData.businessAddress || "",
     // Three separate document arrays
     servicesDocument: initialData.servicesDocument || [],
@@ -69,6 +40,12 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     testimonialsDocument: initialData.testimonialsDocument || [],
   });
 
+  // Add useEffect to sync initial phone data
+  useEffect(() => {
+    if (initialData.clinicPhone) {
+      setPhoneNumber(initialData.clinicPhone);
+    }
+  }, [initialData.clinicPhone, setPhoneNumber]);
   // NEW: Track which fields have been touched/interacted with
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
@@ -124,7 +101,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       question: "Upload your clinic documents for AI processing",
       placeholder: "Upload services, pricing, and testimonials documents",
       required: true, // At least services document is required
-    }
+    },
   ];
 
   // File upload configurations
@@ -258,15 +235,15 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     }));
   };
 
-  const handlePhoneChange = (value: string | undefined) => {
-    // Mark phone field as touched when user interacts
-    markFieldAsTouched("clinicPhone");
+  // const handlePhoneChange = (value: string | undefined) => {
+  //   // Mark phone field as touched when user interacts
+  //   markFieldAsTouched("clinicPhone");
 
-    setFormData(prev => ({
-      ...prev,
-      clinicPhone: value || "",
-    }));
-  };
+  //   setFormData(prev => ({
+  //     ...prev,
+  //     clinicPhone: value || "",
+  //   }));
+  // };
 
   // NEW: Handle field blur (when user leaves a field)
   const handleFieldBlur = (fieldId: string) => {
@@ -306,11 +283,11 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     }
 
     // FIXED PHONE VALIDATION - Check format if there's a value
-    if (currentQuestion.type === "phone" && value?.toString().trim()) {
-      const phoneValidation = validatePhoneNumber(value as string);
-      if (!phoneValidation.isValid) {
-        return phoneValidation.error;
+    if (currentQuestion.type === "phone") {
+      if (currentQuestion.required && !phoneNumber?.trim()) {
+        return "This field is required";
       }
+      return phoneError; // Use error from hook
     }
 
     return null;
@@ -338,7 +315,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       // Reset submit attempt for next field
       setAttemptedSubmit(false);
     } else {
-      onNext({ ...formData, ...consentData });
+      onNext({ ...formData, clinicPhone: phoneNumber, ...consentData });
     }
   };
 
@@ -415,7 +392,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             />
           ) : q.type === "phone" ? (
             <div className="p-3 rounded-xl border-2 border-gray-200 bg-gray-50 w-full text-gray-700 text-xs">
-              {value || "No phone number entered"}
+              {phoneNumber || "No phone number entered"}
             </div>
           ) : (
             <Input
@@ -613,7 +590,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
           <div onBlur={() => handleFieldBlur(currentQuestion.id)}>
             <PhoneInput
               placeholder={currentQuestion.placeholder}
-              value={currentValue as string}
+              value={phoneNumber}
               onChange={handlePhoneChange}
               defaultCountry="US"
               international={true}
@@ -622,7 +599,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             />
           </div>
           {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
-          {currentValue && !hasError && <p className="text-green-600 text-sm mt-2">✓ Valid phone number</p>}
+          {phoneNumber && !hasError && <p className="text-green-600 text-sm mt-2">✓ Valid phone number</p>}
         </div>
       );
     }
