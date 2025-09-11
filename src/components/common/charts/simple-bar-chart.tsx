@@ -52,18 +52,6 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ leadsData, filter }) =>
       return leadDate.isSame(today, "day");
     });
 
-    console.log("Today's date:", today.format("YYYY-MM-DD"));
-    console.log(
-      "All leads:",
-      leadsData.map(lead => ({
-        date: lead.date,
-        formatted: dayjs(lead.date).format("YYYY-MM-DD HH:mm:ss"),
-        hour: dayjs(lead.date).hour(),
-        isSameDay: dayjs(lead.date).isSame(today, "day"),
-      })),
-    );
-    console.log("Today's leads:", todayLeads);
-
     chartData = hours.map(hour => {
       // Convert hour string to 24-hour format
       let hourNumber: number;
@@ -81,7 +69,6 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ leadsData, filter }) =>
       const hourLeads = todayLeads.filter(lead => {
         const leadDate = dayjs(lead.date);
         const leadHour = leadDate.hour();
-        console.log(`Checking lead hour ${leadHour} against slot ${hourNumber} for ${hour}`);
         return leadHour === hourNumber;
       });
 
@@ -91,8 +78,6 @@ const SimpleBarChart: React.FC<SimpleBarChartProps> = ({ leadsData, filter }) =>
         booked: hourLeads.filter(lead => lead.status?.toLowerCase() === "booked").length,
       };
     });
-
-    console.log("Chart data for today:", chartData);
   } else if (filter === "week") {
     // Show daily data for this week
     const startOfWeek = dayjs().startOf("week");
