@@ -8,23 +8,96 @@ interface ExtractedContact {
   firstName: string | null;
   lastName: string | null;
   phone: string | null;
-  countryCode: string | null;
-  mobile: string | null;
-  fullName: string | null;
-  hasEmail: boolean;
-  hasPhone: boolean;
-  hasCountryCode: boolean;
-  hasMobile: boolean;
+  createdDate: string | null;
+}
+
+async function callOpenAI(prompt: string, retries = 2): Promise<ExtractedContact[]> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "You are a data extraction specialist. Always return valid JSON array only, no additional text.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 1500,
+      }),
+    });
+
+    if (!openaiResponse.ok) {
+      const error = await openaiResponse.text();
+      console.error("OpenAI API error:", error);
+      throw new Error("Failed to process data with AI service");
+    }
+
+    const openaiData = await openaiResponse.json();
+    const extractedText = openaiData.choices[0]?.message?.content?.trim();
+
+    if (!extractedText) {
+      throw new Error("No response from AI service");
+    }
+
+    try {
+      // Clean markdown fences
+      let cleaned = extractedText.trim();
+      if (cleaned.startsWith("```")) {
+        cleaned = cleaned
+          .replace(/^```[a-zA-Z]*\n/, "")
+          .replace(/```$/, "")
+          .trim();
+      }
+
+      // Repair incomplete arrays
+      if (cleaned.startsWith("[") && !cleaned.endsWith("]")) {
+        cleaned = cleaned.replace(/,\s*$/, "");
+        cleaned += "]";
+      }
+
+      const parsed = JSON.parse(cleaned);
+      if (!Array.isArray(parsed)) throw new Error("Response not an array");
+
+      return parsed.map(
+        (c: any): ExtractedContact => ({
+          email: c.email || null,
+          firstName: c.firstName || null,
+          lastName: c.lastName || null,
+          phone: c.phone || null,
+          createdDate: c.createdDate || null,
+        }),
+      );
+    } catch (err) {
+      console.error(`Parse failed on attempt ${attempt + 1}:`, err);
+      console.error("Raw response:", extractedText);
+
+      // retry if we still have attempts left
+      if (attempt < retries) {
+        console.log("Retrying OpenAI call...");
+        continue;
+      }
+
+      // If retries exhausted, rethrow
+      throw err;
+    }
+  }
+
+  return [];
 }
 
 serve(async req => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // Parse the incoming JSON data
     const inputData = await req.json();
 
     if (!inputData) {
@@ -41,108 +114,43 @@ serve(async req => {
       });
     }
 
-    // Create the prompt for GPT
     const prompt = `
 You are a data extraction specialist. I will provide you with JSON data of any structure, and you need to extract contact information from it.
+There can be multiple contacts in the data.
 
-Extract the following information and return it as a valid JSON object:
-- email: Extract email address (return null if not found)
-- firstName: Extract first name (return null if not found)
-- lastName: Extract last name (return null if not found)  
-- phone: Extract primary phone number (return null if not found)
-- countryCode: Extract country code from phone number (return null if not found)
-- mobile: Extract mobile/cell phone number if different from phone (return null if not found)
-- fullName: Extract full name if available as single field (return null if not found)
-
-Also include these boolean flags:
-- hasEmail: true if email was found, false otherwise
-- hasPhone: true if any phone number was found, false otherwise
-- hasCountryCode: true if country code was found, false otherwise
-- hasMobile: true if mobile number was found, false otherwise
+Extract the following information and return it as a valid JSON array of objects:
+- email: Extract email address (null if not found)
+- firstName: Extract first name (null if not found)
+- lastName: Extract last name (null if not found)
+- phone: Extract primary phone number (null if not found) e.g. (+54122222222/with country code)
+- createdDate: Extract the date when the contact was created (null if not found)
 
 Important rules:
 1. Only return valid JSON format
-2. Use null for missing data, never use empty strings
-3. Don't make up data - only extract what's actually present
-4. For phone numbers, try to identify country codes (like +1, +44, etc.)
-5. Be flexible with field names - data might use "email", "mail", "e-mail", etc.
-6. Same for names - could be "name", "fullName", "first_name", "fname", etc.
-7. For mobile vs phone, prioritize mobile numbers if both exist
+2. Always return an array, even if only one contact
+3. Use null for missing data, never empty strings
+4. Don't make up data - only extract what's actually present
+5. Be flexible with field names ("email", "mail", "e-mail", etc.)
+6. Same for names ("name", "fullName", "first_name", etc.)
+7. Dates may appear as "created", "createdAt", "creationDate", etc.
+8. Skip entries that don't have at least an email
+9. If multiple emails/phones, pick the first valid one
+10. If no country code in phone, send null
 
 Here's the data to extract from:
-${JSON.stringify(inputData, null, 2)}
+${JSON.stringify(inputData.data, null, 2)}
 
-Return only the JSON object with the extracted data.`;
+Return only the JSON array of extracted contacts.`;
 
-    // Call OpenAI API
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are a data extraction specialist. Always return valid JSON format only, no additional text or explanation.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 500,
-      }),
-    });
-
-    if (!openaiResponse.ok) {
-      const error = await openaiResponse.text();
-      console.error("OpenAI API error:", error);
-      return new Response(JSON.stringify({ error: "Failed to process data with AI service" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const openaiData = await openaiResponse.json();
-    const extractedText = openaiData.choices[0]?.message?.content?.trim();
-
-    if (!extractedText) {
-      return new Response(JSON.stringify({ error: "No response from AI service" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Parse the extracted JSON
-    let extractedContact: ExtractedContact;
+    let extractedContacts: ExtractedContact[] = [];
     try {
-      extractedContact = JSON.parse(extractedText);
-    } catch (parseError) {
-      console.error("Failed to parse extracted JSON:", parseError);
-      console.error("Raw response:", extractedText);
-
-      // Return a fallback response
+      extractedContacts = await callOpenAI(prompt, 2);
+    } catch (err) {
       return new Response(
         JSON.stringify({
           error: "Failed to parse extracted data",
-          rawResponse: extractedText,
-          fallback: {
-            email: null,
-            firstName: null,
-            lastName: null,
-            phone: null,
-            countryCode: null,
-            mobile: null,
-            fullName: null,
-            hasEmail: false,
-            hasPhone: false,
-            hasCountryCode: false,
-            hasMobile: false,
-          },
+          message: err.message,
+          fallback: [],
         }),
         {
           status: 200,
@@ -151,26 +159,10 @@ Return only the JSON object with the extracted data.`;
       );
     }
 
-    // Validate and clean the response
-    const cleanedResponse: ExtractedContact = {
-      email: extractedContact.email || null,
-      firstName: extractedContact.firstName || null,
-      lastName: extractedContact.lastName || null,
-      phone: extractedContact.phone || null,
-      countryCode: extractedContact.countryCode || null,
-      mobile: extractedContact.mobile || null,
-      fullName: extractedContact.fullName || null,
-      hasEmail: !!extractedContact.email,
-      hasPhone: !!(extractedContact.phone || extractedContact.mobile),
-      hasCountryCode: !!extractedContact.countryCode,
-      hasMobile: !!extractedContact.mobile,
-    };
-
     return new Response(
       JSON.stringify({
         success: true,
-        data: cleanedResponse,
-        originalData: inputData,
+        data: extractedContacts,
       }),
       {
         status: 200,
