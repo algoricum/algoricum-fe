@@ -67,23 +67,6 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
       const bookedLast = leadsLastMonth.filter(l => l.status === "Booked").length;
       const bookedChange = getChangePercent(bookedThis, bookedLast);
 
-      // Calculate converted patients (unique by email)
-      // const convertedThis = new Set(
-      //   leadsThisMonth
-      //     .filter(l => l.status === "Converted")
-      //     .map(l => l.email)
-      //     .filter(email => email !== null),
-      // ).size;
-
-      // const convertedLast = new Set(
-      //   leadsLastMonth
-      //     .filter(l => l.status === "Converted")
-      //     .map(l => l.email)
-      //     .filter(email => email !== null),
-      // ).size;
-
-      // const activeChange = getChangePercent(convertedThis, convertedLast);
-
       // Calculate conversion rates
       const convThis = totalThis === 0 ? 0 : Number(((bookedThis / totalThis) * 100).toFixed(2));
 
