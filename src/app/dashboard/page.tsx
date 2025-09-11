@@ -12,7 +12,7 @@ import { createClient } from "@/utils/supabase/config/client";
 import { Button } from "antd";
 import { Bot, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AiActivityLog from "./AiActivityLogs";
 import StatsGrid from "./StatsGrid";
 import TodayTasks from "./TodayTasks";
@@ -139,12 +139,6 @@ export default function DashboardPage() {
     checkUser();
   }, [router, supabase.auth]);
 
-  // Filtered leads for charts
-  const filteredLeadsForChart = useMemo(
-    () => leadsData.filter(lead => ["booked", "converted"].includes((lead.status ?? "").toLowerCase())),
-    [leadsData],
-  );
-
   if (loading) {
     return (
       <DashboardLayout
@@ -259,7 +253,7 @@ export default function DashboardPage() {
               </select>
             </div>
             <div className="mt-4">
-              <SimpleBarChart appointmentsData={filteredLeadsForChart} filter={appointmentFilter} />
+              <SimpleBarChart leadsData={leadsData} filter={appointmentFilter} />
             </div>
           </div>
 
@@ -273,7 +267,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 mt-8">
             {/* Left Side - Conversion Funnel */}
             <div className="bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
-              <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-4 mb-6">Conversion Funnel</h3>
+              <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-100 pb-4 mb-6">Booked Conversion Funnel</h3>
               <div className="mt-4">
                 <ConversionFunnel clinicId={clinicId} />
               </div>
