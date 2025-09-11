@@ -2,7 +2,7 @@
 import { Skeleton } from "antd";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
-import { Calendar, TrendingUp, UserPlus, Users } from "lucide-react";
+import { Calendar, TrendingUp, UserPlus } from "lucide-react";
 import { type JSX, useEffect, useState } from "react";
 
 dayjs.extend(isBetween);
@@ -135,7 +135,7 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
       <StatCard
         icon={<UserPlus className="w-6 h-6 text-purple-600" />}
         title="Total Leads"
@@ -156,13 +156,6 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
         value={`${stats.conversionRate.thisMonth}%`}
         change={stats.conversionRate.change}
         bg="bg-green-100"
-      />
-      <StatCard
-        icon={<Users className="w-6 h-6 text-purple-600" />}
-        title="Active Patients"
-        value={stats.activePatients.thisMonth}
-        change={stats.activePatients.change}
-        bg="bg-purple-100"
       />
     </div>
   );
