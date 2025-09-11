@@ -152,7 +152,7 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
       />
       <StatCard
         icon={<TrendingUp className="w-6 h-6 text-green-600" />}
-        title="Conversion Rate"
+        title="Booking Rate"
         value={`${stats.conversionRate.thisMonth}%`}
         change={stats.conversionRate.change}
         bg="bg-green-100"
