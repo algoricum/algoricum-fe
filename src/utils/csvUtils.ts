@@ -36,19 +36,18 @@ export const handleCsvLeadsUpload = async (clinic_id: string, flag: boolean = fa
       const { error: insertError } = await supabase.from("lead").insert(leadsToInsert);
 
       if (insertError?.code === "23505") {
-        ErrorToast("Upload failed: This email address is already associated with a lead in this clinic.");
-        return;
+        throw new Error("Upload failed: This email address is already associated with a lead in this clinic.");
       }
 
       if (insertError) {
-        ErrorToast(`Upload failed: ${insertError.message}`);
-        return;
+        throw new Error(`Upload failed: ${insertError.message}`);
       }
 
       if (flag) {
         SuccessToast("Leads uploaded successfully");
       }
     } catch (error) {
+      // Catch and display any errors during the upload process
       ErrorToast(`${error}`);
     }
   } else {
