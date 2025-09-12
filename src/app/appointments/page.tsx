@@ -227,10 +227,26 @@ export default function AppointmentsPage() {
     } else {
       // Calculate position relative to viewport
       const rect = e.currentTarget.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8, // 8px gap below the button
-        left: rect.right - 192, // 192px is the width of dropdown (w-48)
-      });
+      const dropdownHeight = 120; // Approximate dropdown height
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+
+      let top = rect.bottom + 8;
+      let left = rect.right - 192; // 192px is dropdown width (w-48)
+
+      if (rect.bottom + dropdownHeight > viewportHeight) {
+        // Position above the button instead
+        top = rect.top - dropdownHeight - 8;
+      }
+
+      // Check if dropdown would go off-screen horizontally
+      if (left < 8) {
+        left = 8;
+      } else if (left + 192 > viewportWidth - 8) {
+        left = viewportWidth - 200;
+      }
+
+      setDropdownPosition({ top, left });
       setActiveDropdown(appointmentId);
     }
   };
