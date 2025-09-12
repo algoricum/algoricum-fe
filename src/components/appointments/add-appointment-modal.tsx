@@ -7,6 +7,7 @@ import { usePhoneValidation } from "@/hooks/usePhoneValidation";
 import { X } from "lucide-react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
+import { useEffect } from "react";
 
 const { TextArea } = Input;
 
@@ -21,6 +22,13 @@ interface AddAppointmentModalProps {
 export function AddAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting }: AddAppointmentModalProps) {
   const [form] = Form.useForm();
   const { phoneNumber, phoneError, handlePhoneChange, handlePhoneBlur, resetPhone } = usePhoneValidation();
+
+  useEffect(() => {
+    if (isOpen) {
+      form.resetFields();
+      resetPhone();
+    }
+  }, [isOpen, form, resetPhone]);
 
   if (!isOpen) return null;
 
