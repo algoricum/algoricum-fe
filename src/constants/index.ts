@@ -25,6 +25,7 @@ export const avatarmenu: MenuProps["items"] = [
     label: "Logout",
   },
 ];
+export const BOOKING_LINK = "https://calendly.com/algoricum/onboarding";
 
 export const protectedRoutes = ["/content/articles", "/content/sections", "/setup"];
 
