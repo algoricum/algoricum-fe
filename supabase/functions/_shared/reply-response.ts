@@ -356,7 +356,7 @@ ${conversationContext}
 The patient's current email "${options.messageBody}" is a REPLY to the conversation above. 
 
 🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
-If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Book here: ${bookingLink}" - Nothing else!
+If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Awesome! Let's lock in your appointment: ${bookingLink}" - Nothing else!
 
 WHEN PATIENT SAYS YES/AFFIRMATIVE:
 If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
@@ -365,7 +365,7 @@ CRITICAL: Check what the LAST Clinic message was asking:
 
 IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
 - Patient's "yes" = booking request
-- Provide ONLY the booking link: "Book here: ${bookingLink} (5-6 words maximum)"
+- Provide ONLY the booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - NO additional information, NO more questions, NO treatment details, NO explanations
 
 IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
@@ -374,7 +374,7 @@ IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", 
 - End with clear next steps (booking opportunity)
 
 EXAMPLE SCENARIOS:
-- Last message: "Ready to book?" → Patient: "Yes" → Response: "Book here: ${bookingLink} (5-6 words maximum)"
+- Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment:: ${bookingLink}"
 - Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
 
@@ -384,7 +384,7 @@ CRITICAL RESPONSE RULES:
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
 - When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
-- When providing booking links, keep it VERY brief: "Book here: ${bookingLink}" (5-6 words maximum)
+- When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
@@ -433,7 +433,7 @@ ${conversationContext}
 The patient's current SMS "${options.messageBody}" is a REPLY to the conversation above. 
 
 🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
-If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Book here: ${bookingLink}" - Nothing else!
+If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Awesome! Let's lock in your appointment: ${bookingLink}" - Nothing else!
 
 WHEN PATIENT SAYS YES/AFFIRMATIVE:
 If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
@@ -442,7 +442,7 @@ CRITICAL: Check what the LAST Clinic message was asking:
 
 IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
 - Patient's "yes" = booking request
-- Provide ONLY the booking link: "Book here: ${bookingLink}"
+- Provide ONLY the booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - NO additional information, NO more questions, NO treatment details, NO explanations
 
 IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
@@ -451,7 +451,7 @@ IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", 
 - End with clear next steps (booking opportunity)
 
 EXAMPLE SCENARIOS:
-- Last message: "Ready to book?" → Patient: "Yes" → Response: "Book here: ${bookingLink}"
+- Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
 
@@ -461,7 +461,7 @@ CRITICAL RESPONSE RULES:
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
 - When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
-- When providing booking links, keep it VERY brief: "Book here: ${bookingLink}" (5-6 words maximum)
+- When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
@@ -934,7 +934,7 @@ ${
 The patient's current message "${options.messageBody}" is a REPLY to the conversation above. 
 
 🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
-If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Book here: ${bookingLink}" - Nothing else!
+If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Awesome! Let's lock in your appointment: ${bookingLink}" - Nothing else!
 
 WHEN PATIENT SAYS YES/AFFIRMATIVE:
 If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
@@ -943,7 +943,7 @@ CRITICAL: Check what the LAST Clinic message was asking:
 
 IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
 - Patient's "yes" = booking request
-- Provide ONLY the booking link: "Book here: ${bookingLink}"
+- Provide ONLY the booking link: "Book here: ${bookingLink} (5-6 words maximum)"
 - NO additional information, NO more questions, NO treatment details, NO explanations
 
 IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
@@ -952,7 +952,7 @@ IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", 
 - End with clear next steps (booking opportunity)
 
 EXAMPLE SCENARIOS:
-- Last message: "Ready to book?" → Patient: "Yes" → Response: "Book here: ${bookingLink}"
+- Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
 
@@ -962,7 +962,7 @@ CRITICAL RESPONSE RULES:
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
 - When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
-- When providing booking links, keep it VERY brief: "Book here: ${bookingLink}" (5-6 words maximum)
+- When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
@@ -1019,7 +1019,7 @@ ${
 The patient's current message "${options.messageBody}" is a REPLY to the conversation above. 
 
 🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
-If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Book here: ${bookingLink}" - Nothing else!
+If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Awesome! Let's lock in your appointment: ${bookingLink}" - Nothing else!
 
 WHEN PATIENT SAYS YES/AFFIRMATIVE:
 If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
@@ -1037,7 +1037,7 @@ IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", 
 - End with clear next steps (booking opportunity)
 
 EXAMPLE SCENARIOS:
-- Last message: "Ready to book?" → Patient: "Yes" → Response: "Book here: ${bookingLink} (5-6 words maximum)"
+- Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment:: ${bookingLink}"
 - Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
 
@@ -1047,7 +1047,7 @@ CRITICAL RESPONSE RULES:
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
 - When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
-- When providing booking links, keep it VERY brief: "Book here: ${bookingLink}" (5-6 words maximum)
+- When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}" 
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
