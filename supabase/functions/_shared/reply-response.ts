@@ -1,5 +1,7 @@
 // _shared/reply-response.ts
 
+import { detectBookingRequestAndCreateSchedule, type BookingDetectionOptions } from "./booking-detection-service.ts";
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 
 interface LeadData {
@@ -149,6 +151,89 @@ export async function generateAIResponse(
       hasLink: messageBodyLower.includes("link"),
     });
 
+    // Check if user responded "yes" to a booking-related question in previous conversation
+    const isYesResponse =
+      messageBodyLower.trim() === "yes" ||
+      messageBodyLower.trim() === "y" ||
+      messageBodyLower.includes("yes please") ||
+      messageBodyLower.includes("sure") ||
+      messageBodyLower.includes("okay") ||
+      messageBodyLower.includes("ok");
+
+    let shouldTriggerBookingProcess = false;
+
+    if (isYesResponse && conversationContext) {
+      // Get the last 2 messages to check if the previous one was asking about booking
+      const messages = conversationContext.split("\n\n");
+      const lastTwoMessages = messages.slice(-2);
+
+      if (lastTwoMessages.length >= 2) {
+        // Get the second-to-last message (the clinic's previous message before user's "yes")
+        const previousMessage = lastTwoMessages[lastTwoMessages.length - 2] || "";
+        const previousMessageLower = previousMessage.toLowerCase();
+        const wasBookingQuestion =
+          previousMessageLower.includes("ready to book") ||
+          previousMessageLower.includes("want to schedule") ||
+          previousMessageLower.includes("let me know if you want to book") ||
+          previousMessageLower.includes("would you like to book") ||
+          previousMessageLower.includes("ready for an appointment") ||
+          previousMessageLower.includes("want to set up") ||
+          previousMessageLower.includes("i can help you book") ||
+          previousMessageLower.includes("ready to book an appointment") ||
+          previousMessageLower.includes("book an appointment") ||
+          previousMessageLower.includes("interested in booking") ||
+          previousMessageLower.includes("if you're interested in booking");
+
+        if (wasBookingQuestion) {
+          shouldTriggerBookingProcess = true;
+          logInfo("📅 Yes response to booking question detected, triggering booking process");
+        }
+      }
+    }
+
+    // Trigger booking process if yes response to booking question
+    if (shouldTriggerBookingProcess) {
+      try {
+        const bookingOptions: BookingDetectionOptions = {
+          messageBody: options.messageBody,
+          subject: options.subject,
+          leadData: {
+            id: leadData.id,
+            first_name: leadData.first_name,
+            last_name: leadData.last_name,
+            email: leadData.email,
+            phone: leadData.phone,
+            notes: leadData.notes,
+          },
+          clinicData: {
+            id: clinicData.id,
+            name: clinicData.name,
+            calendly_link: clinicData.calendly_link,
+          },
+          communicationType: isEmailResponse ? "email" : "sms",
+          senderPhone: leadData.phone,
+        };
+
+        logInfo("🎯 Triggering booking detection service for yes response...");
+        const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
+
+        logInfo("📅 Booking detection result for yes response:", {
+          isBookingRequest: bookingResult.isBookingRequest,
+          meetingScheduleCreated: bookingResult.meetingScheduleCreated,
+          meetingScheduleId: bookingResult.meetingScheduleId,
+          error: bookingResult.error,
+        });
+
+        if (bookingResult.meetingScheduleCreated) {
+          logInfo(`✅ Booking service created meeting schedule for yes response: ${bookingResult.meetingScheduleId}`);
+        } else if (bookingResult.error) {
+          logError(`❌ Booking service error for yes response: ${bookingResult.error}`);
+        }
+      } catch (bookingError) {
+        logError(`❌ Error in booking detection for yes response:`, bookingError);
+      }
+    }
+
     const bookingLink = clinicData.calendly_link || "https://calendly.com/book";
     const unsubscribeLink = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
 
@@ -270,15 +355,18 @@ ${conversationContext}
 🚨 CRITICAL CONTEXT INSTRUCTION FOR EMAIL: 
 The patient's current email "${options.messageBody}" is a REPLY to the conversation above. 
 
+🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
+If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Book here: ${bookingLink}" - Nothing else!
+
 WHEN PATIENT SAYS YES/AFFIRMATIVE:
 If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
 
 CRITICAL: Check what the LAST Clinic message was asking:
 
-IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book"):
+IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
 - Patient's "yes" = booking request
-- Provide ONLY the booking link: "Book here: ${bookingLink}"
-- NO additional information, NO more questions
+- Provide ONLY the booking link: "Book here: ${bookingLink} (5-6 words maximum)"
+- NO additional information, NO more questions, NO treatment details, NO explanations
 
 IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
 - Patient's "yes" = wants treatment information
@@ -286,7 +374,7 @@ IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", 
 - End with clear next steps (booking opportunity)
 
 EXAMPLE SCENARIOS:
-- Last message: "Ready to book?" → Patient: "Yes" → Response: "Book here: ${bookingLink}"
+- Last message: "Ready to book?" → Patient: "Yes" → Response: "Book here: ${bookingLink} (5-6 words maximum)"
 - Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
 
@@ -344,15 +432,18 @@ ${conversationContext}
 🚨 CRITICAL CONTEXT INSTRUCTION FOR SMS: 
 The patient's current SMS "${options.messageBody}" is a REPLY to the conversation above. 
 
+🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
+If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Book here: ${bookingLink}" - Nothing else!
+
 WHEN PATIENT SAYS YES/AFFIRMATIVE:
 If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
 
 CRITICAL: Check what the LAST Clinic message was asking:
 
-IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book"):
+IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
 - Patient's "yes" = booking request
 - Provide ONLY the booking link: "Book here: ${bookingLink}"
-- NO additional information, NO more questions
+- NO additional information, NO more questions, NO treatment details, NO explanations
 
 IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
 - Patient's "yes" = wants treatment information
@@ -719,6 +810,90 @@ async function generateFallbackResponse(
       options.messageBody.toLowerCase().includes("time") ||
       options.messageBody.toLowerCase().includes("available");
 
+    // Check if user responded "yes" to a booking-related question in previous conversation (fallback version)
+    const messageBodyLower = options.messageBody.toLowerCase();
+    const isYesResponse =
+      messageBodyLower.trim() === "yes" ||
+      messageBodyLower.trim() === "y" ||
+      messageBodyLower.includes("yes please") ||
+      messageBodyLower.includes("sure") ||
+      messageBodyLower.includes("okay") ||
+      messageBodyLower.includes("ok");
+
+    let shouldTriggerBookingProcess = false;
+
+    if (isYesResponse && conversationContext) {
+      // Get the last 2 messages to check if the previous one was asking about booking
+      const messages = conversationContext.split("\n\n");
+      const lastTwoMessages = messages.slice(-2);
+
+      if (lastTwoMessages.length >= 2) {
+        // Get the second-to-last message (the clinic's previous message before user's "yes")
+        const previousMessage = lastTwoMessages[lastTwoMessages.length - 2] || "";
+        const previousMessageLower = previousMessage.toLowerCase();
+        const wasBookingQuestion =
+          previousMessageLower.includes("ready to book") ||
+          previousMessageLower.includes("want to schedule") ||
+          previousMessageLower.includes("let me know if you want to book") ||
+          previousMessageLower.includes("would you like to book") ||
+          previousMessageLower.includes("ready for an appointment") ||
+          previousMessageLower.includes("want to set up") ||
+          previousMessageLower.includes("i can help you book") ||
+          previousMessageLower.includes("ready to book an appointment") ||
+          previousMessageLower.includes("book an appointment") ||
+          previousMessageLower.includes("interested in booking") ||
+          previousMessageLower.includes("if you're interested in booking");
+
+        if (wasBookingQuestion) {
+          shouldTriggerBookingProcess = true;
+          logInfo("📅 Yes response to booking question detected in fallback, triggering booking process");
+        }
+      }
+    }
+
+    // Trigger booking process if yes response to booking question
+    if (shouldTriggerBookingProcess) {
+      try {
+        const bookingOptions: BookingDetectionOptions = {
+          messageBody: options.messageBody,
+          subject: options.subject,
+          leadData: {
+            id: leadData.id,
+            first_name: leadData.first_name,
+            last_name: leadData.last_name,
+            email: leadData.email,
+            phone: leadData.phone,
+            notes: leadData.notes,
+          },
+          clinicData: {
+            id: clinicData.id,
+            name: clinicData.name,
+            calendly_link: clinicData.calendly_link,
+          },
+          communicationType: isEmailResponse ? "email" : "sms",
+          senderPhone: leadData.phone,
+        };
+
+        logInfo("🎯 Triggering booking detection service for yes response in fallback...");
+        const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
+
+        logInfo("📅 Booking detection result for yes response in fallback:", {
+          isBookingRequest: bookingResult.isBookingRequest,
+          meetingScheduleCreated: bookingResult.meetingScheduleCreated,
+          meetingScheduleId: bookingResult.meetingScheduleId,
+          error: bookingResult.error,
+        });
+
+        if (bookingResult.meetingScheduleCreated) {
+          logInfo(`✅ Booking service created meeting schedule for yes response in fallback: ${bookingResult.meetingScheduleId}`);
+        } else if (bookingResult.error) {
+          logError(`❌ Booking service error for yes response in fallback: ${bookingResult.error}`);
+        }
+      } catch (bookingError) {
+        logError(`❌ Error in booking detection for yes response in fallback:`, bookingError);
+      }
+    }
+
     const bookingLink = clinicData.calendly_link || "https://calendly.com/book";
     const unsubscribeLink = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
 
@@ -758,15 +933,18 @@ ${
     ? `🚨 CRITICAL CONTEXT INSTRUCTION: 
 The patient's current message "${options.messageBody}" is a REPLY to the conversation above. 
 
+🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
+If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Book here: ${bookingLink}" - Nothing else!
+
 WHEN PATIENT SAYS YES/AFFIRMATIVE:
 If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
 
 CRITICAL: Check what the LAST Clinic message was asking:
 
-IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book"):
+IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
 - Patient's "yes" = booking request
 - Provide ONLY the booking link: "Book here: ${bookingLink}"
-- NO additional information, NO more questions
+- NO additional information, NO more questions, NO treatment details, NO explanations
 
 IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
 - Patient's "yes" = wants treatment information
@@ -840,15 +1018,18 @@ ${
     ? `🚨 CRITICAL CONTEXT INSTRUCTION: 
 The patient's current message "${options.messageBody}" is a REPLY to the conversation above. 
 
+🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
+If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Book here: ${bookingLink}" - Nothing else!
+
 WHEN PATIENT SAYS YES/AFFIRMATIVE:
 If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
 
 CRITICAL: Check what the LAST Clinic message was asking:
 
-IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book"):
+IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
 - Patient's "yes" = booking request
-- Provide ONLY the booking link: "Book here: ${bookingLink}"
-- NO additional information, NO more questions
+- Provide ONLY the booking link: "Book here: ${bookingLink} (5-6 words maximum)"
+- NO additional information, NO more questions, NO treatment details, NO explanations
 
 IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
 - Patient's "yes" = wants treatment information
@@ -856,7 +1037,7 @@ IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", 
 - End with clear next steps (booking opportunity)
 
 EXAMPLE SCENARIOS:
-- Last message: "Ready to book?" → Patient: "Yes" → Response: "Book here: ${bookingLink}"
+- Last message: "Ready to book?" → Patient: "Yes" → Response: "Book here: ${bookingLink} (5-6 words maximum)"
 - Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
 
