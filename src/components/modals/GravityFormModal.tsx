@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
 
+import CryptoJS from "crypto-js";
 const { Text, Title } = Typography;
 const supabase = createClient();
 

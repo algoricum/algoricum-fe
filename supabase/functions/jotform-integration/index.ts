@@ -1,7 +1,8 @@
 // supabase/functions/jotform-integration/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleOptions } from "../_shared/cors.ts";
-import { extractLeadInfo, insertLead, jotformFetch, saveFormsHandler, testWebhookHandler } from "../_shared/jotform-service.ts";
+import { jotformFetch, saveFormsHandler, testWebhookHandler } from "../_shared/jotform-service.ts";
+import { enqueueLead } from "../_shared/Lead-enqueue.ts";
 import { supabase } from "../_shared/supabaseClient.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -36,26 +37,25 @@ serve(async req => {
         if (!rawRequest) return new Response(JSON.stringify({ error: "Missing rawRequest" }), { status: 400 });
 
         const parsedRequest = JSON.parse(rawRequest.toString());
-        const leadInfo = extractLeadInfo(parsedRequest);
-const { data: source } = await supabase
-    .from("lead_source")
-    .select("id")
-    .eq("name", "Others")
-    .single();
 
-        const leadData = {
-          first_name: leadInfo.firstName || null,
-          last_name: leadInfo.lastName || null,
-          email: leadInfo.email || null,
-          phone: leadInfo.phone || null,
-          form_data: { ...parsedRequest, jotform_submission_id: submissionID, jotform_form_id: formID },
-          clinic_id,
-          source_id: source.id,
-          created_at: new Date().toISOString(),
-        };
+        enqueueLead(parsedRequest, clinic_id);
 
-        const { success, error } = await insertLead(leadData);
-        if (!success) return new Response(JSON.stringify({ error: "Failed to insert lead", details: error.message }), { status: 500 });
+        // const leadInfo = extractLeadInfo(parsedRequest);
+        // const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
+
+        // const leadData = {
+        //   first_name: leadInfo.firstName || null,
+        //   last_name: leadInfo.lastName || null,
+        //   email: leadInfo.email || null,
+        //   phone: leadInfo.phone || null,
+        //   form_data: { ...parsedRequest, jotform_submission_id: submissionID, jotform_form_id: formID },
+        //   clinic_id,
+        //   source_id: source.id,
+        //   created_at: new Date().toISOString(),
+        // };
+
+        // const { success, error } = await insertLead(leadData);
+        // if (!success) return new Response(JSON.stringify({ error: "Failed to insert lead", details: error.message }), { status: 500 });
 
         return new Response(JSON.stringify({ status: "ok", submission_id: submissionID, form_id: formID }), {
           headers: { "Content-Type": "application/json" },

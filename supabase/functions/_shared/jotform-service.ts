@@ -1,4 +1,5 @@
 // supabase/functions/_shared/jotform-service.ts
+import { chunkArray, enqueueLead } from "./Lead-enqueue.ts";
 import { supabase } from "./supabaseClient.ts";
 
 export function extractLeadInfo(data: any) {
@@ -80,11 +81,7 @@ export async function processSubmissions(submissions: any[], clinic_id: string) 
   for (const sub of submissions) {
     const answers = sub.answers || {};
     const leadInfo = extractLeadInfo(answers);
-const { data: source } = await supabase
-    .from("lead_source")
-    .select("id")
-    .eq("name", "Others")
-    .single();
+    const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
     const leadData = {
       first_name: leadInfo.firstName || null,
       last_name: leadInfo.lastName || null,
@@ -92,7 +89,7 @@ const { data: source } = await supabase
       phone: leadInfo.phone || null,
       form_data: answers,
       clinic_id,
-      source_id:source.id,
+      source_id: source.id,
       created_at: new Date().toISOString(),
     };
 
@@ -131,7 +128,12 @@ export async function saveFormsHandler(
       // Fetch existing submissions
       const submissionsData = await jotformFetch(`/form/${formId}/submissions`, accessToken);
       if (submissionsData.content && Array.isArray(submissionsData.content)) {
-        await processSubmissions(submissionsData.content, clinic_id);
+        // await processSubmissions(submissionsData.content, clinic_id);
+        const chunks = chunkArray(submissionsData.content, 10);
+        console.log("chunks", chunks);
+        for (const chunk of chunks) {
+          enqueueLead(chunk, clinic_id);
+        }
       }
 
       // Create webhook

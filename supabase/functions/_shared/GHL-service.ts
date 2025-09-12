@@ -1,4 +1,5 @@
 import { supabase } from "../_shared/supabaseClient.ts";
+import { chunkArray, enqueueLead } from "./Lead-enqueue.ts";
 
 const CLIENT_ID = Deno.env.get("GHL_Client_ID") || "";
 const CLIENT_SECRET = Deno.env.get("GHL_Client_Secret") || "";
@@ -8,7 +9,7 @@ const GHL_CONTACTS_URL = "https://services.leadconnectorhq.com/contacts/";
 
 const { data: integration } = await supabase.from("integrations").select("id").eq("name", "GoHighLevel").single();
 const INTEGRATION_ID = integration?.id;
-const SOURCE_ID = "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c";
+// const SOURCE_ID = "bf1bb50b-d6dd-4c11-ba96-2f7aac74895c";
 
 export async function saveTokens(clinic_id: string, tokenData: any) {
   const { access_token, refresh_token, expires_in, locationId } = tokenData;
@@ -86,25 +87,35 @@ export async function importLeads(clinic_id: string) {
   }
 
   const contacts = await contactsRes.json();
+  console.warn("contacts", contacts);
+  console.warn("data123456", contacts);
+  const { data: integration } = await supabase.from("integrations").select("id").eq("name", "GoHighLevel").single();
+  const { data: integration_connection } = await supabase
+    .from("integration_connections")
+    .select("updated_at")
+    .eq("integration_id", integration.id)
+    .eq("clinic_id", clinic_id)
+    .single();
 
-  if (contacts.contacts && Array.isArray(contacts.contacts)) {
-    for (const c of contacts.contacts) {
-      const first = c.firstName ?? null;
-      const last = c.lastName ?? null;
-      const email = c.email ?? null;
-      const phone = c.phone ?? null;
-      const { data: existingLead } = await supabase.from("lead").select("id").eq("email", email).eq("clinic_id", clinic_id).single();
-      if (!existingLead) {
-        await supabase.from("lead").insert({
-          clinic_id,
-          source_id: SOURCE_ID,
-          first_name: first,
-          last_name: last,
-          email,
-          phone,
-          form_data: c,
-        });
-      }
+  if (!integration) throw new Error("Integration not configured");
+
+  const { error: error } = await supabase.from("integration_connections").upsert(
+    {
+      clinic_id,
+      integration_id: integration.id,
+      status: "active",
+      auth_data: tokens,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: ["clinic_id", "integration_id"] },
+  );
+  console.error("error", error);
+  const newPatients = contacts.contacts.filter((p: any) => new Date(p.dateAdded) > new Date(integration_connection.updated_at));
+  console.error("newPatients", newPatients);
+  if (contacts.contacts && Array.isArray(newPatients)) {
+    const chunks = chunkArray(newPatients, 10);
+    for (const chunk of chunks) {
+      enqueueLead(chunk, clinic_id);
     }
   }
 }

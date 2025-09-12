@@ -28,15 +28,30 @@ serve(async () => {
     }
 
     for (const msg of rows) {
+      if (msg.attempts >= 3) {
+        console.warn("Max retries exceeded for msg", msg.msg_id);
+        await supabase.rpc("pgmq_delete", { queue_name: QUEUE, msg_id: msg.msg_id });
+        continue;
+      }
       const msgId = msg.msg_id as number;
       const payload = typeof msg.message === "string" ? JSON.parse(msg.message) : msg.message;
 
       try {
         // Step 2: process payload
         console.log("Processing message", msgId, payload.data.Lead_data);
-        // >>> Your business logic here <<<
-        // Example: send email, call API, etc.
-        // inside your for-loop:
+        if (!payload.clinic_id) {
+          console.warn("Missing clinic_id for msg", msgId);
+          await supabase.rpc("pgmq_delete", { queue_name: QUEUE, msg_id: msgId });
+          continue;
+        }
+
+        const { data: clinic, error: clinicError } = await supabase.from("clinic").select("id").eq("id", payload.clinic_id).single();
+
+        if (clinicError || !clinic) {
+          console.warn("Invalid clinic_id", payload.clinic_id, "for msg", msgId);
+          await supabase.rpc("pgmq_delete", { queue_name: QUEUE, msg_id: msgId });
+          continue;
+        }
         const response = await fetch("https://eypitkzntyiyvwrndkgy.supabase.co/functions/v1/GPT-extractor-function", {
           method: "POST",
           headers: {
@@ -50,12 +65,12 @@ serve(async () => {
         console.log("Extractor response:", result);
         const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
         const rows = result.data.map((p: any) => ({
-          clinic_id: payload.data.clinic_id,
+          clinic_id: payload.clinic_id,
           source_id: source.id,
-          first_name: p.first_name,
-          last_name: p.last_name,
+          first_name: p.firstName,
+          last_name: p.lastName,
           email: p.email,
-          phone: p.bio?.phone_number || null,
+          phone: p.bio?.phone || null,
           form_data: p,
         }));
         const { error } = await supabase.from("lead").upsert(rows, { onConflict: ["email", "clinic_id"] });
