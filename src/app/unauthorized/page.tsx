@@ -1,7 +1,6 @@
 "use client";
-import React from "react";
+import { ArrowLeft, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Shield, ArrowLeft } from "lucide-react";
 const UnauthorizedPage = () => {
   const router = useRouter();
   const handleBackToDashboard = () => {

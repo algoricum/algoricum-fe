@@ -1,19 +1,17 @@
 "use client";
-import type React from "react";
-import { useEffect, useState } from "react";
-import { Input, Button, Typography, Upload } from "antd";
-import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input/max";
-import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
-import { FileTextOutlined, DollarCircleOutlined, StarOutlined } from "@ant-design/icons";
 import { ErrorToast, WarningToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
+import { DollarCircleOutlined, FileTextOutlined, StarOutlined } from "@ant-design/icons";
+import { Button, Input, Typography, Upload } from "antd";
+import { useEffect, useState } from "react";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 const supabase = createClient();
 
 interface ClinicInfoStepProps {
-  // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
@@ -126,7 +124,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       question: "Upload your clinic documents for AI processing",
       placeholder: "Upload services, pricing, and testimonials documents",
       required: true, // At least services document is required
-    }
+    },
   ];
 
   // File upload configurations

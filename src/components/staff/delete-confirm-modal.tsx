@@ -1,9 +1,8 @@
 "use client";
-
-import { AlertTriangle } from "lucide-react";
-import { Button } from "antd";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { ErrorToast} from "@/helpers/toast";
+import { ErrorToast } from "@/helpers/toast";
+import { Button } from "antd";
+import { AlertTriangle } from "lucide-react";
 
 interface Staff {
   id: string;
@@ -31,9 +30,10 @@ export function DeleteConfirmModal({ isOpen, isDeleting, selectedStaff, onClose,
   const handleConfirm = async () => {
     try {
       await onConfirm();
-      
+
       onClose();
     } catch (error) {
+      console.error("Error deleting staff member:", error);
       ErrorToast("Failed to delete staff member. Please try again.");
     }
   };

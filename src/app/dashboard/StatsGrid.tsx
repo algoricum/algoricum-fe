@@ -1,10 +1,9 @@
 "use client";
-
-import { type JSX, useEffect, useState } from "react";
-import { UserPlus, Calendar, TrendingUp, Users } from "lucide-react";
+import { Skeleton } from "antd";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
-import { Skeleton } from "antd";
+import { Calendar, TrendingUp, UserPlus } from "lucide-react";
+import { type JSX, useEffect, useState } from "react";
 
 dayjs.extend(isBetween);
 
@@ -23,7 +22,6 @@ type Stats = {
   totalLeads: { thisMonth: number; lastMonth: number; change: number };
   appointments: { thisMonth: number; lastMonth: number; change: number };
   conversionRate: { thisMonth: number; lastMonth: number; change: number };
-  activePatients: { thisMonth: number; lastMonth: number; change: number };
 };
 
 interface StatsGridProps {
@@ -47,6 +45,10 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
       const startOfLastMonth = now.subtract(1, "month").startOf("month");
       const endOfLastMonth = now.startOf("month");
 
+      console.log("Start of this month:", startOfThisMonth);
+      console.log("Start of last month:", startOfLastMonth);
+      console.log("End of last month:", endOfLastMonth);
+
       // Filter leads by month
       const leadsThisMonth = leadsData.filter(lead => dayjs(lead.date).isAfter(startOfThisMonth));
 
@@ -65,37 +67,17 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
       const bookedLast = leadsLastMonth.filter(l => l.status === "Booked").length;
       const bookedChange = getChangePercent(bookedThis, bookedLast);
 
-      // Calculate converted patients (unique by email)
-      const convertedThis = new Set(
-        leadsThisMonth
-          .filter(l => l.status === "Converted")
-          .map(l => l.email)
-          .filter(email => email !== null),
-      ).size;
-
-      const convertedLast = new Set(
-        leadsLastMonth
-          .filter(l => l.status === "Converted")
-          .map(l => l.email)
-          .filter(email => email !== null),
-      ).size;
-
-      const activeChange = getChangePercent(convertedThis, convertedLast);
-
       // Calculate conversion rates
-      const convThis = totalThis === 0 ? 0 : Math.round((convertedThis / totalThis) * 100);
-      const convLast = totalLast === 0 ? 0 : Math.round((convertedLast / totalLast) * 100);
+      const convThis = totalThis === 0 ? 0 : Number(((bookedThis / totalThis) * 100).toFixed(2));
+
+      const convLast = totalLast === 0 ? 0 : Number(((bookedLast / totalLast) * 100).toFixed(2));
+
       const convChange = getChangePercent(convThis, convLast);
 
       setStats({
         totalLeads: { thisMonth: totalThis, lastMonth: totalLast, change: totalChange },
         appointments: { thisMonth: bookedThis, lastMonth: bookedLast, change: bookedChange },
         conversionRate: { thisMonth: convThis, lastMonth: convLast, change: convChange },
-        activePatients: {
-          thisMonth: convertedThis,
-          lastMonth: convertedLast,
-          change: activeChange,
-        },
       });
 
       setLoading(false);
@@ -136,7 +118,7 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
       <StatCard
         icon={<UserPlus className="w-6 h-6 text-purple-600" />}
         title="Total Leads"
@@ -153,17 +135,10 @@ export default function StatsGrid({ clinicId, leadsData }: StatsGridProps) {
       />
       <StatCard
         icon={<TrendingUp className="w-6 h-6 text-green-600" />}
-        title="Conversion Rate"
+        title="Booking Rate"
         value={`${stats.conversionRate.thisMonth}%`}
         change={stats.conversionRate.change}
         bg="bg-green-100"
-      />
-      <StatCard
-        icon={<Users className="w-6 h-6 text-purple-600" />}
-        title="Active Patients"
-        value={stats.activePatients.thisMonth}
-        change={stats.activePatients.change}
-        bg="bg-purple-100"
       />
     </div>
   );

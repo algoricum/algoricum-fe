@@ -1,16 +1,16 @@
 "use client";
-import { Card, Typography, Space, Button, Row, Col } from "antd";
+import { signOut } from "@/utils/supabase/auth-helper";
 import {
-  ExclamationCircleOutlined,
-  PhoneOutlined,
-  MailOutlined,
   ClockCircleOutlined,
+  ExclamationCircleOutlined,
   IeOutlined,
   InfoCircleOutlined,
   LogoutOutlined,
+  MailOutlined,
+  PhoneOutlined,
 } from "@ant-design/icons";
+import { Button, Card, Col, Row, Space, Typography } from "antd";
 import { useRouter } from "next/navigation";
-import { signOut } from "@/utils/supabase/auth-helper";
 
 const { Title, Text, Paragraph } = Typography;
 

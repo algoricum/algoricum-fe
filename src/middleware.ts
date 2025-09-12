@@ -1,8 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "./utils/supabase/config/middleware";
 import { checkUserStatus } from "@/utils/supabase/auth-helper";
-// List of public routes that don't require authentication
+import { SupabaseClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "./utils/supabase/config/middleware";
 const publicRoutes = [
   "/login",
   "/signup",
@@ -15,17 +14,14 @@ const publicRoutes = [
   "/api/namecheap-dns",
   "/inactive",
   "/unauthorized",
-  "/unsubscribe-lead", // Add unauthorized page to public routes
+  "/unsubscribe-lead",
 ];
 // Paths that should redirect to dashboard if already authenticated
 const authRoutes = ["/login", "/signup", "/forgot-password"];
-// Routes that are restricted for staff users
-// const staffRestrictedRoutes = ["/staff", "/billing"];
 async function getRestrictedRoutes(supabase: SupabaseClient, userId: string): Promise<string[]> {
   try {
     const { data, error } = await supabase
       .from("user_clinic")
-      // This tells postgREST to include the role row (FK role_id) with permissions
       .select("role:role_id(permissions)")
       .eq("user_id", userId)
       .eq("is_active", true)
@@ -48,9 +44,7 @@ async function getRestrictedRoutes(supabase: SupabaseClient, userId: string): Pr
 }
 export async function middleware(request: NextRequest) {
   try {
-    // Get the pathname from the URL
     const { pathname } = request.nextUrl;
-    // Add null check for pathname
     if (!pathname) {
       return NextResponse.next();
     }

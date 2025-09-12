@@ -1,6 +1,6 @@
-import { createClient } from "@/utils/supabase/config/client";
 import { ConnectionStatus } from "@/app/types/types";
 import { ErrorToast } from "@/helpers/toast";
+import { createClient } from "@/utils/supabase/config/client";
 
 const supabase = createClient();
 
@@ -26,16 +26,16 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
         connection = data;
         break;
       }
-      
+
       case "Pipedrive": {
         const { data, error } = await supabase
-        .from("pipedrive_integration")
-        .select("*")
-        .eq("clinic_id", clinicId)
-        .neq("access_token", "")
-        .neq("refresh_token", "")
-        .eq("is_active", true)
-        .maybeSingle();
+          .from("pipedrive_integration")
+          .select("*")
+          .eq("clinic_id", clinicId)
+          .neq("access_token", "")
+          .neq("refresh_token", "")
+          .eq("is_active", true)
+          .maybeSingle();
         if (error) {
           console.error(`Error checking Pipedrive status:`, error);
           return "disconnected";
@@ -128,7 +128,7 @@ export const deleteIntegrationConnections = async (clinicId: string, integration
 
     switch (integrationName) {
       case "Hubspot": {
-        const { error: deleteError } = await supabase.from("hubspot_connections").delete().eq("clinic_id", clinicId); // ⚠️ change to clinic_id if schema uses that
+        const { error: deleteError } = await supabase.from("hubspot_connections").delete().eq("clinic_id", clinicId);
         error = deleteError;
         break;
       }
@@ -158,7 +158,7 @@ export const deleteIntegrationConnections = async (clinicId: string, integration
 
         const { error: deletedError } = await supabase.from("google_form_connections").delete().eq("id", connection?.id);
 
-        ((error = deleteError), deletedError);
+        error = deleteError || deletedError;
         break;
       }
 

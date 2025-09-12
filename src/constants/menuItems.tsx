@@ -1,8 +1,4 @@
-import { ChatIcon, TicketIcon } from "@/icons";
-import { DashboardIcon } from "@/icons";
-import { StaffManagementIcon } from "@/icons";
-// import { CalendarIcon } from "@/icons";
-import { BillingIcon } from "@/icons";
+import { BillingIcon, ChatIcon, DashboardIcon, StaffManagementIcon, TicketIcon } from "@/icons";
 import IntegrationIcon from "@/icons/IntegrationIcon";
 
 const menuItems = [
@@ -48,7 +44,6 @@ const menuItems = [
     label: "Integrations",
     disabled: false,
   },
-  
 ];
 
 export default menuItems;

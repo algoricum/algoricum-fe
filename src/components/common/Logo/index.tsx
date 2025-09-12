@@ -6,10 +6,10 @@ interface Props {
   isSidebar?: boolean;
   isCollapsed?: boolean;
   isBack?: boolean;
-  textColor?:string;
+  textColor?: string;
 }
 
-const Logo = ({ isSidebar = false, isCollapsed = false, isBack = false,textColor='black' }: Props) => {
+const Logo = ({ isSidebar = false, isCollapsed = false, isBack = false, textColor = "black" }: Props) => {
   return (
     <Link href="/" className="w-fit flex">
       <Flex align="center" gap={10}>
@@ -17,7 +17,9 @@ const Logo = ({ isSidebar = false, isCollapsed = false, isBack = false,textColor
         <Flex gap={12} align="center" className="max-sm:!gap-2">
           <Image src={"/logo.svg"} width={40} height={40} alt="Logo" />
           {!isCollapsed && (
-            <p className={`${isSidebar ? "text-xl" : "text-[28px]"} max-sm:text-xl font-helvetica-700 text-Gray900 text-${textColor}`}>Algoricum</p>
+            <p className={`${isSidebar ? "text-xl" : "text-[28px]"} max-sm:text-xl font-helvetica-700 text-Gray900 text-${textColor}`}>
+              Algoricum
+            </p>
           )}{" "}
         </Flex>
       </Flex>

@@ -1,19 +1,15 @@
-import { Message } from "@/utils/supabase/leads-helper"
-import { format } from "date-fns"
+import { Message } from "@/utils/supabase/leads-helper";
+import { format } from "date-fns";
 
 interface MessageBubbleProps {
-  message: Message
+  message: Message;
 }
 
 const MessageBubble = ({ message }: MessageBubbleProps) => {
   return (
     <div className={`flex ${message.isFromLead ? "justify-start" : "justify-end"}`}>
       <div className="max-w-[70%]">
-        <div
-          className={`px-4 py-2 rounded-lg ${
-            message.isFromLead ? "bg-gray-100 text-gray-900" : "bg-brand-primary text-white"
-          }`}
-        >
+        <div className={`px-4 py-2 rounded-lg ${message.isFromLead ? "bg-gray-100 text-gray-900" : "bg-brand-primary text-white"}`}>
           <p className="text-sm">{message.content}</p>
         </div>
         <div className={`mt-1 text-xs text-gray-500 ${message.isFromLead ? "text-left" : "text-right"}`}>
@@ -21,7 +17,7 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default MessageBubble
+export default MessageBubble;

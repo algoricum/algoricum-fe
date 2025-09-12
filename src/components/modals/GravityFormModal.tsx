@@ -1,16 +1,14 @@
 "use client";
-
-import { Modal, Alert, Button, Typography, Spin, Input, Select } from "antd";
-import { LinkOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
+import { ErrorToast } from "@/helpers/toast";
+import { getClinicId } from "@/utils/integration-utils";
+import { createClient } from "@/utils/supabase/config/client";
+import { InfoCircleOutlined, LinkOutlined } from "@ant-design/icons";
+import { Alert, Button, Input, Modal, Select, Spin, Typography } from "antd";
+import Image from "next/image";
 import type React from "react";
 import { useEffect, useState } from "react";
-import CryptoJS from "crypto-js";
 import { ModalProps } from "./types";
-import Image from "next/image";
-import { ErrorToast } from "@/helpers/toast";
-import { createClient } from "@/utils/supabase/config/client";
-import { getClinicId } from "@/utils/integration-utils";
-import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { commonAlertStyles } from "./utils";
 
 const { Text, Title } = Typography;

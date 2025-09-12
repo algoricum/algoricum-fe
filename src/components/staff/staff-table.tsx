@@ -1,8 +1,7 @@
 "use client";
-
+import { Edit, Mail, MoreVertical, SearchIcon, Trash2, User } from "lucide-react";
 import type React from "react";
-import { useState, useRef, useEffect } from "react";
-import { MoreVertical, SearchIcon, Mail, User, Edit, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface Staff {
   id: string;
@@ -21,9 +20,9 @@ interface StaffTableProps {
   searchTerm: string;
   selectedRole: string;
   selectedStatus: string;
-  // eslint-disable-next-line no-unused-vars
+
   onEdit: (staff: Staff) => void;
-  // eslint-disable-next-line no-unused-vars
+
   onDelete: (staff: Staff) => void;
   onClearFilters: () => void;
 }

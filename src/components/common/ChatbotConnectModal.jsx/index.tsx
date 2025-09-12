@@ -1,7 +1,7 @@
-import React, { FC } from "react";
-import { Modal, Button } from "antd";
-import { CopyOutlined } from "@ant-design/icons";
 import { SuccessToast } from "@/helpers/toast";
+import { CopyOutlined } from "@ant-design/icons";
+import { Button, Modal } from "antd";
+import { FC } from "react";
 
 type ChatbotConnectModalProps = {
   apiKey: string;

@@ -7,5 +7,5 @@ export default function Page() {
       contactPhone="+1 (555) 987-6543"
       supportHours="Monday - Friday, 8:00 AM - 6:00 PM"
     />
-  )
+  );
 }

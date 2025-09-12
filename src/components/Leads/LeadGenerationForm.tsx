@@ -1,13 +1,13 @@
 "use client";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import getLeadSourceId from "@/utils/lead_source";
+import { createClient } from "@/utils/supabase/config/client";
+import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { Calendar, Mail, Phone, Stethoscope, User, Users } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { createClient } from "@/utils/supabase/config/client";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
-import getLeadSourceId from "@/utils/lead_source";
-import { User, Mail, Phone, Stethoscope, Users, Calendar } from "lucide-react";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
 
 type FormField = {
   id: string;
@@ -21,7 +21,6 @@ type FormField = {
 
 type FormData = { [key: string]: string | number };
 
-// eslint-disable-next-line no-unused-vars
 type Props = { clinicId: string; onSuccess?: (newLead?: any) => void };
 
 const validatePhoneNumber = (phone: string | undefined): boolean => {
@@ -41,6 +40,7 @@ const validatePhoneNumber = (phone: string | undefined): boolean => {
 
     return true;
   } catch (error) {
+    console.error("Error validating phone number:", error);
     return false;
   }
 };
@@ -78,7 +78,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "consultation_type",
       field_name: "Consultation Type",
       field_type: "textarea",
-      is_required: false, 
+      is_required: false,
       field_order: 6,
     },
     {
@@ -86,7 +86,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       field_id: "services_interest",
       field_name: "Service Interest",
       field_type: "textarea",
-      is_required: false, 
+      is_required: false,
       field_order: 7,
     },
   ];
@@ -94,7 +94,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
   const [formData, setFormData] = useState<FormData>({});
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const supabase = createClient();
 
@@ -179,12 +179,14 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       SuccessToast(" Lead created successfully ");
 
       onSuccess?.(data);
-      setSubmitted(true);
     } catch (err) {
       const error = err as Error;
       ErrorToast(`${error}`);
     } finally {
       setSubmitting(false);
+      setFormData({});
+      setErrors({});
+      setPhoneNumber("");
     }
   };
 
@@ -283,31 +285,6 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
       </div>
     );
   };
-
-  if (submitted) {
-    return (
-      <div className="w-full flex items-center justify-center py-6">
-        <div className="w-full bg-white p-6 rounded-xl shadow-lg text-center">
-          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <User className="w-6 h-6 text-green-600" />
-          </div>
-          <h2 className="text-2xl font-bold mb-3 text-gray-900">Thank You!</h2>
-          <p className="text-gray-600 mb-6">Your information was submitted successfully.</p>
-          <button
-            onClick={() => {
-              setSubmitted(false);
-              setFormData({});
-              setErrors({});
-              setPhoneNumber("");
-            }}
-            className="bg-purple-600 text-white px-6 py-2.5 rounded-lg hover:bg-purple-700 transition-all duration-300 font-medium shadow-md hover:shadow-lg"
-          >
-            Submit Another Lead
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full">

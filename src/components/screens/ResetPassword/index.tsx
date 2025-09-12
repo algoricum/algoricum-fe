@@ -3,11 +3,11 @@ import { Button } from "@/components/elements";
 import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { PasswordIcon } from "@/icons";
+import { createClient } from "@/utils/supabase/config/client";
 import { Flex, Form, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMutation } from "react-query";
-import { createClient } from "@/utils/supabase/config/client";
 
 const { Title, Text } = Typography;
 
@@ -45,7 +45,7 @@ const PasswordSetupPage = () => {
             const { data, error } = await supabase.auth.getSession();
             if (error) throw error;
             if (data.session) {
-              setLoadingSession(false)
+              setLoadingSession(false);
             } else {
               console.error({
                 message: "Error",
@@ -53,10 +53,7 @@ const PasswordSetupPage = () => {
               });
             }
           } catch (error) {
-            console.error({
-              message: "Error",
-              description: "Failed to verify session.",
-            });
+            console.error("Error verifying session:", error);
           }
         };
         verifySession();

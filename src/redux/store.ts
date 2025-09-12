@@ -1,31 +1,22 @@
 // src/redux/store.ts
-import { configureStore, combineReducers } from '@reduxjs/toolkit';
-import { 
-  persistStore, 
-  persistReducer,
-  FLUSH,
-  REHYDRATE,
-  PAUSE,
-  PERSIST,
-  PURGE,
-  REGISTER
-} from 'redux-persist';
-import storage from 'redux-persist/lib/storage';
-import userReducer from './slices/user.slice';
-import clinicReducer from './slices/clinic.slice';
+import { combineReducers, configureStore } from "@reduxjs/toolkit";
+import { FLUSH, PAUSE, PERSIST, persistReducer, persistStore, PURGE, REGISTER, REHYDRATE } from "redux-persist";
+import storage from "redux-persist/lib/storage";
+import clinicReducer from "./slices/clinic.slice";
+import userReducer from "./slices/user.slice";
 
 // Configure redux-persist
 const persistConfig = {
-  key: 'algoricum',
+  key: "algoricum",
   storage,
-  whitelist: ['user', 'clinic'] // Only persist these reducers
+  whitelist: ["user", "clinic"], // Only persist these reducers
 };
 
 // Root reducer
 const rootReducer = combineReducers({
   user: userReducer,
-  clinic: clinicReducer
-    // Add other reducers here as needed
+  clinic: clinicReducer,
+  // Add other reducers here as needed
 });
 
 // Create persisted reducer
@@ -34,7 +25,7 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 // Create store
 export const store = configureStore({
   reducer: persistedReducer,
-  middleware: (getDefaultMiddleware) =>
+  middleware: getDefaultMiddleware =>
     getDefaultMiddleware({
       serializableCheck: {
         // Ignore these redux-persist actions

@@ -59,6 +59,7 @@ export interface Clinic {
   updated_at: string;
 
   // Additional fields from the database
+  mailgun_email?: string;
   openai_api_key?: string;
   assistant_prompt?: string;
   assistant_model?: string;

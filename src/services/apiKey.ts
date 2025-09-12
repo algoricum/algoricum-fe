@@ -1,10 +1,10 @@
 // services/apiKey.ts
-import { createClient } from '@/utils/supabase/config/client';
-import { v4 as uuidv4 } from 'uuid';
+import { createClient } from "@/utils/supabase/config/client";
+import { v4 as uuidv4 } from "uuid";
 
 // Initialize Supabase client
 const supabase = createClient();
-const STORAGE_PREFIX = 'algoricum_';
+const STORAGE_PREFIX = "algoricum_";
 const CLINIC_API_KEY = `${STORAGE_PREFIX}clinic_api_key`;
 // Interface for creating an API key
 interface CreateAPIKeyProps {
@@ -31,10 +31,10 @@ const apiKeyService = {
     try {
       // Check if API key with this name already exists for the clinic
       const { data: existingKey, error: checkError } = await supabase
-        .from('api_key')
-        .select('*')
-        .eq('name', data.name)
-        .eq('clinic_id', data.clinicId)
+        .from("api_key")
+        .select("*")
+        .eq("name", data.name)
+        .eq("clinic_id", data.clinicId)
         .maybeSingle();
 
       if (checkError) {
@@ -42,22 +42,22 @@ const apiKeyService = {
       }
 
       if (existingKey) {
-        throw new Error('API Key already exists with this name');
+        throw new Error("API Key already exists with this name");
       }
 
       // Generate a secure random API key
-      const unhashed_key = self.crypto.randomUUID().replace(/-/g, '');
+      const unhashed_key = self.crypto.randomUUID().replace(/-/g, "");
       const unhashed_key_with_clinic = `${data.clinicId}.${unhashed_key}`;
-      
+
       // Hash the API key for storage
       const encoder = new TextEncoder();
       const data_to_hash = encoder.encode(unhashed_key);
-      const hash_buffer = await self.crypto.subtle.digest('SHA-256', data_to_hash);
-      
+      const hash_buffer = await self.crypto.subtle.digest("SHA-256", data_to_hash);
+
       // Convert hash to hex string
       const hashed_api_key = Array.from(new Uint8Array(hash_buffer))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
 
       // Calculate expiration date
       const now = new Date();
@@ -66,7 +66,7 @@ const apiKeyService = {
 
       // Insert the API key record
       const { error } = await supabase
-        .from('api_key')
+        .from("api_key")
         .insert({
           id: uuidv4(),
           name: data.name,
@@ -74,7 +74,7 @@ const apiKeyService = {
           key_expires_at: key_expires_at.toISOString(),
           clinic_id: data.clinicId,
           created_at: now.toISOString(),
-          updated_at: now.toISOString()
+          updated_at: now.toISOString(),
         })
         .select()
         .single();
@@ -86,7 +86,7 @@ const apiKeyService = {
       // Return the unhashed key and expiration (only time this will be available)
       return {
         api_key: unhashed_key_with_clinic,
-        expires_at: key_expires_at.toISOString()
+        expires_at: key_expires_at.toISOString(),
       };
     } catch (error: any) {
       throw new Error(`Failed to create API key: ${error.message}`);
@@ -101,29 +101,29 @@ const apiKeyService = {
   validate: async (apiKey: string): Promise<boolean> => {
     try {
       // Extract clinic ID and key
-      const parts = apiKey.split('.');
+      const parts = apiKey.split(".");
       if (parts.length !== 2) {
         return false;
       }
 
       const [clinicId, unhashed_key] = parts;
-      
+
       // Hash the provided key
       const encoder = new TextEncoder();
       const data_to_hash = encoder.encode(unhashed_key);
-      const hash_buffer = await self.crypto.subtle.digest('SHA-256', data_to_hash);
-      
+      const hash_buffer = await self.crypto.subtle.digest("SHA-256", data_to_hash);
+
       // Convert hash to hex string
       const hashed_key = Array.from(new Uint8Array(hash_buffer))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
 
       // Look up the API key
       const { data: apiKeyData, error } = await supabase
-        .from('api_key')
-        .select('*')
-        .eq('api_key', hashed_key)
-        .eq('clinic_id', clinicId)
+        .from("api_key")
+        .select("*")
+        .eq("api_key", hashed_key)
+        .eq("clinic_id", clinicId)
         .maybeSingle();
 
       if (error || !apiKeyData) {
@@ -138,15 +138,16 @@ const apiKeyService = {
 
       // Update last used timestamp
       await supabase
-        .from('api_key')
-        .update({ 
+        .from("api_key")
+        .update({
           last_used_at: now.toISOString(),
-          updated_at: now.toISOString()
+          updated_at: now.toISOString(),
         })
-        .eq('id', apiKeyData.id);
+        .eq("id", apiKeyData.id);
 
       return true;
     } catch (error) {
+      console.error("API key validation error:", error);
       return false;
     }
   },
@@ -159,10 +160,10 @@ const apiKeyService = {
   getClinicApiKeys: async (clinicId: string) => {
     try {
       const { data, error } = await supabase
-        .from('api_key')
-        .select('id, name, created_at, last_used_at, key_expires_at')
-        .eq('clinic_id', clinicId)
-        .order('created_at', { ascending: false });
+        .from("api_key")
+        .select("id, name, created_at, last_used_at, key_expires_at")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false });
 
       if (error) {
         throw new Error(error.message);
@@ -181,10 +182,7 @@ const apiKeyService = {
    */
   delete: async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('api_key')
-        .delete()
-        .eq('id', id);
+      const { error } = await supabase.from("api_key").delete().eq("id", id);
 
       if (error) {
         throw new Error(error.message);
@@ -194,7 +192,7 @@ const apiKeyService = {
     } catch (error: any) {
       throw new Error(`Failed to delete API key: ${error.message}`);
     }
-  }
+  },
 };
 
 export default apiKeyService;

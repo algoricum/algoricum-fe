@@ -1,9 +1,15 @@
 // src/redux/slices/userSlice.ts
-import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { User } from "@/interfaces/services_type";
-import { resetPasswordRequest, signInWithPassword,resendOtp as resendOtpService,verifyOtp as verifyOtpService,signUp as signupUserService } from "@/utils/supabase/auth-helper";
 import { getAccessToken } from "@/helpers/storage-helper";
+import { User } from "@/interfaces/services_type";
+import {
+  resendOtp as resendOtpService,
+  resetPasswordRequest,
+  signInWithPassword,
+  signUp as signupUserService,
+  verifyOtp as verifyOtpService,
+} from "@/utils/supabase/auth-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
+import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface UserState {
   user: User | null;
@@ -18,97 +24,82 @@ const initialState: UserState = {
   isAuthenticated: false,
   isLoading: true,
   token: null,
-  error: null
+  error: null,
 };
 
 // Async thunks for auth operations
-export const fetchCurrentUser = createAsyncThunk(
-  'user/fetchCurrentUser',
-  async (_, { rejectWithValue }) => {
-    try {
-      // Get token from localStorage
-      const token = getAccessToken();
-      
-      if (!token) {
-        return rejectWithValue('No token found');
-      }
-      
-      // Get user data from service (checks localStorage first, then Supabase)
-      const userData = await getUserData();
-      
-      if (!userData) {
-        return rejectWithValue('User data not found');
-      }
-      
-      return { user: userData, token };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch user data');
+export const fetchCurrentUser = createAsyncThunk("user/fetchCurrentUser", async (_, { rejectWithValue }) => {
+  try {
+    // Get token from localStorage
+    const token = getAccessToken();
+
+    if (!token) {
+      return rejectWithValue("No token found");
     }
+
+    // Get user data from service (checks localStorage first, then Supabase)
+    const userData = await getUserData();
+
+    if (!userData) {
+      return rejectWithValue("User data not found");
+    }
+
+    return { user: userData, token };
+  } catch (error: any) {
+    return rejectWithValue(error.message || "Failed to fetch user data");
   }
-);
+});
 
 export const loginUser = createAsyncThunk(
-  'user/loginUser',
+  "user/loginUser",
   async (credentials: { email: string; password: string }, { rejectWithValue }) => {
     try {
       const result = await signInWithPassword(credentials.email, credentials.password);
       return result;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Login failed');
+      return rejectWithValue(error.message || "Login failed");
     }
-  }
+  },
 );
 
 export const signupUser = createAsyncThunk(
-  'user/signupUser',
+  "user/signupUser",
   async (userData: { name: string; email: string; password: string }, { rejectWithValue }) => {
     try {
       await signupUserService(userData.name, userData.email, userData.password);
       return { email: userData.email };
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Signup failed');
+      return rejectWithValue(error.message || "Signup failed");
     }
-  }
+  },
 );
 
-export const verifyOtp = createAsyncThunk(
-  'user/verifyOtp',
-  async (data: { email: string; otp: string }, { rejectWithValue }) => {
-    try {
-      await verifyOtpService(data.email, data.otp);
-      return { email: data.email };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'OTP verification failed');
-    }
+export const verifyOtp = createAsyncThunk("user/verifyOtp", async (data: { email: string; otp: string }, { rejectWithValue }) => {
+  try {
+    await verifyOtpService(data.email, data.otp);
+    return { email: data.email };
+  } catch (error: any) {
+    return rejectWithValue(error.message || "OTP verification failed");
   }
-);
+});
 
-export const resendOtp = createAsyncThunk(
-  'user/resendOtp',
-  async (email: string, { rejectWithValue }) => {
-    try {
-      await resendOtpService(email);
-      return { email };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Resend OTP failed');
-    }
+export const resendOtp = createAsyncThunk("user/resendOtp", async (email: string, { rejectWithValue }) => {
+  try {
+    await resendOtpService(email);
+    return { email };
+  } catch (error: any) {
+    return rejectWithValue(error.message || "Resend OTP failed");
   }
-);
+});
 
-
-export const resetPassword = createAsyncThunk(
-  'user/resetPassword',
-  async (password: string, { rejectWithValue }) => {
-    try {
-      await resetPasswordRequest(password);
-      return { success: true };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Password reset failed');
-    }
+export const resetPassword = createAsyncThunk("user/resetPassword", async (password: string, { rejectWithValue }) => {
+  try {
+    await resetPasswordRequest(password);
+    return { success: true };
+  } catch (error: any) {
+    return rejectWithValue(error.message || "Password reset failed");
   }
-);
-
-
+});
 
 const userSlice = createSlice({
   name: "user",
@@ -125,20 +116,20 @@ const userSlice = createSlice({
     setAuthLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
     },
-    clearUser: (state) => {
+    clearUser: state => {
       state.user = null;
       state.isAuthenticated = false;
       state.isLoading = false;
       state.token = null;
       state.error = null;
     },
-    clearError: (state) => {
+    clearError: state => {
       state.error = null;
-    }
+    },
   },
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     // Handle fetchCurrentUser
-    builder.addCase(fetchCurrentUser.pending, (state) => {
+    builder.addCase(fetchCurrentUser.pending, state => {
       state.isLoading = true;
       state.error = null;
     });
@@ -154,9 +145,9 @@ const userSlice = createSlice({
       state.error = action.payload as string;
       state.isAuthenticated = false;
     });
-    
+
     // Handle loginUser
-    builder.addCase(loginUser.pending, (state) => {
+    builder.addCase(loginUser.pending, state => {
       state.isLoading = true;
       state.error = null;
     });
@@ -171,15 +162,9 @@ const userSlice = createSlice({
       state.isLoading = false;
       state.error = action.payload as string;
     });
-  }
+  },
 });
 
-export const { 
-  setUser, 
-  setToken, 
-  setAuthLoading, 
-  clearUser: clearUserAction,
-  clearError
-} = userSlice.actions;
+export const { setUser, setToken, setAuthLoading, clearUser: clearUserAction, clearError } = userSlice.actions;
 
 export default userSlice.reducer;

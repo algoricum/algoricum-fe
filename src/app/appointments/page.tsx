@@ -1,29 +1,28 @@
 "use client";
-
-import type React from "react";
-import { useState, useEffect, useRef } from "react";
-import DashboardLayout from "@/layouts/DashboardLayout";
-import { Calendar, CheckCircle, Clock, SearchIcon, Plus, MoreVertical, Edit, Trash2, Mail, PhoneIcon } from "lucide-react";
+import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
+import { DeleteConfirmationModal } from "@/components/appointments/delete-confirmation-modal";
+import { EditAppointmentModal } from "@/components/appointments/edit-appointment-modal";
+import { StatCard } from "@/components/appointments/stat-card";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import { appointmentHelper, type MeetingSchedule } from "@/utils/appointment-helper";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { Form } from "antd";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import { appointmentHelper, type MeetingSchedule } from "@/utils/appointment-helper";
 import { createClient } from "@/utils/supabase/config/client";
+import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
+import { Form } from "antd";
 import dayjs from "dayjs";
+import { Calendar, CheckCircle, Clock, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import "react-phone-number-input/style.css";
-import { StatCard } from "@/components/appointments/stat-card";
-import { AddAppointmentModal } from "@/components/appointments/add-appointment-modal";
-import { EditStatusModal } from "@/components/appointments/edit-status-modal";
-import { DeleteConfirmationModal } from "@/components/appointments/delete-confirmation-modal";
 
 export default function AppointmentsPage() {
   const [appointmentsData, setAppointmentsData] = useState<MeetingSchedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddAppointmentModal, setShowAddAppointmentModal] = useState(false);
-  const [showEditStatusModal, setShowEditStatusModal] = useState(false);
+  const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<MeetingSchedule | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -47,7 +46,6 @@ export default function AppointmentsPage() {
       try {
         const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
         setAppointmentsData(meetings);
-        
       } catch (error) {
         console.error("Error loading appointments:", error);
         ErrorToast("Failed to load appointments. Please try again.");
@@ -68,7 +66,6 @@ export default function AppointmentsPage() {
           return;
         }
         setClinicId(clinic_id);
-        
       } catch (error) {
         console.error("Error fetching clinic ID:", error);
         ErrorToast("Failed to fetch clinic information.");
@@ -182,30 +179,28 @@ export default function AppointmentsPage() {
     }
   };
 
-  const handleEditStatus = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleEditAppointment = async (formData: any) => {
     if (!selectedAppointment) {
       return;
     }
+
     setIsSubmitting(true);
     try {
-      const updatedMeeting = await appointmentHelper.updateMeetingStatus(selectedAppointment.id, selectedAppointment.status);
+      const updatedMeeting = await appointmentHelper.updateMeeting(selectedAppointment.id, formData);
+
       // Update local state
       setAppointmentsData(prev => prev.map(apt => (apt.id === selectedAppointment.id ? updatedMeeting : apt)));
-      setShowEditStatusModal(false);
+      setShowEditAppointmentModal(false);
       setSelectedAppointment(null);
-      SuccessToast("Appointment status updated successfully!");
+      SuccessToast("Appointment updated successfully!");
     } catch (error: any) {
       console.error("Error updating appointment:", error);
-      ErrorToast(error.message || "Failed to update appointment status. Please try again.");
+      ErrorToast(error.message || "Failed to update appointment. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
-
   const handleDeleteAppointment = async () => {
-    
     if (!selectedAppointment) {
       return;
     }
@@ -242,13 +237,11 @@ export default function AppointmentsPage() {
 
   const openEditModal = (appointment: MeetingSchedule) => {
     setSelectedAppointment(appointment);
-    setShowEditStatusModal(true);
+    setShowEditAppointmentModal(true);
     setActiveDropdown(null);
-    
   };
 
   const openDeleteConfirmation = (appointment: MeetingSchedule) => {
-    
     setSelectedAppointment(appointment);
     setShowDeleteConfirmation(true);
     setActiveDropdown(null);
@@ -576,16 +569,15 @@ export default function AppointmentsPage() {
           clinicId={clinicId}
         />
 
-        <EditStatusModal
-          isOpen={showEditStatusModal}
+        <EditAppointmentModal
+          isOpen={showEditAppointmentModal}
           onClose={() => {
-            setShowEditStatusModal(false);
+            setShowEditAppointmentModal(false);
             setSelectedAppointment(null);
           }}
-          onSubmit={handleEditStatus}
+          onSubmit={handleEditAppointment}
           isSubmitting={isSubmitting}
           appointment={selectedAppointment}
-          onStatusChange={status => setSelectedAppointment(prev => (prev ? { ...prev, status } : null))}
         />
 
         <DeleteConfirmationModal
