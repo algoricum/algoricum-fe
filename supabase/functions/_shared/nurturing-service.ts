@@ -704,42 +704,77 @@ Generate according to the specific pattern for this lead age. Format as specifie
 
 REMEMBER: End naturally without signatures, footers, or closing formalities. The system will add unsubscribe links automatically.`;
     } else {
-      // Use predefined SMS templates based on lead age - NO AI GENERATION
-      const smsTemplates: Record<number, string> = {
-        0: "Hey [First Name], it's [Avatar] at [Clinic Name]. I can hold a spot for [Service] this month. Do you want me to save it, or should I stop bugging you?",
-        2: "Curious - are you still weighing [Service] or just feeling it out? Most people I talk to start here. I can help either way.",
-        5: "Talked to someone last week who felt the same about [Service]. They booked, and now wish they had done it sooner. Want me to share what helped them decide?",
-        10: "We've only got a few [Service] openings next week. Want me to hold one for you, or should I circle back later?",
-        20: "Still curious about [Service], or should I hit pause for now? Totally fine either way. Just let me know.",
-      };
+      // SMS responses - use specific patterns with new style guidelines
+      systemPrompt = `You are a conversational assistant for ${clinic.name}. 
 
-      // Find the closest template based on lead age
-      const availableDays = Object.keys(smsTemplates)
-        .map(Number)
-        .sort((a, b) => a - b);
-      let selectedDay = availableDays[0]; // Default to day 0
+RESPONSE STYLE - BE ENGAGING:
+• Sound like you're texting a friend - casual but knowledgeable
+• Create gentle urgency without being pushy
+• Use personality and light humor when appropriate
+• Be direct and honest - cut through the fluff
+• Make people feel like they're talking to a real person
 
-      for (let i = 0; i < availableDays.length; i++) {
-        if (leadAge >= availableDays[i]) {
-          selectedDay = availableDays[i];
-        } else {
-          break;
-        }
+AVOID FILLER PHRASES:
+• Never use "just checking in", "wanted to", "just wanted to", "hope you're well"
+• Skip pleasantries and get straight to the value/offer
+• Be direct and purposeful in your communication
+• Donot include dashes in the response 
+
+CRITICAL: Generate responses inspired by the specific examples provided. Capture the tone, style, and approach.`;
+
+      // Get specific patterns based on rule name
+      let patternExamples = "";
+
+      if (rule?.name === "sms_5min_initial") {
+        patternExamples = `SMS 0 PATTERN EXAMPLES (Generate response inspired by these):
+- "Hey ${lead.first_name}, this is ${clinic.assistants?.[0]?.assistant_name} at ${clinic.name}. Thanks for reaching out. I can hold a spot for some time this month. Would you like to move forward?"
+- "Hey ${lead.first_name}, this is ${clinic.assistants?.[0]?.assistant_name} at ${clinic.name} I'd love to reserve a spot for you this month. Would you like me to hold one?"
+- "Hey ${lead.first_name}, this is ${clinic.assistants?.[0]?.assistant_name} at ${clinic.name} We've got openings coming up soon, should I save one in your name?"
+- "Hey ${lead.first_name}, this is ${clinic.assistants?.[0]?.assistant_name} at ${clinic.name} I can set aside some time this month just for you. Want to move forward?"
+- "Hey ${lead.first_name}, this is ${clinic.assistants?.[0]?.assistant_name} at ${clinic.name} There's availability right now, and I'd be happy to secure it for you. Should I go ahead?"`;
+      } else if (rule?.name === "sms_2day_followup") {
+        patternExamples = `SMS 1 PATTERN EXAMPLES (Generate response inspired by these):
+- "Hey ${lead.first_name}, Most people reach out, then stall. Want me to make it simple and send you two times to pick from?"
+- "Hey ${lead.first_name}, A lot of people pause at this step, want me to make it easy and share two time options?"
+- "Hey ${lead.first_name}, Most folks hesitate around this point. Would it help if I gave you two simple choices?"
+- "Hey ${lead.first_name}, Sometimes the hardest part is choosing. Want me to narrow it down to two options for you?"
+- "Hey ${lead.first_name}, Sometimes the next step feels unclear. Want me to make it easy and send two times for you to pick from?"`;
+      } else if (rule?.name === "sms_5day_followup") {
+        patternExamples = `SMS 2 PATTERN EXAMPLES (Generate response inspired by these):
+- "Hey ${lead.first_name}, truth is, doing something is easier than overthinking it. Should I grab the next cancellation for you?"
+- "Hey ${lead.first_name}, Honestly, action beats overthinking. Want me to lock in the next cancellation for you?"
+- "Hey ${lead.first_name}, Doing is easier than delaying. Want me to reserve the next opening that comes up?"
+- "Hey ${lead.first_name}, Overthinking slows things down. Want me to grab the next available spot for you?"
+- "Hey ${lead.first_name}, No need to overthink, should I hold the next cancellation for you?"`;
+      } else if (rule?.name === "sms_10day_followup") {
+        patternExamples = `SMS 3 PATTERN EXAMPLES (Generate response inspired by these):
+- "Hey ${lead.first_name}, You've done the thinking. The only gap now is action. Want me to hold a spot so it's off your plate?"
+- "Hey ${lead.first_name}, You've thought it through. The only step left is action. Want me to lock in a spot for you?"
+- "Hey ${lead.first_name}, The only thing missing is the next step. Want me to set aside a spot so it's handled?"
+- "Hey ${lead.first_name}, You've already made the decision in your head. Want me to grab a spot so it's official?"
+- "Hey ${lead.first_name}, You've covered the details. Now it's just action. Want me to secure a time for you?"`;
+      } else if (rule?.name === "sms_20day_followup") {
+        patternExamples = `SMS 4 PATTERN EXAMPLES (Generate response inspired by these):
+- "Hey ${lead.first_name}, before email takes over, what's the one thing you need to feel this visit is worth it?"
+- "Hey ${lead.first_name}, before we switch to email, what's the one thing that would make this visit feel worthwhile for you?"
+- "Hey ${lead.first_name}, what's the one thing that would make this visit pay off for you?"
+- "Hey ${lead.first_name}, before we continue, what's the one thing that would make this time feel well spent for you?"
+- "Hey ${lead.first_name}, I'm curious, what's the single thing you'd need for this appointment to feel valuable?"`;
       }
 
-      let smsMessage = smsTemplates[selectedDay];
+      userPrompt = `Generate a follow-up SMS for ${lead.first_name || "this patient"} at ${clinic.name}.
 
-      // Replace placeholders with actual values
-      smsMessage = smsMessage
-        .replace(/\[First Name\]/g, lead.first_name || "there")
-        .replace(/\[Avatar\]/g, clinic.name || "our team") // Using clinic name as avatar
-        .replace(/\[Clinic Name\]/g, clinic?.name || "our clinic")
-        .replace(/\[Service\]/g, clinic?.clinic_type || "our services");
+${patternExamples}
 
-      logInfo(`Using predefined SMS template for Day ${selectedDay}: "${smsMessage}"`);
+Previous conversation:
+${conversationContext || "No previous conversation - this is a follow-up SMS in our nurturing sequence."}
 
-      // Return the message directly without AI generation
-      return smsMessage;
+Patient Details:
+- Name: ${lead.first_name || ""} ${lead.last_name || ""}
+- Interest Level: ${lead.interest_level || "unknown"}
+- Urgency: ${lead.urgency || "unknown"}
+
+IMPORTANT: Generate a response that captures the same tone, style, and approach as the examples above. Sound casual but knowledgeable, create gentle urgency without being pushy, and make it feel like texting a friend.`;
     }
 
     logInfo("Calling OpenAI API for intelligent response generation");

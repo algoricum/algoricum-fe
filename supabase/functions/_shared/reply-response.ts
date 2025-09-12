@@ -91,8 +91,9 @@ export async function generateAIResponse(
         .from("conversation")
         .select("message, sender_type, created_at")
         .eq("thread_id", options.threadId)
+        .in("sender_type", ["lead", "ai_assistant"])
         .order("created_at", { ascending: true })
-        .limit(10);
+        .limit(2);
 
       if (historyError) {
         logError("❌ Error fetching conversation history:", historyError);
@@ -100,9 +101,23 @@ export async function generateAIResponse(
         logInfo("✅ Conversation history fetched:", conversationHistory?.length || 0, "messages");
       }
 
-      conversationContext = conversationHistory
-        ? conversationHistory.map((c: any) => `${c.sender_type === "lead" ? "Patient" : "Clinic"}: ${c.message}`).join("\n\n")
-        : "";
+      if (conversationHistory && conversationHistory.length > 0) {
+        conversationContext = conversationHistory
+          .map((c: any) => {
+            const sender =
+              c.sender_type === "user" || c.sender_type === "lead" ? "Patient" : c.sender_type === "ai_assistant" ? "Clinic" : "Unknown";
+            return `${sender}: ${c.message}`;
+          })
+          .join("\n\n");
+        logInfo("✅ Conversation context built:", {
+          messageCount: conversationHistory.length,
+          contextLength: conversationContext.length,
+          sampleContext: conversationContext.substring(0, 200) + "...",
+        });
+      } else {
+        conversationContext = "";
+        logInfo("ℹ️ No conversation history available");
+      }
     } else {
       logInfo("ℹ️ No threadId provided, skipping conversation history");
     }
@@ -245,7 +260,44 @@ You are responding directly to this email from a patient: "${options.messageBody
 Subject: ${options.subject || "No Subject"}
 
 Patient: ${leadData.first_name || "Email Lead"} (${leadData.email || "No email"})
-Context: ${conversationContext ? "Ongoing conversation - see history" : "First time contacting us"}
+Context: ${conversationContext ? "Ongoing conversation - see history below" : "First time contacting us"}
+
+${
+  conversationContext
+    ? `CONVERSATION HISTORY (CRITICAL - USE THIS CONTEXT):
+${conversationContext}
+
+🚨 CRITICAL CONTEXT INSTRUCTION FOR EMAIL: 
+The patient's current email "${options.messageBody}" is a REPLY to the conversation above. 
+
+WHEN PATIENT SAYS YES/AFFIRMATIVE:
+If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
+
+YOU MUST IMMEDIATELY:
+1. Identify what treatment/service was mentioned in the LAST Clinic message
+2. Provide specific, detailed information about that treatment
+3. Include benefits, process details, what to expect
+4. End with clear next steps (booking link or direct action)
+5. Make it educational and helpful, not just promotional
+
+EXAMPLE SCENARIOS:
+- If last Clinic message mentioned "Botox" and patient said "yes" → Provide Botox process, benefits, what to expect, then offer direct booking
+- If last Clinic message mentioned "consultation" and patient said "yes" → Explain what happens in consultation, then provide booking link
+- If last Clinic message mentioned "treatment" generally and patient said "yes" → Ask what specific treatment they're interested in
+
+CRITICAL RESPONSE RULES:
+- NEVER end with questions like "Would you like to know more about booking?" or "Ready to book an appointment?"
+- NEVER ask "What questions do you have?" or similar open-ended questions
+- ALWAYS provide complete information and direct next steps
+- When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
+- NEVER send booking links unless: 1) User explicitly asks for booking/appointment, OR 2) User says YES/SURE/OK to a direct booking question
+- When providing booking links, keep it VERY brief: "Book here: ${bookingLink}" (5-6 words maximum)
+- NO treatment information when sending booking links - just the link
+- Make responses definitive and action-oriented, not question-heavy
+
+DO NOT treat this as a new conversation - this is a REPLY continuing the conversation above.`
+    : ""
+}
 
 CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
@@ -277,7 +329,44 @@ CURRENT MESSAGE CONTEXT:
 You are responding directly to this SMS from a patient: "${options.messageBody}"
 
 Patient: ${leadData.first_name || "SMS Lead"} (${phoneNumber})
-Context: ${conversationContext ? "Ongoing conversation - see history" : "First time contacting us"}
+Context: ${conversationContext ? "Ongoing conversation - see history below" : "First time contacting us"}
+
+${
+  conversationContext
+    ? `CONVERSATION HISTORY (CRITICAL - USE THIS CONTEXT):
+${conversationContext}
+
+🚨 CRITICAL CONTEXT INSTRUCTION FOR SMS: 
+The patient's current SMS "${options.messageBody}" is a REPLY to the conversation above. 
+
+WHEN PATIENT SAYS YES/AFFIRMATIVE:
+If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
+
+YOU MUST IMMEDIATELY:
+1. Identify what treatment/service was mentioned in the LAST Clinic message
+2. Provide specific, detailed information about that treatment
+3. Include benefits, process details, what to expect
+4. End with clear next steps (booking link or direct action)
+5. Make it educational and helpful, not just promotional
+
+EXAMPLE SCENARIOS:
+- If last Clinic message mentioned "Botox" and patient said "yes" → Provide Botox process, benefits, what to expect, then offer direct booking
+- If last Clinic message mentioned "consultation" and patient said "yes" → Explain what happens in consultation, then provide booking link
+- If last Clinic message mentioned "treatment" generally and patient said "yes" → Ask what specific treatment they're interested in
+
+CRITICAL RESPONSE RULES:
+- NEVER end with questions like "Would you like to know more about booking?" or "Ready to book an appointment?"
+- NEVER ask "What questions do you have?" or similar open-ended questions
+- ALWAYS provide complete information and direct next steps
+- When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
+- NEVER send booking links unless: 1) User explicitly asks for booking/appointment, OR 2) User says YES/SURE/OK to a direct booking question
+- When providing booking links, keep it VERY brief: "Book here: ${bookingLink}" (5-6 words maximum)
+- NO treatment information when sending booking links - just the link
+- Make responses definitive and action-oriented, not question-heavy
+
+DO NOT treat this as a new conversation - this is a REPLY continuing the conversation above.`
+    : ""
+}
 
 ${
   isBookingInquiry
@@ -522,13 +611,18 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         aiResponse = aiResponse.replace(/【[^】]*】/g, "");
         aiResponse = aiResponse.replace(/\[LEAD_ASSESSMENT\][\s\S]*?\[\/LEAD_ASSESSMENT\]/gi, "");
 
-        // For SMS booking inquiries, add booking link if missing
-        const shouldAddBookingLink = !isEmailResponse && isBookingInquiry && !aiResponse.includes(bookingLink);
+        // For SMS booking inquiries, add booking link if missing (check for any booking link)
+        const hasAnyBookingLink =
+          aiResponse.includes(bookingLink) ||
+          aiResponse.includes("http") ||
+          aiResponse.includes("calendly") ||
+          aiResponse.includes("tinyurl");
+        const shouldAddBookingLink = !isEmailResponse && isBookingInquiry && !hasAnyBookingLink;
         logInfo("🔗 Booking link addition check:", {
           isEmailResponse: isEmailResponse,
           isBookingInquiry: isBookingInquiry,
           bookingLink: bookingLink,
-          aiResponseContainsLink: aiResponse.includes(bookingLink),
+          aiResponseContainsLink: hasAnyBookingLink,
           shouldAddBookingLink: shouldAddBookingLink,
         });
 
@@ -650,6 +744,40 @@ Previous Conversation:
 ${conversationContext || "No previous conversation"}
 
 ${
+  conversationContext
+    ? `🚨 CRITICAL CONTEXT INSTRUCTION: 
+The patient's current message "${options.messageBody}" is a REPLY to the conversation above. 
+
+WHEN PATIENT SAYS YES/AFFIRMATIVE:
+If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
+
+YOU MUST IMMEDIATELY:
+1. Identify what treatment/service was mentioned in the LAST Clinic message
+2. Provide specific, detailed information about that treatment
+3. Include benefits, process details, what to expect
+4. End with clear next steps (booking link or direct action)
+5. Make it educational and helpful, not just promotional
+
+EXAMPLE SCENARIOS:
+- If last Clinic message mentioned "Botox" and patient said "yes" → Provide Botox process, benefits, what to expect, then offer direct booking
+- If last Clinic message mentioned "consultation" and patient said "yes" → Explain what happens in consultation, then provide booking link
+- If last Clinic message mentioned "treatment" generally and patient said "yes" → Ask what specific treatment they're interested in
+
+CRITICAL RESPONSE RULES:
+- NEVER end with questions like "Would you like to know more about booking?" or "Ready to book an appointment?"
+- NEVER ask "What questions do you have?" or similar open-ended questions
+- ALWAYS provide complete information and direct next steps
+- When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
+- NEVER send booking links unless: 1) User explicitly asks for booking/appointment, OR 2) User says YES/SURE/OK to a direct booking question
+- When providing booking links, keep it VERY brief: "Book here: ${bookingLink}" (5-6 words maximum)
+- NO treatment information when sending booking links - just the link
+- Make responses definitive and action-oriented, not question-heavy
+
+DO NOT treat this as a new conversation - this is a REPLY continuing the conversation above.`
+    : ""
+}
+
+${
   isBookingInquiry
     ? `BOOKING INFORMATION:
 - Booking link: ${bookingLink}
@@ -691,6 +819,40 @@ Current SMS Message: ${options.messageBody}
 
 Previous Conversation:
 ${conversationContext || "No previous conversation"}
+
+${
+  conversationContext
+    ? `🚨 CRITICAL CONTEXT INSTRUCTION: 
+The patient's current message "${options.messageBody}" is a REPLY to the conversation above. 
+
+WHEN PATIENT SAYS YES/AFFIRMATIVE:
+If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
+
+YOU MUST IMMEDIATELY:
+1. Identify what treatment/service was mentioned in the LAST Clinic message
+2. Provide specific, detailed information about that treatment
+3. Include benefits, process details, what to expect
+4. End with clear next steps (booking link or direct action)
+5. Make it educational and helpful, not just promotional
+
+EXAMPLE SCENARIOS:
+- If last Clinic message mentioned "Botox" and patient said "yes" → Provide Botox process, benefits, what to expect, then offer direct booking
+- If last Clinic message mentioned "consultation" and patient said "yes" → Explain what happens in consultation, then provide booking link
+- If last Clinic message mentioned "treatment" generally and patient said "yes" → Ask what specific treatment they're interested in
+
+CRITICAL RESPONSE RULES:
+- NEVER end with questions like "Would you like to know more about booking?" or "Ready to book an appointment?"
+- NEVER ask "What questions do you have?" or similar open-ended questions
+- ALWAYS provide complete information and direct next steps
+- When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
+- NEVER send booking links unless: 1) User explicitly asks for booking/appointment, OR 2) User says YES/SURE/OK to a direct booking question
+- When providing booking links, keep it VERY brief: "Book here: ${bookingLink}" (5-6 words maximum)
+- NO treatment information when sending booking links - just the link
+- Make responses definitive and action-oriented, not question-heavy
+
+DO NOT treat this as a new conversation - this is a REPLY continuing the conversation above.`
+    : ""
+}
 
 IMPORTANT: Do NOT include any links, booking information, or unsubscribe options in your SMS response. Keep it conversational and helpful only.
 
@@ -739,8 +901,10 @@ Generate a helpful SMS response that answers their question and keeps the respon
     aiResponse = aiResponse.replace(/【[^】]*】/g, "");
     aiResponse = aiResponse.replace(/\[LEAD_ASSESSMENT\][\s\S]*?\[\/LEAD_ASSESSMENT\]/gi, "");
 
-    // For SMS booking inquiries, add booking link if missing
-    if (!isEmailResponse && isBookingInquiry && !aiResponse.includes(bookingLink)) {
+    // For SMS booking inquiries, add booking link if missing (check for any booking link)
+    const hasAnyBookingLink =
+      aiResponse.includes(bookingLink) || aiResponse.includes("http") || aiResponse.includes("calendly") || aiResponse.includes("tinyurl");
+    if (!isEmailResponse && isBookingInquiry && !hasAnyBookingLink) {
       aiResponse += `\n\nBook here: ${bookingLink}`;
     }
 

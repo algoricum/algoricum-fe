@@ -3,6 +3,8 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import OpenAI from "jsr:@openai/openai";
 
+const avatarNames = ["Clara", "Ava", "Maya", "Sam", "Zoe", "Ella", "Aria"];
+
 function getCorsHeaders(request) {
   const origin = request.headers.get("origin");
   const allowedOrigins = [
@@ -189,7 +191,7 @@ serve(async req => {
     const name = formData.get("name");
     const description = formData.get("description") || "";
     const instructions = formData.get("instructions") || "";
-    const model = "gpt-4o-mini";
+    const model = "gpt-4.1-2025-04-14";
 
     // Parse tools if provided, otherwise use default
     let tools = [];
@@ -372,12 +374,13 @@ serve(async req => {
       openaiAssistantId = newAssistant.id;
 
       // Store the assistant info in our database
+      const randomAvatar = avatarNames[Math.floor(Math.random() * avatarNames.length)];
       const { data: createdAssistant, error: createError } = await supabaseClient
         .from("assistants")
         .upsert({
           clinic_id,
           openai_assistant_id: openaiAssistantId,
-          assistant_name: `${name} assistant`,
+          assistant_name: `${randomAvatar}`,
           assistant_description: description,
           instructions,
           model,
