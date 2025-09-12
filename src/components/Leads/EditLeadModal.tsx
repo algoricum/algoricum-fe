@@ -48,7 +48,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const supabase = createClient();
 
-  const { phoneNumber, setPhoneNumber, phoneError, handlePhoneChange, handlePhoneBlur } = usePhoneValidation();
+  const { phoneNumber, setPhoneNumber, phoneError, handlePhoneChange, handlePhoneBlur, validatePhoneNumber } = usePhoneValidation();
 
   useEffect(() => {
     if (lead && isOpen) {
@@ -86,8 +86,16 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
       }
     }
 
+    let isPhoneValid = true;
+    if (!phoneNumber || !phoneNumber.trim()) {
+      newErrors.phone = "Phone number is required";
+      isPhoneValid = false;
+    } else {
+      isPhoneValid = validatePhoneNumber(phoneNumber);
+    }
+
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0 && !phoneError;
+    return Object.keys(newErrors).length === 0 && isPhoneValid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -139,6 +147,14 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handlePhoneChangeWithErrorClear = (value: string | undefined) => {
+    handlePhoneChange(value);
+    // Clear phone error when user starts typing
+    if (errors.phone) {
+      setErrors(prev => ({ ...prev, phone: "" }));
     }
   };
 
@@ -218,7 +234,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
         </div>
 
         <div className="space-y-1">
-          <label className="block text-sm font-semibold text-gray-700">Phone Number</label>
+          <label className="block text-sm font-semibold text-gray-700">Phone Number *</label>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
             <PhoneInput
@@ -226,21 +242,21 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
               countryCallingCodeEditable={false}
               defaultCountry="US"
               value={phoneNumber}
-              onChange={handlePhoneChange}
+              onChange={handlePhoneChangeWithErrorClear}
               onBlur={handlePhoneBlur}
               placeholder="Enter phone number"
               style={{
                 padding: "10px 16px 10px 40px",
-                border: phoneError ? "2px solid #ef4444" : "2px solid #e5e7eb",
+                border: phoneError || errors.phone ? "2px solid #ef4444" : "2px solid #e5e7eb",
                 borderRadius: "8px",
                 fontSize: "15px",
-                backgroundColor: phoneError ? "#fef2f2" : "#ffffff",
+                backgroundColor: phoneError || errors.phone ? "#fef2f2" : "#ffffff",
                 transition: "all 0.3s",
                 width: "100%",
               }}
             />
           </div>
-          {phoneError && <p className="text-red-500 text-sm">{phoneError}</p>}
+          {(phoneError || errors.phone) && <p className="text-red-500 text-sm">{phoneError || errors.phone}</p>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
