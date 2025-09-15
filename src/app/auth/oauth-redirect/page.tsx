@@ -1,11 +1,10 @@
 "use client";
-
-import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/config/client";
-import { createClinic } from "@/utils/supabase/clinic-helper"; // Import createClinic
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { saveUser } from "@/redux/accessors/user.accessors";
+import { createClinic } from "@/utils/supabase/clinic-helper"; // Import createClinic
+import { createClient } from "@/utils/supabase/config/client";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 export default function OAuthRedirectPage() {
   const router = useRouter();

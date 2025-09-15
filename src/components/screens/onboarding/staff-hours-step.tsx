@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ErrorToast } from "@/helpers/toast";
+import { handleSubscribe } from "@/utils/stripe";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
 import { Button, Select, Switch, Typography } from "antd";
+import { useEffect, useState } from "react";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
-import { createClient } from "@/utils/supabase/config/client";
-import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { ErrorToast } from "@/helpers/toast";
-import { handleSubscribe } from "@/utils/stripe";
 
 interface StaffHoursStepProps {
-  // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;
@@ -121,8 +120,8 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
       .maybeSingle();
 
     if (sub?.status === "active" || sub?.status === "trialing") {
-setSubscribingId(sub.id)    }
-
+      setSubscribingId(sub.id);
+    }
   };
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -135,30 +134,26 @@ setSubscribingId(sub.id)    }
 
       setClinicId(clinic.id);
 
-      
-      
       await checkSubscription(clinic.id);
     };
-    
+
     fetchInitialData();
   }, []);
-  
-  const handleNext = async() => {
-    if(!subscribingId){
 
+  const handleNext = async () => {
+    if (!subscribingId) {
       const { data: planData } = await supabase.from("plans").select("*").limit(1);
-      if(planData && planData[0]?.price_id){
-     
-      await handleSubscribe(planData[0]?.price_id,clinicId)
+      if (planData && planData[0]?.price_id) {
+        await handleSubscribe(planData[0]?.price_id, clinicId);
+      }
     }
-  }
     onNext({ businessHours });
   };
 
   return (
     <div className="max-w-4xl">
-        <Title level={1} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
-Clinic Profile
+      <Title level={1} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
+        Clinic Profile
       </Title>
       <Title level={5} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
         Welcome! Let’s set up your clinic so that we can start following up with leads right away.

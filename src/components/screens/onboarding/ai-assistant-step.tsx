@@ -1,14 +1,12 @@
 "use client";
-
-import { useEffect, useState } from "react";
-import { Button, Upload, message, Typography } from "antd";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
+import { Button, message, Typography, Upload } from "antd";
+import { useEffect, useState } from "react";
 
 const { Dragger } = Upload;
 const { Title, Text } = Typography;
 
 interface AiAssistantStepProps {
-  // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;

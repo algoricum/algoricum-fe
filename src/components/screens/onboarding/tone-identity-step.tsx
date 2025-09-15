@@ -1,13 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Button, Select, Typography } from "antd";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
+import { Button, Select, Typography } from "antd";
+import { useEffect, useState } from "react";
 
 const { Option } = Select;
 const { Title, Text } = Typography;
 
 interface ToneIdentityStepProps {
-  // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;

@@ -1,20 +1,20 @@
 "use client";
+import { AuthSeparator } from "@/components/common";
 import { Button, Input } from "@/components/elements";
 import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, WarningToast } from "@/helpers/toast";
+import { useClinicCheck } from "@/hooks/useClinicCheck";
 import { MailIcon, PasswordIcon } from "@/icons";
 import type { LoginProps } from "@/interfaces/services_type";
+import { checkUserStatus, signInWithPassword } from "@/utils/supabase/auth-helper";
+import { setClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
+import { setUserData } from "@/utils/supabase/user-helper";
 import { Flex, Form, Typography } from "antd";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "react-query";
-import { createClient } from "@/utils/supabase/config/client";
-import { AuthSeparator } from "@/components/common";
-import { signInWithPassword } from "@/utils/supabase/auth-helper";
-import { useClinicCheck } from "@/hooks/useClinicCheck";
-import { setClinicData } from "@/utils/supabase/clinic-helper";
-import { setUserData } from "@/utils/supabase/user-helper";
-import { checkUserStatus } from "@/utils/supabase/auth-helper";
+
 const { Text } = Typography;
 const LoginPage = () => {
   const { push } = useRouter();
@@ -196,7 +196,7 @@ const LoginPage = () => {
           </Form.Item>
         </Flex>
       </Form>
-      <AuthSeparator /> 
+      <AuthSeparator />
       <div className="text-center mt-2">
         <Text className="text-sm text-gray-600">
           Don&apos;t have an account?{" "}

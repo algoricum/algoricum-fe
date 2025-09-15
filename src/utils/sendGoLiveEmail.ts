@@ -1,5 +1,5 @@
-import Mailgun from "mailgun.js";
 import FormData from "form-data";
+import Mailgun from "mailgun.js";
 import { algoricumGoLiveTemplate } from "./ConfirmationMail";
 
 export async function sendGoLiveEmail({
@@ -23,7 +23,7 @@ export async function sendGoLiveEmail({
     const mailData = {
       from: `Algoricum <no-reply@algoricum.com>`,
       to: [email],
-      subject:  `${name}- your setup is complete!`,
+      subject: `${name}- your setup is complete!`,
       html,
       text,
     };

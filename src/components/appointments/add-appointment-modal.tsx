@@ -1,21 +1,20 @@
 "use client";
-
-import { useState } from "react";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { CalendarOutlined, ClockCircleOutlined, MailOutlined, PhoneOutlined, UserOutlined } from "@ant-design/icons";
+import { DatePicker, Form, Input, TimePicker } from "antd";
+import dayjs from "dayjs";
+import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
 import { X } from "lucide-react";
-import { Form, Input, DatePicker, TimePicker } from "antd";
-import { CalendarOutlined, ClockCircleOutlined, UserOutlined, MailOutlined, PhoneOutlined } from "@ant-design/icons";
+import { useState } from "react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
-import dayjs from "dayjs";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 
 const { TextArea } = Input;
 
 interface AddAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // eslint-disable-next-line no-unused-vars
+
   onSubmit: (values: any) => Promise<void>;
   isSubmitting: boolean;
   clinicId: string | null;
@@ -49,6 +48,7 @@ export function AddAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting }:
       setPhoneError("");
       return true;
     } catch (error) {
+      console.error("Error validating phone number:", error);
       setPhoneError("Invalid phone number format");
       return false;
     }

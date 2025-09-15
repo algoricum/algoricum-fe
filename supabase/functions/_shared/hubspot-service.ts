@@ -1,6 +1,5 @@
 // supabase/functions/_shared/hubspot-service.ts
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { hubspotcorsHeaders as corsHeaders } from "./cors.ts";
 
 // Environment variables at top level
 const HUBSPOT_CLIENT_ID = Deno.env.get("HUBSPOT_CLIENT_ID");
@@ -29,7 +28,7 @@ export function getHubSpotPropertiesToFetch() {
     "custom_first_name",
     "custom_last_name",
     "custom_email",
-    "custom_phone"
+    "custom_phone",
   ];
 }
 
@@ -37,8 +36,8 @@ export async function discoverHubSpotProperties(accessToken: string, requestId: 
   try {
     const response = await fetch("https://api.hubapi.com/crm/v3/properties/contacts", {
       headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
+        Authorization: `Bearer ${accessToken}`,
+      },
     });
     if (response.ok) {
       const data = await response.json();
@@ -46,7 +45,7 @@ export async function discoverHubSpotProperties(accessToken: string, requestId: 
         name: prop.name,
         label: prop.label,
         type: prop.type,
-        fieldType: prop.fieldType
+        fieldType: prop.fieldType,
       }));
       console.log(`[${requestId}] Available HubSpot properties:`, properties);
       return properties;
@@ -60,34 +59,15 @@ export async function discoverHubSpotProperties(accessToken: string, requestId: 
 export function mapHubSpotContactToLead(contact: any, clinic_id: string, source_id: string) {
   const props = contact.properties || {};
   const propertyMappings = {
-    first_name: [
-      props.firstname,
-      props.first_name,
-      props.custom_first_name
-    ],
-    last_name: [
-      props.lastname,
-      props.last_name,
-      props.custom_last_name
-    ],
-    email: [
-      props.email,
-      props.email_address,
-      props.primary_email,
-      props.work_email,
-      props.custom_email
-    ],
-    phone: [
-      props.phone,
-      props.phone_number,
-      props.mobilephone,
-      props.custom_phone
-    ]
+    first_name: [props.firstname, props.first_name, props.custom_first_name],
+    last_name: [props.lastname, props.last_name, props.custom_last_name],
+    email: [props.email, props.email_address, props.primary_email, props.work_email, props.custom_email],
+    phone: [props.phone, props.phone_number, props.mobilephone, props.custom_phone],
   };
 
   const getFirstValidValue = (values: any[]) => {
     for (const value of values) {
-      if (value && typeof value === 'string' && value.trim() !== '') {
+      if (value && typeof value === "string" && value.trim() !== "") {
         return value.trim();
       }
     }
@@ -100,16 +80,16 @@ export function mapHubSpotContactToLead(contact: any, clinic_id: string, source_
     last_name: getFirstValidValue(propertyMappings.last_name),
     email: getFirstValidValue(propertyMappings.email),
     phone: getFirstValidValue(propertyMappings.phone),
-    status: 'New',
+    status: "New",
     source_id,
     created_at: new Date(props.createdate).toISOString(),
-    updated_at: new Date(props.lastmodifieddate).toISOString()
+    updated_at: new Date(props.lastmodifieddate).toISOString(),
   };
 
   if (!mappedLead.email && !mappedLead.phone) {
     console.warn(`Contact ${contact.id} has no valid email or phone`, {
       availableProps: Object.keys(props),
-      contactId: contact.id
+      contactId: contact.id,
     });
     return null;
   }
@@ -118,15 +98,15 @@ export function mapHubSpotContactToLead(contact: any, clinic_id: string, source_
 
 export async function refreshHubSpotToken(refreshToken: string, supabase: any, clinic_id: string, requestId: string) {
   console.log(`[${requestId}] Refreshing HubSpot token for clinic ${clinic_id}`);
-  const tokenResponse = await fetch('https://api.hubapi.com/oauth/v1/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  const tokenResponse = await fetch("https://api.hubapi.com/oauth/v1/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      grant_type: 'refresh_token',
+      grant_type: "refresh_token",
       client_id: HUBSPOT_CLIENT_ID!,
       client_secret: HUBSPOT_CLIENT_SECRET!,
-      refresh_token: refreshToken
-    })
+      refresh_token: refreshToken,
+    }),
   });
 
   if (!tokenResponse.ok) {
@@ -136,25 +116,36 @@ export async function refreshHubSpotToken(refreshToken: string, supabase: any, c
   }
 
   const tokenData = await tokenResponse.json();
-  const { error: updateError } = await supabase.from('hubspot_connections').update({
-    access_token: tokenData.access_token,
-    refresh_token: tokenData.refresh_token,
-    token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-  }).eq('clinic_id', clinic_id);
+  const { error: updateError } = await supabase
+    .from("hubspot_connections")
+    .update({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+    })
+    .eq("clinic_id", clinic_id);
 
   if (updateError) {
     console.error(`[${requestId}] Failed to update tokens for clinic ${clinic_id}`, updateError);
-    throw new Error('Failed to save new tokens');
+    throw new Error("Failed to save new tokens");
   }
 
   console.log(`[${requestId}] Token refreshed successfully for clinic ${clinic_id}`);
   return tokenData.access_token;
 }
 
-export async function makeHubSpotRequest(url: string, options: any, accessToken: string, refreshToken: string, supabase: any, clinic_id: string, requestId: string) {
+export async function makeHubSpotRequest(
+  url: string,
+  options: any,
+  accessToken: string,
+  refreshToken: string,
+  supabase: any,
+  clinic_id: string,
+  requestId: string,
+) {
   const response = await fetch(url, {
     ...options,
-    headers: { ...options.headers, Authorization: `Bearer ${accessToken}` }
+    headers: { ...options.headers, Authorization: `Bearer ${accessToken}` },
   });
 
   if (response.status === 401) {
@@ -163,7 +154,7 @@ export async function makeHubSpotRequest(url: string, options: any, accessToken:
       const newAccessToken = await refreshHubSpotToken(refreshToken, supabase, clinic_id, requestId);
       return await fetch(url, {
         ...options,
-        headers: { ...options.headers, Authorization: `Bearer ${newAccessToken}` }
+        headers: { ...options.headers, Authorization: `Bearer ${newAccessToken}` },
       });
     } catch (refreshError) {
       console.error(`[${requestId}] Token refresh failed for clinic ${clinic_id}`, refreshError);
@@ -175,7 +166,7 @@ export async function makeHubSpotRequest(url: string, options: any, accessToken:
 
 export async function syncAllConnections(requestId: string) {
   console.log(`[${requestId}] 🔄 Processing sync for all HubSpot connections`);
-  
+
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error(`[${requestId}] Missing Supabase environment variables`);
     throw new Error("Configuration error - Missing Supabase environment variables");
@@ -203,7 +194,7 @@ export async function syncAllConnections(requestId: string) {
       totalConnections: 0,
       successCount: 0,
       errorCount: 0,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -236,7 +227,7 @@ export async function syncAllConnections(requestId: string) {
       errors.push({ clinic_id, error: error.message });
       console.error(`[${requestId}] ❌ Exception syncing clinic ${clinic_id}:`, error.message);
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
   const summary = {
@@ -245,9 +236,9 @@ export async function syncAllConnections(requestId: string) {
     successCount,
     errorCount,
     errors: errors.length > 0 ? errors : undefined,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
-  
+
   console.log(`[${requestId}] ✅ Cron job completed:`, summary);
   return summary;
 }
@@ -255,7 +246,7 @@ export async function syncAllConnections(requestId: string) {
 export async function processOAuthCallback(code: string, state: string, error?: string, requestId?: string) {
   const reqId = requestId || crypto.randomUUID();
   console.log(`[${reqId}] 🔄 Processing OAuth callback`);
-  
+
   if (error) {
     console.error(`[${reqId}] OAuth error: ${error}`);
     let redirectUrl = FRONTEND_URL || "http://localhost:3001";
@@ -265,16 +256,16 @@ export async function processOAuthCallback(code: string, state: string, error?: 
         redirectUrl = stateData.redirectUrl || redirectUrl;
       }
     } catch (e) {
-      console.error("Could not parse state for OAuth error redirect");
+      console.error("Could not parse state for OAuth error redirect", e.message);
     }
     const redirectUrlWithError = new URL(redirectUrl);
     redirectUrlWithError.searchParams.set("hubspot_status", "error");
     redirectUrlWithError.searchParams.set("error_message", `OAuth error: ${error}`);
-    
+
     return {
       success: false,
       redirectUrl: redirectUrlWithError.toString(),
-      error: `OAuth error: ${error}`
+      error: `OAuth error: ${error}`,
     };
   }
 
@@ -284,11 +275,11 @@ export async function processOAuthCallback(code: string, state: string, error?: 
     const redirectUrlWithError = new URL(redirectUrl);
     redirectUrlWithError.searchParams.set("hubspot_status", "error");
     redirectUrlWithError.searchParams.set("error_message", "Missing code or state parameter");
-    
+
     return {
       success: false,
       redirectUrl: redirectUrlWithError.toString(),
-      error: "Missing code or state parameter"
+      error: "Missing code or state parameter",
     };
   }
 
@@ -296,7 +287,7 @@ export async function processOAuthCallback(code: string, state: string, error?: 
     console.error(`[${reqId}] Missing environment variables`);
     return {
       success: false,
-      error: "Configuration Error - Missing environment variables"
+      error: "Configuration Error - Missing environment variables",
     };
   }
 
@@ -314,15 +305,15 @@ export async function processOAuthCallback(code: string, state: string, error?: 
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json"
+        Accept: "application/json",
       },
       body: new URLSearchParams({
         grant_type: "authorization_code",
         client_id: HUBSPOT_CLIENT_ID,
         client_secret: HUBSPOT_CLIENT_SECRET,
         redirect_uri: HUBSPOT_REDIRECT_URI,
-        code
-      })
+        code,
+      }),
     });
 
     if (!tokenResponse.ok) {
@@ -337,7 +328,7 @@ export async function processOAuthCallback(code: string, state: string, error?: 
     await discoverHubSpotProperties(tokens.access_token, reqId);
 
     const accountResponse = await fetch("https://api.hubapi.com/integrations/v1/me", {
-      headers: { Authorization: `Bearer ${tokens.access_token}` }
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
     let accountData = { companyName: "Unknown", portalId: "unknown" };
     if (accountResponse.ok) {
@@ -354,20 +345,20 @@ export async function processOAuthCallback(code: string, state: string, error?: 
       const searchBody = {
         filterGroups: [
           { filters: [{ propertyName: "createdate", operator: "GTE", value: afterDate }] },
-          { filters: [{ propertyName: "lastmodifieddate", operator: "GTE", value: afterDate }] }
+          { filters: [{ propertyName: "lastmodifieddate", operator: "GTE", value: afterDate }] },
         ],
         properties: propertiesToFetch,
         limit: 100,
-        after: after || undefined
+        after: after || undefined,
       };
 
       const contactsResponse = await fetch("https://api.hubapi.com/crm/v3/objects/contacts/search", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(searchBody)
+        body: JSON.stringify(searchBody),
       });
 
       if (!contactsResponse.ok) {
@@ -384,11 +375,7 @@ export async function processOAuthCallback(code: string, state: string, error?: 
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     if (contacts.length > 0) {
-      const { data: sourceData, error: sourceError } = await supabase
-        .from('lead_source')
-        .select('id')
-        .eq('name', 'Hubspot')
-        .single();
+      const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Hubspot").single();
 
       if (sourceError || !sourceData) {
         console.error(`[${reqId}] Error fetching lead source:`, sourceError);
@@ -398,14 +385,14 @@ export async function processOAuthCallback(code: string, state: string, error?: 
       const source_id = sourceData.id;
       console.log(`[${reqId}] Using clinic_id from state: ${clinic_id}`);
       const leadsToInsert = contacts
-        .map((contact) => {
+        .map(contact => {
           if (!contact.id) {
             console.warn(`[${reqId}] Contact missing ID`, { contact });
             return null;
           }
           return mapHubSpotContactToLead(contact, clinic_id, source_id);
         })
-        .filter((lead) => lead !== null);
+        .filter(lead => lead !== null);
 
       if (leadsToInsert.length === 0) {
         console.warn(`[${reqId}] No valid leads to insert`);
@@ -420,7 +407,7 @@ export async function processOAuthCallback(code: string, state: string, error?: 
               leadError = error;
               retries--;
               if (retries === 0) throw new Error(`Lead save failed after retries: ${JSON.stringify(error)}`);
-              await new Promise((resolve) => setTimeout(resolve, 1000));
+              await new Promise(resolve => setTimeout(resolve, 1000));
               continue;
             }
             console.log(`[${reqId}] Successfully saved ${leadsToInsert.length} leads`);
@@ -430,7 +417,7 @@ export async function processOAuthCallback(code: string, state: string, error?: 
             leadError = err;
             retries--;
             if (retries === 0) throw new Error(`Lead save failed after retries: ${err.message}`);
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
         if (leadError) throw leadError;
@@ -449,7 +436,7 @@ export async function processOAuthCallback(code: string, state: string, error?: 
       scope: ["crm.objects.contacts.read", "crm.objects.leads.read"].join(" "),
       connection_status: "connected",
       last_sync_at: new Date().toISOString(),
-      error_message: null
+      error_message: null,
     });
 
     if (dbError) {
@@ -461,7 +448,7 @@ export async function processOAuthCallback(code: string, state: string, error?: 
     const accountInfo = {
       accountName: accountData.companyName || `Hub ${accountData.portalId}`,
       contactCount: contacts.length,
-      dealCount: 0
+      dealCount: 0,
     };
 
     const redirectUrl = stateData.redirectUrl || FRONTEND_URL || "http://localhost:3001";
@@ -470,12 +457,12 @@ export async function processOAuthCallback(code: string, state: string, error?: 
     redirectUrlWithParams.searchParams.set("account_name", accountInfo.accountName);
     redirectUrlWithParams.searchParams.set("contact_count", accountInfo.contactCount.toString());
     redirectUrlWithParams.searchParams.set("clinic_id", stateData.clinic_id);
-    
+
     console.log(`[${reqId}] Redirecting to: ${redirectUrlWithParams.toString()}`);
     return {
       success: true,
       redirectUrl: redirectUrlWithParams.toString(),
-      accountInfo
+      accountInfo,
     };
   } catch (error) {
     console.error(`[${reqId}] Callback processing error`, { error: error.message, stack: error.stack });
@@ -484,17 +471,17 @@ export async function processOAuthCallback(code: string, state: string, error?: 
       const stateData = JSON.parse(atob(state));
       redirectUrl = stateData.redirectUrl || redirectUrl;
     } catch (e) {
-      console.error("Could not parse state for error redirect");
+      console.error("Could not parse state for error redirect", e.message);
     }
     const redirectUrlWithError = new URL(redirectUrl);
     redirectUrlWithError.searchParams.set("hubspot_status", "error");
     redirectUrlWithError.searchParams.set("error_message", error.message);
-    
+
     console.log(`[${reqId}] Redirecting with error to: ${redirectUrlWithError.toString()}`);
     return {
       success: false,
       redirectUrl: redirectUrlWithError.toString(),
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -505,14 +492,14 @@ export async function syncContactsForClinic(body: any, requestId: string) {
   if (!clinic_id) {
     return {
       success: false,
-      error: "Missing clinic_id"
+      error: "Missing clinic_id",
     };
   }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return {
       success: false,
-      error: "Configuration error - Missing Supabase environment variables"
+      error: "Configuration error - Missing Supabase environment variables",
     };
   }
 
@@ -533,7 +520,7 @@ export async function syncContactsForClinic(body: any, requestId: string) {
     console.error(`[${requestId}] Connection fetch error for clinic ${clinic_id}`, connError);
     return {
       success: false,
-      error: "No active HubSpot connection found"
+      error: "No active HubSpot connection found",
     };
   }
 
@@ -542,7 +529,7 @@ export async function syncContactsForClinic(body: any, requestId: string) {
   if (!refreshToken) {
     return {
       success: false,
-      error: "No refresh token available. Please reconnect HubSpot."
+      error: "No refresh token available. Please reconnect HubSpot.",
     };
   }
 
@@ -558,7 +545,7 @@ export async function syncContactsForClinic(body: any, requestId: string) {
       console.error(`[${requestId}] Proactive token refresh failed for clinic ${clinic_id}`, error);
       return {
         success: false,
-        error: "Failed to refresh access token. Please reconnect HubSpot."
+        error: "Failed to refresh access token. Please reconnect HubSpot.",
       };
     }
   }
@@ -574,7 +561,7 @@ export async function syncContactsForClinic(body: any, requestId: string) {
       filterGroups: [{ filters: [{ propertyName: "lastmodifieddate", operator: "GTE", value: afterDate }] }],
       properties: propertiesToFetch,
       limit: 100,
-      after: after || undefined
+      after: after || undefined,
     };
 
     try {
@@ -583,21 +570,24 @@ export async function syncContactsForClinic(body: any, requestId: string) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(searchBody)
+          body: JSON.stringify(searchBody),
         },
         accessToken,
         refreshToken,
         supabase,
         clinic_id,
-        requestId
+        requestId,
       );
 
       if (!contactsResponse.ok) {
         const errorText = await contactsResponse.text();
-        console.error(`[${requestId}] Contacts search failed for clinic ${clinic_id}`, { status: contactsResponse.status, error: errorText });
+        console.error(`[${requestId}] Contacts search failed for clinic ${clinic_id}`, {
+          status: contactsResponse.status,
+          error: errorText,
+        });
         return {
           success: false,
-          error: `Failed to fetch contacts: ${contactsResponse.status}`
+          error: `Failed to fetch contacts: ${contactsResponse.status}`,
         };
       }
 
@@ -608,7 +598,7 @@ export async function syncContactsForClinic(body: any, requestId: string) {
       console.error(`[${requestId}] Error during contacts fetch for clinic ${clinic_id}`, error);
       return {
         success: false,
-        error: "Network error while fetching contacts"
+        error: "Network error while fetching contacts",
       };
     }
   } while (after);
@@ -616,30 +606,26 @@ export async function syncContactsForClinic(body: any, requestId: string) {
   console.log(`[${requestId}] Fetched ${contacts.length} contacts modified in last 15 minutes for clinic ${clinic_id}`);
 
   if (contacts.length > 0) {
-    const { data: sourceData, error: sourceError } = await supabase
-      .from('lead_source')
-      .select('id')
-      .eq('name', 'Hubspot')
-      .single();
+    const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Hubspot").single();
 
     if (sourceError || !sourceData) {
       console.error(`[${requestId}] Error fetching lead source for clinic ${clinic_id}:`, sourceError);
       return {
         success: false,
-        error: "Could not find HubSpot in lead_source table"
+        error: "Could not find HubSpot in lead_source table",
       };
     }
 
     const source_id = sourceData.id;
     const leadsToInsert = contacts
-      .map((contact) => {
+      .map(contact => {
         if (!contact.id) {
           console.warn(`[${requestId}] Contact missing ID for clinic ${clinic_id}`, { contact });
           return null;
         }
         return mapHubSpotContactToLead(contact, clinic_id, source_id);
       })
-      .filter((lead) => lead !== null);
+      .filter(lead => lead !== null);
 
     if (leadsToInsert.length === 0) {
       console.warn(`[${requestId}] No valid leads to insert for clinic ${clinic_id}`);
@@ -650,11 +636,14 @@ export async function syncContactsForClinic(body: any, requestId: string) {
         try {
           const { error } = await supabase.from("lead").upsert(leadsToInsert);
           if (error) {
-            console.error(`[${requestId}] Lead save error for clinic ${clinic_id}`, { error: JSON.stringify(error), leadSample: leadsToInsert[0] });
+            console.error(`[${requestId}] Lead save error for clinic ${clinic_id}`, {
+              error: JSON.stringify(error),
+              leadSample: leadsToInsert[0],
+            });
             leadError = error;
             retries--;
             if (retries === 0) throw new Error(`Lead save failed after retries: ${JSON.stringify(error)}`);
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             continue;
           }
           console.log(`[${requestId}] Successfully saved ${leadsToInsert.length} leads for clinic ${clinic_id}`);
@@ -664,7 +653,7 @@ export async function syncContactsForClinic(body: any, requestId: string) {
           leadError = err;
           retries--;
           if (retries === 0) throw new Error(`Lead save failed after retries: ${err.message}`);
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
       if (leadError) throw leadError;
@@ -683,22 +672,22 @@ export async function syncContactsForClinic(body: any, requestId: string) {
   return {
     success: true,
     message: `Synced ${contacts.length} leads for clinic ${clinic_id}`,
-    contactCount: contacts.length
+    contactCount: contacts.length,
   };
 }
 
 export async function syncAllClinicContacts(authHeader: string, requestId: string) {
   console.log(`[${requestId}] Handling sync for all connected clinics`);
-  
+
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !HUBSPOT_REDIRECT_URI) {
     return {
       success: false,
-      error: "Configuration error - Missing environment variables"
+      error: "Configuration error - Missing environment variables",
     };
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  
+
   // Get all connected clinic IDs
   const { data: connections, error: connError } = await supabase
     .from("hubspot_connections")
@@ -710,15 +699,15 @@ export async function syncAllClinicContacts(authHeader: string, requestId: strin
   if (connError || !connections || connections.length === 0) {
     return {
       success: false,
-      error: "No active connections found"
+      error: "No active connections found",
     };
   }
 
   const results = [];
   for (const connection of connections) {
-    const syncBody = { 
+    const syncBody = {
       clinic_id: connection.clinic_id,
-      redirectUri: HUBSPOT_REDIRECT_URI 
+      redirectUri: HUBSPOT_REDIRECT_URI,
     };
     try {
       const result = await syncContactsForClinic(syncBody, `${requestId}-${connection.clinic_id}`);
@@ -731,7 +720,7 @@ export async function syncAllClinicContacts(authHeader: string, requestId: strin
   return {
     success: true,
     message: `Synced contacts for ${connections.length} clinics`,
-    results
+    results,
   };
 }
 
@@ -790,27 +779,27 @@ export function createTestSuccessHtml() {
 
 export async function initializeOAuth(redirectUrl: string, clinic_id: string, requestId: string) {
   console.log(`[${requestId}] Connect handler`);
-  
+
   if (!redirectUrl || !clinic_id) {
     return {
       success: false,
-      error: "Missing redirectUrl or clinic_id"
+      error: "Missing redirectUrl or clinic_id",
     };
   }
 
   if (!HUBSPOT_CLIENT_ID || !HUBSPOT_REDIRECT_URI || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return {
       success: false,
-      error: "Configuration error - Missing environment variables"
+      error: "Configuration error - Missing environment variables",
     };
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  
+
   await supabase.from("hubspot_connections").upsert({
     clinic_id,
     connection_status: "connecting",
-    error_message: null
+    error_message: null,
   });
 
   const state = btoa(JSON.stringify({ redirectUrl, clinic_id, timestamp: Date.now() }));
@@ -824,38 +813,41 @@ export async function initializeOAuth(redirectUrl: string, clinic_id: string, re
 
   return {
     success: true,
-    authUrl: authUrl.toString()
+    authUrl: authUrl.toString(),
   };
 }
 
 export async function disconnectConnection(clinic_id: string, requestId: string) {
   console.log(`[${requestId}] Disconnect handler`);
-  
+
   if (!clinic_id) {
     return {
       success: false,
-      error: "Missing clinic_id"
+      error: "Missing clinic_id",
     };
   }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return {
       success: false,
-      error: "Configuration error - Missing Supabase environment variables"
+      error: "Configuration error - Missing Supabase environment variables",
     };
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  await supabase.from("hubspot_connections").update({
-    connection_status: "disconnected",
-    access_token: null,
-    refresh_token: null,
-    token_expires_at: null,
-  }).eq("clinic_id", clinic_id);
+  await supabase
+    .from("hubspot_connections")
+    .update({
+      connection_status: "disconnected",
+      access_token: null,
+      refresh_token: null,
+      token_expires_at: null,
+    })
+    .eq("clinic_id", clinic_id);
 
   return {
     success: true,
-    message: "Successfully disconnected from HubSpot"
+    message: "Successfully disconnected from HubSpot",
   };
 }

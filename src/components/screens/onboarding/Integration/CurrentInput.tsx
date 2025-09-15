@@ -1,16 +1,10 @@
-import React from "react";
-import { Select, Card, Typography, Radio, Space } from "antd";
 import { CurrentInputProps } from "@/app/types/types";
+import { Card, Radio, Select, Space, Typography } from "antd";
+import React from "react";
 
 const { Text } = Typography;
 
-
-const CurrentInput: React.FC<CurrentInputProps> = ({
-  currentQuestion,
-  currentValue,
-  handleInputChange,
-  isSubmitting,
-}) => {
+const CurrentInput: React.FC<CurrentInputProps> = ({ currentQuestion, currentValue, handleInputChange, isSubmitting }) => {
   if (!currentQuestion) return null;
 
   // ----- Select Questions -----
@@ -96,24 +90,16 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
   if (currentQuestion.type === "radio") {
     return (
       <div className="mb-6">
-        {currentQuestion.subtitle && (
-          <Text className="text-gray-600 text-sm mb-4 block">{currentQuestion.subtitle}</Text>
-        )}
+        {currentQuestion.subtitle && <Text className="text-gray-600 text-sm mb-4 block">{currentQuestion.subtitle}</Text>}
 
-        <Radio.Group
-          value={currentValue}
-          onChange={(e) => handleInputChange(e.target.value)}
-          className="w-full"
-        >
+        <Radio.Group value={currentValue} onChange={e => handleInputChange(e.target.value)} className="w-full">
           <Space direction="vertical" size="middle" className="w-full">
             {currentQuestion.options?.map((option: string) => (
               <Card
                 key={option}
                 hoverable
                 className={`rounded-xl border-2 cursor-pointer ${
-                  currentValue === option
-                    ? "border-purple-500 bg-purple-50"
-                    : "border-gray-200 bg-white hover:border-purple-300"
+                  currentValue === option ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-purple-300"
                 }`}
                 styles={{ body: { padding: "16px" } }}
                 onClick={() => !isSubmitting && handleInputChange(option)}
@@ -151,10 +137,7 @@ interface ConnectionCardProps {
 }
 
 const ConnectionCard: React.FC<ConnectionCardProps> = ({ color, letter, title, description }) => (
-  <Card
-    className={`rounded-xl bg-${color}-50 border-2 border-${color}-500 mt-6`}
-    styles={{ body: { padding: "20px" } }}
-  >
+  <Card className={`rounded-xl bg-${color}-50 border-2 border-${color}-500 mt-6`} styles={{ body: { padding: "20px" } }}>
     <div className="flex items-center mb-3">
       <div className={`w-8 h-8 bg-${color}-500 rounded-full flex items-center justify-center mr-3`}>
         <Text className="text-white font-bold text-sm">{letter}</Text>

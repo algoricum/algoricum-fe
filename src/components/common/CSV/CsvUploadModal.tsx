@@ -1,16 +1,15 @@
 "use client";
-
-import type React from "react";
-import { useRef, useState } from "react";
+import { CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import { Modal, Typography } from "antd";
 import Papa from "papaparse";
-import { CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import type React from "react";
+import { useRef, useState, useEffect } from "react";
 
 const { Text } = Typography;
 
 interface CsvUploadModalProps {
   open: boolean;
-  // eslint-disable-next-line no-unused-vars
+
   onOk: (leads: any[]) => void;
   onCancel: () => void;
   okText?: string;
@@ -22,6 +21,15 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
   const [csvValidationError, setCsvValidationError] = useState<string | null>(null);
   const [, setValidationWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setCsvLeads([]);
+    setCsvValidationError(null);
+    setValidationWarnings([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [open]);
 
   // Add header normalization function
   const normalizeHeaders = (data: any[]): any[] => {

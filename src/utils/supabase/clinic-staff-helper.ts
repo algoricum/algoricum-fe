@@ -65,15 +65,15 @@ export interface UpdateResponse {
 
 // Get all staff members for a specific clinic (excluding owner)
 export async function getClinicStaff(clinicId: string): Promise<StaffResponse> {
- try {
-   if (!clinicId) {
-     throw new Error("Clinic ID is required");
-   }
+  try {
+    if (!clinicId) {
+      throw new Error("Clinic ID is required");
+    }
 
-   const { data: staffMembers, error } = await supabase
-     .from("user_clinic")
-     .select(
-       `
+    const { data: staffMembers, error } = await supabase
+      .from("user_clinic")
+      .select(
+        `
         id,
         created_at,
         is_active,
@@ -89,38 +89,38 @@ export async function getClinicStaff(clinicId: string): Promise<StaffResponse> {
           type
         )
       `,
-     )
-     .eq("clinic_id", clinicId)
-     .neq("role.type", "owner")
-     .order("created_at", { ascending: false });
+      )
+      .eq("clinic_id", clinicId)
+      .neq("role.type", "owner")
+      .order("created_at", { ascending: false });
 
-   if (error) {
-     console.error("Error fetching staff members:", error);
-     throw new Error(`Database error: ${error.message}`);
-   }
+    if (error) {
+      console.error("Error fetching staff members:", error);
+      throw new Error(`Database error: ${error.message}`);
+    }
 
-   if (!staffMembers) {
-     return { data: [], error: null };
-   }
+    if (!staffMembers) {
+      return { data: [], error: null };
+    }
 
-   const transformedData: TransformedStaffMember[] = staffMembers.map((item: any) => ({
-     user_id: item.user?.id || "",
-     staff_member: item.user?.name || "Unknown",
-     email: item.user?.email || "No email",
-     role: item.role?.type || "Unknown",
-     joined_date: item.created_at || "",
-     created_by: "Admin",
-     status: item.is_active ? "Active" : "Inactive",
-   }));
+    const transformedData: TransformedStaffMember[] = staffMembers.map((item: any) => ({
+      user_id: item.user?.id || "",
+      staff_member: item.user?.name || "Unknown",
+      email: item.user?.email || "No email",
+      role: item.role?.type || "Unknown",
+      joined_date: item.created_at || "",
+      created_by: "Admin",
+      status: item.is_active ? "Active" : "Inactive",
+    }));
 
-   return { data: transformedData, error: null };
- } catch (error: any) {
-   console.error("Error in getClinicStaffWithJoin:", error);
-   return {
-     data: null,
-     error: error.message || "An unexpected error occurred",
-   };
- }
+    return { data: transformedData, error: null };
+  } catch (error: any) {
+    console.error("Error in getClinicStaffWithJoin:", error);
+    return {
+      data: null,
+      error: error.message || "An unexpected error occurred",
+    };
+  }
 }
 
 // Get staff member by ID
@@ -183,8 +183,6 @@ export async function updateStaffStatus(userId: string, clinicId: string, isActi
   }
 }
 
-
-
 // Additional helper function to get staff count
 export async function getStaffCount(clinicId: string): Promise<{ count: number; error: string | null }> {
   try {
@@ -205,7 +203,6 @@ export async function getStaffCount(clinicId: string): Promise<{ count: number; 
     return { count: 0, error: error.message || "An unexpected error occurred" };
   }
 }
-
 
 // Add these functions to your clinic-staff-helper.ts file
 export async function updateStaffMember(userId: string, clinicId: string, updateData: UpdateStaffData): Promise<StaffUpdateResponse> {
@@ -263,9 +260,6 @@ export async function updateStaffMember(userId: string, clinicId: string, update
   }
 }
 
-
-
-
 /**
  * Delete (deactivate) staff member
  * @param userId - The user ID of the staff member
@@ -299,4 +293,3 @@ export async function deleteStaffMember(userId: string, clinicId: string): Promi
     };
   }
 }
-

@@ -2,12 +2,12 @@
 import { liveEnvironments } from "@/constants";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { CreateClinicProps } from "@/interfaces/services_type";
+import { createClinic } from "@/utils/supabase/clinic-helper";
 import { Form } from "antd";
 import { setCookie } from "cookies-next";
 import { useRouter } from "next/navigation";
 import { useMutation } from "react-query";
 import { CreateWorkSpaceForm } from ".";
-import { createClinic } from "@/utils/supabase/clinic-helper";
 
 const WorkpacePage = () => {
   const [form] = Form.useForm();

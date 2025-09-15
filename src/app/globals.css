@@ -18,7 +18,7 @@
   --color-primary-800: #6d54ef;
   --color-primary-900: #5c41ed;
   --color-primary-1000: #4c2eeb;
-  --color-brand-primary: #591CDD;
+  --color-brand-primary: #591cdd;
   --color-brand-primary-50: #efecfd;
   --color-brand-primary-100: #ded9fb;
   --color-brand-primary-200: #cec6fa;
@@ -57,7 +57,7 @@
   --color-warning-soft: #ffede3;
   --color-warning-dark: #d46a51;
   --color-warning: #f7936f;
-  --color-success: #66CB9F;
+  --color-success: #66cb9f;
   --color-success-soft: #deffee;
   --color-success-dark: #4aae8c;
   --shadow-sm: "0px 0px 1px 0px rgba(12, 26, 75, 0.24), 0px 3px 8px -1px rgba(50, 50, 71, 0.05)";
@@ -88,7 +88,7 @@
 }
 
 html,
-h1, 
+h1,
 h2,
 h3,
 h4,
@@ -664,17 +664,17 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .hide-scrollbar {
   scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none;  /* IE and Edge */
+  -ms-overflow-style: none; /* IE and Edge */
 }
 .hide-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
 }
-.layout-onboarding{
-  background: linear-gradient(208.77deg, #A87FFF 0.61%, #6620FF 99.29%);
+.layout-onboarding {
+  background: linear-gradient(208.77deg, #a87fff 0.61%, #6620ff 99.29%);
 }
 
 .custom-alert-icon .anticon {
-  color: #A068F1 !important;
+  color: #a068f1 !important;
 }
 /* ========================================
    HELVETICA NEUE FONT OVERRIDE - ADD THIS AT THE BOTTOM OF YOUR GLOBALS.CSS
@@ -682,12 +682,24 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* Force HelveticaNeue on absolutely everything */
 * {
-  font-family: 'HelveticaNeue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family:
+    "HelveticaNeue",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif !important;
 }
 
 *::before,
 *::after {
-  font-family: 'HelveticaNeue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family:
+    "HelveticaNeue",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif !important;
 }
 
 /* Override ALL Ant Design components */
@@ -757,7 +769,13 @@ input[type="number"]::-webkit-outer-spin-button {
 .ant-typography p,
 .ant-typography span,
 .ant-typography div {
-  font-family: 'HelveticaNeue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family:
+    "HelveticaNeue",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif !important;
 }
 
 /* Override placeholders */
@@ -766,16 +784,34 @@ textarea::placeholder,
 .ant-input::placeholder,
 .ant-input-password::placeholder,
 .ant-select-selection-placeholder {
-  font-family: 'HelveticaNeue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family:
+    "HelveticaNeue",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif !important;
 }
 
 /* Override any CSS-in-JS styles */
 [class*="css-"],
 [class*="ant-"] {
-  font-family: 'HelveticaNeue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family:
+    "HelveticaNeue",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif !important;
 }
 
 /* Override any inline font styles */
 [style*="font-family"] {
-  font-family: 'HelveticaNeue', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family:
+    "HelveticaNeue",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif !important;
 }

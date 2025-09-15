@@ -1,10 +1,9 @@
 "use client";
+import { Flex } from "antd";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
-// import LeadCapturingForm from "./LeadCapturingForm";
 import ChatbotSettings from "./ChatbotSettings";
 import ClinicSetting from "./ClinicSetting";
-import { Flex } from "antd";
 
 const SettingsTabs = () => {
   const router = useRouter();
@@ -27,7 +26,7 @@ const SettingsTabs = () => {
   };
 
   return (
-    <div className="flex flex-col mt-2">
+    <div className="flex flex-col mt-4 pl-2">
       <Flex className="border border-[#E8EAEC] rounded-[48px] p-2 gap-4 max-w-md inline-flex">
         {/* <TabButton isActive={activeTab === "lead"} onClick={() => handleTabChange("lead")} label="Custom Lead Capturing Form" /> */}
         <TabButton isActive={activeTab === "clinic-setting"} onClick={() => handleTabChange("clinic-setting")} label="Clinic Setting" />

@@ -60,7 +60,6 @@
 //     setLoading(false);
 //   };
 
-  
 //   interface PricingSelectorProps {
 //     plans: {
 //       id: string;
@@ -161,7 +160,6 @@
 //         <br />
 //         No credit card required
 //       </Typography.Title>
-  
 
 //       {loading ? (
 //         <Skeleton active />
