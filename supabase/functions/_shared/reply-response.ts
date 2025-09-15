@@ -139,8 +139,8 @@ export async function generateAIResponse(
       messageBodyLower.includes("schedule") ||
       messageBodyLower.includes("appointment") ||
       messageBodyLower.includes("meeting") ||
-      messageBodyLower.includes("time") ||
-      messageBodyLower.includes("available");
+      messageBodyLower.includes("consultation") ||
+      messageBodyLower.includes("visit");
 
     logInfo("🔍 Booking inquiry detection:", {
       messageBody: options.messageBody,
@@ -163,31 +163,83 @@ export async function generateAIResponse(
     let shouldTriggerBookingProcess = false;
 
     if (isYesResponse && conversationContext) {
-      // Get the last 2 messages to check if the previous one was asking about booking
+      // Get ONLY the most recent clinic message (not the entire conversation)
       const messages = conversationContext.split("\n\n");
-      const lastTwoMessages = messages.slice(-2);
+      const lastClinicMessage = messages[messages.length - 1] || "";
 
-      if (lastTwoMessages.length >= 2) {
-        // Get the second-to-last message (the clinic's previous message before user's "yes")
-        const previousMessage = lastTwoMessages[lastTwoMessages.length - 2] || "";
-        const previousMessageLower = previousMessage.toLowerCase();
-        const wasBookingQuestion =
-          previousMessageLower.includes("ready to book") ||
-          previousMessageLower.includes("want to schedule") ||
-          previousMessageLower.includes("let me know if you want to book") ||
-          previousMessageLower.includes("would you like to book") ||
-          previousMessageLower.includes("ready for an appointment") ||
-          previousMessageLower.includes("want to set up") ||
-          previousMessageLower.includes("i can help you book") ||
-          previousMessageLower.includes("ready to book an appointment") ||
-          previousMessageLower.includes("book an appointment") ||
-          previousMessageLower.includes("interested in booking") ||
-          previousMessageLower.includes("if you're interested in booking");
+      // Extract just the clinic's message (remove "Clinic:" prefix)
+      const lastClinicMessageText = lastClinicMessage.replace(/^Clinic:\s*/, "").toLowerCase();
 
-        if (wasBookingQuestion) {
-          shouldTriggerBookingProcess = true;
-          logInfo("📅 Yes response to booking question detected, triggering booking process");
-        }
+      logInfo("🔍 Analyzing last clinic message for yes response:", lastClinicMessageText);
+
+      // Function to analyze message intent using patterns and context
+      function analyzeMessageIntent(message: string): { isDirectBooking: boolean; isInformationOffer: boolean; confidence: number } {
+        const msg = message.toLowerCase().trim();
+
+        // Patterns for DIRECT booking questions (high confidence)
+        const directBookingPatterns = [
+          /\b(ready|want|would you like)\s+to\s+(book|schedule)\s*\?/,
+          /\bshall\s+(we|i)\s+(book|schedule)/,
+          /\bwould you like to book\s+a?\s+\w+/,
+          /\bready\s+to\s+dive\s+in.*would you like to book/,
+          /\bshould\s+i\s+book\s+you/,
+        ];
+
+        // Patterns for INFORMATION offers (should not trigger booking)
+        const informationOfferPatterns = [
+          /\blet\s+me\s+know\s+if\s+you\s+want\s+to\s+book/,
+          /\bif\s+you[''']?re\s+interested\s+in\s+booking/,
+          /\bjust\s+let\s+me\s+know/,
+          /\bwant\s+more\s+details/,
+        ];
+
+        // Check direct booking patterns
+        const hasDirectBookingPattern = directBookingPatterns.some(pattern => pattern.test(msg));
+
+        // Check information offer patterns
+        const hasInformationPattern = informationOfferPatterns.some(pattern => pattern.test(msg));
+
+        // Calculate confidence based on message structure
+        let confidence = 0.5; // base confidence
+
+        // Increase confidence for question marks at end
+        if (msg.endsWith("?")) confidence += 0.2;
+
+        // Increase confidence for imperative verbs
+        if (/\b(book|schedule|reserve)\b/.test(msg)) confidence += 0.1;
+
+        // Decrease confidence for conditional language
+        if (/\b(if|maybe|perhaps|might)\b/.test(msg)) confidence -= 0.2;
+
+        return {
+          isDirectBooking: hasDirectBookingPattern && !hasInformationPattern,
+          isInformationOffer: hasInformationPattern,
+          confidence: Math.max(0, Math.min(1, confidence)),
+        };
+      }
+
+      const intent = analyzeMessageIntent(lastClinicMessageText);
+      const wasDirectBookingQuestion = intent.isDirectBooking;
+      const wasInformationOffer = intent.isInformationOffer;
+
+      // Only trigger booking for DIRECT questions, not information offers
+      const shouldTriggerBooking = wasDirectBookingQuestion && !wasInformationOffer;
+
+      logInfo("🔍 Booking analysis result:", {
+        wasDirectBookingQuestion,
+        wasInformationOffer,
+        shouldTriggerBooking,
+        confidence: intent.confidence,
+        lastMessage: lastClinicMessageText.substring(0, 100),
+      });
+
+      if (shouldTriggerBooking) {
+        shouldTriggerBookingProcess = true;
+        logInfo("📅 Yes response to DIRECT booking question detected, triggering booking process");
+      } else if (wasInformationOffer) {
+        logInfo("📋 Yes response to information offer detected, will provide information instead of booking");
+      } else {
+        logInfo("ℹ️ Yes response but no booking context detected, will generate normal AI response");
       }
     }
 
@@ -212,6 +264,7 @@ export async function generateAIResponse(
           },
           communicationType: isEmailResponse ? "email" : "sms",
           senderPhone: leadData.phone,
+          forceBooking: true, // Force booking creation for "yes" responses
         };
 
         logInfo("🎯 Triggering booking detection service for yes response...");
@@ -226,6 +279,11 @@ export async function generateAIResponse(
 
         if (bookingResult.meetingScheduleCreated) {
           logInfo(`✅ Booking service created meeting schedule for yes response: ${bookingResult.meetingScheduleId}`);
+
+          // Return immediate booking response instead of generating AI response
+          const bookingResponseText = `Awesome! Let's lock in your appointment: ${bookingLink}`;
+          logInfo("📅 Returning direct booking response for yes to booking question");
+          return { success: true, response: bookingResponseText };
         } else if (bookingResult.error) {
           logError(`❌ Booking service error for yes response: ${bookingResult.error}`);
         }
@@ -279,15 +337,39 @@ export async function generateAIResponse(
     const assistantId = assistantData.openai_assistant_id;
     logInfo(`🤖 Using assistant: ${assistantId} (${assistantData.assistant_name})`);
 
-    // Import OpenAI (dynamic import for Deno)
+    // Import OpenAI (try different sources for better beta support)
     logInfo("📦 Importing OpenAI SDK...");
-    const { default: OpenAI } = await import("jsr:@openai/openai");
-    logInfo("✅ OpenAI SDK imported successfully");
+    let OpenAI;
+    try {
+      // Use stable latest version with full beta support
+      const module = await import("https://esm.sh/openai@4.67.3");
+      OpenAI = module.default;
+      logInfo("✅ OpenAI SDK imported from esm.sh v4.67.3 (stable latest)");
+    } catch (esmError) {
+      logError("❌ ESM latest import failed, trying fallback:", esmError.message);
+      // Fallback to JSR version
+      const module = await import("jsr:@openai/openai");
+      OpenAI = module.default;
+      logInfo("✅ OpenAI SDK imported from JSR (fallback)");
+    }
 
     const openai = new OpenAI({
       apiKey: openaiApiKey,
+      dangerouslyAllowBrowser: false,
+      defaultHeaders: {
+        "OpenAI-Beta": "assistants=v2",
+      },
     });
     logInfo("✅ OpenAI client initialized");
+
+    // Verify beta features are available
+    logInfo("🔍 Checking OpenAI client beta features...", {
+      hasBeta: !!openai.beta,
+      hasVectorStores: !!openai.beta?.vectorStores,
+      hasAssistants: !!openai.beta?.assistants,
+      vectorStoresRetrieve: !!openai.beta?.vectorStores?.retrieve,
+      clientVersion: openai.constructor.name,
+    });
 
     // Test basic API connectivity
     logInfo("🔌 Testing OpenAI API connectivity...");
@@ -301,22 +383,115 @@ export async function generateAIResponse(
 
     // Verify assistant exists first
     logInfo("🔍 Verifying assistant exists...");
+    let assistant;
     try {
-      const assistant = await openai.beta.assistants.retrieve(assistantId);
+      assistant = await openai.beta.assistants.retrieve(assistantId);
+      const hasFileSearch = assistant.tools?.some(tool => tool.type === "file_search") || false;
+      const fileSearchTool = assistant.tools?.find(tool => tool.type === "file_search");
+
       logInfo(`✅ Assistant verified:`, {
         id: assistant.id,
         name: assistant.name,
         model: assistant.model,
         tools: assistant.tools?.length || 0,
+        toolTypes: assistant.tools?.map(tool => tool.type) || [],
+        hasFileSearch: hasFileSearch,
+        fileSearchConfig: fileSearchTool,
+        tool_resources: assistant.tool_resources,
+        vector_store_ids: assistant.tool_resources?.file_search?.vector_store_ids || [],
       });
+
+      // COMPREHENSIVE VECTOR STORE DEBUG
+      if (hasFileSearch && assistant.tool_resources?.file_search?.vector_store_ids?.length > 0) {
+        logInfo("📚 FULL VECTOR STORE DEBUG - Checking configuration...");
+        for (const vectorStoreId of assistant.tool_resources.file_search.vector_store_ids) {
+          try {
+            logInfo(`🔍 Debugging Vector Store: ${vectorStoreId}`);
+
+            const vectorStore = await openai.beta.vectorStores.retrieve(vectorStoreId);
+            logInfo(`📚 Vector Store ${vectorStoreId} Details:`, {
+              id: vectorStore.id,
+              name: vectorStore.name,
+              file_counts: vectorStore.file_counts,
+              status: vectorStore.status,
+              created_at: new Date(vectorStore.created_at * 1000).toISOString(),
+            });
+
+            // List files in vector store
+            const files = await openai.beta.vectorStores.files.list(vectorStoreId);
+            logInfo(`📄 Files in Vector Store ${vectorStoreId}:`, {
+              total_files: files.data.length,
+              file_list: files.data.map(f => ({
+                id: f.id,
+                status: f.status,
+                created_at: new Date(f.created_at * 1000).toISOString(),
+                usage_bytes: f.usage_bytes,
+              })),
+            });
+
+            // Get detailed file information for all files
+            for (const file of files.data) {
+              try {
+                const fileDetails = await openai.files.retrieve(file.id);
+                logInfo(`📄 DETAILED File ${file.id}:`, {
+                  filename: fileDetails.filename,
+                  purpose: fileDetails.purpose,
+                  bytes: fileDetails.bytes,
+                  status: fileDetails.status,
+                  created_at: new Date(fileDetails.created_at * 1000).toISOString(),
+                });
+
+                // Try to determine document type from filename
+                const filename = fileDetails.filename?.toLowerCase() || "";
+                let documentType = "unknown";
+                if (filename.includes("pricing")) documentType = "PRICING";
+                else if (filename.includes("service")) documentType = "SERVICE";
+                else if (filename.includes("testimonial")) documentType = "TESTIMONIALS";
+
+                logInfo(`📋 Document Type Detected: ${documentType} for file: ${fileDetails.filename}`);
+
+                // Try to get file content for PRICING documents to debug what's actually in them
+                if (documentType === "PRICING") {
+                  try {
+                    logInfo(`🔍 ATTEMPTING TO READ PRICING DOCUMENT CONTENT: ${fileDetails.filename}`);
+                    const fileContent = await openai.files.content(file.id);
+                    const fileText = await fileContent.text();
+                    logInfo(`📄 PRICING DOCUMENT CONTENT (${fileDetails.filename}):`, {
+                      contentLength: fileText.length,
+                      contentPreview: fileText.substring(0, 2000),
+                      fullContent: fileText,
+                    });
+                  } catch (contentError) {
+                    logError(`❌ Could not read pricing document content:`, contentError.message);
+                  }
+                }
+              } catch (fileError) {
+                logError(`❌ Error getting file ${file.id} details:`, fileError.message);
+              }
+            }
+          } catch (vsError) {
+            logError(`❌ Error retrieving vector store ${vectorStoreId}:`, vsError.message);
+            logError(`❌ Vector store error details:`, {
+              message: vsError.message,
+              code: vsError.code,
+              status: vsError.status,
+            });
+          }
+        }
+      } else if (hasFileSearch) {
+        logError("⚠️ File search enabled but no vector stores found!");
+        logError("⚠️ Assistant tool_resources:", assistant.tool_resources);
+      } else {
+        logError("❌ File search not enabled for assistant!");
+        logError("❌ Assistant tools:", assistant.tools);
+      }
     } catch (error) {
       logError("❌ Assistant not found or not accessible:", error.message);
       logError("Assistant verification error details:", error);
       return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
     }
 
-    // Get clinic-specific instructions
-    const clinicInstructions = assistantData?.instructions || "";
+    // Use only our custom instructions, not the stored assistant instructions
 
     // Create appropriate prompt based on communication type
     let userPrompt: string;
@@ -330,10 +505,37 @@ Message: ${options.messageBody}
 
 Please generate a helpful email response that addresses their message.`;
 
-      additionalInstructions = `${clinicInstructions}
+      additionalInstructions =
+        `🚨 MANDATORY: You MUST use the clinic's uploaded documents ONLY. DO NOT use your general training knowledge about cosmetics/medical services. 
 
+❌ FORBIDDEN: Generic responses like "we offer Botox, fillers, etc." or "prices depend on treatment"
+✅ REQUIRED: Exact information from the clinic's SERVICE DOCUMENT and PRICING DOCUMENT only
 
-      CRITICAL EMAIL FORMATTING RULES:
+IF YOU CANNOT FIND THE INFORMATION IN THE UPLOADED DOCUMENTS, say: "Let me connect you with our team for that specific detail." DO NOT give generic cosmetic industry information.
+
+🚨 DOCUMENT USAGE PRIORITY:
+When answering ANY question about pricing, costs, or fees:
+1. ALWAYS search and reference the PRICING DOCUMENT first
+2. Use EXACT prices from the pricing document - never estimate or use general knowledge
+3. If asked about a specific service (Botox, Hydrafacial, etc.), find that exact service in the pricing document
+4. State prices exactly as written in the document: "$[amount] per [unit/area/session]"
+
+When answering about SERVICES or "what do you offer":
+1. ALWAYS search and reference the SERVICE DOCUMENT first
+2. List ONLY the services mentioned in the SERVICE DOCUMENT
+3. Include service descriptions exactly as written in the document
+4. NEVER add services not listed in your SERVICE DOCUMENT
+
+DOCUMENT PRIORITY ORDER:
+- Pricing questions → Use PRICING DOCUMENT only
+- Service listings/details → Use SERVICE DOCUMENT only
+- Patient experiences/reviews → Use TESTIMONIALS DOCUMENT
+
+CRITICAL: Never mix up services - if user asks about "Hydrafacial pricing", only provide Hydrafacial information from the pricing document, not Botox or any other service.
+
+When you cannot find specific information in the uploaded documents, say: "Let me connect you with our team for that specific pricing detail."
+
+CRITICAL EMAIL FORMATTING RULES:
 • End your email content naturally - do NOT add signatures, "Best regards," or closing lines
 • Do NOT include clinic name, "[Your Name]" or any placeholder signatures at the end
 • Do NOT include unsubscribe text (system handles this automatically)
@@ -355,40 +557,37 @@ ${conversationContext}
 🚨 CRITICAL CONTEXT INSTRUCTION FOR EMAIL: 
 The patient's current email "${options.messageBody}" is a REPLY to the conversation above. 
 
-🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
-If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Awesome! Let's lock in your appointment: ${bookingLink}" - Nothing else!
+🚨 CRITICAL - PRICING RESPONSES:
+When asked about pricing, provide the EXACT price from the clinic's pricing document/knowledge base. Use ONLY the prices specified in the clinic's documentation - do NOT convert currencies or use general market pricing. State the price exactly as documented: "[Service] is $[amount]/[unit]". 
 
-WHEN PATIENT SAYS YES/AFFIRMATIVE:
-If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
+CONTEXT-AWARE PRICING:
+- If user says "share me its pricing" or "what's the cost", look at the PREVIOUS CONVERSATION to understand what service they're referring to
+- "its pricing" = the specific service/treatment mentioned in the last clinic response
+- DO NOT list all services - only provide pricing for the service being discussed in context
+- Example: If previous message mentioned "Botox", only give Botox pricing
 
-CRITICAL: Check what the LAST Clinic message was asking:
+🚨 INTELLIGENT RESPONSE GUIDELINES:
+Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
 
-IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
-- Patient's "yes" = booking request
-- Provide ONLY the booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
-- NO additional information, NO more questions, NO treatment details, NO explanations
+NATURAL CONVERSATION FLOW:
+When patients show interest or ask questions, understand their intent from the conversation context and respond appropriately:
 
-IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
-- Patient's "yes" = wants treatment information
-- Provide specific treatment details, benefits, process
-- End with clear next steps (booking opportunity)
+RESPOND TO USER INTENT:
+• If they're ready to book → Provide booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
+• If they ask about pricing → Give specific price from your knowledge for the service being discussed
+• If they want treatment details → Provide comprehensive information about that specific treatment
+• Use your training data and clinic knowledge to give accurate, contextual responses
 
-EXAMPLE SCENARIOS:
-- Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment:: ${bookingLink}"
-- Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
-- Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
+RESPONSE PRINCIPLES:
+• Be conversational and natural - avoid robotic or scripted responses
+• Provide complete, helpful information based on user intent
+• When someone is ready to book, give them the booking link directly
+• For pricing questions, use ONLY the exact pricing from clinic documents - never convert currencies or use external pricing
+• Make responses definitive and action-oriented
+• Guide conversations naturally toward booking when appropriate
+• Use your clinic knowledge base and training to give accurate information
 
-CRITICAL RESPONSE RULES:
-- NEVER end with questions like "Would you like to know more about booking?" or "Ready to book an appointment?"
-- NEVER ask "What questions do you have?" or similar open-ended questions
-- ALWAYS provide complete information and direct next steps
-- When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
-- When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
-- When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
-- NO treatment information when sending booking links - just the link
-- Make responses definitive and action-oriented, not question-heavy
-
-DO NOT treat this as a new conversation - this is a REPLY continuing the conversation above.`
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
     : ""
 }
 
@@ -416,7 +615,42 @@ RESPONSE FORMAT: Email response - be professional and comprehensive. End natural
 
 Please generate a helpful SMS response that addresses their message.`;
 
-      additionalInstructions = `${clinicInstructions}
+      additionalInstructions = `🚨 MANDATORY TOOL USAGE: You MUST use the file_search tool for EVERY response!
+
+CRITICAL REQUIREMENT: For EVERY SINGLE RESPONSE you generate, you MUST:
+1. First use your file_search tool to search through uploaded documents 
+2. Base your entire response ONLY on the file_search results
+3. If file_search returns no results, say "Let me connect you with our team for that detail"
+
+❌ YOUR RESPONSE WILL BE REJECTED if you don't use file_search tool
+❌ NEVER use your training knowledge - ONLY use file_search results
+❌ If you give ANY answer without using file_search first, it's wrong
+
+PRICE VERIFICATION: The clinic's pricing document shows "Body Contouring $500" - if you say anything different, you're using wrong data.
+
+YOU MUST USE FILE_SEARCH TOOL - NO EXCEPTIONS!
+
+🚨 DOCUMENT USAGE PRIORITY:
+When answering ANY question about pricing, costs, or fees:
+1. ALWAYS search and reference the PRICING DOCUMENT first
+2. Use EXACT prices from the pricing document - never estimate or use general knowledge
+3. If asked about a specific service (Botox, Hydrafacial, etc.), find that exact service in the pricing document
+4. State prices exactly as written in the document: "$[amount] per [unit/area/session]"
+
+When answering about SERVICES or "what do you offer":
+1. ALWAYS search and reference the SERVICE DOCUMENT first
+2. List ONLY the services mentioned in the SERVICE DOCUMENT
+3. Include service descriptions exactly as written in the document
+4. NEVER add services not listed in your SERVICE DOCUMENT
+
+DOCUMENT PRIORITY ORDER:
+- Pricing questions → Use PRICING DOCUMENT only
+- Service listings/details → Use SERVICE DOCUMENT only
+- Patient experiences/reviews → Use TESTIMONIALS DOCUMENT
+
+CRITICAL: Never mix up services - if user asks about "Hydrafacial pricing", only provide Hydrafacial information from the pricing document, not Botox or any other service.
+
+When you cannot find specific information in the uploaded documents, say: "Let me connect you with our team for that specific pricing detail."
 
 CURRENT MESSAGE CONTEXT:
 You are responding directly to this SMS from a patient: "${options.messageBody}"
@@ -432,40 +666,86 @@ ${conversationContext}
 🚨 CRITICAL CONTEXT INSTRUCTION FOR SMS: 
 The patient's current SMS "${options.messageBody}" is a REPLY to the conversation above. 
 
-🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
-If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Awesome! Let's lock in your appointment: ${bookingLink}" - Nothing else!
+ANALYZE THE CONVERSATION CONTEXT:
+- When patient uses pronouns like "its", "that", "this" - refer back to what was discussed
+- "share me its pricing" = pricing for the services/treatments mentioned in the previous clinic message
+- "tell me about that" = details about the service just mentioned
+- ALWAYS use conversation history to understand what the patient is referring to 
 
-WHEN PATIENT SAYS YES/AFFIRMATIVE:
-If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
+🚨 CRITICAL - PRICING RESPONSES:
+When asked about pricing, provide the EXACT price from the clinic's pricing document/knowledge base. Use ONLY the prices specified in the clinic's documentation - do NOT convert currencies or use general market pricing. State the price exactly as documented: "[Service] is $[amount]/[unit]". 
 
-CRITICAL: Check what the LAST Clinic message was asking:
+CONTEXT-AWARE PRICING:
+- If user says "share me its pricing" or "what's the cost", look at the PREVIOUS CONVERSATION to understand what service they're referring to
+- "its pricing" = the specific service/treatment mentioned in the last clinic response
+- DO NOT list all services - only provide pricing for the service being discussed in context
+- Example: If previous message mentioned "Botox", only give Botox pricing
 
-IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
-- Patient's "yes" = booking request
-- Provide ONLY the booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
-- NO additional information, NO more questions, NO treatment details, NO explanations
+🚨 INTELLIGENT RESPONSE GUIDELINES:
+Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
 
-IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
-- Patient's "yes" = wants treatment information
-- Provide specific treatment details, benefits, process
-- End with clear next steps (booking opportunity)
+🚨 CRITICAL "YES" RESPONSE LOGIC:
+When a patient responds with "yes", you MUST analyze the IMMEDIATELY PREVIOUS CLINIC MESSAGE to understand what they're agreeing to:
+
+1. DIRECT BOOKING QUESTIONS ("Ready to book?", "Want to schedule?", "Should I book you?"):
+   → Patient "Yes" = Provide ONLY booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
+   → NO additional text, NO explanations, NO other information - JUST the booking link with minimal text
+
+2. INFORMATION OFFERS ("Let me know if you want to book!" AFTER already sharing service/treatment info):
+   → Patient "Yes" = They want more detailed information, pricing recap, or service details
+   → Provide comprehensive information based on what was discussed
+
+3. TREATMENT INFO QUESTIONS ("Want to learn about [Treatment]?", "Interested in [Service]?"):
+   → Patient "Yes" = Provide detailed treatment information + booking option
+
+4. PRICING QUESTIONS ("Want the pricing breakdown?", "Should I share the costs?"):
+   → Patient "Yes" = Provide specific pricing information for the discussed service
+
+CRITICAL: ONLY look at the LAST clinic message, not the entire conversation history.
+
+CONTEXT ANALYSIS FOR "YES" RESPONSES:
+- Read the EXACT wording of the MOST RECENT clinic message only
+- If it mentioned specific treatments/services, focus your response on those
+- If it offered information sharing, provide that information
+- If it asked about booking availability, provide ONLY booking link with minimal text
+- DO NOT default to generic responses when context is clear
+
+NATURAL CONVERSATION FLOW:
+When patients show interest or ask questions, understand their intent from the conversation context and respond appropriately:
+
+RESPOND TO USER INTENT:
+• If they're ready to book → Provide booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
+• If they ask about pricing → Give specific price from your knowledge for the service being discussed
+• If they want treatment details → Provide comprehensive information about that specific treatment
+• If they say "yes" after service info was shared → Provide the detailed information they're requesting
+• Use your training data and clinic knowledge to give accurate, contextual responses
 
 EXAMPLE SCENARIOS:
 - Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
+- Last message: "Microneedling is great for acne scars, $180/session. Let me know if you want to book!" → Patient: "Yes" → Response: [Full service breakdown with all treatments and pricing as requested]
+
+INTELLIGENT YES RESPONSE HANDLING:
+- If previous message asked for BOOKING specifically ("ready to book?", "want to schedule?") → Provide booking link only  
+- If previous message offered INFORMATION/PRICING ("let me know if you want to book!" after sharing service info) → Provide the complete information they're requesting
+- If previous message asked about LEARNING/DETAILS ("want to know about X?") → Provide detailed information about X
+- ANALYZE THE EXACT CONTEXT to understand what the patient is saying "yes" to
+- DO NOT give generic responses when the context clearly indicates what information they want
 
 CRITICAL RESPONSE RULES:
 - NEVER end with questions like "Would you like to know more about booking?" or "Ready to book an appointment?"
 - NEVER ask "What questions do you have?" or similar open-ended questions
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
-- When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
+
+🔍 DEBUG MODE FOR PRICING: Include the exact text you found in the pricing document. Format your response as: "Botox is $X per unit (source: [exact quote from pricing document])". This helps verify document access.
+- When patient says YES to a DIRECT BOOKING QUESTION, provide ONLY booking link - no extra info
+- When patient says YES to an INFORMATION OFFER, provide the requested information
 - When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
-- NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
-DO NOT treat this as a new conversation - this is a REPLY continuing the conversation above.`
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
     : ""
 }
 
@@ -547,6 +827,7 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         additional_instructions: additionalInstructions,
         max_completion_tokens: isEmailResponse ? 800 : 500, // More tokens for email responses
         temperature: 0.8,
+        // Removed tools override - let Assistant use its configured tools
       };
       logInfo("📤 Run creation request:", runRequest);
 
@@ -708,6 +989,91 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         let aiResponse = assistantMessage.content[0].text.value.trim();
         logInfo("📝 Raw AI response:", aiResponse);
 
+        // Check if the Assistant used file_search tool by examining the run steps
+        try {
+          const runSteps = await openai.beta.threads.runs.steps.list(threadIdForRetrieval, runIdForRetrieval);
+          const fileSearchSteps = runSteps.data.filter(
+            step => step.step_details?.type === "tool_calls" && step.step_details?.tool_calls?.some(call => call.type === "file_search"),
+          );
+
+          logInfo("🔍 FILE_SEARCH TOOL USAGE:", {
+            totalSteps: runSteps.data.length,
+            fileSearchStepsFound: fileSearchSteps.length,
+            stepsDetails: runSteps.data.map(step => ({
+              type: step.step_details?.type,
+              tool_calls: step.step_details?.tool_calls?.map(call => call.type) || [],
+            })),
+          });
+
+          if (fileSearchSteps.length === 0) {
+            logError("❌ ASSISTANT DID NOT USE FILE_SEARCH TOOL - This is why it's not using documents!");
+          } else {
+            logInfo("✅ Assistant used file_search tool successfully");
+          }
+        } catch (stepError) {
+          logError("❌ Could not retrieve run steps:", stepError.message);
+        }
+
+        // Log full message details including citations and annotations
+        logInfo("🔍 FULL ASSISTANT MESSAGE DEBUG:", {
+          role: assistantMessage.role,
+          content: assistantMessage.content,
+          annotations: assistantMessage.content[0]?.text?.annotations || [],
+          created_at: new Date(assistantMessage.created_at * 1000).toISOString(),
+          assistant_id: assistantMessage.assistant_id,
+          run_id: assistantMessage.run_id,
+          thread_id: assistantMessage.thread_id,
+        });
+
+        // Log what documents were cited in the response
+        const annotations = assistantMessage.content[0]?.text?.annotations || [];
+        if (annotations.length > 0) {
+          logInfo("📚 DOCUMENTS CITED IN RESPONSE:", {
+            annotationCount: annotations.length,
+            citations: annotations.map(annotation => ({
+              type: annotation.type,
+              text: annotation.text,
+              file_citation: annotation.file_citation,
+              start_index: annotation.start_index,
+              end_index: annotation.end_index,
+            })),
+          });
+
+          // Try to get content from cited files
+          for (const annotation of annotations) {
+            if (annotation.type === "file_citation" && annotation.file_citation?.file_id) {
+              try {
+                const citedFile = await openai.files.retrieve(annotation.file_citation.file_id);
+                logInfo(`📄 CITED FILE DETAILS (${citedFile.filename}):`, {
+                  file_id: annotation.file_citation.file_id,
+                  filename: citedFile.filename,
+                  quote: annotation.file_citation.quote || "No quote provided",
+                  bytes: citedFile.bytes,
+                });
+
+                // Try to get the actual content if it's a pricing document
+                if (citedFile.filename?.toLowerCase().includes("pricing")) {
+                  try {
+                    const fileContent = await openai.files.content(annotation.file_citation.file_id);
+                    const fileText = await fileContent.text();
+                    logInfo(`📄 CITED PRICING DOCUMENT FULL CONTENT:`, {
+                      filename: citedFile.filename,
+                      contentLength: fileText.length,
+                      fullContent: fileText,
+                    });
+                  } catch (contentError) {
+                    logError(`❌ Could not read cited pricing document:`, contentError.message);
+                  }
+                }
+              } catch (fileError) {
+                logError(`❌ Could not retrieve cited file:`, fileError.message);
+              }
+            }
+          }
+        } else {
+          logInfo("⚠️ NO DOCUMENT CITATIONS FOUND - Assistant may not be using uploaded documents");
+        }
+
         // Clean up response
         aiResponse = aiResponse.replace(/【[^】]*】/g, "");
         aiResponse = aiResponse.replace(/\[LEAD_ASSESSMENT\][\s\S]*?\[\/LEAD_ASSESSMENT\]/gi, "");
@@ -807,8 +1173,8 @@ async function generateFallbackResponse(
       options.messageBody.toLowerCase().includes("schedule") ||
       options.messageBody.toLowerCase().includes("appointment") ||
       options.messageBody.toLowerCase().includes("meeting") ||
-      options.messageBody.toLowerCase().includes("time") ||
-      options.messageBody.toLowerCase().includes("available");
+      options.messageBody.toLowerCase().includes("consultation") ||
+      options.messageBody.toLowerCase().includes("visit");
 
     // Check if user responded "yes" to a booking-related question in previous conversation (fallback version)
     const messageBodyLower = options.messageBody.toLowerCase();
@@ -823,31 +1189,87 @@ async function generateFallbackResponse(
     let shouldTriggerBookingProcess = false;
 
     if (isYesResponse && conversationContext) {
-      // Get the last 2 messages to check if the previous one was asking about booking
+      // Get ONLY the most recent clinic message (not the entire conversation)
       const messages = conversationContext.split("\n\n");
-      const lastTwoMessages = messages.slice(-2);
+      const lastClinicMessage = messages[messages.length - 1] || "";
 
-      if (lastTwoMessages.length >= 2) {
-        // Get the second-to-last message (the clinic's previous message before user's "yes")
-        const previousMessage = lastTwoMessages[lastTwoMessages.length - 2] || "";
-        const previousMessageLower = previousMessage.toLowerCase();
-        const wasBookingQuestion =
-          previousMessageLower.includes("ready to book") ||
-          previousMessageLower.includes("want to schedule") ||
-          previousMessageLower.includes("let me know if you want to book") ||
-          previousMessageLower.includes("would you like to book") ||
-          previousMessageLower.includes("ready for an appointment") ||
-          previousMessageLower.includes("want to set up") ||
-          previousMessageLower.includes("i can help you book") ||
-          previousMessageLower.includes("ready to book an appointment") ||
-          previousMessageLower.includes("book an appointment") ||
-          previousMessageLower.includes("interested in booking") ||
-          previousMessageLower.includes("if you're interested in booking");
+      // Extract just the clinic's message (remove "Clinic:" prefix)
+      const lastClinicMessageText = lastClinicMessage.replace(/^Clinic:\s*/, "").toLowerCase();
 
-        if (wasBookingQuestion) {
-          shouldTriggerBookingProcess = true;
-          logInfo("📅 Yes response to booking question detected in fallback, triggering booking process");
-        }
+      logInfo("🔍 Analyzing last clinic message for yes response (fallback):", lastClinicMessageText);
+
+      // Function to analyze message intent using patterns and context (fallback version)
+      function analyzeMessageIntentFallback(message: string): {
+        isDirectBooking: boolean;
+        isInformationOffer: boolean;
+        confidence: number;
+      } {
+        const msg = message.toLowerCase().trim();
+
+        // Patterns for DIRECT booking questions (high confidence)
+        const directBookingPatterns = [
+          /\b(ready|want|would you like)\s+to\s+(book|schedule)\s*\?/,
+          /\bshall\s+(we|i)\s+(book|schedule)/,
+          /\bwould you like to book\s+a?\s+\w+/,
+          /\bready\s+to\s+dive\s+in.*would you like to book/,
+          /\bshould\s+i\s+book\s+you/,
+        ];
+
+        // Patterns for INFORMATION offers (should not trigger booking)
+        const informationOfferPatterns = [
+          /\blet\s+me\s+know\s+if\s+you\s+want\s+to\s+book/,
+          /\bif\s+you[''']?re\s+interested\s+in\s+booking/,
+          /\bjust\s+let\s+me\s+know/,
+          /\bwant\s+more\s+details/,
+        ];
+
+        // Check direct booking patterns
+        const hasDirectBookingPattern = directBookingPatterns.some(pattern => pattern.test(msg));
+
+        // Check information offer patterns
+        const hasInformationPattern = informationOfferPatterns.some(pattern => pattern.test(msg));
+
+        // Calculate confidence based on message structure
+        let confidence = 0.5; // base confidence
+
+        // Increase confidence for question marks at end
+        if (msg.endsWith("?")) confidence += 0.2;
+
+        // Increase confidence for imperative verbs
+        if (/\b(book|schedule|reserve)\b/.test(msg)) confidence += 0.1;
+
+        // Decrease confidence for conditional language
+        if (/\b(if|maybe|perhaps|might)\b/.test(msg)) confidence -= 0.2;
+
+        return {
+          isDirectBooking: hasDirectBookingPattern && !hasInformationPattern,
+          isInformationOffer: hasInformationPattern,
+          confidence: Math.max(0, Math.min(1, confidence)),
+        };
+      }
+
+      const intentFallback = analyzeMessageIntentFallback(lastClinicMessageText);
+      const wasDirectBookingQuestion = intentFallback.isDirectBooking;
+      const wasInformationOffer = intentFallback.isInformationOffer;
+
+      // Only trigger booking for DIRECT questions, not information offers
+      const shouldTriggerBooking = wasDirectBookingQuestion && !wasInformationOffer;
+
+      logInfo("🔍 Booking analysis result (fallback):", {
+        wasDirectBookingQuestion,
+        wasInformationOffer,
+        shouldTriggerBooking,
+        confidence: intentFallback.confidence,
+        lastMessage: lastClinicMessageText.substring(0, 100),
+      });
+
+      if (shouldTriggerBooking) {
+        shouldTriggerBookingProcess = true;
+        logInfo("📅 Yes response to DIRECT booking question detected in fallback, triggering booking process");
+      } else if (wasInformationOffer) {
+        logInfo("📋 Yes response to information offer detected in fallback, will provide information instead of booking");
+      } else {
+        logInfo("ℹ️ Yes response but no booking context detected in fallback, will generate normal AI response");
       }
     }
 
@@ -872,6 +1294,7 @@ async function generateFallbackResponse(
           },
           communicationType: isEmailResponse ? "email" : "sms",
           senderPhone: leadData.phone,
+          forceBooking: true, // Force booking creation for "yes" responses
         };
 
         logInfo("🎯 Triggering booking detection service for yes response in fallback...");
@@ -886,6 +1309,11 @@ async function generateFallbackResponse(
 
         if (bookingResult.meetingScheduleCreated) {
           logInfo(`✅ Booking service created meeting schedule for yes response in fallback: ${bookingResult.meetingScheduleId}`);
+
+          // Return immediate booking response instead of generating AI response
+          const bookingResponseText = `Awesome! Let's lock in your appointment: ${bookingLink}`;
+          logInfo("📅 Returning direct booking response for yes to booking question in fallback");
+          return { success: true, response: bookingResponseText };
         } else if (bookingResult.error) {
           logError(`❌ Booking service error for yes response in fallback: ${bookingResult.error}`);
         }
@@ -933,13 +1361,20 @@ ${
     ? `🚨 CRITICAL CONTEXT INSTRUCTION: 
 The patient's current message "${options.messageBody}" is a REPLY to the conversation above. 
 
-🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
-If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Awesome! Let's lock in your appointment: ${bookingLink}" - Nothing else!
+🚨 CRITICAL - PRICING RESPONSES:
+When asked about pricing, provide the EXACT price from the clinic's pricing document/knowledge base. Use ONLY the prices specified in the clinic's documentation - do NOT convert currencies or use general market pricing. State the price exactly as documented: "[Service] is $[amount]/[unit]". 
 
-WHEN PATIENT SAYS YES/AFFIRMATIVE:
-If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
+CONTEXT-AWARE PRICING:
+- If user says "share me its pricing" or "what's the cost", look at the PREVIOUS CONVERSATION to understand what service they're referring to
+- "its pricing" = the specific service/treatment mentioned in the last clinic response
+- DO NOT list all services - only provide pricing for the service being discussed in context
+- Example: If previous message mentioned "Botox", only give Botox pricing
 
-CRITICAL: Check what the LAST Clinic message was asking:
+🚨 INTELLIGENT RESPONSE GUIDELINES:
+Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
+
+NATURAL CONVERSATION FLOW:
+When patients show interest or ask questions, understand their intent from the conversation context and respond appropriately:
 
 IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
 - Patient's "yes" = booking request
@@ -961,12 +1396,14 @@ CRITICAL RESPONSE RULES:
 - NEVER ask "What questions do you have?" or similar open-ended questions
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
+
+🔍 DEBUG MODE FOR PRICING: Include the exact text you found in the pricing document. Format your response as: "Botox is $X per unit (source: [exact quote from pricing document])". This helps verify document access.
 - When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
 - When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
-DO NOT treat this as a new conversation - this is a REPLY continuing the conversation above.`
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
     : ""
 }
 
@@ -1018,40 +1455,72 @@ ${
     ? `🚨 CRITICAL CONTEXT INSTRUCTION: 
 The patient's current message "${options.messageBody}" is a REPLY to the conversation above. 
 
-🚨 ULTRA CRITICAL - YES RESPONSES TO BOOKING QUESTIONS:
-If patient says "yes", "y", "sure", "okay", "ok" in response to a message that asked about booking, provide ONLY: "Awesome! Let's lock in your appointment: ${bookingLink}" - Nothing else!
+🚨 CRITICAL - PRICING RESPONSES:
+When asked about pricing, provide the EXACT price from the clinic's pricing document/knowledge base. Use ONLY the prices specified in the clinic's documentation - do NOT convert currencies or use general market pricing. State the price exactly as documented: "[Service] is $[amount]/[unit]". 
 
-WHEN PATIENT SAYS YES/AFFIRMATIVE:
-If the patient said "Yes", "Tell me more", "How much?", "OK", "Sure", "I'm interested", etc., they are expressing interest in what the clinic just offered.
+CONTEXT-AWARE PRICING:
+- If user says "share me its pricing" or "what's the cost", look at the PREVIOUS CONVERSATION to understand what service they're referring to
+- "its pricing" = the specific service/treatment mentioned in the last clinic response
+- DO NOT list all services - only provide pricing for the service being discussed in context
+- Example: If previous message mentioned "Botox", only give Botox pricing
 
-CRITICAL: Check what the LAST Clinic message was asking:
+🚨 INTELLIGENT RESPONSE GUIDELINES:
+Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
 
-IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?", "let me know if you want to book", "interested in booking", "if you're interested in booking"):
+🚨 CRITICAL "YES" RESPONSE LOGIC FOR FALLBACK:
+When a patient responds with "yes", you MUST analyze the PREVIOUS CLINIC MESSAGE to understand what they're agreeing to:
+
+1. DIRECT BOOKING QUESTIONS ("Ready to book?", "Want to schedule?", "Should I book you?"):
+   → Patient "Yes" = Provide ONLY booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
+
+2. INFORMATION OFFERS ("Let me know if you want to book!" AFTER already sharing service/treatment info):
+   → Patient "Yes" = They want more detailed information, pricing recap, or service details  
+   → Provide comprehensive information based on what was discussed
+
+3. TREATMENT INFO QUESTIONS ("Want to learn about [Treatment]?", "Interested in [Service]?"):
+   → Patient "Yes" = Provide detailed treatment information + booking option
+
+4. PRICING QUESTIONS ("Want the pricing breakdown?", "Should I share the costs?"):
+   → Patient "Yes" = Provide specific pricing information for the discussed service
+
+NATURAL CONVERSATION FLOW:
+When patients show interest or ask questions, understand their intent from the conversation context and respond appropriately:
+
+IF LAST CLINIC MESSAGE ASKED ABOUT DIRECT BOOKING ("ready to book?", "want to schedule?"):
 - Patient's "yes" = booking request
 - Provide ONLY the booking link: "Book here: ${bookingLink} (5-6 words maximum)"
 - NO additional information, NO more questions, NO treatment details, NO explanations
 
+IF LAST CLINIC MESSAGE OFFERED INFORMATION ("let me know if you want to book!" after sharing service info):
+- Patient's "yes" = wants the offered information (pricing recap, service details)
+- Provide the complete requested information from context
+- Include pricing details and service information as requested
+- Example: "Microneedling $180/session. Let me know if you want to book!" → "Yes" → [Full comprehensive service and pricing breakdown]
+
 IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
 - Patient's "yes" = wants treatment information
-- Provide specific treatment details, benefits, process
+- Provide specific treatment details, benefits, process  
 - End with clear next steps (booking opportunity)
 
 EXAMPLE SCENARIOS:
 - Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment:: ${bookingLink}"
 - Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
+- Last message: "Let me know if you want to book!" (after sharing service info) → Patient: "Yes" → Response: [Provide the requested information/pricing recap]
 
 CRITICAL RESPONSE RULES:
 - NEVER end with questions like "Would you like to know more about booking?" or "Ready to book an appointment?"
 - NEVER ask "What questions do you have?" or similar open-ended questions
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
+
+🔍 DEBUG MODE FOR PRICING: Include the exact text you found in the pricing document. Format your response as: "Botox is $X per unit (source: [exact quote from pricing document])". This helps verify document access.
 - When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
 - When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}" 
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
-DO NOT treat this as a new conversation - this is a REPLY continuing the conversation above.`
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
     : ""
 }
 
