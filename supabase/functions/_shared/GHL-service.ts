@@ -110,7 +110,18 @@ export async function importLeads(clinic_id: string) {
     { onConflict: ["clinic_id", "integration_id"] },
   );
   console.error("error", error);
-  const newPatients = contacts.contacts.filter((p: any) => new Date(p.dateAdded) > new Date(integration_connection.updated_at));
+  const newPatients = contacts.contacts.filter((p: any) => {
+    const updatedAt = integration_connection.updated_at ? new Date(integration_connection.updated_at) : null;
+
+    if (updatedAt) {
+      return new Date(p.created_at) > updatedAt;
+    } else {
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - 24);
+      return new Date(p.created_at) >= cutoff;
+    }
+  });
+
   console.error("newPatients", newPatients);
   if (contacts.contacts && Array.isArray(newPatients)) {
     const chunks = chunkArray(newPatients, 10);

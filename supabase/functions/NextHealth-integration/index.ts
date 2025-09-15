@@ -32,7 +32,17 @@ serve(async req => {
     await upsertIntegrationConnection(clinic_id, token, subdomain, location_id, api_key);
 
     const patients = await fetchPatients(token, subdomain, location_id);
-    const newPatients = patients.filter((p: any) => new Date(p.created_at) > new Date(integration_connection.updated_at));
+    const newPatients = patients.filter((p: any) => {
+      const updatedAt = integration_connection.updated_at ? new Date(integration_connection.updated_at) : null;
+
+      if (updatedAt) {
+        return new Date(p.created_at) > updatedAt;
+      } else {
+        const cutoff = new Date();
+        cutoff.setMonth(cutoff.getMonth() - 24);
+        return new Date(p.created_at) >= cutoff;
+      }
+    });
     console.log(`Fetched ${newPatients} patients`);
     // const inserted = await insertPatientsAsLeads(clinic_id, patients);
     const chunks = chunkArray(newPatients, 10);
