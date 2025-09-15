@@ -9,7 +9,15 @@ import { StatCard } from "@/components/Leads/StatCard";
 import { useDropdown } from "@/hooks/useDropdown";
 import { usePagination } from "@/hooks/usePagination"; // Adjust path as needed
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { fetchLeadsForClinic, formatStatus, getCurrentUserClinic, getStatusColor, LEAD_STATUSES } from "@/utils/supabase/leads-helper";
+import {
+  fetchLeadsForClinic,
+  formatStatus,
+  getCurrentUserClinic,
+  getStatusColor,
+  getStatusStats,
+  LEAD_STATUSES,
+  type StatusStats,
+} from "@/utils/supabase/leads-helper";
 import { Modal, Pagination } from "antd";
 import { Edit, MoreVertical, SearchIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -32,7 +40,9 @@ interface Lead {
 
 export default function LeadsPage() {
   const [leadsData, setLeadsData] = useState<Lead[]>([]);
+  const [statusStats, setStatusStats] = useState<StatusStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLeadStatus, setSelectedLeadStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,12 +64,14 @@ export default function LeadsPage() {
     const initializeClinic = async () => {
       try {
         setLoading(true);
+        setStatsLoading(true);
         const currentClinicId = await getCurrentUserClinic();
         setClinicId(currentClinicId);
       } catch (err) {
         console.error("Error getting clinic:", err);
         setError(err instanceof Error ? err.message : "Failed to get clinic");
-        setLoading(false); // Stop loading on clinic error
+        setLoading(false);
+        setStatsLoading(false);
       }
     };
 
@@ -69,8 +81,23 @@ export default function LeadsPage() {
   useEffect(() => {
     if (clinicId) {
       loadData();
+      loadStatusStats();
     }
   }, [clinicId, currentPage, pageSize, selectedLeadStatus, searchQuery]);
+
+  const loadStatusStats = async () => {
+    if (!clinicId) return;
+    try {
+      setStatsLoading(true);
+      const stats = await getStatusStats(clinicId);
+      setStatusStats(stats);
+    } catch (err) {
+      console.error("Error loading status stats:", err);
+      setError(err instanceof Error ? err.message : "Failed to load status stats");
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const handleClose = (newLead?: any) => {
     setShowLeadForm(false);
@@ -90,6 +117,7 @@ export default function LeadsPage() {
         updated_at: newLead.updated_at,
       };
       setLeadsData(prev => [formattedLead, ...prev]);
+      loadStatusStats();
     }
   };
 
@@ -103,7 +131,6 @@ export default function LeadsPage() {
       setLoading(true);
       setError(null);
 
-      // Use the updated function with pagination
       const response = await fetchLeadsForClinic(
         clinicId,
         {
@@ -141,10 +168,12 @@ export default function LeadsPage() {
 
   const handleUpdateLead = (updatedLead: Lead) => {
     setLeadsData(prev => prev.map(lead => (lead.id === updatedLead.id ? updatedLead : lead)));
+    loadStatusStats();
   };
 
   const handleConfirmDelete = (leadId: string) => {
     setLeadsData(prev => prev.filter(lead => lead.id !== leadId));
+    loadStatusStats();
   };
 
   const filteredLeads = leadsData.filter(lead => {
@@ -159,7 +188,6 @@ export default function LeadsPage() {
     }
     return true;
   });
-  // const filteredLeads = leadsData;
 
   const ErrorBlock = () => (
     <div className="flex h-64 flex-col items-center justify-center">
@@ -189,7 +217,7 @@ export default function LeadsPage() {
     </div>
   );
 
-  if (loading) {
+  if (loading || statsLoading) {
     return (
       <DashboardLayout
         header={
@@ -227,7 +255,7 @@ export default function LeadsPage() {
         <div className="my-6 px-4 w-full">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full">
             {leadsStatsConfig.map(stat => (
-              <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(leadsData)} />
+              <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(statusStats)} />
             ))}
           </div>
         </div>
@@ -381,7 +409,6 @@ export default function LeadsPage() {
           </div>
         )}
 
-        {/* Ant Design Pagination */}
         {totalItems > 0 && (
           <div className="flex justify-center py-4">
             <div className="bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-200">

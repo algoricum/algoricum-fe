@@ -1,6 +1,11 @@
 // Path @utils/supabase/leads-helper.ts
 import { createClient } from "./config/client";
 
+export interface StatusStats {
+  status: string;
+  count: number;
+}
+
 export interface PaginatedLeadsResponse {
   leads: Lead[];
   total: number;
@@ -506,5 +511,34 @@ export function getUrgencyColor(urgency: string): string {
       return "text-green-600";
     default:
       return "text-gray-600";
+  }
+}
+
+export async function getStatusStats(clinicId: string): Promise<StatusStats[]> {
+  try {
+    const { data: leads, error } = await supabase.from("lead").select("status").eq("clinic_id", clinicId);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!leads || leads.length === 0) {
+      return [];
+    }
+
+    // Group and count statuses client-side (efficient for per-clinic lead volumes)
+    const statsMap: { [key: string]: number } = {};
+    leads.forEach((lead: any) => {
+      const status = lead.status;
+      statsMap[status] = (statsMap[status] || 0) + 1;
+    });
+
+    return Object.entries(statsMap).map(([status, count]) => ({
+      status,
+      count,
+    }));
+  } catch (error) {
+    console.error("Error fetching status stats:", error);
+    throw error;
   }
 }
