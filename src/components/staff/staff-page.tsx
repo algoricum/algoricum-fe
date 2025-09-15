@@ -10,13 +10,15 @@ import type { JSX } from "react/jsx-runtime";
 import {
   deleteStaffMember,
   getClinicStaff,
+  getStatusStats,
   updateStaffMember,
+  type StaffStatus,
   type TransformedStaffMember,
 } from "../../utils/supabase/clinic-staff-helper";
 // Component imports
 
 import { StaffFilters } from "@/components/staff/staff-filters";
-import { StaffStats } from "@/components/staff/staff-stats";
+import { StatCard } from "@/components/staff/staff-stats";
 import { StaffTable } from "@/components/staff/staff-table";
 import { createStaffUser } from "../../utils/supabase/config/staff";
 import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
@@ -25,6 +27,9 @@ import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
 import { AddStaffModal } from "@/components/staff/add-staff-modal";
 import { DeleteConfirmModal } from "@/components/staff/delete-confirm-modal";
 import { EditStaffModal } from "@/components/staff/edit-staff-modal";
+import { staffStatsConfig } from "@/components/staff/statCardUtils";
+// import {Pagination} from "antd"
+// import { usePagination } from "@/hooks/usePagination";
 
 interface Staff {
   id: string;
@@ -59,6 +64,8 @@ export default function StaffPage(): JSX.Element {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [staffData, setStaffData] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [statusStats, setStatusStats] = useState<StaffStatus[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [showAddStaffModal, setShowAddStaffModal] = useState<boolean>(false);
   const [showEditStaffModal, setShowEditStaffModal] = useState<boolean>(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
@@ -80,6 +87,8 @@ export default function StaffPage(): JSX.Element {
   // Filters
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("all");
+  // Initialize pagination with default page size of 10
+  // const { currentPage, pageSize, paginationConfig, setTotal, resetPagination } = usePagination(10);
 
   // Utility functions
   const mapDatabaseStatusToFrontend = (dbStatus: string): string => {
@@ -141,6 +150,12 @@ export default function StaffPage(): JSX.Element {
     loadStaffData();
   }, []);
 
+  useEffect(() => {
+    if (clinicId) {
+      loadStatusStats();
+    }
+  }, [clinicId, staffData]);
+
   // Computed values
   const filteredStaffData = useMemo(() => {
     return staffData.filter(staff => {
@@ -168,6 +183,19 @@ export default function StaffPage(): JSX.Element {
       label: role.charAt(0).toUpperCase() + role.slice(1),
     }));
   }, [staffData]);
+
+  const loadStatusStats = async () => {
+    if (!clinicId) return;
+    try {
+      setStatsLoading(true);
+      const stats = await getStatusStats(clinicId);
+      setStatusStats(stats);
+    } catch (err) {
+      console.error("Error loading status stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   // Event handlers
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value);
@@ -236,7 +264,7 @@ export default function StaffPage(): JSX.Element {
         email: newStaff.email,
         name: newStaff.name,
         clinicId: clinic_id,
-        roleId
+        roleId,
       });
       if (response.error) {
         ErrorToast(response.error.message || "Failed to create staff member");
@@ -325,6 +353,7 @@ export default function StaffPage(): JSX.Element {
       SuccessToast(`Staff member "${selectedStaffForDelete.name}" has been removed successfully.`);
       setShowDeleteConfirmModal(false);
       setSelectedStaffForDelete(null);
+      await loadStatusStats();
       await refreshStaffData();
     } catch (error: any) {
       console.error("Error deleting staff:", error);
@@ -334,7 +363,7 @@ export default function StaffPage(): JSX.Element {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || statsLoading) {
     return (
       <DashboardLayout
         header={<Header title="Staff Management" description="Manage your healthcare team and staff information." showHamburgerMenu />}
@@ -352,11 +381,11 @@ export default function StaffPage(): JSX.Element {
     >
       <div>
         {/* Stats */}
-        <StaffStats
-          totalStaff={staffData.length}
-          filteredStaff={filteredStaffData.length}
-          hasFilters={searchTerm !== "" || selectedRole !== "all" || selectedStatus !== "all"}
-        />
+        <div className="px-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {staffStatsConfig.map(stat => (
+            <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(statusStats)} />
+          ))}
+        </div>
 
         {/* Table + Filters */}
         <div className="rounded-lg bg-white p-4 shadow sm:p-6">

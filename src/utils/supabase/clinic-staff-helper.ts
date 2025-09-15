@@ -3,6 +3,10 @@ import { createClient } from "@/utils/supabase/config/client";
 
 const supabase = createClient();
 
+export interface StaffStatus {
+  status: string;
+  count: number;
+}
 export interface UpdateStaffData {
   name?: string;
   is_active?: boolean;
@@ -291,5 +295,60 @@ export async function deleteStaffMember(userId: string, clinicId: string): Promi
       data: undefined,
       error: error.message || "An unexpected error occurred while deleting staff member",
     };
+  }
+}
+
+export async function getStatusStats(clinicId: string): Promise<StaffStatus[]> {
+  try {
+    if (!clinicId) {
+      throw new Error("Clinic ID is required");
+    }
+
+    const { data: staffMembers, error } = await supabase
+      .from("user_clinic")
+      .select(
+        `
+        id,
+        created_at,
+        is_active,
+        user_id,
+        role_id,
+        user!inner (
+          id,
+          name,
+          email
+        ),
+        role!inner (
+          id,
+          type
+        )
+      `,
+      )
+      .eq("clinic_id", clinicId)
+      .neq("role.type", "owner")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching staff members:", error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    if (!staffMembers || staffMembers.length === 0) {
+      return [];
+    }
+    // Group and count statuses client-side (efficient for per-clinic lead volumes)
+    const statsMap: { [key: string]: number } = {};
+    staffMembers.forEach((staff_member: any) => {
+      const status = staff_member.is_active ? "active" : "inactive";
+      statsMap[status] = (statsMap[status] || 0) + 1;
+    });
+
+    return Object.entries(statsMap).map(([status, count]) => ({
+      status,
+      count,
+    }));
+  } catch (error) {
+    console.error("Error fetching status stats:", error);
+    throw error;
   }
 }
