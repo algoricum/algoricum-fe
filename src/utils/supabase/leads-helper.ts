@@ -1,5 +1,19 @@
 // Path @utils/supabase/leads-helper.ts
 import { createClient } from "./config/client";
+
+export interface PaginatedLeadsResponse {
+  leads: Lead[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface LeadsPaginationParams {
+  page?: number;
+  pageSize?: number;
+  offset?: number;
+}
 // Updated interfaces to match our new comprehensive status system
 export interface Lead {
   id: string;
@@ -111,9 +125,39 @@ function generateAvatar(name: string): string {
 }
 
 // OPTIMIZED: Fetch all leads with their latest messages in fewer queries
-export async function fetchLeadsForClinic(clinicId: string, filters?: LeadsFilters): Promise<Lead[]> {
+export async function fetchLeadsForClinic(
+  clinicId: string,
+  filters?: LeadsFilters,
+  pagination?: LeadsPaginationParams,
+): Promise<PaginatedLeadsResponse> {
   try {
-    // Single query to get leads with their threads and latest messages
+    const page = pagination?.page || 1;
+    const pageSize = pagination?.pageSize || 10;
+    const offset = pagination?.offset || 0;
+
+    // First, get the total count
+    let countQuery = supabase.from("lead").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId);
+
+    // Apply the same filters to count query
+    if (filters?.status && filters.status !== "all") {
+      countQuery = countQuery.eq("status", filters.status);
+    }
+    if (filters?.interest_level && filters.interest_level !== "all") {
+      countQuery = countQuery.eq("interest_level", filters.interest_level);
+    }
+    if (filters?.urgency && filters.urgency !== "all") {
+      countQuery = countQuery.eq("urgency", filters.urgency);
+    }
+
+    const { count, error: countError } = await countQuery;
+
+    if (countError) {
+      throw countError;
+    }
+
+    const total = count || 0;
+
+    // Then get the paginated data
     let query = supabase
       .from("lead")
       .select(
@@ -145,9 +189,10 @@ export async function fetchLeadsForClinic(clinicId: string, filters?: LeadsFilte
       `,
       )
       .eq("clinic_id", clinicId)
-      .order("updated_at", { ascending: false });
+      .order("updated_at", { ascending: false })
+      .range(offset, offset + pageSize - 1); // Supabase pagination
 
-    // Apply server-side filters
+    // Apply server-side filters to data query
     if (filters?.status && filters.status !== "all") {
       query = query.eq("status", filters.status);
     }
@@ -165,14 +210,19 @@ export async function fetchLeadsForClinic(clinicId: string, filters?: LeadsFilte
     }
 
     if (!leads) {
-      return [];
+      return {
+        leads: [],
+        total: 0,
+        page,
+        pageSize,
+        totalPages: 0,
+      };
     }
 
-    // Transform and enrich the leads data
+    // Transform and enrich the leads data (same as before)
     const enrichedLeads: Lead[] = leads.map((lead: any) => {
       const name = `${lead.first_name || ""} ${lead.last_name || ""}`.trim() || "Anonymous";
 
-      // Get the latest thread and message
       const latestThread = lead.threads?.[0];
       let lastMessage = "No messages yet";
       let lastActivity = new Date(lead.updated_at);
@@ -192,11 +242,11 @@ export async function fetchLeadsForClinic(clinicId: string, filters?: LeadsFilte
         lastMessage,
         lastActivity,
         thread_id,
-        messages: [], // Will be loaded separately when needed
+        messages: [],
       };
     });
 
-    // Apply client-side filters
+    // Apply client-side filters (search and channel)
     let filteredLeads = enrichedLeads;
 
     if (filters?.channel && filters.channel !== "all") {
@@ -213,7 +263,13 @@ export async function fetchLeadsForClinic(clinicId: string, filters?: LeadsFilte
       );
     }
 
-    return filteredLeads;
+    return {
+      leads: filteredLeads,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    };
   } catch (error) {
     console.error("Error fetching leads:", error);
     throw error;

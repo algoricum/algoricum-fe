@@ -6,14 +6,14 @@ import { DeleteLeadModal } from "@/components/Leads/DeleteLeadModal";
 import { EditLeadModal } from "@/components/Leads/EditLeadModal";
 import LeadGenerationForm from "@/components/Leads/LeadGenerationForm";
 import { StatCard } from "@/components/Leads/StatCard";
+import { useDropdown } from "@/hooks/useDropdown";
+import { usePagination } from "@/hooks/usePagination"; // Adjust path as needed
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { fetchLeadsForClinic, formatStatus, getCurrentUserClinic, getStatusColor, LEAD_STATUSES } from "@/utils/supabase/leads-helper";
-import { Modal } from "antd";
+import { Modal, Pagination } from "antd";
 import { Edit, MoreVertical, SearchIcon, Trash2 } from "lucide-react";
-import type React from "react";
 import { useEffect, useState } from "react";
 import { leadsStatsConfig } from "./statsUtil";
-import { useDropdown } from "@/hooks/useDropdown";
 
 interface Lead {
   id: string;
@@ -48,10 +48,29 @@ export default function LeadsPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const { currentPage, pageSize, totalItems, offset, paginationConfig, setTotal } = usePagination(10);
 
   useEffect(() => {
-    loadData();
+    const initializeClinic = async () => {
+      try {
+        setLoading(true);
+        const currentClinicId = await getCurrentUserClinic();
+        setClinicId(currentClinicId);
+      } catch (err) {
+        console.error("Error getting clinic:", err);
+        setError(err instanceof Error ? err.message : "Failed to get clinic");
+        setLoading(false); // Stop loading on clinic error
+      }
+    };
+
+    initializeClinic();
   }, []);
+
+  useEffect(() => {
+    if (clinicId) {
+      loadData();
+    }
+  }, [clinicId, currentPage, pageSize, selectedLeadStatus, searchQuery]);
 
   const handleClose = (newLead?: any) => {
     setShowLeadForm(false);
@@ -75,13 +94,31 @@ export default function LeadsPage() {
   };
 
   const loadData = async () => {
+    if (!clinicId) {
+      console.error("No clinic ID available");
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const currentClinicId = await getCurrentUserClinic();
-      setClinicId(currentClinicId);
-      const leads = await fetchLeadsForClinic(currentClinicId);
-      setLeadsData(leads);
+
+      // Use the updated function with pagination
+      const response = await fetchLeadsForClinic(
+        clinicId,
+        {
+          status: selectedLeadStatus === "all" ? undefined : selectedLeadStatus,
+          search: searchQuery || undefined,
+        },
+        {
+          page: currentPage,
+          pageSize: pageSize,
+          offset: offset,
+        },
+      );
+
+      setLeadsData(response.leads);
+      setTotal(response.total);
     } catch (err) {
       console.error("Error loading data:", err);
       setError(err instanceof Error ? err.message : "Failed to load leads");
@@ -122,6 +159,7 @@ export default function LeadsPage() {
     }
     return true;
   });
+  // const filteredLeads = leadsData;
 
   const ErrorBlock = () => (
     <div className="flex h-64 flex-col items-center justify-center">
@@ -340,6 +378,13 @@ export default function LeadsPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Ant Design Pagination */}
+        {totalItems > 0 && (
+          <div className="mt-4 mx-4 flex justify-center">
+            <Pagination {...paginationConfig} />
           </div>
         )}
 
