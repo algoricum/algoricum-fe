@@ -383,11 +383,12 @@ export default function LeadsPage() {
 
         {/* Ant Design Pagination */}
         {totalItems > 0 && (
-          <div className="mt-4 mx-4 flex justify-center">
-            <Pagination {...paginationConfig} />
+          <div className="flex justify-center py-4">
+            <div className="bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-200">
+              <Pagination {...paginationConfig} />
+            </div>
           </div>
         )}
-
         <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} width={800}>
           {clinicId && <LeadGenerationForm clinicId={clinicId} onSuccess={handleClose} />}
         </Modal>

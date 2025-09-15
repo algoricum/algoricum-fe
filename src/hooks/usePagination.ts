@@ -50,7 +50,7 @@ export const usePagination = (initialPageSize: number = 10): UsePaginationReturn
     pageSize: pageSize,
     total: totalItems,
     showSizeChanger: true,
-    showQuickJumper: true,
+    showQuickJumper: false,
     showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
     pageSizeOptions: ["10", "20", "50", "100"],
     onChange: handleChange,
