@@ -6,21 +6,23 @@ import { StatCard } from "@/components/appointments/stat-card";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { useDropdown } from "@/hooks/useDropdown";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { appointmentHelper, type MeetingSchedule } from "@/utils/appointment-helper";
+import { appointmentHelper, type AppointmentStatus, type MeetingSchedule } from "@/utils/appointment-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
 import { Form } from "antd";
 import dayjs from "dayjs";
-import { Calendar, CheckCircle, Clock, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
-import type React from "react";
+import { Calendar, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import "react-phone-number-input/style.css";
-import { useDropdown } from "@/hooks/useDropdown";
+import { appointmentStatsConfig } from "./statsUtil";
 
 export default function AppointmentsPage() {
   const [appointmentsData, setAppointmentsData] = useState<MeetingSchedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [statusStats, setStatusStats] = useState<AppointmentStatus[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddAppointmentModal, setShowAddAppointmentModal] = useState(false);
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
@@ -47,6 +49,7 @@ export default function AppointmentsPage() {
     const loadAppointments = async () => {
       if (!clinicId) return;
       setIsLoading(true);
+      setStatsLoading(true);
       try {
         const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
         setAppointmentsData(meetings);
@@ -55,6 +58,7 @@ export default function AppointmentsPage() {
         ErrorToast("Failed to load appointments. Please try again.");
       } finally {
         setIsLoading(false);
+        setStatsLoading(false);
       }
     };
     loadAppointments();
@@ -78,6 +82,12 @@ export default function AppointmentsPage() {
     fetchClinicId();
   }, []);
 
+  useEffect(() => {
+    if (clinicId) {
+      loadStatusStats();
+    }
+  }, [clinicId]);
+
   // Clear copied link indicator after 2 seconds
   useEffect(() => {
     if (copiedLink) {
@@ -87,6 +97,19 @@ export default function AppointmentsPage() {
       return () => clearTimeout(timer);
     }
   }, [copiedLink]);
+
+  const loadStatusStats = async () => {
+    if (!clinicId) return;
+    try {
+      setStatsLoading(true);
+      const stats = await appointmentHelper.getStatusStats(clinicId);
+      setStatusStats(stats);
+    } catch (err) {
+      console.error("Error loading status stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const handleAddAppointment = async () => {
     if (!clinicId) {
@@ -251,7 +274,7 @@ export default function AppointmentsPage() {
   };
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || statsLoading) {
     return (
       <DashboardLayout header={<Header title="Appointments" description="Manage patient appointments and scheduling." showHamburgerMenu />}>
         <div className="flex min-h-[400px] items-center justify-center">
@@ -266,24 +289,9 @@ export default function AppointmentsPage() {
       <div className="space-y-6 px-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <StatCard
-            icon={<Calendar className="h-5 w-5 text-blue-600 md:h-6 md:w-6" />}
-            iconBg="bg-blue-100"
-            title="Total"
-            value={appointmentsData.length}
-          />
-          <StatCard
-            icon={<CheckCircle className="h-5 w-5 text-green-600 md:h-6 md:w-6" />}
-            iconBg="bg-green-100"
-            title="Confirmed"
-            value={appointmentsData.filter(apt => apt.status === "confirmed").length}
-          />
-          <StatCard
-            icon={<Clock className="h-5 w-5 text-yellow-600 md:h-6 md:w-6" />}
-            iconBg="bg-yellow-100"
-            title="Pending"
-            value={appointmentsData.filter(apt => apt.status === "pending").length}
-          />
+          {appointmentStatsConfig.map(stat => (
+            <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(statusStats)} />
+          ))}
         </div>
 
         {/* Search and Filter Controls */}
