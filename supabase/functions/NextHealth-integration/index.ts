@@ -25,7 +25,7 @@ serve(async req => {
     const { data: integration } = await supabase.from("integrations").select("id").eq("name", "NextHealth").single();
     const { data: integration_connection } = await supabase
       .from("integration_connections")
-      .select("updated_at")
+      .select("*")
       .eq("integration_id", integration.id)
       .eq("clinic_id", clinic_id)
       .single();
@@ -33,7 +33,7 @@ serve(async req => {
 
     const patients = await fetchPatients(token, subdomain, location_id);
     const newPatients = patients.filter((p: any) => {
-      const updatedAt = integration_connection.updated_at ? new Date(integration_connection.updated_at) : null;
+      const updatedAt = integration_connection?.updated_at ? new Date(integration_connection.updated_at) : null;
 
       if (updatedAt) {
         return new Date(p.created_at) > updatedAt;
@@ -43,6 +43,7 @@ serve(async req => {
         return new Date(p.created_at) >= cutoff;
       }
     });
+
     console.log(`Fetched ${newPatients} patients`);
     // const inserted = await insertPatientsAsLeads(clinic_id, patients);
     const chunks = chunkArray(newPatients, 10);

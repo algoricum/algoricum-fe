@@ -111,7 +111,7 @@ export async function importLeads(clinic_id: string) {
   );
   console.error("error", error);
   const newPatients = contacts.contacts.filter((p: any) => {
-    const updatedAt = integration_connection.updated_at ? new Date(integration_connection.updated_at) : null;
+    const updatedAt = integration_connection?.updated_at ? new Date(integration_connection.updated_at) : null;
 
     if (updatedAt) {
       return new Date(p.created_at) > updatedAt;
