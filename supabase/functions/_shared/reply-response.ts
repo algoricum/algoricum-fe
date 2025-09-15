@@ -133,7 +133,7 @@ export async function generateAIResponse(
     logInfo("📱 Extracted phone number:", phoneNumber);
 
     // Check if user is asking about booking/scheduling
-    const messageBodyLower = options.messageBody.toLowerCase();
+    const messageBodyLower = options.messageBody.toLowerCase().trim();
     const isBookingInquiry =
       messageBodyLower.includes("book") ||
       messageBodyLower.includes("schedule") ||
@@ -141,6 +141,35 @@ export async function generateAIResponse(
       messageBodyLower.includes("meeting") ||
       messageBodyLower.includes("consultation") ||
       messageBodyLower.includes("visit");
+
+    // Enhanced short message detection with context awareness
+    const isShortMessage = options.messageBody.trim().length <= 15;
+    const isShortPricingQuery =
+      isShortMessage &&
+      (messageBodyLower === "price?" ||
+        messageBodyLower === "pricing?" ||
+        messageBodyLower === "cost?" ||
+        messageBodyLower === "how much?" ||
+        messageBodyLower === "price" ||
+        messageBodyLower === "pricing" ||
+        messageBodyLower === "cost");
+
+    const isShortBookingQuery =
+      isShortMessage &&
+      (messageBodyLower === "book" ||
+        messageBodyLower === "schedule" ||
+        messageBodyLower === "appointment" ||
+        messageBodyLower === "book appointment" ||
+        messageBodyLower === "schedule appointment");
+
+    logInfo("🔍 Short message analysis:", {
+      messageBody: options.messageBody,
+      messageLength: options.messageBody.trim().length,
+      isShortMessage: isShortMessage,
+      isShortPricingQuery: isShortPricingQuery,
+      isShortBookingQuery: isShortBookingQuery,
+      hasConversationContext: !!conversationContext,
+    });
 
     logInfo("🔍 Booking inquiry detection:", {
       messageBody: options.messageBody,
@@ -566,6 +595,21 @@ CONTEXT-AWARE PRICING:
 - DO NOT list all services - only provide pricing for the service being discussed in context
 - Example: If previous message mentioned "Botox", only give Botox pricing
 
+🚨 SHORT MESSAGE HANDLING WITH CONTEXT (EMAIL):
+When user sends very short messages like "price?", "cost?", "book", analyze the conversation context:
+
+SHORT PRICING QUERIES ("price?", "pricing?", "cost?", "how much?"):
+- If previous clinic messages mentioned specific services → Provide pricing for THOSE services only
+- If no previous context → Ask what specific service they want pricing for
+- Always use conversation history to understand what they're asking about
+- Example: Previous mentioned "Botox and fillers" → User: "price?" → Response: "Botox pricing details + filler pricing"
+
+SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
+- If conversation already discussed specific treatments → Provide booking link with context
+- If no treatment context → Ask what they'd like to book for
+- Always reference what was previously discussed
+- Example: Previous discussed "Hydrafacial consultation" → User: "book" → Response: "Great! Let's book your Hydrafacial consultation: [link]"
+
 🚨 INTELLIGENT RESPONSE GUIDELINES:
 Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
 
@@ -681,11 +725,34 @@ CONTEXT-AWARE PRICING:
 - DO NOT list all services - only provide pricing for the service being discussed in context
 - Example: If previous message mentioned "Botox", only give Botox pricing
 
+🚨 SHORT MESSAGE HANDLING WITH CONTEXT (SMS):
+When user sends very short messages like "price?", "cost?", "book", analyze the conversation context:
+
+SHORT PRICING QUERIES ("price?", "pricing?", "cost?", "how much?"):
+- If previous clinic messages mentioned specific services → Provide pricing for THOSE services only
+- If no previous context → Ask what specific service they want pricing for
+- Always use conversation history to understand what they're asking about
+- Keep SMS response under 160 characters when possible
+- Example: Previous mentioned "Botox" → User: "price?" → Response: "Botox is $12/unit at our clinic"
+
+SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
+- If conversation already discussed specific treatments → Provide booking link with context
+- If no treatment context → Ask what they'd like to book
+- Always reference what was previously discussed
+- Example: Previous discussed "consultation" → User: "book" → Response: "Ready to book your consultation: [link]"
+
 🚨 INTELLIGENT RESPONSE GUIDELINES:
 Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
 
 🚨 CRITICAL "YES" RESPONSE LOGIC:
 When a patient responds with "yes", you MUST analyze the IMMEDIATELY PREVIOUS CLINIC MESSAGE to understand what they're agreeing to:
+
+🚨 MOST RECENT CONTEXT RULE:
+- IGNORE all previous conversation history except the LAST clinic message
+- Even if conversation mentioned service1, service2, service3 - ONLY focus on what the MOST RECENT clinic message was about
+- If last clinic message asked about Botox → "yes" means they want Botox information/booking
+- If last clinic message asked about Hydrafacial → "yes" means they want Hydrafacial information/booking
+- NEVER mix services or refer to earlier mentioned treatments
 
 1. DIRECT BOOKING QUESTIONS ("Ready to book?", "Want to schedule?", "Should I book you?"):
    → Patient "Yes" = Provide ONLY booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
@@ -693,15 +760,15 @@ When a patient responds with "yes", you MUST analyze the IMMEDIATELY PREVIOUS CL
 
 2. INFORMATION OFFERS ("Let me know if you want to book!" AFTER already sharing service/treatment info):
    → Patient "Yes" = They want more detailed information, pricing recap, or service details
-   → Provide comprehensive information based on what was discussed
+   → Provide comprehensive information based on what was discussed IN THE LAST MESSAGE ONLY
 
 3. TREATMENT INFO QUESTIONS ("Want to learn about [Treatment]?", "Interested in [Service]?"):
-   → Patient "Yes" = Provide detailed treatment information + booking option
+   → Patient "Yes" = Provide detailed treatment information + booking option FOR THAT SPECIFIC TREATMENT ONLY
 
 4. PRICING QUESTIONS ("Want the pricing breakdown?", "Should I share the costs?"):
-   → Patient "Yes" = Provide specific pricing information for the discussed service
+   → Patient "Yes" = Provide specific pricing information for the service mentioned in the LAST MESSAGE ONLY
 
-CRITICAL: ONLY look at the LAST clinic message, not the entire conversation history.
+CRITICAL: ONLY look at the LAST clinic message, not the entire conversation history. Focus on the MOST RECENT service/topic mentioned.
 
 CONTEXT ANALYSIS FOR "YES" RESPONSES:
 - Read the EXACT wording of the MOST RECENT clinic message only
@@ -1370,6 +1437,21 @@ CONTEXT-AWARE PRICING:
 - DO NOT list all services - only provide pricing for the service being discussed in context
 - Example: If previous message mentioned "Botox", only give Botox pricing
 
+🚨 SHORT MESSAGE HANDLING WITH CONTEXT (EMAIL FALLBACK):
+When user sends very short messages like "price?", "cost?", "book", analyze the conversation context:
+
+SHORT PRICING QUERIES ("price?", "pricing?", "cost?", "how much?"):
+- If previous clinic messages mentioned specific services → Provide pricing for THOSE services only
+- If no previous context → Ask what specific service they want pricing for
+- Always use conversation history to understand what they're asking about
+- Example: Previous mentioned "Botox and fillers" → User: "price?" → Response: "Botox pricing details + filler pricing"
+
+SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
+- If conversation already discussed specific treatments → Provide booking link with context
+- If no treatment context → Ask what they'd like to book for
+- Always reference what was previously discussed
+- Example: Previous discussed "Hydrafacial consultation" → User: "book" → Response: "Great! Let's book your Hydrafacial consultation: [link]"
+
 🚨 INTELLIGENT RESPONSE GUIDELINES:
 Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
 
@@ -1464,24 +1546,47 @@ CONTEXT-AWARE PRICING:
 - DO NOT list all services - only provide pricing for the service being discussed in context
 - Example: If previous message mentioned "Botox", only give Botox pricing
 
+🚨 SHORT MESSAGE HANDLING WITH CONTEXT (SMS FALLBACK):
+When user sends very short messages like "price?", "cost?", "book", analyze the conversation context:
+
+SHORT PRICING QUERIES ("price?", "pricing?", "cost?", "how much?"):
+- If previous clinic messages mentioned specific services → Provide pricing for THOSE services only
+- If no previous context → Ask what specific service they want pricing for
+- Always use conversation history to understand what they're asking about
+- Keep SMS response under 160 characters when possible
+- Example: Previous mentioned "Botox" → User: "price?" → Response: "Botox is $12/unit at our clinic"
+
+SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
+- If conversation already discussed specific treatments → Provide booking link with context
+- If no treatment context → Ask what they'd like to book
+- Always reference what was previously discussed
+- Example: Previous discussed "consultation" → User: "book" → Response: "Ready to book your consultation: [link]"
+
 🚨 INTELLIGENT RESPONSE GUIDELINES:
 Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
 
 🚨 CRITICAL "YES" RESPONSE LOGIC FOR FALLBACK:
 When a patient responds with "yes", you MUST analyze the PREVIOUS CLINIC MESSAGE to understand what they're agreeing to:
 
+🚨 MOST RECENT CONTEXT RULE (FALLBACK):
+- IGNORE all previous conversation history except the LAST clinic message
+- Even if conversation mentioned service1, service2, service3 - ONLY focus on what the MOST RECENT clinic message was about
+- If last clinic message asked about Botox → "yes" means they want Botox information/booking
+- If last clinic message asked about Hydrafacial → "yes" means they want Hydrafacial information/booking
+- NEVER mix services or refer to earlier mentioned treatments
+
 1. DIRECT BOOKING QUESTIONS ("Ready to book?", "Want to schedule?", "Should I book you?"):
    → Patient "Yes" = Provide ONLY booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
 
 2. INFORMATION OFFERS ("Let me know if you want to book!" AFTER already sharing service/treatment info):
    → Patient "Yes" = They want more detailed information, pricing recap, or service details  
-   → Provide comprehensive information based on what was discussed
+   → Provide comprehensive information based on what was discussed IN THE LAST MESSAGE ONLY
 
 3. TREATMENT INFO QUESTIONS ("Want to learn about [Treatment]?", "Interested in [Service]?"):
-   → Patient "Yes" = Provide detailed treatment information + booking option
+   → Patient "Yes" = Provide detailed treatment information + booking option FOR THAT SPECIFIC TREATMENT ONLY
 
 4. PRICING QUESTIONS ("Want the pricing breakdown?", "Should I share the costs?"):
-   → Patient "Yes" = Provide specific pricing information for the discussed service
+   → Patient "Yes" = Provide specific pricing information for the service mentioned in the LAST MESSAGE ONLY
 
 NATURAL CONVERSATION FLOW:
 When patients show interest or ask questions, understand their intent from the conversation context and respond appropriately:
