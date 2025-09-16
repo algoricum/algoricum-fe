@@ -68,12 +68,23 @@ export interface UpdateResponse {
 }
 
 // Get all staff members for a specific clinic (excluding owner)
-export async function getClinicStaff(clinicId: string): Promise<StaffResponse> {
+export const getClinicStaff = async (currentPage: number, pageSize: number, clinicId: string) => {
   try {
     if (!clinicId) {
       throw new Error("Clinic ID is required");
     }
 
+    // Fetch total count for pagination (excluding owners)
+    const { count, error: countError } = await supabase
+      .from("user_clinic")
+      .select("id, role!inner(type)", { count: "exact", head: true })
+      .eq("clinic_id", clinicId)
+      .neq("role.type", "owner");
+
+    if (countError) throw countError;
+    const total = count || 0;
+
+    // Fetch paginated staff with role + user join
     const { data: staffMembers, error } = await supabase
       .from("user_clinic")
       .select(
@@ -95,19 +106,14 @@ export async function getClinicStaff(clinicId: string): Promise<StaffResponse> {
       `,
       )
       .eq("clinic_id", clinicId)
-      .neq("role.type", "owner")
-      .order("created_at", { ascending: false });
+      .neq("role.type", "owner") // exclude owner
+      .order("created_at", { ascending: false })
+      .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
-    if (error) {
-      console.error("Error fetching staff members:", error);
-      throw new Error(`Database error: ${error.message}`);
-    }
+    if (error) throw error;
 
-    if (!staffMembers) {
-      return { data: [], error: null };
-    }
-
-    const transformedData: TransformedStaffMember[] = staffMembers.map((item: any) => ({
+    // Transform the data
+    const transformedData: TransformedStaffMember[] = (staffMembers || []).map((item: any) => ({
       user_id: item.user?.id || "",
       staff_member: item.user?.name || "Unknown",
       email: item.user?.email || "No email",
@@ -117,15 +123,20 @@ export async function getClinicStaff(clinicId: string): Promise<StaffResponse> {
       status: item.is_active ? "Active" : "Inactive",
     }));
 
-    return { data: transformedData, error: null };
-  } catch (error: any) {
-    console.error("Error in getClinicStaffWithJoin:", error);
     return {
-      data: null,
+      data: transformedData,
+      total,
+      error: null,
+    };
+  } catch (error: any) {
+    console.error("Error in getClinicStaffPagination:", error);
+    return {
+      data: [],
+      total: 0,
       error: error.message || "An unexpected error occurred",
     };
   }
-}
+};
 
 // Get staff member by ID
 // export async function getStaffMember(userId: string, clinicId: string): Promise<SingleStaffResponse> {
