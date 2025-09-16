@@ -89,7 +89,7 @@ export default function StaffPage(): JSX.Element {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("all");
   // Initialize pagination with default page size of 10
-  const { currentPage, pageSize, paginationConfig, setTotal, resetPagination } = usePagination(10);
+  const { currentPage, pageSize, paginationConfig, setTotal } = usePagination(10);
 
   // Effects
   useEffect(() => {
@@ -166,10 +166,6 @@ export default function StaffPage(): JSX.Element {
       loadStatusStats();
     }
   }, [clinicId, staffData]);
-
-  useEffect(() => {
-    resetPagination();
-  }, [searchTerm, resetPagination]);
 
   // Computed values
   const filteredStaffData = useMemo(() => {
