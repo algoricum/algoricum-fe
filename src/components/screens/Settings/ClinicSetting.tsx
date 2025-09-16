@@ -225,12 +225,12 @@ const ClinicSetting = () => {
           {/* Non-editable fields with copy functionality */}
           <div className="space-y-4 mt-6 pt-6 border-t border-gray-200">
             <Title level={5} className="!text-gray-600 !mb-4">
-              Integration Details
+              Nurturing Details
             </Title>
 
             {/* Mailgun Email Field */}
             <div>
-              <label className="font-medium text-gray-700">Mailgun Email</label>
+              <label className="font-medium text-gray-700">Nurturing Email</label>
               <div className="relative">
                 <Input
                   value={formData.mailgun_email || "Not configured"}
@@ -255,7 +255,7 @@ const ClinicSetting = () => {
 
             {/* Twilio Phone Number Field */}
             <div>
-              <label className="font-medium text-gray-700">Twilio Phone Number</label>
+              <label className="font-medium text-gray-700">Nurturing Phone Number</label>
               <div className="relative">
                 <Input
                   value={twilioPhoneNumber || "Not configured"}
