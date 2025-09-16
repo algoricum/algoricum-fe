@@ -83,7 +83,7 @@ export default function LeadsPage() {
       loadData();
       loadStatusStats();
     }
-  }, [clinicId, currentPage, pageSize, selectedLeadStatus, searchQuery]);
+  }, [clinicId, currentPage, pageSize]);
 
   const loadStatusStats = async () => {
     if (!clinicId) return;
@@ -131,18 +131,11 @@ export default function LeadsPage() {
       setLoading(true);
       setError(null);
 
-      const response = await fetchLeadsForClinic(
-        clinicId,
-        {
-          status: selectedLeadStatus === "all" ? undefined : selectedLeadStatus,
-          search: searchQuery || undefined,
-        },
-        {
-          page: currentPage,
-          pageSize: pageSize,
-          offset: offset,
-        },
-      );
+      const response = await fetchLeadsForClinic(clinicId, {
+        page: currentPage,
+        pageSize: pageSize,
+        offset: offset,
+      });
 
       setLeadsData(response.leads);
       setTotal(response.total);

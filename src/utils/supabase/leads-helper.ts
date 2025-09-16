@@ -130,31 +130,14 @@ function generateAvatar(name: string): string {
 }
 
 // OPTIMIZED: Fetch all leads with their latest messages in fewer queries
-export async function fetchLeadsForClinic(
-  clinicId: string,
-  filters?: LeadsFilters,
-  pagination?: LeadsPaginationParams,
-): Promise<PaginatedLeadsResponse> {
+export async function fetchLeadsForClinic(clinicId: string, pagination?: LeadsPaginationParams): Promise<PaginatedLeadsResponse> {
   try {
     const page = pagination?.page || 1;
     const pageSize = pagination?.pageSize || 10;
     const offset = pagination?.offset || 0;
 
-    // First, get the total count
-    let countQuery = supabase.from("lead").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId);
-
-    // Apply the same filters to count query
-    if (filters?.status && filters.status !== "all") {
-      countQuery = countQuery.eq("status", filters.status);
-    }
-    if (filters?.interest_level && filters.interest_level !== "all") {
-      countQuery = countQuery.eq("interest_level", filters.interest_level);
-    }
-    if (filters?.urgency && filters.urgency !== "all") {
-      countQuery = countQuery.eq("urgency", filters.urgency);
-    }
-
-    const { count, error: countError } = await countQuery;
+    // First, get the total count (no filters applied)
+    const { count, error: countError } = await supabase.from("lead").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId);
 
     if (countError) {
       throw countError;
@@ -162,8 +145,8 @@ export async function fetchLeadsForClinic(
 
     const total = count || 0;
 
-    // Then get the paginated data
-    let query = supabase
+    // Get paginated data (no filters applied)
+    const { data: leads, error } = await supabase
       .from("lead")
       .select(
         `
@@ -197,19 +180,6 @@ export async function fetchLeadsForClinic(
       .order("updated_at", { ascending: false })
       .range(offset, offset + pageSize - 1); // Supabase pagination
 
-    // Apply server-side filters to data query
-    if (filters?.status && filters.status !== "all") {
-      query = query.eq("status", filters.status);
-    }
-    if (filters?.interest_level && filters.interest_level !== "all") {
-      query = query.eq("interest_level", filters.interest_level);
-    }
-    if (filters?.urgency && filters.urgency !== "all") {
-      query = query.eq("urgency", filters.urgency);
-    }
-
-    const { data: leads, error } = await query;
-
     if (error) {
       throw error;
     }
@@ -224,7 +194,7 @@ export async function fetchLeadsForClinic(
       };
     }
 
-    // Transform and enrich the leads data (same as before)
+    // Transform and enrich the leads data
     const enrichedLeads: Lead[] = leads.map((lead: any) => {
       const name = `${lead.first_name || ""} ${lead.last_name || ""}`.trim() || "Anonymous";
 
@@ -251,25 +221,8 @@ export async function fetchLeadsForClinic(
       };
     });
 
-    // Apply client-side filters (search and channel)
-    let filteredLeads = enrichedLeads;
-
-    if (filters?.channel && filters.channel !== "all") {
-      filteredLeads = filteredLeads.filter(lead => lead.channel === filters.channel);
-    }
-
-    if (filters?.search) {
-      const searchLower = filters.search.toLowerCase();
-      filteredLeads = filteredLeads.filter(
-        lead =>
-          lead.name.toLowerCase().includes(searchLower) ||
-          (lead.email && lead.email.toLowerCase().includes(searchLower)) ||
-          lead?.lastMessage?.toLowerCase().includes(searchLower),
-      );
-    }
-
     return {
-      leads: filteredLeads,
+      leads: enrichedLeads,
       total,
       page,
       pageSize,
