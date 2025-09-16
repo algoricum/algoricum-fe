@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { useState } from "react";
 
 export const usePhoneValidation = () => {
   const [phoneNumber, setPhoneNumber] = useState<string>("");

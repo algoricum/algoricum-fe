@@ -13,7 +13,7 @@ export interface Clinic {
   language: string;
   updated_at: string;
   widget_theme: WidgetTheme;
-  logo:string;
+  logo: string;
   domain: string;
   dashboard_theme: ClinicTheme;
   owner_id: string;

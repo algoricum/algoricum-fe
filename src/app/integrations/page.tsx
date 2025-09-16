@@ -1,51 +1,49 @@
 "use client";
-import { JSX, useEffect, useState } from "react";
-import { Card, Button, Row, Col, Divider } from "antd";
-import { createClient } from "@/utils/supabase/config/client";
-// import dayjs from "dayjs";
-import DashboardLayout from "@/layouts/DashboardLayout";
+import { ConnectionStatus } from "@/app/types/types";
 import { Header } from "@/components/common";
-import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
-  FacebookLeadFormModal,
   CsvUploadModal,
   CustomCrmModal,
+  FacebookLeadFormModal,
   GoHighLevelLeadFormModal,
   GoogleFormModal,
+  GoogleLeadFormModal,
+  GravityFormModal,
   HubspotModal,
   JotformModal,
-  GravityFormModal,
-  GoogleLeadFormModal,
+  NexHealthLeadFormModal,
   PipedriveModal,
   TypeformModal,
-  NexHealthLeadFormModal,
 } from "@/components/modals/Modals";
-import { ConnectionStatus } from "@/app/types/types";
-import { deleteIntegrationConnections, updateIntegrationConnectionStatus } from "./integrationUtils";
+import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import DashboardLayout from "@/layouts/DashboardLayout";
 import {
-  getClinicId,
-  syncPipedriveLeads,
-  syncGoogleLeadFormLeads,
-  syncTypeformLeads,
-  connectToHubSpot,
-  connectToPipedrive,
-  connectToGoogleForm,
-  connectToTypeform,
-  findSheetDetails,
-  createJotformConnection,
-  syncJotformLeads,
   connectToGHL,
-  connectToNextHealth,
-  connnectToGravityForm,
+  connectToGoogleForm,
   connectToGoogleLeadForm,
+  connectToHubSpot,
+  connectToNextHealth,
+  connectToPipedrive,
+  connectToTypeform,
+  connnectToGravityForm,
+  createJotformConnection,
   fetchJotformForms,
   fetchTypeformForms,
+  getClinicId,
+  syncGoogleLeadFormLeads,
+  syncJotformLeads,
+  syncPipedriveLeads,
+  syncTypeformLeads,
 } from "@/utils/integration-utils";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
 import { getUserData } from "@/utils/supabase/user-helper";
+import { Button, Card, Col, Divider, Row } from "antd";
 import Image from "next/image";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { JSX, useEffect, useState } from "react";
+import { deleteIntegrationConnections, updateIntegrationConnectionStatus } from "./integrationUtils";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -91,13 +89,7 @@ interface IntegrationStates {
 
 // Icon mapping for different integrations
 const getIntegrationIcon = (logo: string): JSX.Element => {
-  return    <Image
-      src={logo}
-      alt={`${name} logo`}
-      width={24}
-      height={24}
-      className="object-contain"
-    />;
+  return <Image src={logo} alt={`${name} logo`} width={24} height={24} className="object-contain" />;
 };
 
 export default function IntegrationsPage() {
@@ -249,8 +241,19 @@ export default function IntegrationsPage() {
     initializeAllIntegrationStatuses();
   }, [
     supabase,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    getIntegrationStatus("Facebook Lead Forms"),getIntegrationStatus("Jotform"),getIntegrationStatus("Google Lead Forms"),getIntegrationStatus("Google Forms"),getIntegrationStatus("Hubspot"),getIntegrationStatus("GoHighLevel"),getIntegrationStatus("Typeform"),getIntegrationStatus("Pipedrive"),getIntegrationStatus("Gravity Form"),getIntegrationStatus("NextHealth"),getIntegrationStatus("CSV Upload"),getIntegrationStatus("Custom CRM")
+
+    getIntegrationStatus("Facebook Lead Forms"),
+    getIntegrationStatus("Jotform"),
+    getIntegrationStatus("Google Lead Forms"),
+    getIntegrationStatus("Google Forms"),
+    getIntegrationStatus("Hubspot"),
+    getIntegrationStatus("GoHighLevel"),
+    getIntegrationStatus("Typeform"),
+    getIntegrationStatus("Pipedrive"),
+    getIntegrationStatus("Gravity Form"),
+    getIntegrationStatus("NextHealth"),
+    getIntegrationStatus("CSV Upload"),
+    getIntegrationStatus("Custom CRM"),
   ]);
 
   const handleIntegrationClick = async (integration: IntegrationWithStatus) => {
@@ -354,10 +357,7 @@ export default function IntegrationsPage() {
     }
   };
 
-  const syncGoogleFormLeads = async (
-    // eslint-disable-next-line no-unused-vars
-    selectedSheetsObjects: ({ spreadsheet_id: any; spreadsheet_title: any; sheet_id: any; sheet_title: any } | null)[],
-  ) => {
+  const syncGoogleFormLeads = async () => {
     try {
       const { data: connection } = await supabase
         .from("google_form_connections")
@@ -657,8 +657,8 @@ export default function IntegrationsPage() {
           selectedWorksheets={selectedSheets}
           onSelectWorksheets={setSelectedSheets}
           onSyncLeads={async () => {
-            const selectedSheetsObjects = await selectedSheets.map(value => findSheetDetails(googleFormTreeData, value)).filter(Boolean);
-            syncGoogleFormLeads(selectedSheetsObjects);
+            // const selectedSheetsObjects = await selectedSheets.map(value => findSheetDetails(googleFormTreeData, value)).filter(Boolean);
+            syncGoogleFormLeads();
             setGoogleFormLeadsSynced(true);
             toggleModal("Google Forms", false);
           }}

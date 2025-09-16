@@ -1,13 +1,13 @@
 "use client";
 
-import { Modal, Alert, Button, Typography, Spin, Input } from "antd";
+import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { LinkOutlined } from "@ant-design/icons";
+import { Alert, Button, Input, Modal, Spin, Typography } from "antd";
+import Image from "next/image";
 import type React from "react";
 import { useState } from "react";
-import Image from "next/image";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
-import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 
 
 const { Text } = Typography;
@@ -76,7 +76,10 @@ export const NexHealthLeadFormModal: React.FC<ModalProps> = ({ open, status, acc
                   <strong>API Integration Guide</strong>
                   <br />• Sign up for a NexHealth developer account (if not already created).
                   <br />• Visit{" "}
-                  <a href="https://developers.nexhealth.com/api-key" target="_blank" rel="noopener noreferrer" className="underline">NexHealth API Key</a> and Copy API Key.
+                  <a href="https://developers.nexhealth.com/api-key" target="_blank" rel="noopener noreferrer" className="underline">
+                    NexHealth API Key
+                  </a>{" "}
+                  and Copy API Key.
                   <br />• Paste here. We&apos;ll automatically sync your patients
                   <br />• Takes less than 30 seconds!
                 </Text>

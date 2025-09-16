@@ -10,16 +10,11 @@ const FIELD_KEYWORDS: Record<string, string[]> = {
 
 function matchLabel(label: string, keywords: string[]) {
   const l = label.toLowerCase();
-  return keywords.some((k) => l.includes(k));
+  return keywords.some(k => l.includes(k));
 }
 
 // Generate OAuth 1.0 HMAC-SHA1 signature
-export async function getOAuthParams(
-  method: string,
-  endpoint: string,
-  consumerKey: string,
-  consumerSecret: string
-) {
+export async function getOAuthParams(method: string, endpoint: string, consumerKey: string, consumerSecret: string) {
   const oauth_consumer_key = consumerKey;
   const oauth_nonce = crypto.randomUUID().replace(/-/g, "");
   const oauth_signature_method = "HMAC-SHA1";
@@ -35,43 +30,22 @@ export async function getOAuthParams(
   };
 
   // Build base string
-  const paramString = new URLSearchParams(
-    Object.entries(params).sort((a, b) => a[0].localeCompare(b[0]))
-  ).toString();
+  const paramString = new URLSearchParams(Object.entries(params).sort((a, b) => a[0].localeCompare(b[0]))).toString();
 
-  const baseString = [
-    method.toUpperCase(),
-    encodeURIComponent(endpoint),
-    encodeURIComponent(paramString),
-  ].join("&");
+  const baseString = [method.toUpperCase(), encodeURIComponent(endpoint), encodeURIComponent(paramString)].join("&");
 
   // Signing key
   const signingKey = `${consumerSecret}&`;
 
   // HMAC-SHA1
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(signingKey),
-    { name: "HMAC", hash: "SHA-1" },
-    false,
-    ["sign"]
-  );
-  const signatureBytes = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(baseString)
-  );
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(signingKey), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+  const signatureBytes = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(baseString));
   const oauth_signature = base64encode(signatureBytes);
 
   return { ...params, oauth_signature };
 }
 
-export async function fetchFormStructure(
-  baseURL: string,
-  formId: string,
-  consumerKey: string,
-  consumerSecret: string
-) {
+export async function fetchFormStructure(baseURL: string, formId: string, consumerKey: string, consumerSecret: string) {
   const endpoint = `${baseURL}/wp-json/gf/v2/forms/${formId}`;
   const oauthParams = await getOAuthParams("GET", endpoint, consumerKey, consumerSecret);
   const url = `${endpoint}?${new URLSearchParams(oauthParams).toString()}`;
@@ -79,12 +53,7 @@ export async function fetchFormStructure(
   return res.json();
 }
 
-export async function fetchFormEntries(
-  baseURL: string,
-  formId: string,
-  consumerKey: string,
-  consumerSecret: string
-) {
+export async function fetchFormEntries(baseURL: string, formId: string, consumerKey: string, consumerSecret: string) {
   const endpoint = `${baseURL}/wp-json/gf/v2/forms/${formId}/entries`;
   const oauthParams = await getOAuthParams("GET", endpoint, consumerKey, consumerSecret);
   const url = `${endpoint}?${new URLSearchParams(oauthParams).toString()}`;
@@ -105,24 +74,18 @@ export function mapFields(structure: any) {
       const label = (field.label || "").toLowerCase();
       if (field.type === "name" && field.inputs) {
         for (const input of field.inputs) {
-          if (matchLabel(input.label || "", FIELD_KEYWORDS.first_name))
-            fieldMap.first_name = input.id;
-          if (matchLabel(input.label || "", FIELD_KEYWORDS.last_name))
-            fieldMap.last_name = input.id;
+          if (matchLabel(input.label || "", FIELD_KEYWORDS.first_name)) fieldMap.first_name = input.id;
+          if (matchLabel(input.label || "", FIELD_KEYWORDS.last_name)) fieldMap.last_name = input.id;
         }
       } else if (field.type === "email") {
         fieldMap.email = String(field.id);
       } else if (field.type === "phone") {
         fieldMap.phone = String(field.id);
       } else if (field.type === "text") {
-        if (matchLabel(label, FIELD_KEYWORDS.first_name))
-          fieldMap.first_name = String(field.id);
-        if (matchLabel(label, FIELD_KEYWORDS.last_name))
-          fieldMap.last_name = String(field.id);
-        if (matchLabel(label, FIELD_KEYWORDS.email))
-          fieldMap.email = String(field.id);
-        if (matchLabel(label, FIELD_KEYWORDS.phone))
-          fieldMap.phone = String(field.id);
+        if (matchLabel(label, FIELD_KEYWORDS.first_name)) fieldMap.first_name = String(field.id);
+        if (matchLabel(label, FIELD_KEYWORDS.last_name)) fieldMap.last_name = String(field.id);
+        if (matchLabel(label, FIELD_KEYWORDS.email)) fieldMap.email = String(field.id);
+        if (matchLabel(label, FIELD_KEYWORDS.phone)) fieldMap.phone = String(field.id);
       }
     }
   }

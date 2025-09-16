@@ -1,12 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { hubspotcorsHeaders as corsHeaders } from "../_shared/cors.ts";
 import {
-  syncAllConnections,
+  createTestSuccessHtml,
+  disconnectConnection,
+  initializeOAuth,
   processOAuthCallback,
   syncAllClinicContacts,
-  initializeOAuth,
-  disconnectConnection,
-  createTestSuccessHtml
+  syncAllConnections
 } from '../_shared/hubspot-service.ts';
 
 // Environment variables at top level
@@ -15,7 +15,7 @@ const HUBSPOT_REDIRECT_URI = Deno.env.get("HUBSPOT_REDIRECT_URI");
 const FRONTEND_URL = Deno.env.get("FRONTEND_URL");
 
 
-serve(async (req) => {
+serve(async req => {
   const requestId = crypto.randomUUID();
   const url = new URL(req.url);
   console.log(`[${requestId}] 🚀 PUBLIC REQUEST`, {
@@ -26,7 +26,7 @@ serve(async (req) => {
     hasCode: !!url.searchParams.get("code"),
     hasState: !!url.searchParams.get("state"),
     hasAuthHeader: !!req.headers.get("authorization"),
-    userAgent: req.headers.get("user-agent")?.substring(0, 50)
+    userAgent: req.headers.get("user-agent")?.substring(0, 50),
   });
 
   if (req.method === "OPTIONS") {

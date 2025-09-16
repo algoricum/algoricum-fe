@@ -1,7 +1,7 @@
-"use client"
-import { Header } from "@/components/common"
-import SettingsTabs from "@/components/screens/Settings/SettingsTabs"
-import DashboardLayout from "@/layouts/DashboardLayout"
+"use client";
+import { Header } from "@/components/common";
+import SettingsTabs from "@/components/screens/Settings/SettingsTabs";
+import DashboardLayout from "@/layouts/DashboardLayout";
 
 const Page = () => {
   return (
@@ -11,6 +11,6 @@ const Page = () => {
       <SettingsTabs />
     </DashboardLayout>
   );
-}
+};
 
-export default Page
+export default Page;

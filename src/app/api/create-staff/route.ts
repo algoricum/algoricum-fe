@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import {CreateStaffRequest,CreateStaffResponse,ApiErrorResponse} from "@/interfaces/createStaffApi/types";
-import { createAdminClient } from "@/utils/supabase/config/admin";
-import { generateRandomPassword } from "@/utils/createStaffApiUtils";
 import { sendWelcomeEmail } from "@/app/api/create-staff/welcomeEmail";
+import { ApiErrorResponse, CreateStaffRequest, CreateStaffResponse } from "@/interfaces/createStaffApi/types";
+import { generateRandomPassword } from "@/utils/createStaffApiUtils";
+import { createAdminClient } from "@/utils/supabase/config/admin";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest): Promise<NextResponse<CreateStaffResponse | ApiErrorResponse>> {
   try {

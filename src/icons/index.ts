@@ -3,6 +3,7 @@ import ArticleIcon from "./ArticleIcon";
 import BackArrowIcon from "./BackArrowIcon";
 import BasicPlanIcon from "./BasicPlanIcon";
 import BellIcon from "./BellIcon";
+import BillingIcon from "./BillingIcon";
 import BurgerIcon from "./BurgerIcon";
 import ChatIcon from "./ChatIcon";
 import ChatPageIcon from "./ChatPageIcon";
@@ -19,6 +20,7 @@ import EmailIcon from "./EmailIcon";
 import FacebookIcon from "./FacebookIcon";
 import FolderIcon from "./FolderIcon";
 import HelpCenterIcon from "./HelpCenterIcon";
+import InfoIcon from "./InfoIcon";
 import KnowledgeBaseIcon from "./KnowledgeBaseIcon";
 import LinkedinIcon from "./LinkedinIcon";
 import LogoutIcon from "./LogoutIcon";
@@ -30,19 +32,17 @@ import PlusIcon from "./PlusIcon";
 import PremiumHelpCenterIcon from "./PremiumHelpCenterIcon";
 import PremiumPlanIcon from "./PremiumPlanIcon";
 import PublicArticleIcon from "./PublicArticleIcon";
-
-import InfoIcon from "./InfoIcon";
 import QuestionOcta from "./QuestionOcta";
 import SearchIcon from "./SearchIcon";
 import SettingIcon from "./SettingIcon";
 import SetupIcon from "./SetupIcon";
 import ShortcutKeyIcon from "./ShortcutKeyIcon";
+import StaffManagementIcon from "./StaffManagmentIcons";
 import StandardPlanIcon from "./StandardPlanIcon";
 import TicketIcon from "./TicketIcon";
 import TwitterIcon from "./TwitterIcon";
 import UploadIcon from "./UploadIcon";
-import StaffManagementIcon from "./StaffManagmentIcons";
-import BillingIcon from "./BillingIcon";
+import UserIcon from "./UserIcon";
 
 export {
   AllHelpCenterIcon,
@@ -50,6 +50,7 @@ export {
   BackArrowIcon,
   BasicPlanIcon,
   BellIcon,
+  BillingIcon,
   BurgerIcon,
   ChatIcon,
   ChatPageIcon,
@@ -83,10 +84,10 @@ export {
   SettingIcon,
   SetupIcon,
   ShortcutKeyIcon,
+  StaffManagementIcon,
   StandardPlanIcon,
   TicketIcon,
   TwitterIcon,
   UploadIcon,
-  StaffManagementIcon,
-  BillingIcon,
+  UserIcon,
 };

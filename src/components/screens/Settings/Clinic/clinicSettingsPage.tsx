@@ -3,13 +3,13 @@ import { Button, Input, PasswordInput } from "@/components/elements";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { PencilIcon, UploadIcon } from "@/icons";
 import { Clinic, UpdateClinicProps, User } from "@/interfaces/services_type";
-import { createClient } from "@/utils/supabase/config/client";
-import { Flex, Form, Upload, UploadFile } from "antd";
-import { useEffect, useState, useRef } from "react";
-import SettingsCard from "../SettingsCard";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { getUserData } from "@/utils/supabase/user-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
+import { createClient } from "@/utils/supabase/config/client";
+import { getUserData } from "@/utils/supabase/user-helper";
+import { Flex, Form, Upload, UploadFile } from "antd";
+import { useEffect, useRef, useState } from "react";
+import SettingsCard from "../SettingsCard";
 
 const ClinicSettingsPage = () => {
   const [form] = Form.useForm();
@@ -129,7 +129,7 @@ const ClinicSettingsPage = () => {
 
     try {
       setLoading(true);
-      let logoUrl = clinic?.logo;
+      const logoUrl = clinic?.logo;
 
       // Handle logo upload if changed
       if (isLogoChanged && logoFile && user?.id) {

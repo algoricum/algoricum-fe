@@ -1,19 +1,17 @@
 "use client";
-import type React from "react";
-import { useEffect, useState } from "react";
-import { Input, Button, Typography, Upload } from "antd";
-import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input/max";
-import "react-phone-number-input/style.css";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
-import { FileTextOutlined, DollarCircleOutlined, StarOutlined } from "@ant-design/icons";
 import { ErrorToast, WarningToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
+import { DollarCircleOutlined, FileTextOutlined, StarOutlined } from "@ant-design/icons";
+import { Button, Input, Typography, Upload } from "antd";
+import { useEffect, useState } from "react";
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input/max";
+import "react-phone-number-input/style.css";
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 const supabase = createClient();
 
 interface ClinicInfoStepProps {
-  // eslint-disable-next-line no-unused-vars
   onNext: (data: any) => void;
   onPrev?: () => void;
   initialData?: any;

@@ -3,7 +3,7 @@ import { AuthSeparator } from "@/components/common";
 import { Button, Input } from "@/components/elements";
 import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { MailIcon, PasswordIcon } from "@/icons";
+import { MailIcon, PasswordIcon, UserIcon } from "@/icons";
 import { SignupProps } from "@/interfaces/services_type";
 import { saveUser } from "@/redux/accessors/user.accessors";
 import { signUp } from "@/utils/supabase/auth-helper";
@@ -13,13 +13,10 @@ import { Flex, Form, Typography } from "antd";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "react-query";
-
 const { Text } = Typography;
 const SignupPage = () => {
-
   const { push } = useRouter();
   const [form] = Form.useForm();
-
   const handleFieldFocus = (fieldName: string) => {
     form.setFields([
       {
@@ -28,12 +25,11 @@ const SignupPage = () => {
       },
     ]);
   };
-
   const { mutate, isLoading } = useMutation((data: SignupProps) => signUp(data.name, data.email, data.password), {
     onSuccess: (data: any) => {
       if (!data?.user) return;
       saveUser(data.user);
-      setUserData(data.user)
+      setUserData(data.user);
       push("/verify-otp");
       SuccessToast("OTP sent successfully. Please verify your email");
     },
@@ -41,18 +37,15 @@ const SignupPage = () => {
       ErrorToast(error?.message || error?.error_description || "An error occurred while signing up");
     },
   });
-
   const onFinish = (values: any) => {
     mutate(values);
   };
-
   return (
     <Flex vertical gap={36} className="w-full">
       <div>
         <h1 className="text-2xl font-bold mb-1 font">Create Your Algoricum Account</h1>
         <p className="text-sm text-gray-600">Start optimizing your clinic&apos;s lead flow with AI-powered tools.</p>
       </div>
-
       <Form
         form={form}
         name="signup"
@@ -74,9 +67,13 @@ const SignupPage = () => {
               rules={[{ required: true, message: "Please input your name" }]}
               validateTrigger={["onBlur", "onSubmit"]}
             >
-              <Input className="w-full" placeholder="Name" onFocus={() => handleFieldFocus("name")} />
+              <Input
+                prefix={<UserIcon />}
+                className="w-full placeholder:opacity-70"
+                placeholder="Name"
+                onFocus={() => handleFieldFocus("name")}
+              />
             </Form.Item>
-
             <Form.Item
               name="email"
               label="Email Address"
@@ -93,9 +90,13 @@ const SignupPage = () => {
               ]}
               validateTrigger={["onBlur", "onSubmit"]}
             >
-              <Input prefix={<MailIcon />} className="w-full" placeholder="Email" onFocus={() => handleFieldFocus("email")} />
+              <Input
+                prefix={<MailIcon />}
+                className="w-full placeholder:opacity-70"
+                placeholder="Email"
+                onFocus={() => handleFieldFocus("email")}
+              />
             </Form.Item>
-
             <Form.Item
               name="password"
               label="Password"
@@ -114,12 +115,11 @@ const SignupPage = () => {
             >
               <PasswordInput
                 prefix={<PasswordIcon />}
-                className="w-full"
+                className="w-full placeholder:opacity-70"
                 placeholder="Password"
                 onFocus={() => handleFieldFocus("password")}
               />
             </Form.Item>
-
             <Form.Item
               name="confirmPassword"
               label="Confirm Password"
@@ -139,7 +139,7 @@ const SignupPage = () => {
             >
               <PasswordInput
                 prefix={<PasswordIcon />}
-                className="w-full"
+                className="w-full placeholder:opacity-70"
                 placeholder="Confirm Password"
                 onFocus={() => handleFieldFocus("confirmPassword")}
                 onPaste={e => e.preventDefault()}
@@ -150,7 +150,6 @@ const SignupPage = () => {
               />
             </Form.Item>
           </Flex>
-
           <Form.Item>
             <Button
               loading={isLoading}
@@ -180,5 +179,4 @@ const SignupPage = () => {
     </Flex>
   );
 };
-
 export default SignupPage;

@@ -1,8 +1,8 @@
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { User } from "@/interfaces/services_type";
-import { getUserData, setUserData } from "@/utils/supabase/user-helper";
 import { setAccessToken } from "@/helpers/storage-helper";
+import { User } from "@/interfaces/services_type";
 import { signOut } from "@/utils/supabase/auth-helper";
+import { getUserData, setUserData } from "@/utils/supabase/user-helper";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface UserState {
   user: User | null;
@@ -33,7 +33,7 @@ const userSlice = createSlice({
     setAuthLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
     },
-    clearUser: (state) => {
+    clearUser: state => {
       state.user = null;
       state.isAuthenticated = false;
       state.isLoading = false;
@@ -49,7 +49,7 @@ export const saveUser = (user: any, token?: string) => (dispatch: any) => {
   if (user) {
     setUserData(user);
     dispatch(setUser(user));
-    
+
     if (token) {
       setAccessToken(token);
       dispatch(setToken(token));
@@ -60,7 +60,7 @@ export const saveUser = (user: any, token?: string) => (dispatch: any) => {
 };
 
 export const clearUser = () => (dispatch: any) => {
-  signOut()
+  signOut();
   dispatch(clearUserAction());
 };
 
@@ -68,6 +68,5 @@ export const clearUser = () => (dispatch: any) => {
 export const getUser = async (): Promise<User | null> => {
   return await getUserData();
 };
-
 
 export default userSlice.reducer;

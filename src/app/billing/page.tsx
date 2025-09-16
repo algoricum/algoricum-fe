@@ -1,17 +1,16 @@
 "use client";
-
-import { useEffect, useState } from "react";
-import DashboardLayout from "@/layouts/DashboardLayout";
-import { Button, Alert, Card, Typography, Row, Col, Tag, Flex } from "antd";
-import { CheckCircle, XCircle, AlertTriangle, ExternalLink, Download } from "lucide-react";
-import { createClient } from "@/utils/supabase/config/client";
 import { Header } from "@/components/common";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
+import { Alert, Button, Card, Col, Flex, Row, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { AlertTriangle, CheckCircle, Download, ExternalLink, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 dayjs.extend(utc);
 dayjs.extend(relativeTime);

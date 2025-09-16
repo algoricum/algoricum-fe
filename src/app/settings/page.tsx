@@ -1,16 +1,14 @@
-"use client"
-import { Header } from "@/components/common"
-import SettingsTabs from "@/components/screens/Settings/SettingsTabs"
-import DashboardLayout from "@/layouts/DashboardLayout"
+"use client";
+import { Header } from "@/components/common";
+import SettingsTabs from "@/components/screens/Settings/SettingsTabs";
+import DashboardLayout from "@/layouts/DashboardLayout";
 
 const Page = () => {
   return (
-    <DashboardLayout
-      header={<Header title="Profile Settings" description="Manage your profile and application settings." />}
-    >
+    <DashboardLayout header={<Header title="Profile Settings" description="Manage your profile and application settings." />}>
       <SettingsTabs />
     </DashboardLayout>
-  )
-}
+  );
+};
 
-export default Page
+export default Page;

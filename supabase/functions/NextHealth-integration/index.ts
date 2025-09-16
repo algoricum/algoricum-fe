@@ -1,15 +1,15 @@
 // supabase/functions/sync-nexhealth/index.ts
 import { serve } from "https://deno.land/std@0.179.0/http/server.ts";
-import {  corsHeaders, handleOptions } from "../_shared/cors.ts";
+import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import {
   authenticate,
   fetchInstitution,
-  upsertIntegrationConnection,
   fetchPatients,
   insertPatientsAsLeads,
+  upsertIntegrationConnection,
 } from "../_shared/nextHealth-service.ts";
 
-serve(async (req) => {
+serve(async req => {
   const optionsResponse = handleOptions(req);
   if (optionsResponse) return optionsResponse;
 

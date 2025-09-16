@@ -1,9 +1,8 @@
 "use client";
-
-import { useSearchParams } from "next/navigation";
-import { Card, Button, Typography, Space, Divider } from "antd";
-import { CheckCircleOutlined, MailOutlined, ArrowLeftOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, CheckCircleOutlined, MailOutlined } from "@ant-design/icons";
+import { Button, Card, Divider, Space, Typography } from "antd";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 const { Title, Text, Paragraph } = Typography;
 

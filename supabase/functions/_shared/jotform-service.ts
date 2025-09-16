@@ -101,7 +101,15 @@ const { data: source } = await supabase
   }
 }
 
-export async function saveFormsHandler(selectedForms: string[], storedForms: any[], clinic_id: string, accessToken: string, authData: any, integration_id: string, JOTFORM_WEBHOOK_BASE_URL: string) {
+export async function saveFormsHandler(
+  selectedForms: string[],
+  storedForms: any[],
+  clinic_id: string,
+  accessToken: string,
+  authData: any,
+  integration_id: string,
+  JOTFORM_WEBHOOK_BASE_URL: string,
+) {
   const formsToAdd = selectedForms.filter(f => !storedForms.some((s: any) => s.form_id === f));
   const formsToRemove = storedForms.filter((s: any) => !selectedForms.includes(s.form_id));
 
