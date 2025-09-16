@@ -1,6 +1,7 @@
 "use client";
 
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { BOOKING_LINK } from "@/constants/";
 import {
   ONBOARDING_COMPLETED_STEPS_KEY,
   ONBOARDING_LEADS_FILE_NAME,
@@ -11,6 +12,8 @@ import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { useAuth } from "@/hooks/useAuth";
 import apiKeyService from "@/services/apiKey";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
+import generateClinicInstructions from "@/utils/generateClinicInstructions";
+import { handleSubscribe } from "@/utils/stripe";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getClinicData, updateClinic, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
@@ -22,13 +25,7 @@ import { useCallback, useEffect, useState } from "react";
 import BookingSetupStep from "./booking-setup-step";
 import ClinicInfoStep from "./clinic-info-step";
 import IntegrationsStep from "./Integration";
-// import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
-import { BOOKING_LINK } from "@/constants/";
-import { handleSubscribe } from "@/utils/stripe";
 import StaffHoursStep from "./staff-hours-step";
-// import { log } from "console";
-// import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
-import generateClinicInstructions from "@/utils/generateClinicInstructions";
 
 const { Text } = Typography;
 const supabase = createClient();
@@ -61,8 +58,8 @@ export default function MainOnboarding() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
-  
-    const checkSubscription = async (id: string) => {
+
+  const checkSubscription = async (id: string) => {
     const { data: sub } = await supabase
       .from("stripe_subscriptions")
       .select("id,status")
@@ -70,15 +67,13 @@ export default function MainOnboarding() {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-      if(!sub){
-        
-        const { data: planData } = await supabase.from("plans").select("*").limit(1);
-        if(planData && planData[0]?.price_id){
-          
-          console.log("asdf",!sub,planData)
-          await handleSubscribe(planData[0]?.price_id,id)
-        }
+    if (!sub) {
+      const { data: planData } = await supabase.from("plans").select("*").limit(1);
+      if (planData && planData[0]?.price_id) {
+        console.log("asdf", !sub, planData);
+        await handleSubscribe(planData[0]?.price_id, id);
       }
+    }
   };
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -89,17 +84,11 @@ export default function MainOnboarding() {
         return;
       }
 
-
-      
-      
       await checkSubscription(clinic.id);
     };
-    if(currentStepIndex>1){
-
+    if (currentStepIndex > 1) {
       fetchInitialData();
     }
-
-    
   }, [currentStepIndex]);
   // Only use BASE_STEPS for sidebar and navigation
   const STEPS = BASE_STEPS;
@@ -581,7 +570,7 @@ export default function MainOnboarding() {
           />
         );
       case "staff-hours":
-        return <StaffHoursStep onNext={(handleStepComplete)} onPrev={handleStepPrevious} initialData={stepData} />;
+        return <StaffHoursStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       // case "tone-identity":
       //   return <ToneIdentityStep onNext={handleStepComplete} onPrev={handleStepPrevious} initialData={stepData} />;
       // case "ai-assistant":
