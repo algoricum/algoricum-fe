@@ -18,6 +18,7 @@ export interface BookingDetectionOptions {
   };
   communicationType: "sms" | "email";
   senderPhone?: string;
+  forceBooking?: boolean; // Force booking creation even if keywords don't match
 }
 
 export interface BookingDetectionResult {
@@ -75,11 +76,16 @@ export async function detectBookingRequestAndCreateSchedule(
     const messageBodyLower = options.messageBody.toLowerCase().trim();
     const subjectLower = options.subject?.toLowerCase().trim() || "";
 
-    const isBookingRequest = bookingKeywords.some(
+    const keywordMatch = bookingKeywords.some(
       keyword => messageBodyLower.includes(keyword.toLowerCase()) || subjectLower.includes(keyword.toLowerCase()),
     );
 
+    // Check if this is a booking request (either keyword match OR forced booking)
+    const isBookingRequest = keywordMatch || options.forceBooking || false;
+
     logBookingInfo("Booking detection result:", {
+      keywordMatch,
+      forceBooking: options.forceBooking,
       isBookingRequest,
       matchedInBody: bookingKeywords.filter(keyword => messageBodyLower.includes(keyword)),
       matchedInSubject: bookingKeywords.filter(keyword => subjectLower.includes(keyword)),

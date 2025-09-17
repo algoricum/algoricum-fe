@@ -1,7 +1,7 @@
 // supabase/functions/manage-assistant-with-files/index.js
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import OpenAI from "jsr:@openai/openai";
+import OpenAI from "https://esm.sh/openai@4.67.3";
 
 const avatarNames = ["Clara", "Ava", "Maya", "Sam", "Zoe", "Ella", "Aria"];
 
@@ -243,6 +243,9 @@ serve(async req => {
     // Initialize OpenAI client
     const openai = new OpenAI({
       apiKey: Deno.env.get("OPENAI_API_KEY"),
+      defaultHeaders: {
+        "OpenAI-Beta": "assistants=v2",
+      },
     });
 
     let assistantResult;

@@ -655,12 +655,6 @@ async function generateIntelligentResponse(
 
     const assistantInstructions = clinic.assistants?.[0]?.instructions || "";
 
-    logInfo(`DEBUG: Rule details - Name: ${rule?.name}, timeFromCreated: ${rule?.timeFromCreated}ms`);
-    logInfo(`DEBUG: IsDemo: ${isDemo}, Lead age calculated: ${leadAge}`);
-    logInfo(`DEBUG: Instructions length: ${assistantInstructions.length}`);
-    logInfo(`DEBUG: Instructions contain PSYCHOLOGY PATTERN: ${assistantInstructions.includes("PSYCHOLOGY PATTERN")}`);
-    logInfo(`DEBUG: Instructions contain EMAIL FOLLOW-UP PATTERNS: ${assistantInstructions.includes("EMAIL FOLLOW-UP PATTERNS")}`);
-
     let systemPrompt = "";
     let userPrompt = "";
 
@@ -674,6 +668,8 @@ CRITICAL EMAIL FORMATTING RULES:
 • Include booking links when appropriate for email follow-ups
 • Simply end where your message naturally concludes
 • Keep content focused and conversational without formal closings
+• FORMAT FOR READABILITY: Break lines after approximately 15-20 words to make emails appear longer and more readable
+• Use line breaks strategically to create visual space and improve flow
 
 BOOKING LINK FOR EMAILS:
 ${bookingLink ? `Available booking link: ${bookingLink}` : "No booking link configured"}
@@ -996,7 +992,7 @@ async function sendEmail(
     if (!settings) {
       const { data: fetchedSettings, error: settingsError } = await supabase
         .from("clinic")
-        .select("mailgun_domain, mailgun_email, name, address, phone")
+        .select("mailgun_domain, mailgun_email, name, address, phone, logo")
         .eq("id", clinicId)
         .single();
 
@@ -1031,15 +1027,15 @@ async function sendEmail(
       };
     }
 
-    const { mailgun_domain, mailgun_email, name: clinicName, address, phone } = settings;
+    const { mailgun_domain, mailgun_email, name: clinicName, address, phone, logo } = settings;
 
     // Create professional HTML email template
     const primaryColor = "#2563eb"; // Default blue if no color set
-    const logo_url =
-      "https://ozmytbghfvrfhbjvabor.supabase.co/storage/v1/object/public/clinic-logos/39d699cb-f712-431c-ba38-9e718310e2bb-iy9cs5ln.png";
+    const logo_url = logo;
+
     const logoSection = logo_url
       ? `<img src="${logo_url}" alt="${clinicName} Logo" style="max-height: 60px; margin-bottom: 30px; display: block;">`
-      : `<h1 style="color: ${primaryColor}; font-size: 28px; font-weight: bold; margin: 0 0 30px 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${clinicName}</h1>`;
+      : "";
 
     // Convert body content to HTML with better formatting
     const isAlreadyHTML = body.includes("<br>") || body.includes("<p>") || body.includes("<div>");
@@ -1065,12 +1061,17 @@ async function sendEmail(
             <tr>
                 <td align="center">
                     <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                        ${
+                          logoSection
+                            ? `
                         <!-- Header with Logo -->
                         <tr>
                             <td style="padding: 40px 40px 20px 40px; text-align: center; border-bottom: 1px solid #e2e8f0;">
                                 ${logoSection}
                             </td>
-                        </tr>
+                        </tr>`
+                            : ""
+                        }
                         
                         <!-- Main Content -->
                         <tr>
