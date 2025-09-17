@@ -18,7 +18,7 @@ import { defaultCorsHeaders } from "../_shared/cors.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const FRONTEND_URL = "http://localhost:3000"; // Deno.env.get("FRONTEND_URL");
+const FRONTEND_URL = Deno.env.get("FRONTEND_URL");
 
 // Robust error handler with context
 function createErrorResponse(message: string, statusCode: number = 500, context?: any) {
@@ -219,6 +219,23 @@ async function handleRequest(request: Request): Promise<Response> {
         });
       } catch (error) {
         return createErrorResponse("Failed to get integration status", 500, error.message);
+      }
+    }
+
+    // Handle webhook
+    if (method === "POST" && url.pathname.includes("/webhook")) {
+      try {
+        const webhookData = await request.json();
+        logInfo("Calendly webhook received", { event: webhookData.event });
+
+        const result = await handleCalendlyWebhook(webhookData, supabase);
+        return new Response(JSON.stringify({ success: true, message: "Webhook processed", result }), {
+          status: 200,
+          headers: { ...defaultCorsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        logError("Webhook processing error", error);
+        return createErrorResponse("Failed to process webhook", 500, error.message);
       }
     }
 

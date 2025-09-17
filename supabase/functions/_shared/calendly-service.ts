@@ -338,19 +338,266 @@ async function disconnectIntegration(supabase: any, clinicId: string) {
   logInfo("Calendly integration disconnected", { clinicId });
 }
 
+// Handle Calendly webhook events
+async function handleCalendlyWebhook(webhookData: any, supabase: any) {
+  logInfo("Processing Calendly webhook", { event: webhookData.event });
+
+  try {
+    // Extract event information
+    const eventType = webhookData.event;
+    const payload = webhookData.payload;
+
+    // Handle different webhook events
+    switch (eventType) {
+      case "invitee.created":
+        return await handleInviteeCreated(payload, supabase);
+      case "invitee.canceled":
+        return await handleInviteeCanceled(payload, supabase);
+      default:
+        logInfo("Unhandled webhook event type", { eventType });
+        return { handled: false, reason: "Unhandled event type" };
+    }
+  } catch (error) {
+    logError("Webhook processing error", error);
+    throw error;
+  }
+}
+
+// Handle when someone books an appointment
+async function handleInviteeCreated(payload: any, supabase: any) {
+  logInfo("Processing invitee created", { payload });
+
+  try {
+    const invitee = payload;
+
+    // Find the clinic based on event type URI
+    const clinic = await findClinicByEventType(invitee.event.uri, supabase);
+    if (!clinic) {
+      logError("No clinic found for event type", { event_type_uri: invitee.event.uri });
+      return { handled: false, reason: "No clinic found for this event type" };
+    }
+
+    // Find existing lead by email and clinic
+    const lead = await findLeadByEmail(invitee.email, clinic.clinic_id, supabase);
+    if (!lead) {
+      logError("No lead found with email", { email: invitee.email, clinic_id: clinic.clinic_id });
+      return { handled: false, reason: "No lead found with this email" };
+    }
+
+    logInfo("Found lead for booking", { leadId: lead.id, email: invitee.email });
+
+    // Extract phone from answers if available
+    let phoneNumber = lead.phone; // Use existing phone from lead
+    if (invitee.questions_and_answers && Array.isArray(invitee.questions_and_answers)) {
+      const phoneAnswer = invitee.questions_and_answers.find(
+        (answer: any) =>
+          answer.question.toLowerCase().includes("phone") ||
+          answer.question.toLowerCase().includes("mobile") ||
+          answer.question.toLowerCase().includes("contact"),
+      );
+      if (phoneAnswer && phoneAnswer.answer) {
+        phoneNumber = phoneAnswer.answer;
+      }
+    }
+
+    // Prepare meeting schedule data
+    const meetingData = {
+      username: invitee.name,
+      email: invitee.email,
+      preferred_meeting_time: new Date(invitee.scheduled_event.start_time),
+      meeting_link: invitee.scheduled_event.uri,
+      calendly_link: invitee.event.uri,
+      meeting_notes: JSON.stringify({
+        event_type: invitee.event.name,
+        end_time: invitee.scheduled_event.end_time,
+        timezone: invitee.timezone,
+        answers: invitee.questions_and_answers || [],
+        calendly_event_id: invitee.uri,
+        scheduled_event_uri: invitee.scheduled_event.uri,
+      }),
+      clinic_id: clinic.clinic_id,
+      status: "confirmed",
+      phone_number: phoneNumber,
+    };
+
+    // Upsert meeting schedule record (unique by email)
+    const { data: meetingRecord, error: meetingError } = await supabase
+      .from("meeting_schedule")
+      .upsert(meetingData, { onConflict: "email" })
+      .select();
+
+    if (meetingError) {
+      logError("Failed to save meeting schedule", meetingError);
+      throw new Error(`Failed to save meeting schedule: ${meetingError.message}`);
+    }
+
+    logInfo("Meeting schedule saved successfully", {
+      meetingId: meetingRecord[0]?.id,
+      email: invitee.email,
+      leadId: lead.id,
+    });
+
+    // Update lead status to "Booked" if not already
+    if (lead.status !== "Booked") {
+      await updateLeadStatus(lead.id, "Booked", supabase);
+    }
+
+    return {
+      handled: true,
+      meetingId: meetingRecord[0]?.id,
+      leadId: lead.id,
+      clinic: clinic.clinic_id,
+    };
+  } catch (error) {
+    logError("Error handling invitee created", error);
+    throw error;
+  }
+}
+
+// Handle when someone cancels an appointment
+async function handleInviteeCanceled(payload: any, supabase: any) {
+  logInfo("Processing invitee canceled", { payload });
+
+  try {
+    const invitee = payload;
+
+    // Get existing meeting to preserve notes
+    const { data: existingMeeting } = await supabase.from("meeting_schedule").select("meeting_notes").eq("email", invitee.email).single();
+
+    // Parse existing notes and add cancellation info
+    let existingNotes = {};
+    try {
+      existingNotes = JSON.parse(existingMeeting?.meeting_notes || "{}");
+    } catch (e) {
+      console.log("error creating meeting schedule", e.message);
+      existingNotes = {};
+    }
+
+    // Update meeting schedule status to pending (or you could delete it)
+    const { data, error } = await supabase
+      .from("meeting_schedule")
+      .update({
+        status: "pending",
+        meeting_notes: JSON.stringify({
+          ...existingNotes,
+          canceled_at: new Date().toISOString(),
+          cancellation_reason: "Canceled via Calendly",
+        }),
+      })
+      .eq("email", invitee.email)
+      .select();
+
+    if (error) {
+      logError("Failed to update canceled meeting", error);
+      throw new Error(`Failed to update meeting: ${error.message}`);
+    }
+
+    if (data && data.length > 0) {
+      logInfo("Meeting canceled successfully", { meetingId: data[0].id, email: invitee.email });
+
+      // Optionally update lead status back to previous status
+      // You can customize this based on your business logic
+
+      return { handled: true, meetingId: data[0].id, status: "canceled" };
+    } else {
+      logInfo("No meeting found to cancel", { email: invitee.email });
+      return { handled: false, reason: "No meeting found" };
+    }
+  } catch (error) {
+    logError("Error handling invitee canceled", error);
+    throw error;
+  }
+}
+
+// Find clinic by event type URI
+async function findClinicByEventType(eventTypeUri: string, supabase: any) {
+  try {
+    const { data, error } = await supabase
+      .from("calendly_integrations")
+      .select("clinic_id, selected_event_type")
+      .eq("selected_event_type", eventTypeUri)
+      .eq("is_active", true)
+      .single();
+
+    if (error || !data) {
+      // Try to find by checking available_event_types array
+      const { data: integrations, error: intError } = await supabase
+        .from("calendly_integrations")
+        .select("clinic_id, available_event_types")
+        .eq("is_active", true);
+
+      if (!intError && integrations) {
+        for (const integration of integrations) {
+          if (integration.available_event_types) {
+            const eventType = integration.available_event_types.find((et: any) => et.uri === eventTypeUri);
+            if (eventType) {
+              return { clinic_id: integration.clinic_id };
+            }
+          }
+        }
+      }
+
+      return null;
+    }
+
+    return { clinic_id: data.clinic_id };
+  } catch (error) {
+    logError("Error finding clinic by event type", error);
+    return null;
+  }
+}
+
+// Find lead by email and clinic
+async function findLeadByEmail(email: string, clinicId: string, supabase: any) {
+  try {
+    const { data, error } = await supabase
+      .from("lead")
+      .select("id, phone, status, first_name, last_name")
+      .eq("email", email)
+      .eq("clinic_id", clinicId)
+      .single();
+
+    if (error || !data) {
+      logInfo("No lead found", { email, clinicId, error: error?.message });
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    logError("Error finding lead by email", error);
+    return null;
+  }
+}
+
+// Update lead status
+async function updateLeadStatus(leadId: string, status: string, supabase: any) {
+  try {
+    const { error } = await supabase.from("lead").update({ status, updated_at: new Date().toISOString() }).eq("id", leadId);
+
+    if (error) {
+      logError("Failed to update lead status", error);
+    } else {
+      logInfo("Lead status updated", { leadId, status });
+    }
+  } catch (error) {
+    logError("Error updating lead status", error);
+  }
+}
+
 export {
+  disconnectIntegration,
   exchangeCodeForTokens,
   getCalendlyUser,
-  getEventTypes,
-  storeIntegration,
   getClinicIntegration,
+  getEventTypes,
+  getIntegrationStatus,
+  handleCalendlyWebhook,
+  logError,
+  logInfo,
   saveSelectedEventType,
   storeAvailableEventTypes,
-  getIntegrationStatus,
-  disconnectIntegration,
+  storeIntegration,
   validateClinicTiming,
-  logInfo,
-  logError,
 };
 
-export type { CalendlyTokens, ClinicTiming, CalendlyEventType };
+export type { CalendlyEventType, CalendlyTokens, ClinicTiming };
