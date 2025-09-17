@@ -7,7 +7,16 @@ import { commonAlertStyles } from "./utils";
 
 const { Text } = Typography;
 
-export const CalendlyModal: React.FC<ModalProps> = ({ open, status, accountInfo, onOk, onCancel, onConnect, buttonLoading }) => (
+export const CalendlyModal: React.FC<ModalProps> = ({
+  open,
+  status,
+  accountInfo,
+  availableEventTypes,
+  onOk,
+  onCancel,
+  onConnect,
+  buttonLoading,
+}) => (
   <Modal
     title={
       <div className="flex items-center">
@@ -83,13 +92,51 @@ export const CalendlyModal: React.FC<ModalProps> = ({ open, status, accountInfo,
         </div>
       )}
       {status === "connected" && accountInfo && (
-        <Alert
-          message="Successfully Connected!"
-          description={`Connected to ${accountInfo.accountName || "your Calendly account"}. Your booking links are now ready!`}
-          type="success"
-          showIcon
-          className="mb-4"
-        />
+        <>
+          {availableEventTypes && availableEventTypes.length > 0 ? (
+            <Alert
+              message="Successfully Connected!"
+              description={`Connected to ${accountInfo.accountName || "your Calendly account"}. Your booking links are now ready!`}
+              type="success"
+              showIcon
+              className="mb-4"
+            />
+          ) : (
+            <div>
+              <Alert
+                message="Account Connected - No Meeting Links Found"
+                description={`Connected to ${accountInfo.accountName || "your Calendly account"}, but no event types were found. You need to create your first meeting link.`}
+                type="warning"
+                showIcon
+                className="mb-4"
+              />
+              <div className="text-center">
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <Text className="text-sm text-blue-700">
+                    <strong>Next Steps:</strong>
+                    <br />• Click "Create Meeting Link" below
+                    <br />• Set up your first appointment type in Calendly
+                    <br />• Return here to complete your setup
+                  </Text>
+                </div>
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<span className="text-lg">+</span>}
+                  onClick={() => window.open("https://calendly.com/event_types/new", "_blank")}
+                  className="bg-green-500 border-green-500 hover:!bg-green-600 h-12 px-8 text-lg font-medium"
+                >
+                  Create Meeting Link in Calendly
+                </Button>
+                <div className="mt-4">
+                  <Text className="text-sm text-gray-600">
+                    After creating your meeting link, refresh this page or reconnect to see your new options.
+                  </Text>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   </Modal>

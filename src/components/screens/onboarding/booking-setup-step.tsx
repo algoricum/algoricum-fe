@@ -343,12 +343,6 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
     }
   };
 
-  // Skip event type selection
-  const handleSkipEventTypeSelection = () => {
-    setState(prev => ({ ...prev, showEventTypeSelection: false }));
-    onNext(state.formData);
-  };
-
   return (
     <div className="max-w-4xl">
       {/* Previous Questions */}
@@ -391,6 +385,7 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
         open={state.showCalendlyModal}
         status={state.calendlyStatus}
         accountInfo={state.calendlyAccountInfo}
+        availableEventTypes={state.availableEventTypes}
         buttonLoading={state.calendlyLoading}
         onConnect={handleCalendlyConnect}
         onOk={handleCalendlyModalOk}
@@ -455,10 +450,6 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
             )}
 
             <div className="flex justify-between pt-4 border-t">
-              <Button onClick={handleSkipEventTypeSelection} className="px-6" disabled={state.eventTypeSelectionLoading}>
-                Skip for Now
-              </Button>
-
               <Button
                 type="primary"
                 onClick={handleSaveEventType}

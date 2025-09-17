@@ -3,6 +3,7 @@ export interface ModalProps {
   buttonLoading: boolean;
   status: "disconnected" | "connecting" | "connected";
   accountInfo?: any;
+  availableEventTypes?: any[];
   onOk: () => void;
   onCancel: () => void;
 
