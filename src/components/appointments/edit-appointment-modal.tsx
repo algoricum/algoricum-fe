@@ -3,9 +3,9 @@ import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { CalendarOutlined, ClockCircleOutlined, MailOutlined, PhoneOutlined, UserOutlined } from "@ant-design/icons";
 import { DatePicker, Form, Input, TimePicker, Select } from "antd";
 import dayjs from "dayjs";
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { usePhoneValidation } from "@/hooks/usePhoneValidation";
 import { X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import type { MeetingSchedule } from "@/utils/appointment-helper";
@@ -23,8 +23,7 @@ interface EditAppointmentModalProps {
 
 export function EditAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting, appointment }: EditAppointmentModalProps) {
   const [form] = Form.useForm();
-  const [phoneNumber, setPhoneNumber] = useState<string>("");
-  const [phoneError, setPhoneError] = useState<string>("");
+  const { phoneNumber, phoneError, handlePhoneChange, handlePhoneBlur, setPhoneNumber } = usePhoneValidation();
 
   // Initialize form when appointment data is available
   useEffect(() => {
@@ -54,54 +53,13 @@ export function EditAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting, 
       });
 
       setPhoneNumber(appointment.phone_number || "");
-      setPhoneError("");
     }
-  }, [appointment, isOpen, form]);
+  }, [appointment, isOpen, form, setPhoneNumber]);
 
   if (!isOpen || !appointment) return null;
 
-  const validatePhoneNumber = (phone: string | undefined): boolean => {
-    if (!phone) {
-      setPhoneError("Phone number is required");
-      return false;
-    }
-
-    try {
-      if (!isValidPhoneNumber(phone)) {
-        setPhoneError("Please enter a valid phone number");
-        return false;
-      }
-
-      const phoneNumberObj = parsePhoneNumber(phone);
-      if (!phoneNumberObj || !phoneNumberObj.isValid()) {
-        setPhoneError("Invalid phone number for the selected country");
-        return false;
-      }
-
-      setPhoneError("");
-      return true;
-    } catch (error) {
-      console.error("Error validating phone number:", error);
-      setPhoneError("Invalid phone number format");
-      return false;
-    }
-  };
-
-  const handlePhoneChange = (value: string | undefined) => {
-    setPhoneNumber(value || "");
-    if (value) {
-      validatePhoneNumber(value);
-    } else {
-      setPhoneError("");
-    }
-  };
-
-  const handlePhoneBlur = () => {
-    validatePhoneNumber(phoneNumber);
-  };
-
   const handleSubmit = async (values: any) => {
-    if (!validatePhoneNumber(phoneNumber)) {
+    if (phoneError) {
       return;
     }
 
@@ -131,7 +89,6 @@ export function EditAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting, 
   const handleClose = () => {
     form.resetFields();
     setPhoneNumber("");
-    setPhoneError("");
     onClose();
   };
 

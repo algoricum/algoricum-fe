@@ -1,7 +1,7 @@
-import { isValidPhoneNumber, parsePhoneNumber } from "libphonenumber-js";
+import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input/max";
 import { useState } from "react";
 
-export const usePhoneValidation = () => {
+export const usePhoneValidation = (onFieldTouch?: (fieldId: string) => void) => {
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [phoneError, setPhoneError] = useState<string>("");
 
@@ -33,6 +33,9 @@ export const usePhoneValidation = () => {
 
   const handlePhoneChange = (value: string | undefined) => {
     setPhoneNumber(value || "");
+    if (onFieldTouch) {
+      onFieldTouch("clinicPhone");
+    }
     if (value) {
       validatePhoneNumber(value);
     } else {
@@ -41,6 +44,9 @@ export const usePhoneValidation = () => {
   };
 
   const handlePhoneBlur = () => {
+    if (onFieldTouch) {
+      onFieldTouch("clinicPhone");
+    }
     validatePhoneNumber(phoneNumber);
   };
 
