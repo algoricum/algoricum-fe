@@ -11,8 +11,9 @@ import { fetchLeadsForClinic, formatStatus, getCurrentUserClinic, getStatusColor
 import { Modal } from "antd";
 import { Edit, MoreVertical, SearchIcon, Trash2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { leadsStatsConfig } from "./statsUtil";
+import { useDropdown } from "@/hooks/useDropdown";
 
 interface Lead {
   id: string;
@@ -38,9 +39,11 @@ export default function LeadsPage() {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [clinicId, setClinicId] = useState<string | null>(null);
 
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { activeDropdown, dropdownPosition, dropdownRef, toggleDropdown, closeDropdown } = useDropdown({
+    dropdownWidth: 192,
+    dropdownHeight: 120,
+    offset: 8,
+  });
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -71,18 +74,6 @@ export default function LeadsPage() {
     }
   };
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setActiveDropdown(null);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -99,47 +90,16 @@ export default function LeadsPage() {
     }
   };
 
-  const toggleActionMenu = (e: React.MouseEvent, leadId: string) => {
-    e.stopPropagation();
-    if (activeDropdown === leadId) {
-      setActiveDropdown(null);
-    } else {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const dropdownHeight = 120; // Approximate dropdown height
-      const viewportHeight = window.innerHeight;
-      const viewportWidth = window.innerWidth;
-
-      let top = rect.bottom + 8;
-      let left = rect.right - 192; // 192px is dropdown width (w-48)
-
-      // Check if dropdown would go below viewport
-      if (rect.bottom + dropdownHeight > viewportHeight) {
-        // Position above the button instead
-        top = rect.top - dropdownHeight - 8;
-      }
-
-      // Check if dropdown would go off-screen horizontally
-      if (left < 8) {
-        left = 8;
-      } else if (left + 192 > viewportWidth - 8) {
-        left = viewportWidth - 200;
-      }
-
-      setDropdownPosition({ top, left });
-      setActiveDropdown(leadId);
-    }
-  };
-
   const handleEditLead = (lead: Lead) => {
     setSelectedLead(lead);
     setEditModalOpen(true);
-    setActiveDropdown(null);
+    closeDropdown();
   };
 
   const handleDeleteLead = (lead: Lead) => {
     setSelectedLead(lead);
     setDeleteModalOpen(true);
-    setActiveDropdown(null);
+    closeDropdown();
   };
 
   const handleUpdateLead = (updatedLead: Lead) => {
@@ -323,7 +283,7 @@ export default function LeadsPage() {
                       <td className="px-6 py-4">
                         <div className="relative">
                           <button
-                            onClick={e => toggleActionMenu(e, lead.id)}
+                            onClick={e => toggleDropdown(e, lead.id)}
                             className="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 transition-colors duration-200"
                             type="button"
                           >
@@ -340,7 +300,12 @@ export default function LeadsPage() {
         </div>
 
         {activeDropdown && (
-          <div className="fixed inset-0 z-[9999]" onClick={() => setActiveDropdown(null)}>
+          <div
+            className="fixed inset-0 z-[9999]"
+            onClick={() => {
+              closeDropdown();
+            }}
+          >
             {filteredLeads.map(lead => {
               if (lead.id !== activeDropdown) return null;
               return (

@@ -1,8 +1,7 @@
 "use client";
 import { Edit, Mail, MoreVertical, SearchIcon, Trash2, User } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
-
+import { useDropdown } from "@/hooks/useDropdown";
 interface Staff {
   id: string;
   name: string;
@@ -28,9 +27,11 @@ interface StaffTableProps {
 }
 
 export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus, onEdit, onDelete, onClearFilters }: StaffTableProps) {
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { activeDropdown, dropdownPosition, dropdownRef, toggleDropdown, closeDropdown } = useDropdown({
+    dropdownWidth: 192,
+    dropdownHeight: 120,
+    offset: 8,
+  });
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -38,36 +39,6 @@ export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus
   };
 
   const hasFilters = searchTerm || selectedRole !== "all" || selectedStatus !== "all";
-
-  const toggleDropdown = (e: React.MouseEvent, staffId: string) => {
-    e.stopPropagation();
-    if (activeDropdown === staffId) {
-      setActiveDropdown(null);
-    } else {
-      // Calculate position relative to viewport
-      const rect = e.currentTarget.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8, // 8px gap below the button
-        left: rect.right - 192, // 192px is the width of dropdown (w-48)
-      });
-      setActiveDropdown(staffId);
-    }
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setActiveDropdown(null);
-      }
-    };
-
-    if (activeDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-  }, [activeDropdown]);
 
   const getRoleBadgeClass = (role: string) => {
     switch (role.toLowerCase()) {
@@ -242,7 +213,7 @@ export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus
                     onClick={e => {
                       e.stopPropagation();
                       onEdit(staff);
-                      setActiveDropdown(null);
+                      closeDropdown();
                     }}
                     className="flex w-full items-center px-4 py-3 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-blue-50 hover:text-blue-700"
                     type="button"
@@ -257,7 +228,7 @@ export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus
                     onClick={e => {
                       e.stopPropagation();
                       onDelete(staff);
-                      setActiveDropdown(null);
+                      closeDropdown();
                     }}
                     className="flex w-full items-center px-4 py-3 text-sm font-medium text-red-600 transition-colors duration-200 hover:bg-red-50"
                     type="button"

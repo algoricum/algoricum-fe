@@ -6,7 +6,7 @@ import { Modal } from "antd";
 import { User, Mail, Phone } from "lucide-react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import { isValidPhoneNumber } from "libphonenumber-js";
+import { usePhoneValidation } from "@/hooks/usePhoneValidation";
 import { LEAD_STATUSES } from "@/utils/supabase/leads-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
@@ -30,7 +30,6 @@ interface EditLeadModalProps {
   lead: Lead | null;
   isOpen: boolean;
   onClose: () => void;
-   
   onUpdate: (updatedLead: Lead) => void;
 }
 
@@ -39,16 +38,17 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
     first_name: "",
     last_name: "",
     email: "",
-    phone: "",
     status: "",
     interest_level: "",
     urgency: "",
     notes: "",
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const supabase = createClient();
+
+  const { phoneNumber, setPhoneNumber, phoneError, handlePhoneChange, handlePhoneBlur, validatePhoneNumber } = usePhoneValidation();
 
   useEffect(() => {
     if (lead && isOpen) {
@@ -56,15 +56,15 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
         first_name: lead.first_name || "",
         last_name: lead.last_name || "",
         email: lead.email || "",
-        phone: lead.phone || "",
         status: lead.status || "",
         interest_level: lead.interest_level || "",
         urgency: lead.urgency || "",
         notes: lead.notes || "",
       });
+      setPhoneNumber(lead.phone || "");
       setErrors({});
     }
-  }, [lead, isOpen]);
+  }, [lead, isOpen, setPhoneNumber]);
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -86,12 +86,16 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
       }
     }
 
-    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
-      newErrors.phone = "Please enter a valid phone number";
+    let isPhoneValid = true;
+    if (!phoneNumber || !phoneNumber.trim()) {
+      newErrors.phone = "Phone number is required";
+      isPhoneValid = false;
+    } else {
+      isPhoneValid = validatePhoneNumber(phoneNumber);
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return Object.keys(newErrors).length === 0 && isPhoneValid;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,17 +104,14 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
 
     setLoading(true);
     try {
-      // Update lead in database
       const { error } = await supabase
         .from("lead")
         .update({
           first_name: formData.first_name,
           last_name: formData.last_name,
           email: formData.email,
-          phone: formData.phone,
+          phone: phoneNumber,
           status: formData.status,
-          // interest_level: formData.interest_level || "medium",
-          // urgency: formData.urgency || "this_month",
           updated_at: new Date().toISOString(),
         })
         .eq("id", lead.id);
@@ -123,7 +124,7 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
         last_name: formData.last_name,
         name: `${formData.first_name} ${formData.last_name}`.trim(),
         email: formData.email,
-        phone: formData.phone,
+        phone: phoneNumber,
         status: formData.status,
         interest_level: formData.interest_level,
         urgency: formData.urgency,
@@ -149,9 +150,9 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
     }
   };
 
-  const handlePhoneChange = (value: string | undefined) => {
-
-    setFormData(prev => ({ ...prev, phone: value || "" }));
+  const handlePhoneChangeWithErrorClear = (value: string | undefined) => {
+    handlePhoneChange(value);
+    // Clear phone error when user starts typing
     if (errors.phone) {
       setErrors(prev => ({ ...prev, phone: "" }));
     }
@@ -233,28 +234,29 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
         </div>
 
         <div className="space-y-1">
-          <label className="block text-sm font-semibold text-gray-700">Phone Number</label>
+          <label className="block text-sm font-semibold text-gray-700">Phone Number *</label>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
             <PhoneInput
               international
               countryCallingCodeEditable={false}
               defaultCountry="US"
-              value={formData.phone}
-              onChange={handlePhoneChange}
+              value={phoneNumber}
+              onChange={handlePhoneChangeWithErrorClear}
+              onBlur={handlePhoneBlur}
               placeholder="Enter phone number"
               style={{
                 padding: "10px 16px 10px 40px",
-                border: errors.phone ? "2px solid #ef4444" : "2px solid #e5e7eb",
+                border: phoneError || errors.phone ? "2px solid #ef4444" : "2px solid #e5e7eb",
                 borderRadius: "8px",
                 fontSize: "15px",
-                backgroundColor: errors.phone ? "#fef2f2" : "#ffffff",
+                backgroundColor: phoneError || errors.phone ? "#fef2f2" : "#ffffff",
                 transition: "all 0.3s",
                 width: "100%",
               }}
             />
           </div>
-          {errors.phone && <p className="text-red-500 text-sm">{errors.phone}</p>}
+          {(phoneError || errors.phone) && <p className="text-red-500 text-sm">{phoneError || errors.phone}</p>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -14,8 +14,9 @@ import { Form } from "antd";
 import dayjs from "dayjs";
 import { Calendar, CheckCircle, Clock, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import "react-phone-number-input/style.css";
+import { useDropdown } from "@/hooks/useDropdown";
 
 export default function AppointmentsPage() {
   const [appointmentsData, setAppointmentsData] = useState<MeetingSchedule[]>([]);
@@ -25,7 +26,7 @@ export default function AppointmentsPage() {
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<MeetingSchedule | null>(null);
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [clinicId, setClinicId] = useState<string | null>(null);
@@ -33,8 +34,11 @@ export default function AppointmentsPage() {
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [, setPhoneError] = useState<string>("");
   const [form] = Form.useForm();
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const { activeDropdown, dropdownPosition, dropdownRef, toggleDropdown, closeDropdown } = useDropdown({
+    dropdownWidth: 192,
+    dropdownHeight: 120,
+    offset: 8,
+  });
 
   const supabase = createClient();
 
@@ -73,21 +77,6 @@ export default function AppointmentsPage() {
     };
     fetchClinicId();
   }, []);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setActiveDropdown(null);
-      }
-    };
-    if (activeDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-  }, [activeDropdown]);
 
   // Clear copied link indicator after 2 seconds
   useEffect(() => {
@@ -220,31 +209,16 @@ export default function AppointmentsPage() {
     }
   };
 
-  const toggleDropdown = (e: React.MouseEvent, appointmentId: string) => {
-    e.stopPropagation();
-    if (activeDropdown === appointmentId) {
-      setActiveDropdown(null);
-    } else {
-      // Calculate position relative to viewport
-      const rect = e.currentTarget.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8, // 8px gap below the button
-        left: rect.right - 192, // 192px is the width of dropdown (w-48)
-      });
-      setActiveDropdown(appointmentId);
-    }
-  };
-
   const openEditModal = (appointment: MeetingSchedule) => {
     setSelectedAppointment(appointment);
     setShowEditAppointmentModal(true);
-    setActiveDropdown(null);
+    closeDropdown();
   };
 
   const openDeleteConfirmation = (appointment: MeetingSchedule) => {
     setSelectedAppointment(appointment);
     setShowDeleteConfirmation(true);
-    setActiveDropdown(null);
+    closeDropdown();
   };
 
   // Filter appointments based on search and status
@@ -523,7 +497,7 @@ export default function AppointmentsPage() {
                         onClick={e => {
                           e.stopPropagation();
                           openEditModal(appointment);
-                          setActiveDropdown(null);
+                          closeDropdown();
                         }}
                         className="flex w-full items-center px-4 py-3 text-sm font-medium text-gray-700 transition-colors duration-200 hover:bg-blue-50 hover:text-blue-700"
                         type="button"
