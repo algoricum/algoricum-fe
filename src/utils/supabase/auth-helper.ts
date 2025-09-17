@@ -62,6 +62,7 @@ export const signUp = async (
       email,
       password,
     });
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     if (error) throw error;
     if (!data.user) throw new Error("Signup failed");
@@ -73,6 +74,7 @@ export const signUp = async (
         name,
         email,
         is_email_verified: false,
+        time_zone: tz,
       },
     ]);
 

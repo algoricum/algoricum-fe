@@ -138,7 +138,7 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
       centered
     >
       <div className="py-4">
-        {(status === "disconnected" || status === "connecting") && (
+        {status && (
           <>
             <Alert
               message="Connect your Gravity Forms Account"
@@ -261,7 +261,7 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
           </>
         )}
 
-        {status === "connected" && (
+        {/* {status === "connected" && (
           <>
             <Alert
               message="Successfully Connected!"
@@ -282,7 +282,7 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
               hoverBgColor="orange-600"
             />
           </>
-        )}
+        )} */}
       </div>
     </Modal>
   );
