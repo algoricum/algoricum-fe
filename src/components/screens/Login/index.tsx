@@ -2,7 +2,7 @@
 import { AuthSeparator } from "@/components/common";
 import { Button, Input } from "@/components/elements";
 import PasswordInput from "@/components/elements/PasswordInput";
-import { ErrorToast, WarningToast } from "@/helpers/toast";
+import { ErrorToast, WarningToast, SuccessToast } from "@/helpers/toast";
 import { useClinicCheck } from "@/hooks/useClinicCheck";
 import { MailIcon, PasswordIcon } from "@/icons";
 import type { LoginProps } from "@/interfaces/services_type";
@@ -81,6 +81,7 @@ const LoginPage = () => {
       }
       const supabase = createClient();
       // Proceed with clinic check for verified users
+      SuccessToast("Logged In succesfully");
       checkAndRedirectIfNoClinic(supabase, user.id, { push }, redirectUrl, setClinicData);
     },
     onError: (error: any) => {
@@ -196,7 +197,7 @@ const LoginPage = () => {
           </Form.Item>
         </Flex>
       </Form>
-      <AuthSeparator /> 
+      <AuthSeparator />
       <div className="text-center mt-2">
         <Text className="text-sm text-gray-600">
           Don&apos;t have an account?{" "}
