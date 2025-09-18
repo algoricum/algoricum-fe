@@ -148,9 +148,14 @@ async function processSMSMessage(
     const messageBody = webhookData.Body || "";
     const messageSid = webhookData.MessageSid;
 
+    console.log(`📱 === PROCESSING SMS MESSAGE ===`);
+    console.log(`📞 From: ${senderPhone} | To: ${recipientPhone} | Clinic: ${clinicId}`);
+    console.log(`💬 Message: "${messageBody}" | MessageSID: ${messageSid}`);
     console.log(`Processing SMS from: ${senderPhone} to: ${recipientPhone}`);
 
     // Find the clinic by matching recipient phone to twilio_phone_number and clinic_id
+    console.log(`🔍 Looking up Twilio config for clinic_id: ${clinicId}`);
+
     const { data: twilioConfig, error: configError } = await supabaseClient
       .from("twilio_config")
       .select(
@@ -174,6 +179,12 @@ async function processSMSMessage(
       .limit(1)
       .single();
 
+    console.log(`🏥 Twilio config query result:`, {
+      hasData: !!twilioConfig,
+      error: configError?.message,
+      configId: twilioConfig?.id,
+    });
+
     if (configError || !twilioConfig) {
       console.error("❌ Error finding Twilio config:", configError);
       return {
@@ -192,12 +203,22 @@ async function processSMSMessage(
     console.log(`✅ Found clinic: ${clinicData.id} - ${clinicData.name}`);
 
     // Check if sender phone exists in lead table for this clinic with improved matching
+    console.log(`👤 Looking up lead for phone: ${senderPhone} in clinic: ${clinicData.id}`);
+
     const { data: existingLead, error: leadError } = await supabaseClient
       .from("lead")
       .select("id, email, first_name, last_name, status, clinic_id, notes, form_data, created_at")
       .eq("clinic_id", clinicData.id)
+      .eq("phone", senderPhone)
       .limit(1)
       .single();
+
+    console.log(`👤 Lead query result:`, {
+      hasData: !!existingLead,
+      error: leadError?.message,
+      errorCode: leadError?.code,
+      leadId: existingLead?.id,
+    });
 
     let leadData = existingLead;
 
@@ -287,14 +308,15 @@ async function processSMSMessage(
     // Check for stop keywords and mark lead as Cold if found
     const stopKeywords = ["stop", "unsubscribe", "opt out", "optout", "quit", "cancel", "end", "remove"];
     const messageBodyLower = messageBody.toLowerCase().trim();
-    const isStopKeyword = stopKeywords.some(
-      keyword =>
-        messageBodyLower === keyword ||
-        messageBodyLower.includes(`${keyword} `) ||
-        messageBodyLower.includes(` ${keyword}`) ||
-        messageBodyLower.startsWith(`${keyword} `) ||
-        messageBodyLower.endsWith(` ${keyword}`),
-    );
+    console.log(`🔍 Checking message for stop keywords: "${messageBody}" -> "${messageBodyLower}"`);
+
+    const isStopKeyword = stopKeywords.some(keyword => {
+      // Check if the keyword appears as a standalone word (not part of another word)
+      const wordRegex = new RegExp(`\\b${keyword.toLowerCase()}\\b`, "i");
+      return wordRegex.test(messageBodyLower) && messageBodyLower.trim().length <= 20; // Only for short messages
+    });
+
+    console.log(`📝 Stop keyword check result: ${isStopKeyword}`);
 
     if (isStopKeyword) {
       console.log(`📴 Stop keyword detected in message: "${messageBody}". Marking lead as Cold.`);
@@ -320,32 +342,51 @@ async function processSMSMessage(
 
     // Check for booking/appointment keywords and create meeting_schedule if detected using shared service
     if (!isStopKeyword) {
-      const bookingOptions: BookingDetectionOptions = {
-        messageBody: messageBody,
-        leadData: {
-          id: leadData.id,
-          first_name: leadData.first_name,
-          last_name: leadData.last_name,
-          email: leadData.email,
-          phone: leadData.phone,
-          notes: leadData.notes,
-        },
-        clinicData: {
-          id: clinicData.id,
-          name: clinicData.name,
-          calendly_link: clinicData.calendly_link,
-        },
-        communicationType: "sms",
-        senderPhone: senderPhone,
-      };
+      console.log(`🔍 Checking for booking request in message: "${messageBody}"`);
+      console.log(`📱 Lead data: ${leadData.id} - ${leadData.first_name} ${leadData.last_name} - ${leadData.phone}`);
 
-      const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
+      try {
+        const bookingOptions: BookingDetectionOptions = {
+          messageBody: messageBody,
+          leadData: {
+            id: leadData.id,
+            first_name: leadData.first_name,
+            last_name: leadData.last_name,
+            email: leadData.email,
+            phone: leadData.phone,
+            notes: leadData.notes,
+          },
+          clinicData: {
+            id: clinicData.id,
+            name: clinicData.name,
+            calendly_link: clinicData.calendly_link,
+          },
+          communicationType: "sms",
+          senderPhone: senderPhone,
+        };
 
-      if (bookingResult.meetingScheduleCreated) {
-        console.log(`✅ Booking service created meeting schedule: ${bookingResult.meetingScheduleId}`);
-      } else if (bookingResult.error) {
-        console.error(`❌ Booking service error: ${bookingResult.error}`);
+        console.log(`🎯 Calling booking detection service...`);
+        const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
+
+        console.log(`📅 Booking detection result:`, {
+          isBookingRequest: bookingResult.isBookingRequest,
+          meetingScheduleCreated: bookingResult.meetingScheduleCreated,
+          meetingScheduleId: bookingResult.meetingScheduleId,
+          error: bookingResult.error,
+        });
+
+        if (bookingResult.meetingScheduleCreated) {
+          console.log(`✅ Booking service created meeting schedule: ${bookingResult.meetingScheduleId}`);
+        } else if (bookingResult.error) {
+          console.error(`❌ Booking service error: ${bookingResult.error}`);
+        } else if (!bookingResult.isBookingRequest) {
+          console.log(`ℹ️ No booking keywords detected in message: "${messageBody}"`);
+        }
+      } catch (bookingError) {
+        console.error(`❌ Error in booking detection:`, bookingError);
       }
+    } else {
+      console.log(`⚠️ Skipping booking detection due to stop keyword`);
     }
 
     // Create or find thread for SMS conversation
@@ -411,6 +452,7 @@ async function processSMSMessage(
 
     // Generate AI response or unsubscribe confirmation
     let aiResponseText = "";
+    let aiResponse: any = null;
 
     if (isStopKeyword) {
       // Provide standard unsubscribe confirmation for stop keywords
@@ -423,7 +465,7 @@ async function processSMSMessage(
     } else {
       // Generate normal AI response for non-stop messages
       console.log("🤖 Generating AI response...");
-      const aiResponse = await generateAIResponse(
+      aiResponse = await generateAIResponse(
         leadData as LeadData,
         {
           messageBody: messageBody,
@@ -466,7 +508,9 @@ async function processSMSMessage(
       },
     };
   } catch (error) {
-    console.error("Error processing SMS message:", error);
+    console.error("❌ ERROR in processSMSMessage:", error);
+    console.error("❌ Error stack:", error.stack);
+    console.error("❌ Error occurred at line:", error.stack?.split("\n")[1]);
     return {
       success: false,
       message: "Internal processing error: " + error.message,
