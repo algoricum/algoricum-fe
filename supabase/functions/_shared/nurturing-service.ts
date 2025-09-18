@@ -611,7 +611,7 @@ async function generateIntelligentResponse(
 
   // Only create unsubscribe elements for emails (NEVER for SMS per instructions)
   const unsubscribeButton = isEmail
-    ? `<a href="${unsubscribeLink}" style="color: #6b7280; text-decoration: none; font-size: 12px;">unsubscribe here</a>`
+    ? `<a href="${unsubscribeLink}" style="color: #6b7280; text-decoration: underline; font-weight: bold; font-size: 12px;">unsubscribe here</a>`
     : null;
 
   const unsubscribeFooter = isEmail
@@ -662,14 +662,39 @@ async function generateIntelligentResponse(
       systemPrompt = `${assistantInstructions}
 
 CRITICAL EMAIL FORMATTING RULES:
-• End your email content naturally - do NOT add signatures, "Best regards," or closing lines
-• Do NOT include clinic name, "[Your Name]" or any placeholder signatures at the end
+• **FOLLOW EXACT EMAIL TEMPLATES**: Use the story-driven, psychology-based email format from the provided 20-email nurture sequence examples
+• **SUBJECT PATTERNS**: Create unique subjects like these examples:
+  - "The [dollar amount/number] mistake that started a movement"
+  - "Why we ignore problems that matter most"
+  - "The [location/entity] with no [expected thing]"
+  - "The myth of the 'perfect time'"
+  - "The [effect/phenomenon] is weirder than you think"
+  - "The woman/man who [action] and changed [outcome]"
+  - "What [profession] know about [concept] that the rest of us don't"
+  - "The lost art of [concept]"
+  - "The [number]-minute rule for [action]"
+  - "Lessons from [number] patient conversations"
+• **EMAIL STRUCTURE**: Follow this exact storytelling pattern:
+  1. Hook with specific story/example/statistic
+  2. Build narrative with concrete details
+  3. Reveal the lesson or principle
+  4. Connect to broader human behavior/psychology
+  5. Relate back to reader's situation
+  6. Call to action
+  7. P.S. with service offer
+• **STORYTELLING ELEMENTS**: Include:
+  - Corporate examples (J&J, Toyota, Fortune 500)
+  - Medical/healthcare stories and research
+  - Psychology studies and behavioral science
+  - Historical examples with specific dates/names
+  - Personal anecdotes from clinic experience
+• **TONE**: Conversational, educational, story-driven, never pushy
+• **FORMAT**: Natural paragraph flow, not forced short lines
+• **PARAGRAPH LENGTH**: Each paragraph MUST be maximum 20 words - literally count 1,2,3...19,20 and STOP. Break long sentences into multiple paragraphs.
+• **SUBJECT LINE**: NEVER write "Subject:" in the subject line - write ONLY the subject text without any prefix
+• Do NOT include "Subject:" prefix or clinic signatures
 • Do NOT include unsubscribe text (system handles this automatically)
 • Include booking links when appropriate for email follow-ups
-• Simply end where your message naturally concludes
-• Keep content focused and conversational without formal closings
-• FORMAT FOR READABILITY: Break lines after approximately 15-20 words to make emails appear longer and more readable
-• Use line breaks strategically to create visual space and improve flow
 
 BOOKING LINK FOR EMAILS:
 ${bookingLink ? `Available booking link: ${bookingLink}` : "No booking link configured"}
@@ -686,19 +711,39 @@ Patient Details:
 - Lead Age: ${leadAge} days
 - Interest Level: ${lead.interest_level || "unknown"}
 - Urgency: ${lead.urgency || "unknown"}
+- Clinic Type: ${clinic.clinic_type || "healthcare"}
 
-IMPORTANT: Follow the specific EMAIL FOLLOW-UP PATTERN from your instructions based on the lead age (${leadAge} days). Use the appropriate pattern:
-- Day 21+: STORY PATTERN with clinic success stories
-- Day 24+: EDUCATION PATTERN with insights
-- Day 27+: PSYCHOLOGY PATTERN with behavioral insights  
-- Day 30+: MOMENTUM PATTERN focusing on action
-- Day 45+: SOCIAL PROOF PATTERN with patient feedback
-- Day 60+: URGENCY/SCARCITY PATTERN about opportunity cost
-- Day 100+: FINAL SEQUENCE with direct close
+FOLLOW THESE EXACT EMAIL EXAMPLES FOR INSPIRATION:
 
-Generate according to the specific pattern for this lead age. Format as specified in your instructions with proper subject line and body content.
+**Day 21 Example**: "The $20 million mistake that started a movement" - J&J Tylenol story showing decisive action
+**Day 24 Example**: "Why we ignore problems that matter most" - Psychology of urgency effect  
+**Day 27 Example**: "The hospital with no waiting room" - Virginia Mason Medical Center innovation
+**Day 30 Example**: "The myth of the 'perfect time'" - Present bias and cost of waiting
+**Day 33 Example**: "The placebo effect is weirder than you think" - 2002 knee surgery study
+**Day 36 Example**: "The woman who walked into a clinic and changed medicine" - Fanny Longfellow ether story
+**Day 39 Example**: "What surgeons know about confidence" - Confidence through preparation
+**Day 42 Example**: "The lost art of follow-through" - Duke habits research (45% of actions)
+**Day 100 Example**: "Are you still curious, or should I close your file?" - Direct final sequence
 
-REMEMBER: End naturally without signatures, footers, or closing formalities. The system will add unsubscribe links automatically.`;
+GENERATE AN EMAIL FOLLOWING THIS PATTERN:
+1. Create unique subject using patterns above (vary the hook completely) - NO "Subject:" prefix
+2. Start with specific story, statistic, or historical example
+3. Build narrative with concrete details (names, dates, numbers)
+4. Extract the universal principle or psychology concept
+5. Connect to human behavior and decision-making
+6. Relate back to reader's ${clinic.clinic_type} situation
+7. End with conversational call-to-action
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Subject line: Write ONLY the text, never include "Subject:"
+- Paragraphs: STRICT 20-word maximum - literally count 1,2,3...20 and STOP
+- Break long sentences into multiple short paragraphs if needed
+- Each paragraph = 1 complete thought in 20 words or less
+
+MAKE IT COMPLETELY UNIQUE - different story, different psychology concept, different hook than previous emails. Use real examples from business, medicine, psychology research, or history.
+REMEMBER: End naturally without signatures, footers, or closing formalities. The system will add unsubscribe links automatically.
+
+`;
     } else {
       // SMS responses - use specific patterns with new style guidelines
       systemPrompt = `You are a conversational assistant for ${clinic.name}. 
@@ -812,8 +857,14 @@ IMPORTANT: Generate a response that captures the same tone, style, and approach 
 
             if (line.toLowerCase().startsWith("subject:")) {
               subject = line.replace(/^subject:\s*/i, "").trim();
+              subject = subject.replace(/^subject:\s*/i, "").trim();
+              // Remove any markdown formatting like ** from subject
+              subject = subject.replace(/^\*\*|\*\*$/g, "").trim();
               foundSubject = true;
             } else if (foundSubject && line.trim()) {
+              if (line.toLowerCase().startsWith("subject:")) {
+                continue;
+              }
               // After finding subject, everything else is body content
               body += (body ? "\n" : "") + line;
             } else if (foundSubject && !line.trim() && body) {
