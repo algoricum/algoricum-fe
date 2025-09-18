@@ -246,7 +246,7 @@ export default function LeadsPage() {
     >
       <div>
         <div className="my-6 px-4 w-full">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full">
             {leadsStatsConfig.map(stat => (
               <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(statusStats)} />
             ))}
