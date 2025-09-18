@@ -29,6 +29,11 @@ export interface CreateMeetingRequest {
   status?: MeetingStatus;
 }
 
+export interface AppointmentStatus {
+  status: string;
+  count: number;
+}
+
 export interface UpdateMeetingRequest {
   username?: string;
   email?: string;
@@ -389,6 +394,35 @@ export class AppointmentHelper {
       return data || [];
     } catch (error) {
       console.error("Error fetching meetings by date:", error);
+      throw error;
+    }
+  }
+
+  async getStatusStats(clinicId: string): Promise<AppointmentStatus[]> {
+    try {
+      const { data: appointments, error } = await this.supabase.from("meeting_schedule").select("status").eq("clinic_id", clinicId);
+
+      if (error) {
+        throw error;
+      }
+
+      if (!appointments || appointments.length === 0) {
+        return [];
+      }
+
+      // Group and count statuses client-side (efficient for per-clinic lead volumes)
+      const statsMap: { [key: string]: number } = {};
+      appointments.forEach((lead: any) => {
+        const status = lead.status;
+        statsMap[status] = (statsMap[status] || 0) + 1;
+      });
+
+      return Object.entries(statsMap).map(([status, count]) => ({
+        status,
+        count,
+      }));
+    } catch (error) {
+      console.error("Error fetching status stats:", error);
       throw error;
     }
   }

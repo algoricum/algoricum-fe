@@ -36,11 +36,8 @@ export const usePhoneValidation = (onFieldTouch?: (fieldId: string) => void) => 
     if (onFieldTouch) {
       onFieldTouch("clinicPhone");
     }
-    if (value) {
-      validatePhoneNumber(value);
-    } else {
-      setPhoneError("");
-    }
+
+    validatePhoneNumber(value);
   };
 
   const handlePhoneBlur = () => {
