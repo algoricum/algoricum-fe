@@ -690,7 +690,7 @@ CRITICAL EMAIL FORMATTING RULES:
   - Personal anecdotes from clinic experience
 • **TONE**: Conversational, educational, story-driven, never pushy
 • **FORMAT**: Natural paragraph flow, not forced short lines
-• **PARAGRAPH LENGTH**: Each paragraph MUST be maximum 20 words - literally count 1,2,3...19,20 and STOP. Break long sentences into multiple paragraphs.
+• **PARAGRAPH LENGTH**: ABSOLUTE 20-word maximum - count EVERY word including "a", "the", "and". NO EXCEPTIONS. Split long sentences into multiple paragraphs rather than exceed 20 words.
 • **SUBJECT LINE**: NEVER write "Subject:" in the subject line - write ONLY the subject text without any prefix
 • Do NOT include "Subject:" prefix or clinic signatures
 • Do NOT include unsubscribe text (system handles this automatically)
@@ -727,20 +727,37 @@ FOLLOW THESE EXACT EMAIL EXAMPLES FOR INSPIRATION:
 
 GENERATE AN EMAIL FOLLOWING THIS PATTERN:
 1. Create unique subject using patterns above (vary the hook completely) - NO "Subject:" prefix
-2. Start with specific story, statistic, or historical example
-3. Build narrative with concrete details (names, dates, numbers)
-4. Extract the universal principle or psychology concept
-5. Connect to human behavior and decision-making
-6. Relate back to reader's ${clinic.clinic_type} situation
-7. End with conversational call-to-action
+2. Start with personalized greeting: "Hi ${lead.first_name || "there"},"
+3. Begin with specific story, statistic, or historical example
+4. Build narrative with concrete details (names, dates, numbers)
+5. Extract the universal principle or psychology concept
+6. Connect to human behavior and decision-making
+7. Relate back to reader's ${clinic.clinic_type} situation
+8. End with conversational call-to-action
 
 CRITICAL FORMATTING REQUIREMENTS:
 - Subject line: Write ONLY the text, never include "Subject:"
-- Paragraphs: STRICT 20-word maximum - literally count 1,2,3...20 and STOP
-- Break long sentences into multiple short paragraphs if needed
-- Each paragraph = 1 complete thought in 20 words or less
+- Paragraphs: ABSOLUTE 20-word limit - count EVERY single word including "a", "the", "and"
+- If a sentence is 25 words, split it into TWO paragraphs
+- NO EXCEPTIONS to the 20-word rule - sacrifice sentence flow if needed
+- Better to have short, choppy paragraphs than exceed 20 words
+- Count words like this: "In(1) 1999(2), a(3) pivotal(4) study(5)..." and STOP at word 20
 
-MAKE IT COMPLETELY UNIQUE - different story, different psychology concept, different hook than previous emails. Use real examples from business, medicine, psychology research, or history.
+MAKE IT COMPLETELY UNIQUE - NO repetitive patient stories or similar hooks. Use DIVERSE examples:
+- Historical events (like J&J Tylenol crisis, Virginia Mason hospital)
+- Psychology research studies (Stanford, Harvard, Yale experiments)
+- Corporate innovation stories (Apple, Toyota, Fortune 500 companies)
+- Scientific discoveries and breakthroughs
+- Cultural phenomena and social movements
+- Technology evolution and disruptions
+
+AVOID REPETITIVE PATTERNS:
+- Don't use "patient who ignored X and paid $Y" stories repeatedly
+- Don't start with "Have you heard about..." every time
+- Vary the opening hooks completely
+- Use different industries, time periods, and contexts
+- Create fresh angles and perspectives each time
+
 REMEMBER: End naturally without signatures, footers, or closing formalities. The system will add unsubscribe links automatically.
 
 `;
