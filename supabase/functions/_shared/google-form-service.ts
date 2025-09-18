@@ -2,7 +2,6 @@ import { corsHeaders } from "./cors.ts";
 import { chunkArray, enqueueLead } from "./Lead-enqueue.ts";
 const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID");
 const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
-const googleRedirectUri = Deno.env.get("GOOGLE_REDIRECT_URI");
 const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
 
 // Initiate OAuth Flow
@@ -44,7 +43,7 @@ export async function initiateOAuthFlow(req: any) {
 
     const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     authUrl.searchParams.set("client_id", googleClientId);
-    authUrl.searchParams.set("redirect_uri", googleRedirectUri);
+    authUrl.searchParams.set("redirect_uri", new URL(redirectTo).origin + "/Redirect-form");
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("scope", scopes.join(" "));
     authUrl.searchParams.set("access_type", "offline");
@@ -143,7 +142,7 @@ export async function handleOAuthCallback(req: any, supabase: any) {
       client_secret: googleClientSecret,
       code: code,
       grant_type: "authorization_code",
-      redirect_uri: googleRedirectUri,
+      redirect_uri: new URL(redirectUri).origin + "/Redirect-form",
     });
 
     const tokenResponse = await fetch(tokenUrl, {
