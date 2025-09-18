@@ -742,6 +742,8 @@ CRITICAL FORMATTING REQUIREMENTS:
 - NO EXCEPTIONS to the 20-word rule - sacrifice sentence flow if needed
 - Better to have short, choppy paragraphs than exceed 20 words
 - Count words like this: "In(1) 1999(2), a(3) pivotal(4) study(5)..." and STOP at word 20
+- Start each new paragraph on a NEW LINE with proper line breaks between them
+- Do NOT combine multiple sentences into one paragraph block
 
 MAKE IT COMPLETELY UNIQUE - NO repetitive patient stories or similar hooks. Use DIVERSE examples:
 - Historical events (like J&J Tylenol crisis, Virginia Mason hospital)
