@@ -409,7 +409,7 @@ async function determineFollowUpsForLead(lead: Lead, supabase: any, followUpRule
     return [];
   }
 
-  if (lead.status !== "Engaged") {
+  if (lead.status === "Booked" || lead.status === "Cold" || lead.status === "Converted") {
     logInfo(`Lead ${lead.id}: Skipping follow-ups - status is "${lead.status}", only "Engaged" leads are valid for follow-ups`);
     return [];
   }

@@ -159,37 +159,37 @@ serve(async req => {
 
     // Get form data (multipart/form-data with files)
     const formData = await req.formData();
-    
+
     // Extract files with their source field names for better document_type detection
     const fileSourceMap = [
-      { field: 'service_document', file: formData.get('service_document'), type: 'service' },
-      { field: 'pricing_document', file: formData.get('pricing_document'), type: 'pricing' },
-      { field: 'testimonials_document', file: formData.get('testimonials_document'), type: 'testimonials' },
+      { field: "service_document", file: formData.get("service_document"), type: "service" },
+      { field: "pricing_document", file: formData.get("pricing_document"), type: "pricing" },
+      { field: "testimonials_document", file: formData.get("testimonials_document"), type: "testimonials" },
       // Fallback to old field names for backward compatibility
-      { field: 'clinic_document_1', file: formData.get('clinic_document_1'), type: null },
-      { field: 'clinic_document_2', file: formData.get('clinic_document_2'), type: null },
-      { field: 'clinic_document_3', file: formData.get('clinic_document_3'), type: null }
+      { field: "clinic_document_1", file: formData.get("clinic_document_1"), type: null },
+      { field: "clinic_document_2", file: formData.get("clinic_document_2"), type: null },
+      { field: "clinic_document_3", file: formData.get("clinic_document_3"), type: null },
     ].filter(item => item.file && item.file.size > 0);
 
     const files = fileSourceMap.map(item => item.file);
 
-    console.log('📁 File extraction debug:', {
-      service_document: !!formData.get('service_document'),
-      pricing_document: !!formData.get('pricing_document'),
-      testimonials_document: !!formData.get('testimonials_document'),
-      clinic_document_1: !!formData.get('clinic_document_1'),
-      clinic_document_2: !!formData.get('clinic_document_2'),
-      clinic_document_3: !!formData.get('clinic_document_3'),
-      total_files_found: files.length
+    console.log("📁 File extraction debug:", {
+      service_document: !!formData.get("service_document"),
+      pricing_document: !!formData.get("pricing_document"),
+      testimonials_document: !!formData.get("testimonials_document"),
+      clinic_document_1: !!formData.get("clinic_document_1"),
+      clinic_document_2: !!formData.get("clinic_document_2"),
+      clinic_document_3: !!formData.get("clinic_document_3"),
+      total_files_found: files.length,
     });
 
     // Extract other form fields
-    const clinic_id = formData.get('clinic_id');
-    const assistant_id = formData.get('assistant_id') || null;
-    const name = formData.get('name');
-    const description = formData.get('description') || '';
-    const instructions = formData.get('instructions') || '';
-    const model = 'gpt-4o-mini';
+    const clinic_id = formData.get("clinic_id");
+    const assistant_id = formData.get("assistant_id") || null;
+    const name = formData.get("name");
+    const description = formData.get("description") || "";
+    const instructions = formData.get("instructions") || "";
+    const model = "gpt-4o-mini";
 
     // Parse tools if provided, otherwise use default
     let tools = [];
@@ -377,7 +377,7 @@ serve(async req => {
         .upsert({
           clinic_id,
           openai_assistant_id: openaiAssistantId,
-          assistant_name: name,
+          assistant_name: `${name} assistant`,
           assistant_description: description,
           instructions,
           model,
@@ -412,26 +412,24 @@ serve(async req => {
 
     // Save file references in the database
     if (uploadedFiles.length > 0) {
-      const fileRecords = uploadedFiles.map((file, index) => {
+      const fileRecords = uploadedFiles.map(file => {
         // Get document type from the source mapping or infer from filename
         let documentType = null;
-        
+
         // First try to match with the source field mapping
-        const sourceItem = fileSourceMap.find(item => 
-          item.file && item.file.name === file.file_name
-        );
-        
+        const sourceItem = fileSourceMap.find(item => item.file && item.file.name === file.file_name);
+
         if (sourceItem && sourceItem.type) {
           documentType = sourceItem.type;
         } else {
           // Fallback to filename-based detection
           const fileName = file.file_name.toLowerCase();
-          if (fileName.includes('service') || fileName.includes('treatment')) {
-            documentType = 'service';
-          } else if (fileName.includes('pricing') || fileName.includes('price')) {
-            documentType = 'pricing';
-          } else if (fileName.includes('testimonial') || fileName.includes('review')) {
-            documentType = 'testimonials';
+          if (fileName.includes("service") || fileName.includes("treatment")) {
+            documentType = "service";
+          } else if (fileName.includes("pricing") || fileName.includes("price")) {
+            documentType = "pricing";
+          } else if (fileName.includes("testimonial") || fileName.includes("review")) {
+            documentType = "testimonials";
           }
         }
 
@@ -439,50 +437,50 @@ serve(async req => {
           assistant_id: assistantResult.id,
           openai_file_id: file.openai_file_id,
           file_name: file.file_name,
-          purpose: 'assistants',
-          document_type: documentType
+          purpose: "assistants",
+          document_type: documentType,
           // Note: created_at has default value, no need to set explicitly
         };
       });
 
-      console.log('📁 Saving file records to database:', {
+      console.log("📁 Saving file records to database:", {
         count: fileRecords.length,
         assistant_id: assistantResult.id,
-        files: fileRecords.map(f => ({ name: f.file_name, openai_id: f.openai_file_id }))
+        files: fileRecords.map(f => ({ name: f.file_name, openai_id: f.openai_file_id })),
       });
 
-      const { data: savedFiles, error: fileError } = await supabaseClient
-        .from('assistant_files')
-        .insert(fileRecords)
-        .select();
+      const { data: savedFiles, error: fileError } = await supabaseClient.from("assistant_files").insert(fileRecords).select();
 
       if (fileError) {
-        console.error('❌ Failed to save file references in database:', {
+        console.error("❌ Failed to save file references in database:", {
           error: fileError.message,
           details: fileError.details,
           hint: fileError.hint,
           code: fileError.code,
-          fileRecords: fileRecords
+          fileRecords: fileRecords,
         });
-        
+
         // Return error since file tracking is important
-        return new Response(JSON.stringify({
-          error: 'Assistant created but failed to save file references',
-          assistant: assistantResult,
-          fileError: fileError.message,
-          filesUploaded: uploadedFiles.length
-        }), {
-          status: 207, // Multi-status - partial success
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json'
-          }
-        });
+        return new Response(
+          JSON.stringify({
+            error: "Assistant created but failed to save file references",
+            assistant: assistantResult,
+            fileError: fileError.message,
+            filesUploaded: uploadedFiles.length,
+          }),
+          {
+            status: 207, // Multi-status - partial success
+            headers: {
+              ...headers,
+              "Content-Type": "application/json",
+            },
+          },
+        );
       }
 
-      console.log('✅ File references saved successfully:', {
+      console.log("✅ File references saved successfully:", {
         saved: savedFiles?.length || 0,
-        expected: fileRecords.length
+        expected: fileRecords.length,
       });
     }
 
