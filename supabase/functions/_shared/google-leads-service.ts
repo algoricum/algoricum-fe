@@ -2,7 +2,6 @@ import { supabase } from "./supabaseClient.ts";
 
 const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
 const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-const googleRedirectUri = Deno.env.get("GOOGLE_LEAD_REDIRECT_URI")!;
 const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
 
 /**
@@ -15,7 +14,7 @@ export async function startAuth(clinic_id: string, redirectTo: string) {
 
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
     client_id: googleClientId,
-    redirect_uri: googleRedirectUri,
+    redirect_uri: new URL(redirectTo).origin + "/Redirect-lead",
     response_type: "code",
     scope: scopes,
     access_type: "offline",
@@ -40,7 +39,7 @@ export async function handleOAuthCallback(code: string, clinic_id: string, redir
       code,
       client_id: googleClientId,
       client_secret: googleClientSecret,
-      redirect_uri: googleRedirectUri,
+      redirect_uri: new URL(redirectTo).origin + "/Redirect-lead",
       grant_type: "authorization_code",
     }),
   });
