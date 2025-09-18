@@ -44,7 +44,7 @@ export default function AppointmentsPage() {
   });
 
   // Initialize pagination with default page size of 10
-  const { currentPage, pageSize, paginationConfig, setTotal } = usePagination(10);
+  const { currentPage, pageSize, paginationConfig, setTotal, setCurrentPage } = usePagination(10);
 
   const supabase = createClient();
 
@@ -54,28 +54,22 @@ export default function AppointmentsPage() {
     setIsLoading(true);
     setStatsLoading(true);
     try {
-      // Fetch total count for pagination
-      const { count, error: countError } = await supabase
+      const {
+        data: meetings,
+        error,
+        count,
+      } = await supabase
         .from("meeting_schedule")
-        .select("*", { count: "exact", head: true })
-        .eq("clinic_id", clinicId);
-
-      if (countError) throw countError;
-
-      // Set total items for pagination
-      setTotal(count || 0);
-
-      // Fetch paginated data
-      const { data: meetings, error } = await supabase
-        .from("meeting_schedule")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("clinic_id", clinicId)
         .order("created_at", { ascending: false })
         .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
 
       if (error) throw error;
 
+      // Set both data and total count from single query
       setAppointmentsData(meetings || []);
+      setTotal(count || 0);
     } catch (error) {
       console.error("Error loading appointments:", error);
       ErrorToast("Failed to load appointments. Please try again.");
@@ -237,13 +231,23 @@ export default function AppointmentsPage() {
   };
 
   const handleDeleteAppointment = async () => {
-    if (!selectedAppointment) {
-      return;
-    }
+    if (!selectedAppointment) return;
+
     setIsSubmitting(true);
     try {
       await appointmentHelper.deleteMeeting(selectedAppointment.id);
-      await loadAppointments();
+
+      // Calculate if current page will be empty after deletion
+      const newTotalItems = appointmentsData.length - 1;
+      const totalPages = Math.ceil(newTotalItems / pageSize);
+
+      // If current page is now beyond total pages, go to the previous page
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(currentPage - 1); // This will trigger useEffect
+      } else if (newTotalItems === 0) {
+        setCurrentPage(1); // This will trigger useEffect
+      }
+
       setShowDeleteConfirmation(false);
       setSelectedAppointment(null);
       SuccessToast("Appointment deleted successfully!");

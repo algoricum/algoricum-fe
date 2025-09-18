@@ -6,6 +6,7 @@ export interface UsePaginationReturn {
   pageSize: number;
   totalItems: number;
   offset: number;
+  setCurrentPage: (total: number) => void;
   paginationConfig: PaginationProps;
   setTotal: (total: number) => void;
   resetPagination: () => void;
@@ -66,5 +67,6 @@ export const usePagination = (initialPageSize: number = 10): UsePaginationReturn
     paginationConfig,
     setTotal,
     resetPagination,
+    setCurrentPage,
   };
 };
