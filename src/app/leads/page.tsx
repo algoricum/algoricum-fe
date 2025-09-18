@@ -18,7 +18,7 @@ import {
   LEAD_STATUSES,
   type StatusStats,
 } from "@/utils/supabase/leads-helper";
-import { Modal, Pagination } from "antd";
+import { Modal, Pagination, Select } from "antd";
 import { Edit, MoreVertical, SearchIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { leadsStatsConfig } from "./statsUtil";
@@ -266,18 +266,27 @@ export default function LeadsPage() {
                   className="w-full rounded-lg border border-gray-300 px-10 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
                 />
               </div>
-              <select
+              <Select
                 value={selectedLeadStatus}
-                onChange={e => setSelectedLeadStatus(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 md:w-[220px]"
-              >
-                <option value="all">All Status</option>
-                {LEAD_STATUSES.map(status => (
-                  <option key={status} value={status}>
-                    {formatStatus(status)}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedLeadStatus}
+                placeholder="Select status"
+                className="w-full md:w-[240px]"
+                size="large"
+                style={{
+                  borderRadius: "12px",
+                }}
+                dropdownStyle={{
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                }}
+                options={[
+                  { value: "all", label: "All Status" },
+                  ...LEAD_STATUSES.map(status => ({
+                    value: status,
+                    label: formatStatus(status),
+                  })),
+                ]}
+              />
             </div>
             <button
               onClick={() => setShowLeadForm(true)}

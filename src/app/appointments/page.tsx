@@ -12,7 +12,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import { appointmentHelper, type AppointmentStatus, type MeetingSchedule } from "@/utils/appointment-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import { Form, Pagination } from "antd";
+import { Form, Pagination, Select } from "antd";
 import dayjs from "dayjs";
 import { Calendar, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -338,15 +338,19 @@ export default function AppointmentsPage() {
           {/* Filter and Add Button */}
           <div className="flex gap-3">
             {/* Status Filter */}
-            <select
+            <Select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              onChange={setStatusFilter}
+              className="w-auto min-w-[120px]"
+              size="middle"
+              style={{
+                borderRadius: "8px",
+              }}
             >
-              <option value="all">All Status</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="pending">Pending</option>
-            </select>
+              <Select.Option value="all">All Status</Select.Option>
+              <Select.Option value="confirmed">Confirmed</Select.Option>
+              <Select.Option value="pending">Pending</Select.Option>
+            </Select>
 
             {/* Add Appointment Button */}
             <button

@@ -1,7 +1,7 @@
 "use client";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { ErrorToast } from "@/helpers/toast";
-import { Button } from "antd";
+import { Button, Select } from "antd";
 import { X } from "lucide-react";
 import type React from "react";
 
@@ -83,15 +83,20 @@ export function EditStaffModal({ isOpen, isSubmitting, selectedStaff, editStaff,
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
-            <select
+            <Select
               value={editStaff.status}
-              onChange={e => onInputChange("status", e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500"
+              onChange={value => onInputChange("status", value)}
+              className="w-full"
+              size="large"
+              style={{
+                borderRadius: "8px",
+              }}
               disabled={isSubmitting}
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+              options={[
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+              ]}
+            />
           </div>
 
           <div className="flex flex-col gap-3 pt-4 md:flex-row">
