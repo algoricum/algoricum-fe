@@ -6,14 +6,22 @@ import { DeleteLeadModal } from "@/components/Leads/DeleteLeadModal";
 import { EditLeadModal } from "@/components/Leads/EditLeadModal";
 import LeadGenerationForm from "@/components/Leads/LeadGenerationForm";
 import { StatCard } from "@/components/Leads/StatCard";
+import { useDropdown } from "@/hooks/useDropdown";
+import { usePagination } from "@/hooks/usePagination"; // Adjust path as needed
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { fetchLeadsForClinic, formatStatus, getCurrentUserClinic, getStatusColor, LEAD_STATUSES } from "@/utils/supabase/leads-helper";
-import { Modal } from "antd";
+import {
+  fetchLeadsForClinic,
+  formatStatus,
+  getCurrentUserClinic,
+  getStatusColor,
+  getStatusStats,
+  LEAD_STATUSES,
+  type StatusStats,
+} from "@/utils/supabase/leads-helper";
+import { Modal, Pagination } from "antd";
 import { Edit, MoreVertical, SearchIcon, Trash2 } from "lucide-react";
-import type React from "react";
 import { useEffect, useState } from "react";
 import { leadsStatsConfig } from "./statsUtil";
-import { useDropdown } from "@/hooks/useDropdown";
 
 interface Lead {
   id: string;
@@ -32,7 +40,9 @@ interface Lead {
 
 export default function LeadsPage() {
   const [leadsData, setLeadsData] = useState<Lead[]>([]);
+  const [statusStats, setStatusStats] = useState<StatusStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLeadStatus, setSelectedLeadStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,10 +58,46 @@ export default function LeadsPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const { currentPage, pageSize, totalItems, offset, paginationConfig, setTotal } = usePagination(10);
 
   useEffect(() => {
-    loadData();
+    const initializeClinic = async () => {
+      try {
+        setLoading(true);
+        setStatsLoading(true);
+        const currentClinicId = await getCurrentUserClinic();
+        setClinicId(currentClinicId);
+      } catch (err) {
+        console.error("Error getting clinic:", err);
+        setError(err instanceof Error ? err.message : "Failed to get clinic");
+        setLoading(false);
+        setStatsLoading(false);
+      }
+    };
+
+    initializeClinic();
   }, []);
+
+  useEffect(() => {
+    if (clinicId) {
+      loadData();
+      loadStatusStats();
+    }
+  }, [clinicId, currentPage, pageSize]);
+
+  const loadStatusStats = async () => {
+    if (!clinicId) return;
+    try {
+      setStatsLoading(true);
+      const stats = await getStatusStats(clinicId);
+      setStatusStats(stats);
+    } catch (err) {
+      console.error("Error loading status stats:", err);
+      setError(err instanceof Error ? err.message : "Failed to load status stats");
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const handleClose = (newLead?: any) => {
     setShowLeadForm(false);
@@ -71,17 +117,28 @@ export default function LeadsPage() {
         updated_at: newLead.updated_at,
       };
       setLeadsData(prev => [formattedLead, ...prev]);
+      loadStatusStats();
     }
   };
 
   const loadData = async () => {
+    if (!clinicId) {
+      console.error("No clinic ID available");
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const currentClinicId = await getCurrentUserClinic();
-      setClinicId(currentClinicId);
-      const leads = await fetchLeadsForClinic(currentClinicId);
-      setLeadsData(leads);
+
+      const response = await fetchLeadsForClinic(clinicId, {
+        page: currentPage,
+        pageSize: pageSize,
+        offset: offset,
+      });
+
+      setLeadsData(response.leads);
+      setTotal(response.total);
     } catch (err) {
       console.error("Error loading data:", err);
       setError(err instanceof Error ? err.message : "Failed to load leads");
@@ -104,10 +161,12 @@ export default function LeadsPage() {
 
   const handleUpdateLead = (updatedLead: Lead) => {
     setLeadsData(prev => prev.map(lead => (lead.id === updatedLead.id ? updatedLead : lead)));
+    loadStatusStats();
   };
 
   const handleConfirmDelete = (leadId: string) => {
     setLeadsData(prev => prev.filter(lead => lead.id !== leadId));
+    loadStatusStats();
   };
 
   const filteredLeads = leadsData.filter(lead => {
@@ -151,7 +210,7 @@ export default function LeadsPage() {
     </div>
   );
 
-  if (loading) {
+  if (loading || statsLoading) {
     return (
       <DashboardLayout
         header={
@@ -189,7 +248,7 @@ export default function LeadsPage() {
         <div className="my-6 px-4 w-full">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full">
             {leadsStatsConfig.map(stat => (
-              <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(leadsData)} />
+              <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(statusStats)} />
             ))}
           </div>
         </div>
@@ -343,6 +402,13 @@ export default function LeadsPage() {
           </div>
         )}
 
+        {totalItems > 0 && (
+          <div className="flex justify-center py-4">
+            <div className="bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-200">
+              <Pagination {...paginationConfig} />
+            </div>
+          </div>
+        )}
         <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} width={800}>
           {clinicId && <LeadGenerationForm clinicId={clinicId} onSuccess={handleClose} />}
         </Modal>

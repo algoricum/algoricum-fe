@@ -26,7 +26,9 @@ const validateEmail = (email: string) => {
 };
 
 export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showAllQuestions = false }: ClinicInfoStepProps) {
-  const { phoneNumber, phoneError, handlePhoneChange, setPhoneNumber } = usePhoneValidation();
+  const { phoneNumber, phoneError, handlePhoneChange, setPhoneNumber } = usePhoneValidation(fieldId => {
+    markFieldAsTouched(fieldId);
+  });
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [formData, setFormData] = useState({
     clinicName: initialData.clinicName || "",
@@ -42,10 +44,10 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
 
   // Add useEffect to sync initial phone data
   useEffect(() => {
-    if (initialData.clinicPhone) {
+    if (initialData.clinicPhone && !phoneNumber) {
       setPhoneNumber(initialData.clinicPhone);
     }
-  }, [initialData.clinicPhone, setPhoneNumber]);
+  }, [initialData.clinicPhone, phoneNumber, setPhoneNumber]);
   // NEW: Track which fields have been touched/interacted with
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
@@ -270,6 +272,10 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
       return null;
     }
 
+    if (currentQuestion.type === "phone") {
+      return phoneError || null;
+    }
+
     const value = formData[currentQuestion.id as keyof typeof formData];
 
     // Required field check for all types
@@ -280,14 +286,6 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     // Email validation - only if there's a value
     if (currentQuestion.type === "email" && value?.toString().trim() && !validateEmail(value as string)) {
       return "Please enter a valid email address";
-    }
-
-    // FIXED PHONE VALIDATION - Check format if there's a value
-    if (currentQuestion.type === "phone") {
-      if (currentQuestion.required && !phoneNumber?.trim()) {
-        return "This field is required";
-      }
-      return phoneError; // Use error from hook
     }
 
     return null;
@@ -462,6 +460,8 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
     if (currentQuestionIndex === questions.length - 1) {
       return !getFieldError(true) && consentData.acceptedPrivacyPolicy && consentData.acceptedTermsandConditions;
     }
+
+    // For phone and all other fields, just check if there's an error
     return !getFieldError(true);
   };
 
@@ -579,6 +579,7 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             className={`text-xs p-3 rounded-xl border-2 bg-white w-full mb-2 ${hasError ? "border-red-500" : "border-gray-200"}`}
             autoFocus
           />
+
           {hasError && <p className="text-red-500 text-sm mb-4">{error}</p>}
         </>
       );
@@ -591,15 +592,18 @@ export default function ClinicInfoStep({ onNext, onPrev, initialData = {}, showA
             <PhoneInput
               placeholder={currentQuestion.placeholder}
               value={phoneNumber}
-              onChange={handlePhoneChange}
+              onChange={value => {
+                handlePhoneChange(value);
+                markFieldAsTouched(currentQuestion.id); // Add this line
+              }}
               defaultCountry="US"
               international={true}
               countryCallingCodeEditable={false}
               className={`phone-input-custom ${hasError ? "phone-input-error" : ""} p-2 rounded-xl border-2 bg-white`}
             />
           </div>
-          {hasError && <p className="text-red-500 text-sm mt-2">{error}</p>}
-          {phoneNumber && !hasError && <p className="text-green-600 text-sm mt-2">✓ Valid phone number</p>}
+          {phoneError && <p className="text-red-500 text-sm mt-2">{error}</p>}
+          {phoneNumber && phoneError == "" && <p className="text-green-600 text-sm mt-2">✓ Valid phone number</p>}
         </div>
       );
     }
