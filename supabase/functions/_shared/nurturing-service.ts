@@ -745,20 +745,29 @@ CRITICAL FORMATTING REQUIREMENTS:
 - Start each new paragraph on a NEW LINE with proper line breaks between them
 - Do NOT combine multiple sentences into one paragraph block
 
-MAKE IT COMPLETELY UNIQUE - NO repetitive patient stories or similar hooks. Use DIVERSE examples:
-- Historical events (like J&J Tylenol crisis, Virginia Mason hospital)
-- Psychology research studies (Stanford, Harvard, Yale experiments)
-- Corporate innovation stories (Apple, Toyota, Fortune 500 companies)
-- Scientific discoveries and breakthroughs
-- Cultural phenomena and social movements
-- Technology evolution and disruptions
+MAKE IT COMPLETELY UNIQUE - USE DIVERSE STORY TYPES:
+- Historical events: Wright brothers, Marie Curie, Alexander Fleming discoveries
+- Psychology research: Stanford marshmallow test, Milgram experiments, cognitive biases
+- Innovation breakthroughs: Post-it notes accident, Velcro invention, GPS development  
+- Cultural shifts: How habits changed society, social movements, generational changes
+- Scientific discoveries: Medical breakthroughs, unexpected findings, paradigm shifts
+- Human behavior studies: Why people procrastinate, decision-making patterns, social psychology
+
+SUBJECT LINE VARIATIONS:
+- "The accidental discovery that changed everything"
+- "Why 89% of people make this same mistake"  
+- "What kindergarteners taught us about [topic]"
+- "The 15-minute rule that transformed lives"
+- "Before you decide, read this"
 
 AVOID REPETITIVE PATTERNS:
-- Don't use "patient who ignored X and paid $Y" stories repeatedly
-- Don't start with "Have you heard about..." every time
-- Vary the opening hooks completely
-- Use different industries, time periods, and contexts
-- Create fresh angles and perspectives each time
+- NEVER use "$X million lesson" or "$X cost" templates repeatedly  
+- DON'T start with "In [year], [entity] faced..." every time
+- AVOID corporate loss/cost stories if recently used
+- ROTATE between: historical events, psychology studies, scientific discoveries, cultural phenomena, innovations
+- COMPLETELY different opening hooks: questions, statistics, quotes, observations, scenarios
+- VARY the lesson types: behavioral psychology, decision science, innovation stories, cultural shifts
+- NO MORE than one "cost/loss" story per sequence
 
 REMEMBER: End naturally without signatures, footers, or closing formalities. The system will add unsubscribe links automatically.
 
