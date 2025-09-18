@@ -7,11 +7,12 @@ import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { useDropdown } from "@/hooks/useDropdown";
+import { usePagination } from "@/hooks/usePagination"; // Import the usePagination hook
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { appointmentHelper, type AppointmentStatus, type MeetingSchedule } from "@/utils/appointment-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import { Form } from "antd";
+import { Form, Pagination } from "antd";
 import dayjs from "dayjs";
 import { Calendar, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -42,17 +43,40 @@ export default function AppointmentsPage() {
     offset: 8,
   });
 
+  // Initialize pagination with default page size of 10
+  const { currentPage, pageSize, paginationConfig, setTotal } = usePagination(10);
+
   const supabase = createClient();
 
-  // Load appointments data from Supabase
+  // Load appointments data from Supabase with pagination
   useEffect(() => {
     const loadAppointments = async () => {
       if (!clinicId) return;
       setIsLoading(true);
       setStatsLoading(true);
       try {
-        const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
-        setAppointmentsData(meetings);
+        // Fetch total count for pagination
+        const { count, error: countError } = await supabase
+          .from("meeting_schedule")
+          .select("*", { count: "exact", head: true })
+          .eq("clinic_id", clinicId);
+
+        if (countError) throw countError;
+
+        // Set total items for pagination
+        setTotal(count || 0);
+
+        // Fetch paginated data
+        const { data: meetings, error } = await supabase
+          .from("meeting_schedule")
+          .select("*")
+          .eq("clinic_id", clinicId)
+          .order("created_at", { ascending: false })
+          .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+
+        if (error) throw error;
+
+        setAppointmentsData(meetings || []);
       } catch (error) {
         console.error("Error loading appointments:", error);
         ErrorToast("Failed to load appointments. Please try again.");
@@ -62,7 +86,7 @@ export default function AppointmentsPage() {
       }
     };
     loadAppointments();
-  }, [clinicId]);
+  }, [clinicId, currentPage, pageSize, setTotal]);
 
   // Get clinic ID when component mounts
   useEffect(() => {
@@ -174,9 +198,18 @@ export default function AppointmentsPage() {
         return;
       }
 
-      // Reload appointments data
-      const meetings = await appointmentHelper.getMeetingsByClinic(clinicId!);
-      setAppointmentsData(meetings);
+      const { data: meetings } = await supabase
+        .from("meeting_schedule")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false })
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+
+      setAppointmentsData(meetings || []);
+
+      // Update total count
+      const { count } = await supabase.from("meeting_schedule").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId);
+      setTotal(count || 0);
 
       SuccessToast("Meeting schedule saved successfully!");
       form.resetFields();
@@ -212,6 +245,7 @@ export default function AppointmentsPage() {
       setIsSubmitting(false);
     }
   };
+
   const handleDeleteAppointment = async () => {
     if (!selectedAppointment) {
       return;
@@ -221,6 +255,11 @@ export default function AppointmentsPage() {
       await appointmentHelper.deleteMeeting(selectedAppointment.id);
       // Update local state
       setAppointmentsData(prev => prev.filter(apt => apt.id !== selectedAppointment.id));
+
+      // Update total count
+      const { count } = await supabase.from("meeting_schedule").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId);
+      setTotal(count || 0);
+
       setShowDeleteConfirmation(false);
       setSelectedAppointment(null);
       SuccessToast("Appointment deleted successfully!");
@@ -515,7 +554,7 @@ export default function AppointmentsPage() {
                         </div>
                         Edit Status
                       </button>
-                      <hr className="my-1 border-gray-100" />
+                      <hr className="my-1 border-gray-200" />
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -535,6 +574,12 @@ export default function AppointmentsPage() {
               })}
             </div>
           )}
+        </div>
+
+        <div className="flex justify-center py-4">
+          <div className="bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-200">
+            <Pagination {...paginationConfig} />
+          </div>
         </div>
 
         {/* Modals */}
