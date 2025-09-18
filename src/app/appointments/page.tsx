@@ -49,42 +49,43 @@ export default function AppointmentsPage() {
   const supabase = createClient();
 
   // Load appointments data from Supabase with pagination
+  const loadAppointments = async () => {
+    if (!clinicId) return;
+    setIsLoading(true);
+    setStatsLoading(true);
+    try {
+      // Fetch total count for pagination
+      const { count, error: countError } = await supabase
+        .from("meeting_schedule")
+        .select("*", { count: "exact", head: true })
+        .eq("clinic_id", clinicId);
+
+      if (countError) throw countError;
+
+      // Set total items for pagination
+      setTotal(count || 0);
+
+      // Fetch paginated data
+      const { data: meetings, error } = await supabase
+        .from("meeting_schedule")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false })
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+
+      if (error) throw error;
+
+      setAppointmentsData(meetings || []);
+    } catch (error) {
+      console.error("Error loading appointments:", error);
+      ErrorToast("Failed to load appointments. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadAppointments = async () => {
-      if (!clinicId) return;
-      setIsLoading(true);
-      setStatsLoading(true);
-      try {
-        // Fetch total count for pagination
-        const { count, error: countError } = await supabase
-          .from("meeting_schedule")
-          .select("*", { count: "exact", head: true })
-          .eq("clinic_id", clinicId);
-
-        if (countError) throw countError;
-
-        // Set total items for pagination
-        setTotal(count || 0);
-
-        // Fetch paginated data
-        const { data: meetings, error } = await supabase
-          .from("meeting_schedule")
-          .select("*")
-          .eq("clinic_id", clinicId)
-          .order("created_at", { ascending: false })
-          .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-
-        if (error) throw error;
-
-        setAppointmentsData(meetings || []);
-      } catch (error) {
-        console.error("Error loading appointments:", error);
-        ErrorToast("Failed to load appointments. Please try again.");
-      } finally {
-        setIsLoading(false);
-        setStatsLoading(false);
-      }
-    };
     loadAppointments();
   }, [clinicId, currentPage, pageSize, setTotal]);
 
@@ -198,18 +199,7 @@ export default function AppointmentsPage() {
         return;
       }
 
-      const { data: meetings } = await supabase
-        .from("meeting_schedule")
-        .select("*")
-        .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false })
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-
-      setAppointmentsData(meetings || []);
-
-      // Update total count
-      const { count } = await supabase.from("meeting_schedule").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId);
-      setTotal(count || 0);
+      await loadAppointments();
 
       SuccessToast("Meeting schedule saved successfully!");
       form.resetFields();
@@ -253,13 +243,7 @@ export default function AppointmentsPage() {
     setIsSubmitting(true);
     try {
       await appointmentHelper.deleteMeeting(selectedAppointment.id);
-      // Update local state
-      setAppointmentsData(prev => prev.filter(apt => apt.id !== selectedAppointment.id));
-
-      // Update total count
-      const { count } = await supabase.from("meeting_schedule").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId);
-      setTotal(count || 0);
-
+      await loadAppointments();
       setShowDeleteConfirmation(false);
       setSelectedAppointment(null);
       SuccessToast("Appointment deleted successfully!");
