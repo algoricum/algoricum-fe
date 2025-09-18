@@ -110,7 +110,7 @@ export default function AppointmentsPage() {
     if (clinicId) {
       loadStatusStats();
     }
-  }, [clinicId]);
+  }, [clinicId, appointmentsData]);
 
   // Clear copied link indicator after 2 seconds
   useEffect(() => {
