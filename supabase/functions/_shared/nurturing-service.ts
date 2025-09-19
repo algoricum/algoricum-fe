@@ -723,7 +723,18 @@ FOLLOW THESE EXACT EMAIL EXAMPLES FOR INSPIRATION:
 **Day 36 Example**: "The woman who walked into a clinic and changed medicine" - Fanny Longfellow ether story
 **Day 39 Example**: "What surgeons know about confidence" - Confidence through preparation
 **Day 42 Example**: "The lost art of follow-through" - Duke habits research (45% of actions)
+**Day 45 Example**: "The experiment that shocked psychologists" - Milgram authority study
+**Day 50 Example**: "The 10-minute rule for doing anything hard" - Starting momentum technique
+**Day 55 Example**: "Lessons from 1,000 patient conversations" - Three common myths
+**Day 60 Example**: "The quiet cost of putting yourself last" - Self-care prioritization
+**Day 70 Example**: "How billion-dollar companies make decisions fast" - Speed over perfection
+**Day 80 Example**: "The psychology of momentum (and how to get it)" - Zeigarnik effect
+**Day 90 Example**: "The 3 most common myths I hear in this clinic" - Patient misconceptions
 **Day 100 Example**: "Are you still curious, or should I close your file?" - Direct final sequence
+**Day 110 Example**: "The one-year challenge" - Long-term perspective mental exercise
+**Day 115 Example**: "The invisible opportunity cost" - Hidden costs of inaction
+**Day 118 Example**: "The best time to start (and it's not what you think)" - Tree planting proverb
+**Day 120 Example**: "Before I stop bugging you..." - Final email sequence
 
 GENERATE AN EMAIL FOLLOWING THIS PATTERN:
 1. Create unique subject using patterns above (vary the hook completely) - NO "Subject:" prefix

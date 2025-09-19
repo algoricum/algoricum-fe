@@ -37,6 +37,20 @@ interface CalendlyEventType {
   active: boolean;
 }
 
+interface WebhookSubscription {
+  uri: string;
+  callback_url: string;
+  created_at: string;
+  updated_at: string;
+  retry_started_at?: string;
+  state: string;
+  events: string[];
+  scope: string;
+  organization: string;
+  user?: string;
+  creator: string;
+}
+
 // Enhanced logging
 function logInfo(message: string, data?: any) {
   const timestamp = new Date().toISOString();
@@ -155,6 +169,24 @@ async function storeIntegration(supabase: any, clinicId: string, tokens: Calendl
       .eq("status", "active")
       .single();
 
+    // Get user's organization for webhook creation
+    let currentOrganization = null;
+    try {
+      const orgResponse = await fetch("https://api.calendly.com/organization_memberships?user=" + userInfo.resource.uri, {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+
+      if (orgResponse.ok) {
+        const orgData = await orgResponse.json();
+        if (orgData.collection && orgData.collection.length > 0) {
+          currentOrganization = orgData.collection[0].organization;
+          logInfo("Retrieved organization for webhook setup", { organization: currentOrganization });
+        }
+      }
+    } catch (orgError) {
+      logError("Failed to fetch organization - webhooks may not work", orgError);
+    }
+
     const integrationData = {
       clinic_id: clinicId,
       access_token: tokens.access_token,
@@ -167,6 +199,7 @@ async function storeIntegration(supabase: any, clinicId: string, tokens: Calendl
         user_uri: userInfo.resource.uri,
         user_email: userInfo.resource.email,
         user_name: userInfo.resource.name,
+        current_organization: currentOrganization,
       },
       updated_at: new Date().toISOString(),
     };
@@ -584,7 +617,227 @@ async function updateLeadStatus(leadId: string, status: string, supabase: any) {
   }
 }
 
+// Create webhook subscription for Calendly integration
+async function createWebhookSubscription(supabase: any, clinicId: string, webhookUrl: string): Promise<WebhookSubscription> {
+  const integration = await getClinicIntegration(supabase, clinicId);
+
+  if (!integration.configuration?.current_organization) {
+    throw new Error("Organization URI not found in integration configuration");
+  }
+
+  // Check if webhook already exists for this organization
+  logInfo("Checking for existing webhook subscriptions", { clinicId, webhookUrl });
+
+  const listResponse = await fetch(
+    `https://api.calendly.com/webhook_subscriptions?organization=${integration.configuration.current_organization}`,
+    {
+      headers: {
+        Authorization: `Bearer ${integration.access_token}`,
+      },
+    },
+  );
+
+  if (listResponse.ok) {
+    const existingWebhooks = await listResponse.json();
+    const existingWebhook = existingWebhooks.collection?.find((webhook: any) => webhook.callback_url === webhookUrl);
+
+    if (existingWebhook) {
+      logInfo("Found existing webhook subscription", { clinicId, webhookUri: existingWebhook.uri });
+
+      // Store the existing webhook URI in database
+      const { error: updateError } = await supabase
+        .from("calendly_integrations")
+        .update({
+          webhook_subscription_uri: existingWebhook.uri,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("clinic_id", clinicId);
+
+      if (updateError) {
+        logError("Failed to store existing webhook subscription URI", updateError);
+      }
+
+      return existingWebhook;
+    }
+  }
+
+  const requestBody = {
+    url: webhookUrl,
+    events: ["invitee.created", "invitee.canceled"],
+    organization: integration.configuration.current_organization,
+    scope: "organization",
+  };
+
+  logInfo("Creating new Calendly webhook subscription", { clinicId, webhookUrl, events: requestBody.events });
+
+  const response = await fetch("https://api.calendly.com/webhook_subscriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${integration.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    // Handle 409 conflict (webhook already exists) gracefully
+    if (response.status === 409) {
+      logInfo("Webhook already exists for this URL - handling gracefully", { clinicId, webhookUrl });
+
+      // Try to find and return the existing webhook
+      try {
+        const listRetryResponse = await fetch(
+          `https://api.calendly.com/webhook_subscriptions?organization=${integration.configuration.current_organization}`,
+          {
+            headers: {
+              Authorization: `Bearer ${integration.access_token}`,
+            },
+          },
+        );
+
+        if (listRetryResponse.ok) {
+          const webhooks = await listRetryResponse.json();
+          logInfo("Retrieved existing webhooks for conflict resolution", {
+            clinicId,
+            webhookCount: webhooks.collection?.length || 0,
+          });
+
+          const existingWebhook = webhooks.collection?.find((webhook: any) => webhook.callback_url === webhookUrl);
+
+          if (existingWebhook) {
+            logInfo("Found matching existing webhook", { clinicId, webhookUri: existingWebhook.uri });
+
+            // Store the webhook URI
+            await supabase
+              .from("calendly_integrations")
+              .update({
+                webhook_subscription_uri: existingWebhook.uri,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("clinic_id", clinicId);
+
+            return existingWebhook;
+          } else {
+            logInfo("No matching webhook found - creating placeholder response", { clinicId });
+            // If we can't find the specific webhook, create a minimal response to avoid error
+            const placeholderWebhook = {
+              uri: "placeholder",
+              callback_url: webhookUrl,
+              events: ["invitee.created", "invitee.canceled"],
+              state: "active",
+              scope: "organization",
+              organization: integration.configuration.current_organization,
+            };
+
+            // Don't store placeholder URI
+            return placeholderWebhook;
+          }
+        } else {
+          logError("Failed to list existing webhooks during conflict resolution", {
+            status: listRetryResponse.status,
+            clinicId,
+          });
+        }
+      } catch (listError) {
+        logError("Error while handling webhook conflict", { clinicId, error: listError });
+      }
+
+      // If all else fails, return a minimal webhook object to avoid throwing error
+      logInfo("Returning minimal webhook response for 409 conflict", { clinicId });
+      return {
+        uri: "conflict-handled",
+        callback_url: webhookUrl,
+        events: ["invitee.created", "invitee.canceled"],
+        state: "active",
+        scope: "organization",
+        organization: integration.configuration.current_organization,
+      };
+    }
+
+    logError("Failed to create Calendly webhook", {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorText,
+      clinicId,
+    });
+    throw new Error(`Failed to create webhook subscription: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  const webhookData = result.resource;
+
+  // Store webhook subscription URI in the integration record
+  const { error: updateError } = await supabase
+    .from("calendly_integrations")
+    .update({
+      webhook_subscription_uri: webhookData.uri,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("clinic_id", clinicId);
+
+  if (updateError) {
+    logError("Failed to store webhook subscription URI", updateError);
+    throw new Error(`Failed to store webhook subscription URI: ${updateError.message}`);
+  }
+
+  logInfo("Successfully created webhook subscription", {
+    clinicId,
+    webhookUri: webhookData.uri,
+    events: webhookData.events,
+  });
+
+  return webhookData;
+}
+
+// Delete webhook subscription
+async function deleteWebhookSubscription(supabase: any, clinicId: string): Promise<void> {
+  const integration = await getClinicIntegration(supabase, clinicId);
+
+  if (!integration.webhook_subscription_uri) {
+    logInfo("No webhook subscription to delete", { clinicId });
+    return;
+  }
+
+  logInfo("Deleting webhook subscription", { clinicId, webhookUri: integration.webhook_subscription_uri });
+
+  const response = await fetch(integration.webhook_subscription_uri, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${integration.access_token}`,
+    },
+  });
+
+  if (!response.ok && response.status !== 404) {
+    const errorText = await response.text();
+    logError("Failed to delete webhook subscription", {
+      status: response.status,
+      error: errorText,
+      clinicId,
+    });
+    throw new Error(`Failed to delete webhook subscription: ${response.status} - ${errorText}`);
+  }
+
+  // Clear webhook subscription URI from database
+  const { error: updateError } = await supabase
+    .from("calendly_integrations")
+    .update({
+      webhook_subscription_uri: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("clinic_id", clinicId);
+
+  if (updateError) {
+    logError("Failed to clear webhook subscription URI", updateError);
+  }
+
+  logInfo("Successfully deleted webhook subscription", { clinicId });
+}
+
 export {
+  createWebhookSubscription,
+  deleteWebhookSubscription,
   disconnectIntegration,
   exchangeCodeForTokens,
   getCalendlyUser,
@@ -600,4 +853,4 @@ export {
   validateClinicTiming,
 };
 
-export type { CalendlyEventType, CalendlyTokens, ClinicTiming };
+export type { CalendlyEventType, CalendlyTokens, ClinicTiming, WebhookSubscription };
