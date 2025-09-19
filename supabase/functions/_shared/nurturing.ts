@@ -1,14 +1,15 @@
 // _shared/nurturing.ts
 
-import { processAllLeads, type FollowUpRule } from './nurturing-service.ts';
+import { processAllLeads, type FollowUpRule } from "./nurturing-service.ts";
 
 const FOLLOW_UP_RULES: FollowUpRule[] = [
   {
-    name: 'sms_5min_initial',
+    name: "sms_5min_initial",
     timeFromCreated: 30 * 1000, // 5 minutes
-    leadStatus: ['New'],
-    communicationType: 'sms',
-    onlyOnce: true
+    leadStatus: ["New"],
+    communicationType: "sms",
+    onlyOnce: true,
+    toleranceWindow: 1 * 60 * 1000,
   },
   {
     name: "sms_2day_followup",
@@ -182,12 +183,9 @@ const FOLLOW_UP_RULES: FollowUpRule[] = [
   },
 ];
 
-async function processProductionLeads(supabase: any, communicationType?: 'sms' | 'email') {
-  return processAllLeads(supabase, communicationType, FOLLOW_UP_RULES)
+async function processProductionLeads(supabase: any, communicationType?: "sms" | "email") {
+  return processAllLeads(supabase, communicationType, FOLLOW_UP_RULES);
 }
 
 // Export all functions
-export {
-  FOLLOW_UP_RULES, processProductionLeads as processAllLeads
-};
-
+export { FOLLOW_UP_RULES, processProductionLeads as processAllLeads };
