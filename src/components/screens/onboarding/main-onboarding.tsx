@@ -292,6 +292,24 @@ export default function MainOnboarding() {
         return;
       }
 
+      // Fetch Calendly booking link if available
+      let calendlyBookingLink = mappedData.calendlyLink || "https://tinyurl.com/35c3wr42";
+      try {
+        const { data: calendlyIntegration } = await supabase
+          .from("calendly_integrations")
+          .select("clinic_booking_link")
+          .eq("clinic_id", clinic.id)
+          .eq("status", "active")
+          .single();
+
+        if (calendlyIntegration?.clinic_booking_link) {
+          calendlyBookingLink = calendlyIntegration.clinic_booking_link;
+          console.log("📅 Using Calendly booking link:", calendlyBookingLink);
+        }
+      } catch (error) {
+        console.log("📅 No Calendly integration found, using default/provided link", error);
+      }
+
       // Generate slug from clinic name
       const clinicSlug = generateSlug(mappedData.legalBusinessName || clinic.name || "clinic");
 
@@ -314,7 +332,7 @@ export default function MainOnboarding() {
         email: mappedData.emailAddress || user.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink || BOOKING_LINK,
+        calendly_link: mappedData.calendlyLink || calendlyBookingLink || BOOKING_LINK,
         tone_selector: mappedData.toneSelector,
         sentence_length: mappedData.sentenceLength,
         formality_level: mappedData.formalityLevel,

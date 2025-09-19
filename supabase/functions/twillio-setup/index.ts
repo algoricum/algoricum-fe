@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const supabaseUrl = deno.env.get("SUPABASE_URL");
+
 serve(async req => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -86,16 +88,16 @@ serve(async req => {
     });
 
     // Twilio credentials from environment
-    console.log('Checking Twilio credentials');
-    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID')
-    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN')
-    
+    console.log("Checking Twilio credentials");
+    const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+    const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+
     // SMS Processor webhook URL with clinic_id parameter - Update this to your actual Supabase project URL
-    const smsWebhookUrl = `https://ozmytbghfvrfhbjvabor.supabase.co/functions/v1/sms-processor?clinic_id=${clinic_id}`
-    
-    console.log('Twilio environment variables', {
-      twilioAccountSid: twilioAccountSid ? 'set' : 'not set',
-      twilioAuthToken: twilioAuthToken ? 'set' : 'not set',
+    const smsWebhookUrl = `${supabaseUrl}/functions/v1/sms-processor?clinic_id=${clinic_id}`;
+
+    console.log("Twilio environment variables", {
+      twilioAccountSid: twilioAccountSid ? "set" : "not set",
+      twilioAuthToken: twilioAuthToken ? "set" : "not set",
       smsWebhookUrl,
     });
 
@@ -115,15 +117,15 @@ serve(async req => {
     console.log("Twilio auth header created");
 
     // Step 1: Search for available numbers in both US and Canada
-    const countries = ['US', 'CA'];
-    let allAvailableNumbers = [];
-    
+    const countries = ["US", "CA"];
+    const allAvailableNumbers = [];
+
     // Extract area code from phone_number if provided
-    const areaCodeMatch = phone_number.match(/^\+1(\d{3})/)
+    const areaCodeMatch = phone_number.match(/^\+1(\d{3})/);
     const areaCode = areaCodeMatch ? areaCodeMatch[1] : null;
-    
+
     if (areaCode) {
-      console.log('Area code extracted from phone_number', { areaCode });
+      console.log("Area code extracted from phone_number", { areaCode });
     } else {
       console.log("No area code provided in phone_number, proceeding without area code filter");
     }
@@ -131,20 +133,20 @@ serve(async req => {
     // Search in both countries
     for (const country of countries) {
       let searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/AvailablePhoneNumbers/${country}/Local.json?SmsEnabled=true&Limit=10`;
-      
+
       if (areaCode) {
         searchUrl += `&AreaCode=${areaCode}`;
       }
-      
+
       console.log(`Searching for available Twilio numbers in ${country}`, { searchUrl });
 
       try {
         const searchResponse = await fetch(searchUrl, {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'Authorization': `Basic ${authHeader}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
+            Authorization: `Basic ${authHeader}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
         });
 
         const searchData = await searchResponse.json();
@@ -158,7 +160,7 @@ serve(async req => {
           // Add country info to each number for tracking
           const numbersWithCountry = searchData.available_phone_numbers.map(num => ({
             ...num,
-            country: country
+            country: country,
           }));
           allAvailableNumbers.push(...numbersWithCountry);
           console.log(`Added ${numbersWithCountry.length} numbers from ${country}`);
@@ -169,56 +171,51 @@ serve(async req => {
       }
     }
 
-    console.log('Total available numbers found', { 
+    console.log("Total available numbers found", {
       total: allAvailableNumbers.length,
       byCountry: countries.map(country => ({
         country,
-        count: allAvailableNumbers.filter(num => num.country === country).length
-      }))
+        count: allAvailableNumbers.filter(num => num.country === country).length,
+      })),
     });
 
     if (allAvailableNumbers.length === 0) {
-      console.log('No available phone numbers found in any country, updating twilio_config to failed if exists', { twilio_config_id });
+      console.log("No available phone numbers found in any country, updating twilio_config to failed if exists", { twilio_config_id });
       if (twilio_config_id) {
         await supabaseClient.from("twilio_config").update({ status: "failed" }).eq("id", twilio_config_id);
       }
-      return new Response(
-        JSON.stringify({ error: 'No available phone numbers found in US or Canada' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      return new Response(JSON.stringify({ error: "No available phone numbers found in US or Canada" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Prioritize numbers: if area code provided, prefer numbers from same area code
     let selectedNumber;
     if (areaCode) {
       // Try to find a number matching the area code first
-      const matchingAreaCode = allAvailableNumbers.find(num => 
-        num.phone_number.includes(areaCode)
-      );
+      const matchingAreaCode = allAvailableNumbers.find(num => num.phone_number.includes(areaCode));
       selectedNumber = matchingAreaCode || allAvailableNumbers[0];
     } else {
       selectedNumber = allAvailableNumbers[0];
     }
-    
-    console.log('Selected Twilio phone number', { 
+
+    console.log("Selected Twilio phone number", {
       selectedNumber: selectedNumber.phone_number,
       country: selectedNumber.country,
-      matchedAreaCode: areaCode && selectedNumber.phone_number.includes(areaCode)
+      matchedAreaCode: areaCode && selectedNumber.phone_number.includes(areaCode),
     });
 
     // Step 2: Purchase the number with SMS processor webhook (including clinic_id)
-    const purchaseUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers.json`
+    const purchaseUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers.json`;
     const purchaseBody = new URLSearchParams({
       PhoneNumber: selectedNumber.phone_number,
       SmsUrl: smsWebhookUrl, // Now includes clinic_id parameter
-      SmsMethod: 'POST',
+      SmsMethod: "POST",
       // Optional: Add status callback URL for delivery receipts (also with clinic_id)
-      SmsStatusCallback: `https://ozmytbghfvrfhbjvabor.supabase.co/functions/v1/sms-processor/status?clinic_id=${clinic_id}`
-    })
-    console.log('Purchasing Twilio phone number', {
+      SmsStatusCallback: `${supabaseUrl}/functions/v1/sms-processor/status?clinic_id=${clinic_id}`,
+    });
+    console.log("Purchasing Twilio phone number", {
       purchaseUrl,
       phoneNumber: selectedNumber.phone_number,
       smsUrl: smsWebhookUrl,
@@ -315,24 +312,24 @@ serve(async req => {
     console.log("Successfully upserted twilio_config", { twilio_config_id: data.id });
 
     // Optionally: Verify webhook was set correctly by fetching the number details
-    console.log('Verifying webhook configuration...');
-    const verifyUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers/${purchaseData.sid}.json`
+    console.log("Verifying webhook configuration...");
+    const verifyUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers/${purchaseData.sid}.json`;
     const verifyResponse = await fetch(verifyUrl, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Basic ${authHeader}`,
-      }
-    })
-    
+        Authorization: `Basic ${authHeader}`,
+      },
+    });
+
     if (verifyResponse.ok) {
-      const verifyData = await verifyResponse.json()
-      console.log('Webhook verification successful', {
+      const verifyData = await verifyResponse.json();
+      console.log("Webhook verification successful", {
         phone_number: verifyData.phone_number,
         sms_url: verifyData.sms_url,
         sms_method: verifyData.sms_method,
       });
     } else {
-      console.log('Webhook verification failed', { status: verifyResponse.status });
+      console.log("Webhook verification failed", { status: verifyResponse.status });
     }
 
     // Success response
@@ -352,7 +349,7 @@ serve(async req => {
         twilio_sid: purchaseData.sid,
         clinic_id,
         twilio_config_id: data.id,
-        webhook_url: smsWebhookUrl // Include webhook URL in response for verification
+        webhook_url: smsWebhookUrl, // Include webhook URL in response for verification
       }),
       {
         status: 200,
