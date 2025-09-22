@@ -83,7 +83,7 @@ export interface ChannelStats {
 }
 
 // Valid status options for the new comprehensive system
-export const LEAD_STATUSES = ["New", "Engaged", "Cold", "Booked", "Converted"] as const;
+export const LEAD_STATUSES = ["New", "Engaged", "Cold", "Booked"] as const;
 
 export const INTEREST_LEVELS = ["high", "medium", "low"] as const;
 export const URGENCY_LEVELS = ["asap", "this_month", "curious"] as const;

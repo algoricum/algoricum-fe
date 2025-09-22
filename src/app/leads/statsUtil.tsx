@@ -33,13 +33,6 @@ export const leadsStatsConfig: StatConfig[] = [
     getValue: statusStats => statusStats.find(stat => stat.status.toLowerCase() === "new")?.count || 0,
   },
   {
-    key: "converted",
-    icon: <CheckCircle className="h-6 w-6 text-purple-600 md:h-7 md:w-7" />,
-    iconBg: "bg-purple-100",
-    title: "Converted",
-    getValue: statusStats => statusStats.find(stat => stat.status.toLowerCase() === "converted")?.count || 0,
-  },
-  {
     key: "cold",
     icon: <SearchIcon className="h-6 w-6 text-gray-600 md:h-7 md:w-7" />,
     iconBg: "bg-gray-100",

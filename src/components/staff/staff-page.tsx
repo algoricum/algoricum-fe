@@ -210,8 +210,8 @@ export default function StaffPage(): JSX.Element {
 
   // Event handlers
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value);
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedRole(e.target.value);
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedStatus(e.target.value);
+  const handleRoleChange = (value: string) => setSelectedRole(value);
+  const handleStatusChange = (value: string) => setSelectedStatus(value);
   const clearSearch = () => setSearchTerm("");
 
   const clearFilters = () => {

@@ -26,6 +26,7 @@ export function AddAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting }:
   useEffect(() => {
     if (isOpen) {
       form.resetFields();
+      resetPhone();
     }
   }, [isOpen, form]);
 
