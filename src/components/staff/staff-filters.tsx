@@ -1,5 +1,5 @@
 "use client";
-import { Button } from "antd";
+import { Button, Select } from "antd";
 import { Plus, Search, X } from "lucide-react";
 import type React from "react";
 
@@ -13,9 +13,9 @@ interface StaffFiltersProps {
 
   onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 
-  onRoleChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onRoleChange: (value: string) => void;
 
-  onStatusChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  onStatusChange: (value: string) => void;
   onClearSearch: () => void;
   onClearFilters: () => void;
   onAddStaff: () => void;
@@ -25,11 +25,9 @@ export function StaffFilters({
   searchTerm,
   selectedRole,
   selectedStatus,
-  availableRoles,
   totalStaff,
   filteredStaff,
   onSearchChange,
-  onRoleChange,
   onStatusChange,
   onClearSearch,
   onClearFilters,
@@ -60,29 +58,37 @@ export function StaffFilters({
           </div>
 
           {/* Role */}
-          <select
+          {/* <Select
             value={selectedRole}
             onChange={onRoleChange}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 md:w-[160px]"
+            className="w-full md:w-[160px]"
+            size="large"
+            style={{
+              borderRadius: "8px",
+            }}
           >
-            <option value="all">All Roles</option>
+            <Select.Option value="all">All Roles</Select.Option>
             {availableRoles.map(role => (
-              <option key={role.value} value={role.value}>
+              <Select.Option key={role.value} value={role.value}>
                 {role.label}
-              </option>
+              </Select.Option>
             ))}
-          </select>
+          </Select> */}
 
           {/* Status */}
-          <select
+          <Select
             value={selectedStatus}
-            onChange={onStatusChange}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 md:w-[160px]"
+            onChange={value => onStatusChange(value as string)}
+            className="w-full md:w-[160px]"
+            size="large"
+            style={{
+              borderRadius: "8px",
+            }}
           >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
+            <Select.Option value="all">All Status</Select.Option>
+            <Select.Option value="active">Active</Select.Option>
+            <Select.Option value="inactive">Inactive</Select.Option>
+          </Select>
         </div>
 
         {/* Add button */}

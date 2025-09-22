@@ -21,7 +21,7 @@ const BillingPage = () => {
   const [subscriptionEvents, setSubscriptionEvents] = useState<any[]>([]);
   const [trialEnd, setTrialEnd] = useState<string | null>(null);
   const [clinicId, setClinicId] = useState<string | null>("demo-clinic");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
   const [currentPriceId, setCurrentPriceId] = useState<string | null>("price_demo");
   const [currentPlan, setCurrentPlan] = useState<any | null>(null);
@@ -169,7 +169,7 @@ const BillingPage = () => {
             <div className="px-4 md:px-0">
               <Row gutter={[24, 24]} className="mb-8">
                 <Col xs={24} lg={14}>
-                  <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">
+                  <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-8">
                     <div className="flex items-center mb-6">
                       {subscriptionStatus === "active" || subscriptionStatus === "trialing" ? (
                         <CheckCircle className="w-6 h-6 text-green-600 mr-3" />
@@ -258,7 +258,7 @@ const BillingPage = () => {
 
           {subscriptionEvents.length > 0 && (
             <div className="px-4 md:px-0">
-              <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">
+              <div className="bg-white rounded-xl shadow-2xl border-2 border-gray-200 p-8 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800 mb-6">Recent Events</h3>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">

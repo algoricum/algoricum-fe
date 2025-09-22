@@ -260,29 +260,6 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
             </div>
           </>
         )}
-
-        {/* {status === "connected" && (
-          <>
-            <Alert
-              message="Successfully Connected!"
-              description={`Connected to Gravity Forms. Your Gravity Forms integration is ready!`}
-              type="success"
-              showIcon
-              className="mb-4"
-            />
-            <div className="flex flex-col items-center">
-              <Text className="text-gray-600">⚡ Your Gravity Forms integration is ready! Need further help? Book a support meeting.</Text>
-              <br />
-            </div>
-            <BookingLinkComponent
-              bgColor="bg-orange-50"
-              borderColor="border-orange-400"
-              textColor="orange-700"
-              buttonBgColor="orange-400"
-              hoverBgColor="orange-600"
-            />
-          </>
-        )} */}
       </div>
     </Modal>
   );

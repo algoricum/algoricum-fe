@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState, useEffect } from "react";
-import { Modal } from "antd";
+import { Modal, Select } from "antd";
 import { User, Mail, Phone } from "lucide-react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -262,18 +262,26 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1">
             <label className="block text-sm font-semibold text-gray-700">Status</label>
-            <select
+            <Select
               value={formData.status}
-              onChange={e => handleInputChange("status", e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg border-2 border-gray-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              onChange={value => handleInputChange("status", value)}
+              placeholder="Select status"
+              className="w-full"
+              size="large"
+              style={{
+                height: "42px", // matches py-2.5 padding
+              }}
+              dropdownStyle={{
+                borderRadius: "8px",
+              }}
             >
-              <option value="">Select status</option>
+              <Select.Option value="">Select status</Select.Option>
               {LEAD_STATUSES.map(status => (
-                <option key={status} value={status}>
+                <Select.Option key={status} value={status}>
                   {status}
-                </option>
+                </Select.Option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 

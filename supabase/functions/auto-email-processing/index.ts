@@ -1,5 +1,4 @@
 // supabase/functions/auto-email-processing/index.ts
-// This Supabase cron job calls your existing test-email-connection function automatically
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -35,8 +34,9 @@ serve(async req => {
           assistant_name,
           instructions
         )
-      `)
-      .not('mailgun_email', 'is', null);
+      `,
+      )
+      .not("mailgun_email", "is", null);
 
     if (clinicsError) {
       console.error("Failed to fetch clinics:", clinicsError);
@@ -77,7 +77,7 @@ serve(async req => {
     for (const clinic of clinics) {
       try {
         console.log(`🏥 Processing clinic: ${clinic.name} (ID: ${clinic.id})`);
-        
+
         if (!clinic.mailgun_email) {
           console.log(`⚠️ Skipping ${clinic.name} - no email configuration`);
           continue;
@@ -95,7 +95,7 @@ serve(async req => {
 
         // Prepare the payload exactly like your button does, but with cron_job flag
         const payload = {
-          ...clinic.mailgun_email,  // This contains all SMTP/IMAP settings
+          ...clinic.mailgun_email, // This contains all SMTP/IMAP settings
           clinic_id: clinic.id,
           assistant_id: assistant.id,
           cron_job: true, // This tells your function it's a cron job, not manual test

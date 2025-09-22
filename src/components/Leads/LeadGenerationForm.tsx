@@ -88,7 +88,7 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
     staticFields.forEach(f => {
       const value = formData[f.field_id];
 
-      if (f.is_required && !value) {
+      if (f.is_required && f.field_type !== "tel" && !value) {
         newErrors[f.field_id] = `${f.field_name} is required`;
       }
 
@@ -103,18 +103,17 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
         if (f.is_required && !phoneNumber) {
           newErrors[f.field_id] = "Phone number is required";
         }
-        // phoneError is automatically set by the hook, no need to call validatePhoneNumber manually
       }
     });
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0 && !phoneError; // Added phoneError check to form validation
+    return Object.keys(newErrors).length === 0 && phoneError === "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("form validity", validateForm());
     if (!validateForm()) return;
-
     setSubmitting(true);
     const source_id = await getLeadSourceId("Others");
 

@@ -28,7 +28,7 @@ export function AddAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting }:
       form.resetFields();
       resetPhone();
     }
-  }, [isOpen, form, resetPhone]);
+  }, [isOpen, form]);
 
   if (!isOpen) return null;
 

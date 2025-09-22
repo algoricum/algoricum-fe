@@ -10,13 +10,15 @@ import type { JSX } from "react/jsx-runtime";
 import {
   deleteStaffMember,
   getClinicStaff,
+  getStatusStats,
   updateStaffMember,
+  type StaffStatus,
   type TransformedStaffMember,
 } from "../../utils/supabase/clinic-staff-helper";
 // Component imports
 
 import { StaffFilters } from "@/components/staff/staff-filters";
-import { StaffStats } from "@/components/staff/staff-stats";
+import { StatCard } from "@/components/staff/staff-stats";
 import { StaffTable } from "@/components/staff/staff-table";
 import { createStaffUser } from "../../utils/supabase/config/staff";
 import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
@@ -25,6 +27,10 @@ import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
 import { AddStaffModal } from "@/components/staff/add-staff-modal";
 import { DeleteConfirmModal } from "@/components/staff/delete-confirm-modal";
 import { EditStaffModal } from "@/components/staff/edit-staff-modal";
+import { staffStatsConfig } from "@/components/staff/statCardUtils";
+import { getInitials, mapDatabaseStatusToFrontend, mapFrontendStatusToDatabase } from "@/components/staff/staffUtilFunctions";
+import { Pagination } from "antd";
+import { usePagination } from "@/hooks/usePagination";
 
 interface Staff {
   id: string;
@@ -59,12 +65,14 @@ export default function StaffPage(): JSX.Element {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [staffData, setStaffData] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [statusStats, setStatusStats] = useState<StaffStatus[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [showAddStaffModal, setShowAddStaffModal] = useState<boolean>(false);
   const [showEditStaffModal, setShowEditStaffModal] = useState<boolean>(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
-  const [clinicId, setClinicId] = useState<string | null>(null);
+  const [clinicId, setClinicId] = useState<string>("");
   const [selectedStaffForEdit, setSelectedStaffForEdit] = useState<Staff | null>(null);
   const [selectedStaffForDelete, setSelectedStaffForDelete] = useState<Staff | null>(null);
   const [newStaff, setNewStaff] = useState<NewStaff>({
@@ -80,66 +88,84 @@ export default function StaffPage(): JSX.Element {
   // Filters
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("all");
-
-  // Utility functions
-  const mapDatabaseStatusToFrontend = (dbStatus: string): string => {
-    if (dbStatus === "Active" || dbStatus === "TRUE") return "active";
-    return "inactive";
-  };
-
-  const mapFrontendStatusToDatabase = (frontendStatus: string): boolean => {
-    return frontendStatus === "active";
-  };
-
-  const getInitials = (name: string): string =>
-    name
-      .split(" ")
-      .map(w => w.charAt(0).toUpperCase())
-      .join("")
-      .substring(0, 2);
+  // Initialize pagination with default page size of 10
+  const { currentPage, pageSize, paginationConfig, setTotal } = usePagination(10);
 
   // Effects
   useEffect(() => {
-    const loadStaffData = async (): Promise<void> => {
+    const initializeClinic = async () => {
       try {
-        setIsLoading(true);
-        const currentClinicId: string | null = await getCurrentUserClinic();
+        const currentClinicId = await getCurrentUserClinic();
         if (!currentClinicId) {
           ErrorToast("No clinic found. Please make sure you have a clinic set up.");
           return;
         }
         setClinicId(currentClinicId);
-
-        const { data: staffMembers, error } = await getClinicStaff(currentClinicId);
-        if (error) {
-          console.error("Error loading staff data:", error);
-          ErrorToast("Failed to load staff data. Please try again.");
-          return;
-        }
-
-        const transformedStaff: Staff[] =
-          staffMembers?.map((member: TransformedStaffMember) => ({
-            id: member.user_id,
-            name: member.staff_member,
-            email: member.email,
-            role: member.role,
-            createdBy: member.created_by,
-            password: "••••••••",
-            avatar: getInitials(member.staff_member),
-            joinedDate: member.joined_date,
-            status: mapDatabaseStatusToFrontend(member.status),
-          })) || [];
-
-        setStaffData(transformedStaff);
       } catch (error: any) {
-        console.error("Error loading staff data:", error);
-        ErrorToast("Failed to load staff data. Please try again.");
-      } finally {
-        setIsLoading(false);
+        console.error("Error getting clinic:", error);
+        ErrorToast("Failed to load clinic data. Please try again.");
       }
     };
-    loadStaffData();
+    initializeClinic();
   }, []);
+
+  const loadStaffData = async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+
+      // Get clinic ID if not already set
+      if (!clinicId) {
+        const currentClinicId = await getCurrentUserClinic();
+        if (!currentClinicId) {
+          ErrorToast("No clinic found. Please make sure you have a clinic set up.");
+          return;
+        }
+        setClinicId(currentClinicId);
+      }
+
+      const { data: staffMembers, total, error } = await getClinicStaff(currentPage, pageSize, clinicId);
+
+      if (error) {
+        ErrorToast(error);
+        return;
+      }
+
+      // Set total for pagination
+      setTotal(total);
+
+      const transformedStaff: Staff[] =
+        staffMembers?.map((member: TransformedStaffMember) => ({
+          id: member.user_id,
+          name: member.staff_member,
+          email: member.email,
+          role: member.role,
+          createdBy: member.created_by,
+          password: "••••••••",
+          avatar: getInitials(member.staff_member),
+          joinedDate: member.joined_date,
+          status: mapDatabaseStatusToFrontend(member.status),
+        })) || [];
+
+      setStaffData(transformedStaff);
+    } catch (error: any) {
+      console.error("Error loading staff data:", error);
+      ErrorToast("Failed to load staff data. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (clinicId) {
+      loadStaffData();
+    }
+  }, [clinicId, currentPage, pageSize]);
+
+  useEffect(() => {
+    if (clinicId) {
+      loadStatusStats();
+    }
+  }, [clinicId, staffData]);
 
   // Computed values
   const filteredStaffData = useMemo(() => {
@@ -169,10 +195,23 @@ export default function StaffPage(): JSX.Element {
     }));
   }, [staffData]);
 
+  const loadStatusStats = async () => {
+    if (!clinicId) return;
+    try {
+      setStatsLoading(true);
+      const stats = await getStatusStats(clinicId);
+      setStatusStats(stats);
+    } catch (err) {
+      console.error("Error loading status stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   // Event handlers
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value);
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedRole(e.target.value);
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedStatus(e.target.value);
+  const handleRoleChange = (value: string) => setSelectedRole(value);
+  const handleStatusChange = (value: string) => setSelectedStatus(value);
   const clearSearch = () => setSearchTerm("");
 
   const clearFilters = () => {
@@ -186,25 +225,7 @@ export default function StaffPage(): JSX.Element {
 
   const refreshStaffData = async () => {
     if (!clinicId) return;
-    try {
-      const { data: staffMembers, error } = await getClinicStaff(clinicId);
-      if (error) return;
-      const transformed: Staff[] =
-        staffMembers?.map((m: TransformedStaffMember) => ({
-          id: m.user_id,
-          name: m.staff_member,
-          email: m.email,
-          role: m.role,
-          createdBy: m.created_by,
-          password: "••••••••",
-          avatar: getInitials(m.staff_member),
-          joinedDate: m.joined_date,
-          status: mapDatabaseStatusToFrontend(m.status),
-        })) || [];
-      setStaffData(transformed);
-    } catch (e) {
-      console.error("Error refreshing staff data:", e);
-    }
+    await loadStaffData();
   };
 
   const handleAddStaff = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -236,7 +257,7 @@ export default function StaffPage(): JSX.Element {
         email: newStaff.email,
         name: newStaff.name,
         clinicId: clinic_id,
-        roleId
+        roleId,
       });
       if (response.error) {
         ErrorToast(response.error.message || "Failed to create staff member");
@@ -325,6 +346,7 @@ export default function StaffPage(): JSX.Element {
       SuccessToast(`Staff member "${selectedStaffForDelete.name}" has been removed successfully.`);
       setShowDeleteConfirmModal(false);
       setSelectedStaffForDelete(null);
+      await loadStatusStats();
       await refreshStaffData();
     } catch (error: any) {
       console.error("Error deleting staff:", error);
@@ -334,7 +356,7 @@ export default function StaffPage(): JSX.Element {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || statsLoading) {
     return (
       <DashboardLayout
         header={<Header title="Staff Management" description="Manage your healthcare team and staff information." showHamburgerMenu />}
@@ -352,11 +374,11 @@ export default function StaffPage(): JSX.Element {
     >
       <div>
         {/* Stats */}
-        <StaffStats
-          totalStaff={staffData.length}
-          filteredStaff={filteredStaffData.length}
-          hasFilters={searchTerm !== "" || selectedRole !== "all" || selectedStatus !== "all"}
-        />
+        <div className="px-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {staffStatsConfig.map(stat => (
+            <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(statusStats)} />
+          ))}
+        </div>
 
         {/* Table + Filters */}
         <div className="rounded-lg bg-white p-4 shadow sm:p-6">
@@ -384,6 +406,12 @@ export default function StaffPage(): JSX.Element {
             onDelete={handleDeleteStaff}
             onClearFilters={clearFilters}
           />
+        </div>
+
+        <div className="flex justify-center py-4">
+          <div className="bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-200">
+            <Pagination {...paginationConfig} />
+          </div>
         </div>
 
         {/* Modals */}

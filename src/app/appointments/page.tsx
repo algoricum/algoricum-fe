@@ -6,21 +6,24 @@ import { StatCard } from "@/components/appointments/stat-card";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { useDropdown } from "@/hooks/useDropdown";
+import { usePagination } from "@/hooks/usePagination"; // Import the usePagination hook
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { appointmentHelper, type MeetingSchedule } from "@/utils/appointment-helper";
+import { appointmentHelper, type AppointmentStatus, type MeetingSchedule } from "@/utils/appointment-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import { Form } from "antd";
+import { Form, Pagination, Select } from "antd";
 import dayjs from "dayjs";
-import { Calendar, CheckCircle, Clock, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
-import type React from "react";
+import { Calendar, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import "react-phone-number-input/style.css";
-import { useDropdown } from "@/hooks/useDropdown";
+import { appointmentStatsConfig } from "./statsUtil";
 
 export default function AppointmentsPage() {
   const [appointmentsData, setAppointmentsData] = useState<MeetingSchedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [statusStats, setStatusStats] = useState<AppointmentStatus[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddAppointmentModal, setShowAddAppointmentModal] = useState(false);
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
@@ -40,25 +43,45 @@ export default function AppointmentsPage() {
     offset: 8,
   });
 
+  // Initialize pagination with default page size of 10
+  const { currentPage, pageSize, paginationConfig, setTotal, setCurrentPage } = usePagination(10);
+
   const supabase = createClient();
 
-  // Load appointments data from Supabase
+  // Load appointments data from Supabase with pagination
+  const loadAppointments = async () => {
+    if (!clinicId) return;
+    setIsLoading(true);
+    setStatsLoading(true);
+    try {
+      const {
+        data: meetings,
+        error,
+        count,
+      } = await supabase
+        .from("meeting_schedule")
+        .select("*", { count: "exact" })
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false })
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+
+      if (error) throw error;
+
+      // Set both data and total count from single query
+      setAppointmentsData(meetings || []);
+      setTotal(count || 0);
+    } catch (error) {
+      console.error("Error loading appointments:", error);
+      ErrorToast("Failed to load appointments. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadAppointments = async () => {
-      if (!clinicId) return;
-      setIsLoading(true);
-      try {
-        const meetings = await appointmentHelper.getMeetingsByClinic(clinicId);
-        setAppointmentsData(meetings);
-      } catch (error) {
-        console.error("Error loading appointments:", error);
-        ErrorToast("Failed to load appointments. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
     loadAppointments();
-  }, [clinicId]);
+  }, [clinicId, currentPage, pageSize, setTotal]);
 
   // Get clinic ID when component mounts
   useEffect(() => {
@@ -78,6 +101,12 @@ export default function AppointmentsPage() {
     fetchClinicId();
   }, []);
 
+  useEffect(() => {
+    if (clinicId) {
+      loadStatusStats();
+    }
+  }, [clinicId, appointmentsData]);
+
   // Clear copied link indicator after 2 seconds
   useEffect(() => {
     if (copiedLink) {
@@ -87,6 +116,19 @@ export default function AppointmentsPage() {
       return () => clearTimeout(timer);
     }
   }, [copiedLink]);
+
+  const loadStatusStats = async () => {
+    if (!clinicId) return;
+    try {
+      setStatsLoading(true);
+      const stats = await appointmentHelper.getStatusStats(clinicId);
+      setStatusStats(stats);
+    } catch (err) {
+      console.error("Error loading status stats:", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const handleAddAppointment = async () => {
     if (!clinicId) {
@@ -151,9 +193,7 @@ export default function AppointmentsPage() {
         return;
       }
 
-      // Reload appointments data
-      const meetings = await appointmentHelper.getMeetingsByClinic(clinicId!);
-      setAppointmentsData(meetings);
+      await loadAppointments();
 
       SuccessToast("Meeting schedule saved successfully!");
       form.resetFields();
@@ -189,15 +229,25 @@ export default function AppointmentsPage() {
       setIsSubmitting(false);
     }
   };
+
   const handleDeleteAppointment = async () => {
-    if (!selectedAppointment) {
-      return;
-    }
+    if (!selectedAppointment) return;
+
     setIsSubmitting(true);
     try {
       await appointmentHelper.deleteMeeting(selectedAppointment.id);
-      // Update local state
-      setAppointmentsData(prev => prev.filter(apt => apt.id !== selectedAppointment.id));
+
+      // Calculate if current page will be empty after deletion
+      const newTotalItems = appointmentsData.length - 1;
+      const totalPages = Math.ceil(newTotalItems / pageSize);
+
+      // If current page is now beyond total pages, go to the previous page
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(currentPage - 1); // This will trigger useEffect
+      } else if (newTotalItems === 0) {
+        setCurrentPage(1); // This will trigger useEffect
+      }
+
       setShowDeleteConfirmation(false);
       setSelectedAppointment(null);
       SuccessToast("Appointment deleted successfully!");
@@ -251,7 +301,7 @@ export default function AppointmentsPage() {
   };
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || statsLoading) {
     return (
       <DashboardLayout header={<Header title="Appointments" description="Manage patient appointments and scheduling." showHamburgerMenu />}>
         <div className="flex min-h-[400px] items-center justify-center">
@@ -266,24 +316,9 @@ export default function AppointmentsPage() {
       <div className="space-y-6 px-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <StatCard
-            icon={<Calendar className="h-5 w-5 text-blue-600 md:h-6 md:w-6" />}
-            iconBg="bg-blue-100"
-            title="Total"
-            value={appointmentsData.length}
-          />
-          <StatCard
-            icon={<CheckCircle className="h-5 w-5 text-green-600 md:h-6 md:w-6" />}
-            iconBg="bg-green-100"
-            title="Confirmed"
-            value={appointmentsData.filter(apt => apt.status === "confirmed").length}
-          />
-          <StatCard
-            icon={<Clock className="h-5 w-5 text-yellow-600 md:h-6 md:w-6" />}
-            iconBg="bg-yellow-100"
-            title="Pending"
-            value={appointmentsData.filter(apt => apt.status === "pending").length}
-          />
+          {appointmentStatsConfig.map(stat => (
+            <StatCard key={stat.key} icon={stat.icon} iconBg={stat.iconBg} title={stat.title} value={stat.getValue(statusStats)} />
+          ))}
         </div>
 
         {/* Search and Filter Controls */}
@@ -303,15 +338,19 @@ export default function AppointmentsPage() {
           {/* Filter and Add Button */}
           <div className="flex gap-3">
             {/* Status Filter */}
-            <select
+            <Select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              onChange={setStatusFilter}
+              className="w-auto min-w-[120px]"
+              size="middle"
+              style={{
+                borderRadius: "8px",
+              }}
             >
-              <option value="all">All Status</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="pending">Pending</option>
-            </select>
+              <Select.Option value="all">All Status</Select.Option>
+              <Select.Option value="confirmed">Confirmed</Select.Option>
+              <Select.Option value="pending">Pending</Select.Option>
+            </Select>
 
             {/* Add Appointment Button */}
             <button
@@ -507,7 +546,7 @@ export default function AppointmentsPage() {
                         </div>
                         Edit Status
                       </button>
-                      <hr className="my-1 border-gray-100" />
+                      <hr className="my-1 border-gray-200" />
                       <button
                         onClick={e => {
                           e.stopPropagation();
@@ -527,6 +566,12 @@ export default function AppointmentsPage() {
               })}
             </div>
           )}
+        </div>
+
+        <div className="flex justify-center py-4">
+          <div className="bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-200">
+            <Pagination {...paginationConfig} />
+          </div>
         </div>
 
         {/* Modals */}
