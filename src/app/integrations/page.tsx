@@ -442,8 +442,8 @@ export default function IntegrationsPage() {
 
   const connectedIntegrations = integrations.filter(i => i.connected);
   const availableIntegrations = integrations.filter(i => !i.connected);
-  console.log("connectedIntegrations", connectedIntegrations)
-  console.log("available ")
+  console.log("connectedIntegrations", connectedIntegrations);
+  console.log("available ");
   return (
     <DashboardLayout
       header={
@@ -751,14 +751,22 @@ export default function IntegrationsPage() {
             setButtonLoading(false);
             toggleModal("Pipedrive", false);
           }}
-          onConnect={() => {
-            connectToPipedrive(setButtonLoading);
+          onConnect={async () => {
+            await connectToPipedrive(setButtonLoading);
+            // Auto-sync leads after successful connection
+            setTimeout(async () => {
+              try {
+                await syncPipedriveLeads();
+                SuccessToast("Pipedrive leads synced successfully!");
+              } catch (error) {
+                console.error("Auto-sync failed:", error);
+              }
+            }, 3000);
           }}
           onDisconnect={() => {
             updateIntegrationStatus("Pipedrive", "disconnected");
             setPipedriveAccountInfo(null);
           }}
-          onSyncLeads={syncPipedriveLeads}
           buttonLoading={buttonLoading}
         />
 

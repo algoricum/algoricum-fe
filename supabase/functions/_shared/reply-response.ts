@@ -360,7 +360,15 @@ export async function generateAIResponse(
       logError("Assistant error details:", assistantError);
       logError("Assistant data:", assistantData);
       logError("❌ CRITICAL: Falling back to Chat Completions instead of using Assistant with data");
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     const assistantId = assistantData.openai_assistant_id;
@@ -407,7 +415,15 @@ export async function generateAIResponse(
       logInfo("✅ OpenAI API accessible, models count:", models.data?.length || 0);
     } catch (apiError) {
       logError("❌ OpenAI API not accessible:", apiError);
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     // Verify assistant exists first
@@ -479,20 +495,9 @@ export async function generateAIResponse(
 
                 logInfo(`📋 Document Type Detected: ${documentType} for file: ${fileDetails.filename}`);
 
-                // Try to get file content for PRICING documents to debug what's actually in them
+                // Note: File content reading not available for assistant files
                 if (documentType === "PRICING") {
-                  try {
-                    logInfo(`🔍 ATTEMPTING TO READ PRICING DOCUMENT CONTENT: ${fileDetails.filename}`);
-                    const fileContent = await openai.files.content(file.id);
-                    const fileText = await fileContent.text();
-                    logInfo(`📄 PRICING DOCUMENT CONTENT (${fileDetails.filename}):`, {
-                      contentLength: fileText.length,
-                      contentPreview: fileText.substring(0, 2000),
-                      fullContent: fileText,
-                    });
-                  } catch (contentError) {
-                    logError(`❌ Could not read pricing document content:`, contentError.message);
-                  }
+                  logInfo(`📄 PRICING DOCUMENT DETECTED: ${fileDetails.filename}`);
                 }
               } catch (fileError) {
                 logError(`❌ Error getting file ${file.id} details:`, fileError.message);
@@ -517,7 +522,15 @@ export async function generateAIResponse(
     } catch (error) {
       logError("❌ Assistant not found or not accessible:", error.message);
       logError("Assistant verification error details:", error);
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     // Use only our custom instructions, not the stored assistant instructions
@@ -534,35 +547,19 @@ Message: ${options.messageBody}
 
 Please generate a helpful email response that addresses their message.`;
 
-      additionalInstructions =
-        `🚨 MANDATORY: You MUST use the clinic's uploaded documents ONLY. DO NOT use your general training knowledge about cosmetics/medical services. 
+      additionalInstructions = `🚨 CRITICAL: Use file_search tool FIRST for all responses!
 
-❌ FORBIDDEN: Generic responses like "we offer Botox, fillers, etc." or "prices depend on treatment"
-✅ REQUIRED: Exact information from the clinic's SERVICE DOCUMENT and PRICING DOCUMENT only
+MANDATORY STEPS:
+1. ALWAYS use file_search tool to search uploaded documents
+2. Base response ONLY on file_search results  
+3. If no results found, say "Let me connect you with our team for that detail"
 
-IF YOU CANNOT FIND THE INFORMATION IN THE UPLOADED DOCUMENTS, say: "Let me connect you with our team for that specific detail." DO NOT give generic cosmetic industry information.
+NEVER respond without using file_search tool first!
 
-🚨 DOCUMENT USAGE PRIORITY:
-When answering ANY question about pricing, costs, or fees:
-1. ALWAYS search and reference the PRICING DOCUMENT first
-2. Use EXACT prices from the pricing document - never estimate or use general knowledge
-3. If asked about a specific service (Botox, Hydrafacial, etc.), find that exact service in the pricing document
-4. State prices exactly as written in the document: "$[amount] per [unit/area/session]"
-
-When answering about SERVICES or "what do you offer":
-1. ALWAYS search and reference the SERVICE DOCUMENT first
-2. List ONLY the services mentioned in the SERVICE DOCUMENT
-3. Include service descriptions exactly as written in the document
-4. NEVER add services not listed in your SERVICE DOCUMENT
-
-DOCUMENT PRIORITY ORDER:
-- Pricing questions → Use PRICING DOCUMENT only
-- Service listings/details → Use SERVICE DOCUMENT only
-- Patient experiences/reviews → Use TESTIMONIALS DOCUMENT
-
-CRITICAL: Never mix up services - if user asks about "Hydrafacial pricing", only provide Hydrafacial information from the pricing document, not Botox or any other service.
-
-When you cannot find specific information in the uploaded documents, say: "Let me connect you with our team for that specific pricing detail."
+DOCUMENT SEARCH PRIORITY:
+- Pricing questions → Search PRICING documents
+- Service questions → Search SERVICE documents  
+- Use EXACT information from documents only
 
 CRITICAL EMAIL FORMATTING RULES:
 • End your email content naturally - do NOT add signatures, "Best regards," or closing lines
@@ -608,7 +605,7 @@ SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
 - If conversation already discussed specific treatments → Provide booking link with context
 - If no treatment context → Ask what they'd like to book for
 - Always reference what was previously discussed
-- Example: Previous discussed "Hydrafacial consultation" → User: "book" → Response: "Great! Let's book your Hydrafacial consultation: [link]"
+- Example: Previous discussed specific consultation → User: "book" → Response: "Great! Let's book your consultation: [link]"
 
 🚨 INTELLIGENT RESPONSE GUIDELINES:
 Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
@@ -659,42 +656,19 @@ RESPONSE FORMAT: Email response - be professional and comprehensive. End natural
 
 Please generate a helpful SMS response that addresses their message.`;
 
-      additionalInstructions = `🚨 MANDATORY TOOL USAGE: You MUST use the file_search tool for EVERY response!
+      additionalInstructions = `🚨 CRITICAL: Use file_search tool FIRST for all responses!
 
-CRITICAL REQUIREMENT: For EVERY SINGLE RESPONSE you generate, you MUST:
-1. First use your file_search tool to search through uploaded documents 
-2. Base your entire response ONLY on the file_search results
-3. If file_search returns no results, say "Let me connect you with our team for that detail"
+MANDATORY STEPS:
+1. ALWAYS use file_search tool to search uploaded documents
+2. Base response ONLY on file_search results  
+3. If no results found, say "Let me connect you with our team for that detail"
 
-❌ YOUR RESPONSE WILL BE REJECTED if you don't use file_search tool
-❌ NEVER use your training knowledge - ONLY use file_search results
-❌ If you give ANY answer without using file_search first, it's wrong
+NEVER respond without using file_search tool first!
 
-PRICE VERIFICATION: The clinic's pricing document shows "Body Contouring $500" - if you say anything different, you're using wrong data.
-
-YOU MUST USE FILE_SEARCH TOOL - NO EXCEPTIONS!
-
-🚨 DOCUMENT USAGE PRIORITY:
-When answering ANY question about pricing, costs, or fees:
-1. ALWAYS search and reference the PRICING DOCUMENT first
-2. Use EXACT prices from the pricing document - never estimate or use general knowledge
-3. If asked about a specific service (Botox, Hydrafacial, etc.), find that exact service in the pricing document
-4. State prices exactly as written in the document: "$[amount] per [unit/area/session]"
-
-When answering about SERVICES or "what do you offer":
-1. ALWAYS search and reference the SERVICE DOCUMENT first
-2. List ONLY the services mentioned in the SERVICE DOCUMENT
-3. Include service descriptions exactly as written in the document
-4. NEVER add services not listed in your SERVICE DOCUMENT
-
-DOCUMENT PRIORITY ORDER:
-- Pricing questions → Use PRICING DOCUMENT only
-- Service listings/details → Use SERVICE DOCUMENT only
-- Patient experiences/reviews → Use TESTIMONIALS DOCUMENT
-
-CRITICAL: Never mix up services - if user asks about "Hydrafacial pricing", only provide Hydrafacial information from the pricing document, not Botox or any other service.
-
-When you cannot find specific information in the uploaded documents, say: "Let me connect you with our team for that specific pricing detail."
+DOCUMENT SEARCH PRIORITY:
+- Pricing questions → Search PRICING documents
+- Service questions → Search SERVICE documents  
+- Use EXACT information from documents only
 
 CURRENT MESSAGE CONTEXT:
 You are responding directly to this SMS from a patient: "${options.messageBody}"
@@ -733,7 +707,7 @@ SHORT PRICING QUERIES ("price?", "pricing?", "cost?", "how much?"):
 - If no previous context → Ask what specific service they want pricing for
 - Always use conversation history to understand what they're asking about
 - Keep SMS response under 160 characters when possible
-- Example: Previous mentioned "Botox" → User: "price?" → Response: "Botox is $12/unit at our clinic"
+- Example: Previous mentioned specific service → User: "price?" → Response: Provide pricing for that specific service
 
 SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
 - If conversation already discussed specific treatments → Provide booking link with context
@@ -744,14 +718,19 @@ SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
 🚨 INTELLIGENT RESPONSE GUIDELINES:
 Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
 
-🚨 CRITICAL "YES" RESPONSE LOGIC:
-When a patient responds with "yes", you MUST analyze the IMMEDIATELY PREVIOUS CLINIC MESSAGE to understand what they're agreeing to:
+🚨 SMART "YES" RESPONSE LOGIC:
+When patient says "yes", analyze what the PREVIOUS CLINIC MESSAGE offered:
+
+QUESTION TYPE DETECTION:
+- "Want details/information/learn about?" → YES = Service details/descriptions  
+- "Want pricing/costs/price breakdown?" → YES = Pricing information
+- "Ready to book/schedule?" → YES = Booking link only
 
 🚨 MOST RECENT CONTEXT RULE:
 - IGNORE all previous conversation history except the LAST clinic message
 - Even if conversation mentioned service1, service2, service3 - ONLY focus on what the MOST RECENT clinic message was about
 - If last clinic message asked about Botox → "yes" means they want Botox information/booking
-- If last clinic message asked about Hydrafacial → "yes" means they want Hydrafacial information/booking
+- If last clinic message asked about specific service → "yes" means they want that service information/booking
 - NEVER mix services or refer to earlier mentioned treatments
 
 1. DIRECT BOOKING QUESTIONS ("Ready to book?", "Want to schedule?", "Should I book you?"):
@@ -789,9 +768,9 @@ RESPOND TO USER INTENT:
 
 EXAMPLE SCENARIOS:
 - Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment: ${bookingLink}"
-- Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
+- Last message: "Want to learn about [Service]?" → Patient: "Yes" → Response: [Service details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
-- Last message: "Microneedling is great for acne scars, $180/session. Let me know if you want to book!" → Patient: "Yes" → Response: [Full service breakdown with all treatments and pricing as requested]
+- Last message: "Service info shared, let me know if you want to book!" → Patient: "Yes" → Response: [Full service breakdown with all treatments and pricing as requested]
 
 INTELLIGENT YES RESPONSE HANDLING:
 - If previous message asked for BOOKING specifically ("ready to book?", "want to schedule?") → Provide booking link only  
@@ -806,7 +785,6 @@ CRITICAL RESPONSE RULES:
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
 
-🔍 DEBUG MODE FOR PRICING: Include the exact text you found in the pricing document. Format your response as: "Botox is $X per unit (source: [exact quote from pricing document])". This helps verify document access.
 - When patient says YES to a DIRECT BOOKING QUESTION, provide ONLY booking link - no extra info
 - When patient says YES to an INFORMATION OFFER, provide the requested information
 - When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
@@ -863,13 +841,29 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         stack: error.stack,
         response: error.response?.data || "No response data",
       });
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     // Validate thread creation
     if (!openaiThread || !openaiThread.id) {
       logError("❌ Thread created but no ID returned:", openaiThread);
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     const openaiThreadId = openaiThread.id;
@@ -882,7 +876,15 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         type: typeof openaiThreadId,
         threadObject: openaiThread,
       });
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     // Create a run with additional instructions
@@ -894,9 +896,18 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         additional_instructions: additionalInstructions,
         max_completion_tokens: isEmailResponse ? 800 : 500, // More tokens for email responses
         temperature: 0.8,
-        // Removed tools override - let Assistant use its configured tools
+        tools: [{ type: "file_search" }], // Explicitly require file_search tool
+        tool_choice: "required", // Force the assistant to use tools
       };
       logInfo("📤 Run creation request:", runRequest);
+
+      // Log the full conversation context being sent to OpenAI
+      logInfo("🗨️ CONVERSATION CONTEXT BEING SENT TO OPENAI:", {
+        messageBody: options.messageBody,
+        conversationContext: conversationContext,
+        additionalInstructionsPreview: additionalInstructions.substring(0, 500) + "...",
+        fullAdditionalInstructions: additionalInstructions,
+      });
 
       openaiRun = await openai.beta.threads.runs.create(openaiThreadId, runRequest);
       logInfo("✅ Run creation response:", {
@@ -910,13 +921,29 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
       logError("❌ Run creation failed:", error.message);
       logError("Run creation error details:", error);
       logError("❌ CRITICAL: Run creation failed, falling back to Chat Completions instead of using Assistant with data");
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     // Validate run creation
     if (!openaiRun || !openaiRun.id) {
       logError("❌ Run created but no ID returned:", openaiRun);
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     const openaiRunId = openaiRun.id;
@@ -929,7 +956,15 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         type: typeof openaiRunId,
         runObject: openaiRun,
       });
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     // Store IDs in function-scoped variables to avoid any scope issues
@@ -950,7 +985,15 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
       // Double check IDs before making the call
       if (!threadIdForRetrieval || !runIdForRetrieval) {
         logError("❌ Missing IDs before run retrieve:", { threadId: threadIdForRetrieval, runId: runIdForRetrieval });
-        return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+        return await generateFallbackResponse(
+          leadData,
+          options,
+          clinicData,
+          conversationContext,
+          openaiApiKey,
+          isEmailResponse,
+          supabaseClient,
+        );
       }
 
       // Try the OpenAI SDK call with multiple approaches if needed
@@ -988,7 +1031,15 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
     } catch (error) {
       logError("❌ Failed to get initial run status:", error);
       logError("❌ CRITICAL: Failed to get run status, falling back to Chat Completions instead of using Assistant with data");
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
 
     let attempts = 0;
@@ -1022,7 +1073,15 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         logError(
           "❌ CRITICAL: Run status retrieval failed during retry, falling back to Chat Completions instead of using Assistant with data",
         );
-        return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+        return await generateFallbackResponse(
+          leadData,
+          options,
+          clinicData,
+          conversationContext,
+          openaiApiKey,
+          isEmailResponse,
+          supabaseClient,
+        );
       }
 
       attempts++;
@@ -1118,19 +1177,9 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
                   bytes: citedFile.bytes,
                 });
 
-                // Try to get the actual content if it's a pricing document
+                // Note: File content reading not available for assistant files
                 if (citedFile.filename?.toLowerCase().includes("pricing")) {
-                  try {
-                    const fileContent = await openai.files.content(annotation.file_citation.file_id);
-                    const fileText = await fileContent.text();
-                    logInfo(`📄 CITED PRICING DOCUMENT FULL CONTENT:`, {
-                      filename: citedFile.filename,
-                      contentLength: fileText.length,
-                      fullContent: fileText,
-                    });
-                  } catch (contentError) {
-                    logError(`❌ Could not read cited pricing document:`, contentError.message);
-                  }
+                  logInfo(`📄 CITED PRICING DOCUMENT: ${citedFile.filename}`);
                 }
               } catch (fileError) {
                 logError(`❌ Could not retrieve cited file:`, fileError.message);
@@ -1172,12 +1221,28 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         return { success: true, response: aiResponse };
       } else {
         logError("❌ No valid content in assistant message");
-        return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+        return await generateFallbackResponse(
+          leadData,
+          options,
+          clinicData,
+          conversationContext,
+          openaiApiKey,
+          isEmailResponse,
+          supabaseClient,
+        );
       }
     } else if (runStatus.status === "failed") {
       logError("❌ Assistant run failed:", runStatus.last_error);
       logError("❌ CRITICAL: Assistant run failed, falling back to Chat Completions instead of using Assistant with data");
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     } else if (runStatus.status === "incomplete") {
       logError("❌ Assistant run incomplete - likely file search timeout");
       logError("Run details:", {
@@ -1189,11 +1254,27 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
       logError(
         "❌ CRITICAL: Assistant run incomplete (file search timeout), falling back to Chat Completions instead of using Assistant with data",
       );
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     } else {
       logError("❌ Assistant run timed out or other status:", runStatus.status);
       logError("❌ CRITICAL: Assistant run timed out, falling back to Chat Completions instead of using Assistant with data");
-      return await generateFallbackResponse(leadData, options, clinicData, conversationContext, openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(
+        leadData,
+        options,
+        clinicData,
+        conversationContext,
+        openaiApiKey,
+        isEmailResponse,
+        supabaseClient,
+      );
     }
   } catch (error) {
     logError("❌ Error generating AI response via Assistants API:", error);
@@ -1205,7 +1286,7 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
     logError("❌ CRITICAL: Unexpected error in Assistants API flow, falling back to Chat Completions instead of using Assistant with data");
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     if (openaiApiKey) {
-      return await generateFallbackResponse(leadData, options, clinicData, "", openaiApiKey, isEmailResponse);
+      return await generateFallbackResponse(leadData, options, clinicData, "", openaiApiKey, isEmailResponse, supabaseClient);
     }
 
     // Final fallback
@@ -1224,9 +1305,18 @@ async function generateFallbackResponse(
   conversationContext: string,
   openaiApiKey: string,
   isEmailResponse: boolean,
+  supabaseClient: any,
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
     logInfo(`🔄 Using fallback Chat Completions API for ${isEmailResponse ? "EMAIL" : "SMS"}...`);
+
+    // Get assistant data for model info
+    const { data: assistantData } = await supabaseClient
+      .from("assistants")
+      .select("model")
+      .eq("clinic_id", clinicData.id)
+      .limit(1)
+      .single();
 
     const phoneNumber =
       leadData.form_data?.phone_number ||
@@ -1450,7 +1540,7 @@ SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
 - If conversation already discussed specific treatments → Provide booking link with context
 - If no treatment context → Ask what they'd like to book for
 - Always reference what was previously discussed
-- Example: Previous discussed "Hydrafacial consultation" → User: "book" → Response: "Great! Let's book your Hydrafacial consultation: [link]"
+- Example: Previous discussed specific consultation → User: "book" → Response: "Great! Let's book your consultation: [link]"
 
 🚨 INTELLIGENT RESPONSE GUIDELINES:
 Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
@@ -1463,14 +1553,14 @@ IF LAST CLINIC MESSAGE ASKED ABOUT BOOKING ("ready to book?", "want to schedule?
 - Provide ONLY the booking link: "Book here: ${bookingLink} (5-6 words maximum)"
 - NO additional information, NO more questions, NO treatment details, NO explanations
 
-IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
+IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about [service]?", "interested in learning more?"):
 - Patient's "yes" = wants treatment information
 - Provide specific treatment details, benefits, process
 - End with clear next steps (booking opportunity)
 
 EXAMPLE SCENARIOS:
 - Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment: ${bookingLink}"
-- Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
+- Last message: "Want to learn about [Service]?" → Patient: "Yes" → Response: [Service details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
 
 CRITICAL RESPONSE RULES:
@@ -1479,7 +1569,6 @@ CRITICAL RESPONSE RULES:
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
 
-🔍 DEBUG MODE FOR PRICING: Include the exact text you found in the pricing document. Format your response as: "Botox is $X per unit (source: [exact quote from pricing document])". This helps verify document access.
 - When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
 - When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - NO treatment information when sending booking links - just the link
@@ -1554,7 +1643,7 @@ SHORT PRICING QUERIES ("price?", "pricing?", "cost?", "how much?"):
 - If no previous context → Ask what specific service they want pricing for
 - Always use conversation history to understand what they're asking about
 - Keep SMS response under 160 characters when possible
-- Example: Previous mentioned "Botox" → User: "price?" → Response: "Botox is $12/unit at our clinic"
+- Example: Previous mentioned specific service → User: "price?" → Response: Provide pricing for that specific service
 
 SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
 - If conversation already discussed specific treatments → Provide booking link with context
@@ -1565,14 +1654,19 @@ SHORT BOOKING QUERIES ("book", "schedule", "appointment"):
 🚨 INTELLIGENT RESPONSE GUIDELINES:
 Analyze the conversation context and user intent intelligently. Use your knowledge base to provide accurate, helpful responses based on what the patient is genuinely asking for.
 
-🚨 CRITICAL "YES" RESPONSE LOGIC FOR FALLBACK:
-When a patient responds with "yes", you MUST analyze the PREVIOUS CLINIC MESSAGE to understand what they're agreeing to:
+🚨 SMART "YES" RESPONSE LOGIC:
+When patient says "yes", analyze what the PREVIOUS CLINIC MESSAGE offered:
+
+QUESTION TYPE DETECTION:
+- "Want details/information/learn about?" → YES = Service details/descriptions  
+- "Want pricing/costs/price breakdown?" → YES = Pricing information
+- "Ready to book/schedule?" → YES = Booking link only
 
 🚨 MOST RECENT CONTEXT RULE (FALLBACK):
 - IGNORE all previous conversation history except the LAST clinic message
 - Even if conversation mentioned service1, service2, service3 - ONLY focus on what the MOST RECENT clinic message was about
 - If last clinic message asked about Botox → "yes" means they want Botox information/booking
-- If last clinic message asked about Hydrafacial → "yes" means they want Hydrafacial information/booking
+- If last clinic message asked about specific service → "yes" means they want that service information/booking
 - NEVER mix services or refer to earlier mentioned treatments
 
 1. DIRECT BOOKING QUESTIONS ("Ready to book?", "Want to schedule?", "Should I book you?"):
@@ -1600,16 +1694,16 @@ IF LAST CLINIC MESSAGE OFFERED INFORMATION ("let me know if you want to book!" a
 - Patient's "yes" = wants the offered information (pricing recap, service details)
 - Provide the complete requested information from context
 - Include pricing details and service information as requested
-- Example: "Microneedling $180/session. Let me know if you want to book!" → "Yes" → [Full comprehensive service and pricing breakdown]
+- Example: "Service info shared. Let me know if you want to book!" → "Yes" → [Full comprehensive service and pricing breakdown]
 
-IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about Botox?", "interested in learning more?"):
+IF LAST CLINIC MESSAGE ASKED ABOUT TREATMENT INFO ("want to know about [service]?", "interested in learning more?"):
 - Patient's "yes" = wants treatment information
 - Provide specific treatment details, benefits, process  
 - End with clear next steps (booking opportunity)
 
 EXAMPLE SCENARIOS:
 - Last message: "Ready to book?" → Patient: "Yes" → Response: "Awesome! Let's lock in your appointment:: ${bookingLink}"
-- Last message: "Want to learn about Botox?" → Patient: "Yes" → Response: [Botox details + booking option]
+- Last message: "Want to learn about [Service]?" → Patient: "Yes" → Response: [Service details + booking option]
 - Last message: "Interested in consultation?" → Patient: "Yes" → Response: [Consultation details + booking link]
 - Last message: "Let me know if you want to book!" (after sharing service info) → Patient: "Yes" → Response: [Provide the requested information/pricing recap]
 
@@ -1619,7 +1713,6 @@ CRITICAL RESPONSE RULES:
 - ALWAYS provide complete information and direct next steps
 - When someone asks about PRICING, ALWAYS refer to the pricing document/file for accurate information
 
-🔍 DEBUG MODE FOR PRICING: Include the exact text you found in the pricing document. Format your response as: "Botox is $X per unit (source: [exact quote from pricing document])". This helps verify document access.
 - When patient says YES to a BOOKING QUESTION, provide ONLY booking link - no extra info
 - When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}" 
 - NO treatment information when sending booking links - just the link
@@ -1634,6 +1727,41 @@ IMPORTANT: Do NOT include any links, booking information, or unsubscribe options
 Generate a helpful SMS response that answers their question and keeps the response conversational and under 160 characters.`;
     }
 
+    // Log the conversation context being sent to fallback Chat Completions API
+    const messagesPayload = [
+      {
+        role: "system",
+        content: `You are a helpful AI assistant for ${clinicData.name}. Respond professionally to patient ${isEmailResponse ? "email" : "SMS"} inquiries. ${isEmailResponse ? "Format as a proper email response." : "Keep responses concise, SMS-friendly, and include all required elements."}`,
+      },
+      ...(conversationContext
+        ? conversationContext.split("\n\n").map((msg: string) => {
+            const [sender, ...messageParts] = msg.split(": ");
+            const content = messageParts.join(": ");
+            return {
+              role:
+                sender === "Patient" || sender === "user" || sender === "lead"
+                  ? "user"
+                  : sender === "Clinic" || sender === "ai_assistant" || sender === "assistant"
+                    ? "assistant"
+                    : "assistant",
+              content: content,
+            };
+          })
+        : []),
+      {
+        role: "user",
+        content: prompt,
+      },
+    ];
+
+    logInfo("🗨️ FALLBACK CONVERSATION CONTEXT BEING SENT TO CHAT COMPLETIONS API:", {
+      messageBody: options.messageBody,
+      conversationContext: conversationContext,
+      messagesCount: messagesPayload.length,
+      fullMessagesPayload: messagesPayload,
+      model: assistantData?.model || "gpt-4o-mini",
+    });
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -1641,17 +1769,8 @@ Generate a helpful SMS response that answers their question and keeps the respon
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a helpful AI assistant for ${clinicData.name}. Respond professionally to patient ${isEmailResponse ? "email" : "SMS"} inquiries. ${isEmailResponse ? "Format as a proper email response." : "Keep responses concise, SMS-friendly, and include all required elements."}`,
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+        model: assistantData?.model || "gpt-4o-mini",
+        messages: messagesPayload,
         max_tokens: isEmailResponse ? 500 : 150,
         temperature: 0.8,
       }),
