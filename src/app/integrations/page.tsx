@@ -761,7 +761,7 @@ export default function IntegrationsPage() {
               } catch (error) {
                 console.error("Auto-sync failed:", error);
               }
-            }, 3000);
+            }, 2000);
           }}
           onDisconnect={() => {
             updateIntegrationStatus("Pipedrive", "disconnected");
