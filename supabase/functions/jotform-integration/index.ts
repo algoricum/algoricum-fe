@@ -37,11 +37,7 @@ serve(async req => {
 
         const parsedRequest = JSON.parse(rawRequest.toString());
         const leadInfo = extractLeadInfo(parsedRequest);
-const { data: source } = await supabase
-    .from("lead_source")
-    .select("id")
-    .eq("name", "Others")
-    .single();
+        const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
 
         const leadData = {
           first_name: leadInfo.firstName || null,
@@ -111,7 +107,7 @@ const { data: source } = await supabase
             JOTFORM_WEBHOOK_BASE_URL,
           );
           return new Response(JSON.stringify({ status: "saved", forms: newStoredForms }), {
-            headers: { "Content-Type": "application/json" },
+            headers: { ...corsHeaders(), "Content-Type": "application/json" },
           });
         } catch (err) {
           return new Response(JSON.stringify({ error: err.message }), { status: 500 });

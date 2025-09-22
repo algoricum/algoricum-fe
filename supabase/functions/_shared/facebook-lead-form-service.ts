@@ -38,17 +38,27 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
   const code = params.get("code");
   const stateRaw = params.get("state") || "";
 
-  if (!code) {
-    return new Response(JSON.stringify({ error: "Missing code in callback" }), {
-      status: 400,
-      headers: { ...corsHeaders(), "Content-Type": "application/json" },
-    });
-  }
-
   // parse state -> clinic_id|redirect_to
   const decodedState = decodeURIComponent(stateRaw);
   const [clinic_id, redirectToEncoded] = decodedState.split("|");
   const redirectTo = redirectToEncoded ? decodeURIComponent(redirectToEncoded) : null;
+  if (!code) {
+    if (redirectTo) {
+      try {
+        const redirectUrl = new URL(redirectTo);
+        redirectUrl.searchParams.set("facebook_lead_form_status", "error");
+        return new Response(null, {
+          status: 302,
+          headers: {
+            ...corsHeaders(),
+            Location: redirectUrl.toString(),
+          },
+        });
+      } catch {
+        // if invalid redirect, fall through to JSON
+      }
+    }
+  }
 
   // const origin = ORIGIN_OVERRIDE || new URL(req.url).origin
   const redirectUri = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/callback`;
@@ -58,7 +68,7 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
   tokenExchangeUrl.searchParams.set("client_id", FACEBOOK_APP_ID);
   tokenExchangeUrl.searchParams.set("redirect_uri", redirectUri);
   tokenExchangeUrl.searchParams.set("client_secret", FACEBOOK_APP_SECRET);
-  tokenExchangeUrl.searchParams.set("code", code);
+  tokenExchangeUrl.searchParams.set("code", code || "");
 
   const tokenRes = await fetch(tokenExchangeUrl.toString());
   if (!tokenRes.ok) {

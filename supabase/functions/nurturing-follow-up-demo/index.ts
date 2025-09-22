@@ -162,7 +162,7 @@ async function processNurturingFollowupsDemo(supabase: any) {
     }
 
     // Use the shared service to process all leads for demo clinics only
-    const result = await processScheduledFollowUps(supabase)
+    const result = await processScheduledFollowUps(supabase, undefined, demoClinicIds)
 
     if (!result.success) {
       return {

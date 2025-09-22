@@ -520,6 +520,99 @@ export const connectToGoogleLeadForm = async (setButtonLoading: any) => {
   }
 };
 
+export const connectToCalendly = async (setButtonLoading: any) => {
+  setButtonLoading(true);
+  try {
+    const clinic_id = await getClinicId();
+
+    // Call the Supabase edge function to initiate OAuth
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/calendly-integrations/oauth/start`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        clinic_id: clinic_id,
+        redirect_uri: `${SUPABASE_URL}/functions/v1/calendly-integrations/oauth/callback`,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.success && data.oauth_url) {
+      // Redirect to Calendly OAuth
+      window.location.href = data.oauth_url;
+    } else {
+      throw new Error(data.error || "Failed to start OAuth flow");
+    }
+  } catch (error) {
+    setButtonLoading(false);
+    console.error("Error initiating Calendly OAuth:", error);
+    ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Calendly. Please try again"}`);
+  }
+};
+
+export const fetchCalendlyEventTypes = async () => {
+  try {
+    const clinic_id = await getClinicId();
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/calendly-integrations/event-types?clinic_id=${clinic_id}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      return data.data.event_types;
+    } else {
+      throw new Error(data.error || "Failed to fetch event types");
+    }
+  } catch (error) {
+    console.error("Error fetching Calendly event types:", error);
+    ErrorToast(`Failed to fetch event types: ${error instanceof Error ? error.message : "Please try again"}`);
+    return [];
+  }
+};
+
+export const saveCalendlyEventType = async (selectedEventTypeUri: string) => {
+  try {
+    const clinic_id = await getClinicId();
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/calendly-integrations/save-event-type`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        clinic_id: clinic_id,
+        selected_event_type_uri: selectedEventTypeUri,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      SuccessToast("Calendly event type saved successfully!");
+      return data.data;
+    } else {
+      throw new Error(data.error || "Failed to save event type");
+    }
+  } catch (error) {
+    console.error("Error saving Calendly event type:", error);
+    ErrorToast(`Failed to save event type: ${error instanceof Error ? error.message : "Please try again"}`);
+    throw error;
+  }
+};
+
 export const fetchGoogleFormSheets = async (setGoogleFormTreeData: any) => {
   try {
     const clinicId = await getClinicId();
