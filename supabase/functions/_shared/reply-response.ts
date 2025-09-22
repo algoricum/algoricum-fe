@@ -95,7 +95,7 @@ export async function generateAIResponse(
         .eq("thread_id", options.threadId)
         .in("sender_type", ["lead", "ai_assistant"])
         .order("created_at", { ascending: true })
-        .limit(2);
+        .limit(10);
 
       if (historyError) {
         logError("❌ Error fetching conversation history:", historyError);
@@ -812,66 +812,108 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
       responseType: isEmailResponse ? "EMAIL" : "SMS",
     });
 
-    // Create a thread for this conversation
-    logInfo("🧵 Creating OpenAI thread...");
+    // Check if OpenAI thread already exists for this conversation
+    logInfo("🔍 Checking for existing OpenAI thread...");
+    let openaiThreadId: string | null = null;
+
+    if (options.threadId) {
+      const { data: threadData, error: threadError } = await supabaseClient
+        .from("threads")
+        .select("openai_thread_id")
+        .eq("id", options.threadId)
+        .single();
+
+      if (threadError) {
+        logError("❌ Error fetching thread data:", threadError);
+      } else if (threadData?.openai_thread_id) {
+        openaiThreadId = threadData.openai_thread_id;
+        logInfo("✅ Found existing OpenAI thread:", openaiThreadId);
+      }
+    }
+
     let openaiThread;
-    try {
-      const threadRequest = {
-        messages: [
-          {
-            role: "user",
-            content: userPrompt,
-          },
-        ],
-      };
-      logInfo("📤 Thread creation request:", threadRequest);
 
-      openaiThread = await openai.beta.threads.create(threadRequest);
-      logInfo("✅ Thread creation response:", {
-        id: openaiThread?.id,
-        object: openaiThread?.object,
-        created_at: openaiThread?.created_at,
-        metadata: openaiThread?.metadata,
-      });
-    } catch (error) {
-      logError("❌ Thread creation failed:", error.message);
-      logError("Thread creation error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-        response: error.response?.data || "No response data",
-      });
-      return await generateFallbackResponse(
-        leadData,
-        options,
-        clinicData,
-        conversationContext,
-        openaiApiKey,
-        isEmailResponse,
-        supabaseClient,
-      );
+    if (openaiThreadId) {
+      // Use existing thread - add message to it
+      logInfo("🧵 Adding message to existing OpenAI thread...");
+      try {
+        // Add the new message to the existing thread
+        await openai.beta.threads.messages.create(openaiThreadId, {
+          role: "user",
+          content: userPrompt,
+        });
+
+        // Get the thread object for consistency
+        openaiThread = await openai.beta.threads.retrieve(openaiThreadId);
+        logInfo("✅ Message added to existing thread:", openaiThreadId);
+      } catch (error) {
+        logError("❌ Error adding message to existing thread:", error);
+        // Fall back to creating new thread
+        openaiThreadId = null;
+      }
     }
 
-    // Validate thread creation
-    if (!openaiThread || !openaiThread.id) {
-      logError("❌ Thread created but no ID returned:", openaiThread);
-      return await generateFallbackResponse(
-        leadData,
-        options,
-        clinicData,
-        conversationContext,
-        openaiApiKey,
-        isEmailResponse,
-        supabaseClient,
-      );
+    if (!openaiThreadId) {
+      // Create a new thread for this conversation
+      logInfo("🧵 Creating new OpenAI thread...");
+      try {
+        const threadRequest = {
+          messages: [
+            {
+              role: "user",
+              content: userPrompt,
+            },
+          ],
+        };
+        logInfo("📤 Thread creation request:", threadRequest);
+
+        openaiThread = await openai.beta.threads.create(threadRequest);
+        openaiThreadId = openaiThread.id;
+
+        logInfo("✅ Thread creation response:", {
+          id: openaiThread?.id,
+          object: openaiThread?.object,
+          created_at: openaiThread?.created_at,
+          metadata: openaiThread?.metadata,
+        });
+
+        // Store the OpenAI thread ID in the database
+        if (options.threadId && openaiThreadId) {
+          logInfo("💾 Storing OpenAI thread ID in database...");
+          const { error: updateError } = await supabaseClient
+            .from("threads")
+            .update({ openai_thread_id: openaiThreadId })
+            .eq("id", options.threadId);
+
+          if (updateError) {
+            logError("❌ Error storing OpenAI thread ID:", updateError);
+          } else {
+            logInfo("✅ OpenAI thread ID stored successfully");
+          }
+        }
+      } catch (error) {
+        logError("❌ Thread creation failed:", error.message);
+        logError("Thread creation error details:", {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+          response: error.response?.data || "No response data",
+        });
+        return await generateFallbackResponse(
+          leadData,
+          options,
+          clinicData,
+          conversationContext,
+          openaiApiKey,
+          isEmailResponse,
+          supabaseClient,
+        );
+      }
     }
 
-    const openaiThreadId = openaiThread.id;
-    logInfo(`✅ Created thread with ID: ${openaiThreadId}`);
-
-    // Additional validation to catch issues early
-    if (typeof openaiThreadId !== "string" || openaiThreadId.trim() === "") {
-      logError("❌ Invalid thread ID received:", {
+    // Validate thread creation/retrieval
+    if (!openaiThreadId || typeof openaiThreadId !== "string" || openaiThreadId.trim() === "") {
+      logError("❌ No valid OpenAI thread ID available:", {
         threadId: openaiThreadId,
         type: typeof openaiThreadId,
         threadObject: openaiThread,
@@ -886,6 +928,8 @@ RESPONSE FORMAT: SMS response - Keep main message under 160 characters, be conve
         supabaseClient,
       );
     }
+
+    logInfo(`✅ Using OpenAI thread with ID: ${openaiThreadId}`);
 
     // Create a run with additional instructions
     logInfo("🏃 Creating run...");
