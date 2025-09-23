@@ -178,6 +178,34 @@ export default function IntegrationsPage() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    const handleOAuthRedirect = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const pipedriveStatus = urlParams.get("pipedrive_status");
+      const errorMessage = urlParams.get("error_message");
+      const accountName = urlParams.get("account_name");
+      const contactCount = urlParams.get("contact_count");
+      const dealCount = urlParams.get("deal_count");
+
+      if (pipedriveStatus === "success") {
+        const accountInfo = {
+          accountName: accountName || "Connected Account",
+          contactCount: parseInt(contactCount || "0"),
+          dealCount: parseInt(dealCount || "0"),
+        };
+        updateIntegrationStatus("Pipedrive", "connected");
+        setPipedriveAccountInfo(accountInfo);
+
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setTimeout(() => syncPipedriveLeads(), 1000);
+      } else if (pipedriveStatus === "error") {
+        console.log("❌ Pipedrive OAuth error detected from URL:", errorMessage);
+        updateIntegrationStatus("Pipedrive", "disconnected");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+
+    handleOAuthRedirect();
+
     if (searchParams.toString()) {
       router.replace(pathname); // strips off all params
     }
@@ -442,8 +470,8 @@ export default function IntegrationsPage() {
 
   const connectedIntegrations = integrations.filter(i => i.connected);
   const availableIntegrations = integrations.filter(i => !i.connected);
-  console.log("connectedIntegrations", connectedIntegrations)
-  console.log("available ")
+  console.log("connectedIntegrations", connectedIntegrations);
+  console.log("available ");
   return (
     <DashboardLayout
       header={
@@ -751,14 +779,12 @@ export default function IntegrationsPage() {
             setButtonLoading(false);
             toggleModal("Pipedrive", false);
           }}
-          onConnect={() => {
-            connectToPipedrive(setButtonLoading);
-          }}
+          onConnect={() => connectToPipedrive(setButtonLoading)}
+          onSyncLeads={syncPipedriveLeads}
           onDisconnect={() => {
             updateIntegrationStatus("Pipedrive", "disconnected");
             setPipedriveAccountInfo(null);
           }}
-          onSyncLeads={syncPipedriveLeads}
           buttonLoading={buttonLoading}
         />
 

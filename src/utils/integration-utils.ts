@@ -159,18 +159,51 @@ export const syncJotformLeads = async (forms: string[]) => {
 };
 
 export const clearOAuthState = () => {
-  localStorage.removeItem("hubspot_oauth_status");
-  localStorage.removeItem("pipedrive_oauth_status");
-  localStorage.removeItem("google_form_oauth_status");
-  localStorage.removeItem("google_lead_form_oauth_status");
-  localStorage.removeItem("facebook_lead_form_oauth_status");
-  localStorage.removeItem("typeform_oauth_status");
-  localStorage.removeItem("hubspot_oauth_account_info");
-  localStorage.removeItem("pipedrive_oauth_account_info");
-  localStorage.removeItem("google_form_oauth_account_info");
-  localStorage.removeItem("google_lead_form_oauth_account_info");
-  localStorage.removeItem("facebook_lead_form_oauth_account_info");
-  localStorage.removeItem("typeform_oauth_account_info");
+  // Only clear temporary OAuth data, preserve connected status
+  const preservedData: { [key: string]: string | null } = {};
+
+  const keysToPreserve = [
+    "hubspot_oauth_status",
+    "pipedrive_oauth_status",
+    "google_form_oauth_status",
+    "google_lead_form_oauth_status",
+    "facebook_lead_form_oauth_status",
+    "typeform_oauth_status",
+    "hubspot_oauth_account_info",
+    "pipedrive_oauth_account_info",
+    "google_form_oauth_account_info",
+    "google_lead_form_oauth_account_info",
+    "facebook_lead_form_oauth_account_info",
+    "typeform_oauth_account_info",
+  ];
+
+  keysToPreserve.forEach(key => {
+    const value = localStorage.getItem(key);
+    if (value === "connected" || (key.includes("account_info") && value)) {
+      preservedData[key] = value;
+    }
+  });
+
+  // Clear all OAuth items
+  keysToPreserve.forEach(key => {
+    localStorage.removeItem(key);
+  });
+
+  // Restore preserved connected statuses and account info
+  Object.entries(preservedData).forEach(([key, value]) => {
+    if (value) {
+      localStorage.setItem(key, value);
+    }
+  });
+};
+
+export const clearTemporaryOAuthState = () => {
+  // Clear only temporary OAuth states, not connected ones
+  const tempKeys = ["oauth_state", "oauth_code_verifier", "oauth_redirect_url", "oauth_form_data", "oauth_question_index"];
+
+  tempKeys.forEach(key => {
+    localStorage.removeItem(key);
+  });
 };
 
 export const saveOAuthState = (platform: string, status: string, accountInfo?: any) => {
@@ -261,6 +294,7 @@ export const connectToGHL = async (setButtonLoading: any) => {
     ErrorToast(`Connection Failed: ${error instanceof Error ? error.message : "Unable to connect to Go High Level. Please try again"}`);
   }
 };
+
 export const connectToPipedrive = async (setButtonLoading: any) => {
   setButtonLoading(true);
   try {
@@ -312,6 +346,7 @@ export const connectToPipedrive = async (setButtonLoading: any) => {
     }
 
     console.log("🚀 Redirecting to Pipedrive OAuth:", data.authUrl);
+
     window.location.href = data.authUrl;
   } catch (error) {
     setButtonLoading(false);

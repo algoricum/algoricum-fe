@@ -51,7 +51,7 @@ export const handleCsvLeadsUpload = async (clinic_id: string, flag: boolean = fa
       ErrorToast(`${error}`);
     }
   } else {
-    WarningToast("No CSV file found for upload");
+    // WarningToast("No CSV file found for upload");
   }
 };
 // Upload CSV file to Supabase storage and handle leads upload

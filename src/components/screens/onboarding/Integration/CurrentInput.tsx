@@ -1,11 +1,144 @@
 import { CurrentInputProps } from "@/app/types/types";
+import { CheckCircleOutlined } from "@ant-design/icons";
 import { Card, Radio, Select, Space, Typography } from "antd";
 import React from "react";
 
 const { Text } = Typography;
 
-const CurrentInput: React.FC<CurrentInputProps> = ({ currentQuestion, currentValue, handleInputChange, isSubmitting }) => {
+const CurrentInput: React.FC<CurrentInputProps> = ({
+  currentQuestion,
+  currentValue,
+  handleInputChange,
+  isSubmitting,
+  hubspotStatus,
+  hubspotAccountInfo,
+  pipedriveStatus,
+  pipedriveAccountInfo,
+  goHighLevelStatus,
+  nextHealthStatus,
+  googleFormStatus,
+  googleFormAccountInfo,
+  googleLeadFormStatus,
+  googleLeadFormAccountInfo,
+  facebookLeadFormStatus,
+  facebookLeadFormAccountInfo,
+}) => {
   if (!currentQuestion) return null;
+
+  // Check if any integration is connected and show only the connected status
+  if (currentQuestion.id === "selectedCrm") {
+    if (hubspotStatus === "connected") {
+      return (
+        <div className="mb-6">
+          <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+            <Text className="text-gray-700 text-lg">HubSpot</Text>
+            <div className="mt-2 p-2 bg-green-100 rounded-lg">
+              <Text className="text-green-700 text-sm">
+                <CheckCircleOutlined className="mr-1" />
+                Connected to {hubspotAccountInfo?.accountName || "HubSpot"}
+              </Text>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (pipedriveStatus === "connected") {
+      return (
+        <div className="mb-6">
+          <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+            <Text className="text-gray-700 text-lg">Pipedrive</Text>
+            <div className="mt-2 p-2 bg-blue-100 rounded-lg">
+              <Text className="text-blue-700 text-sm">
+                <CheckCircleOutlined className="mr-1" />
+                Connected to {pipedriveAccountInfo?.accountName || "Pipedrive"}
+              </Text>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (goHighLevelStatus === "connected") {
+      return (
+        <div className="mb-6">
+          <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+            <Text className="text-gray-700 text-lg">GoHighLevel</Text>
+            <div className="mt-2 p-2 bg-green-100 rounded-lg">
+              <Text className="text-green-700 text-sm">
+                <CheckCircleOutlined className="mr-1" />
+                Connected to Go High Level
+              </Text>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (nextHealthStatus === "connected") {
+      return (
+        <div className="mb-6">
+          <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+            <Text className="text-gray-700 text-lg">NextHealth</Text>
+            <div className="mt-2 p-2 bg-green-100 rounded-lg">
+              <Text className="text-green-700 text-sm">
+                <CheckCircleOutlined className="mr-1" />
+                Connected to NextHealth
+              </Text>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  if (currentQuestion.id === "adsConnections") {
+    if (googleLeadFormStatus === "connected") {
+      return (
+        <div className="mb-6">
+          <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+            <Text className="text-gray-700 text-lg">Google Ads Lead Forms</Text>
+            <div className="mt-2 p-2 bg-yellow-100 rounded-lg">
+              <Text className="text-yellow-700 text-sm">
+                <CheckCircleOutlined className="mr-1" />
+                Connected to {googleLeadFormAccountInfo?.accountName || "Google Ads Lead Forms"}
+              </Text>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (facebookLeadFormStatus === "connected") {
+      return (
+        <div className="mb-6">
+          <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+            <Text className="text-gray-700 text-lg">Facebook Lead Ads</Text>
+            <div className="mt-2 p-2 bg-blue-100 rounded-lg">
+              <Text className="text-blue-700 text-sm">
+                <CheckCircleOutlined className="mr-1" />
+                Connected to {facebookLeadFormAccountInfo?.accountName || "Facebook Lead Ads"}
+              </Text>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  if (currentQuestion.id === "leadCaptureForms") {
+    if (googleFormStatus === "connected") {
+      return (
+        <div className="mb-6">
+          <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200">
+            <Text className="text-gray-700 text-lg">Google Forms</Text>
+            <div className="mt-2 p-2 bg-yellow-100 rounded-lg">
+              <Text className="text-yellow-700 text-sm">
+                <CheckCircleOutlined className="mr-1" />
+                Connected to {googleFormAccountInfo?.accountName || "Google Forms"}
+              </Text>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
 
   // ----- Select Questions -----
   if (currentQuestion.type === "select") {
@@ -26,8 +159,8 @@ const CurrentInput: React.FC<CurrentInputProps> = ({ currentQuestion, currentVal
           ))}
         </Select>
 
-        {/* CRM Connections */}
-        {currentQuestion.id === "selectedCrm" && currentValue === "Pipedrive" && (
+        {/* CRM Connection Cards (when not connected) */}
+        {currentQuestion.id === "selectedCrm" && currentValue === "Pipedrive" && pipedriveStatus !== "connected" && (
           <ConnectionCard
             color="green"
             letter="P"
@@ -36,7 +169,7 @@ const CurrentInput: React.FC<CurrentInputProps> = ({ currentQuestion, currentVal
           />
         )}
 
-        {currentQuestion.id === "selectedCrm" && currentValue === "HubSpot" && (
+        {currentQuestion.id === "selectedCrm" && currentValue === "HubSpot" && hubspotStatus !== "connected" && (
           <ConnectionCard
             color="red"
             letter="H"
@@ -45,7 +178,7 @@ const CurrentInput: React.FC<CurrentInputProps> = ({ currentQuestion, currentVal
           />
         )}
 
-        {currentQuestion.id === "selectedCrm" && currentValue === "GoHighLevel" && (
+        {currentQuestion.id === "selectedCrm" && currentValue === "GoHighLevel" && goHighLevelStatus !== "connected" && (
           <ConnectionCard
             color="blue"
             letter="H"
@@ -54,8 +187,8 @@ const CurrentInput: React.FC<CurrentInputProps> = ({ currentQuestion, currentVal
           />
         )}
 
-        {/* Ads Connections */}
-        {currentQuestion.id === "adsConnections" && currentValue === "Facebook Lead Ads" && (
+        {/* Ads Connection Cards (when not connected) */}
+        {currentQuestion.id === "adsConnections" && currentValue === "Facebook Lead Ads" && facebookLeadFormStatus !== "connected" && (
           <ConnectionCard
             color="blue"
             letter="F"
@@ -64,7 +197,7 @@ const CurrentInput: React.FC<CurrentInputProps> = ({ currentQuestion, currentVal
           />
         )}
 
-        {currentQuestion.id === "adsConnections" && currentValue === "Google Ads Lead Forms" && (
+        {currentQuestion.id === "adsConnections" && currentValue === "Google Ads Lead Forms" && googleLeadFormStatus !== "connected" && (
           <ConnectionCard
             color="yellow"
             letter="G"
@@ -73,8 +206,8 @@ const CurrentInput: React.FC<CurrentInputProps> = ({ currentQuestion, currentVal
           />
         )}
 
-        {/* Lead Capture Forms */}
-        {currentQuestion.id === "leadCaptureForms" && currentValue === "Google Forms" && (
+        {/* Lead Capture Forms Connection Cards (when not connected) */}
+        {currentQuestion.id === "leadCaptureForms" && currentValue === "Google Forms" && googleFormStatus !== "connected" && (
           <ConnectionCard
             color="yellow"
             letter="G"
