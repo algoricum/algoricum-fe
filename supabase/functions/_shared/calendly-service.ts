@@ -404,9 +404,9 @@ async function handleInviteeCreated(payload: any, supabase: any) {
     const invitee = payload;
 
     // Find the clinic based on event type URI
-    const clinic = await findClinicByEventType(invitee.event.uri, supabase);
+    const clinic = await findClinicByEventType(invitee.scheduled_event.event_type, supabase);
     if (!clinic) {
-      logError("No clinic found for event type", { event_type_uri: invitee.event.uri });
+      logError("No clinic found for event type", { event_type_uri: invitee.scheduled_event.event_type });
       return { handled: false, reason: "No clinic found for this event type" };
     }
 
@@ -439,9 +439,9 @@ async function handleInviteeCreated(payload: any, supabase: any) {
       email: invitee.email,
       preferred_meeting_time: new Date(invitee.scheduled_event.start_time),
       meeting_link: invitee.scheduled_event.uri,
-      calendly_link: invitee.event.uri,
+      calendly_link: invitee.scheduled_event.event_type,
       meeting_notes: JSON.stringify({
-        event_type: invitee.event.name,
+        event_type: invitee.scheduled_event.name,
         end_time: invitee.scheduled_event.end_time,
         timezone: invitee.timezone,
         answers: invitee.questions_and_answers || [],
@@ -547,9 +547,9 @@ async function findClinicByEventType(eventTypeUri: string, supabase: any) {
   try {
     const { data, error } = await supabase
       .from("calendly_integrations")
-      .select("clinic_id, selected_event_type")
-      .eq("selected_event_type", eventTypeUri)
-      .eq("is_active", true)
+      .select("clinic_id, selected_event_type_uri")
+      .eq("selected_event_type_uri", eventTypeUri)
+      .eq("status", "active")
       .single();
 
     if (error || !data) {
@@ -557,7 +557,7 @@ async function findClinicByEventType(eventTypeUri: string, supabase: any) {
       const { data: integrations, error: intError } = await supabase
         .from("calendly_integrations")
         .select("clinic_id, available_event_types")
-        .eq("is_active", true);
+        .eq("status", "active");
 
       if (!intError && integrations) {
         for (const integration of integrations) {
@@ -628,8 +628,13 @@ async function createWebhookSubscription(supabase: any, clinicId: string, webhoo
   // Check if webhook already exists for this organization
   logInfo("Checking for existing webhook subscriptions", { clinicId, webhookUrl });
 
+  const organizationUri = integration.configuration.current_organization;
+  if (!organizationUri) {
+    throw new Error("Organization URI is missing from integration configuration");
+  }
+
   const listResponse = await fetch(
-    `https://api.calendly.com/webhook_subscriptions?organization=${integration.configuration.current_organization}`,
+    `https://api.calendly.com/webhook_subscriptions?organization=${encodeURIComponent(organizationUri)}&scope=organization`,
     {
       headers: {
         Authorization: `Bearer ${integration.access_token}`,
@@ -659,6 +664,15 @@ async function createWebhookSubscription(supabase: any, clinicId: string, webhoo
 
       return existingWebhook;
     }
+  } else {
+    const errorText = await listResponse.text();
+    logError("Failed to list existing webhooks", {
+      status: listResponse.status,
+      statusText: listResponse.statusText,
+      error: errorText,
+      organizationUri: organizationUri,
+      clinicId,
+    });
   }
 
   const requestBody = {
@@ -689,7 +703,7 @@ async function createWebhookSubscription(supabase: any, clinicId: string, webhoo
       // Try to find and return the existing webhook
       try {
         const listRetryResponse = await fetch(
-          `https://api.calendly.com/webhook_subscriptions?organization=${integration.configuration.current_organization}`,
+          `https://api.calendly.com/webhook_subscriptions?organization=${encodeURIComponent(integration.configuration.current_organization)}&scope=organization`,
           {
             headers: {
               Authorization: `Bearer ${integration.access_token}`,
@@ -735,8 +749,12 @@ async function createWebhookSubscription(supabase: any, clinicId: string, webhoo
             return placeholderWebhook;
           }
         } else {
+          const errorText = await listRetryResponse.text();
           logError("Failed to list existing webhooks during conflict resolution", {
             status: listRetryResponse.status,
+            statusText: listRetryResponse.statusText,
+            error: errorText,
+            organizationUri: integration.configuration.current_organization,
             clinicId,
           });
         }
