@@ -447,6 +447,12 @@ async function determineFollowUpsForLead(lead: Lead, supabase: any, followUpRule
       continue;
     }
 
+    // Skip SMS nurturing for "Responded" leads (but allow emails)
+    if (lead.status === "Responded" && rule.communicationType === "sms") {
+      logInfo(`Lead ${lead.id}: Skipping SMS rule ${rule.name} - lead has "Responded" status (emails still allowed)`);
+      continue;
+    }
+
     // Check if this follow-up has already been sent
     if (rule.onlyOnce && (await hasFollowUpBeenSent(lead.id, rule.name, supabase))) {
       logInfo(`Lead ${lead.id}: ${rule.name} already sent`);
