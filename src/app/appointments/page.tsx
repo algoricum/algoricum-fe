@@ -237,6 +237,8 @@ export default function AppointmentsPage() {
     try {
       await appointmentHelper.deleteMeeting(selectedAppointment.id);
 
+      setAppointmentsData(prev => prev.filter(apt => apt.id !== selectedAppointment.id));
+
       // Calculate if current page will be empty after deletion
       const newTotalItems = appointmentsData.length - 1;
       const totalPages = Math.ceil(newTotalItems / pageSize);
