@@ -269,7 +269,7 @@ export function EditAppointmentModal({ isOpen, onClose, onSubmit, isSubmitting, 
 
           <Form.Item label="Status" name="status" rules={[{ required: true, message: "Please select a status" }]}>
             <Select placeholder="Select status" disabled={isSubmitting} className="w-full">
-              <Option value="pending">Pending</Option>
+              <Option value="booked">Booked</Option>
               <Option value="confirmed">Confirmed</Option>
             </Select>
           </Form.Item>

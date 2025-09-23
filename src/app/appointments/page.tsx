@@ -349,7 +349,7 @@ export default function AppointmentsPage() {
             >
               <Select.Option value="all">All Status</Select.Option>
               <Select.Option value="confirmed">Confirmed</Select.Option>
-              <Select.Option value="pending">Pending</Select.Option>
+              <Select.Option value="booked">Booked</Select.Option>
             </Select>
 
             {/* Add Appointment Button */}
@@ -491,7 +491,7 @@ export default function AppointmentsPage() {
                                 appointment.status === "confirmed" ? "bg-green-600" : "bg-amber-600"
                               }`}
                             ></div>
-                            {appointment.status === "confirmed" ? "CONFIRMED" : "PENDING"}
+                            {appointment.status === "confirmed" ? "CONFIRMED" : "Booked"}
                           </span>
                         </td>
 
