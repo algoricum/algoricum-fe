@@ -22,14 +22,14 @@ export const appointmentStatsConfig: StatConfig[] = [
     key: "booked",
     icon: <CheckCircle className="h-6 w-6 text-green-600 md:h-7 md:w-7" />,
     iconBg: "bg-green-100",
-    title: "Booked",
+    title: "Confirmed",
     getValue: statusStats => statusStats.find(stat => stat.status.toLowerCase() === "confirmed")?.count || 0,
   },
   {
     key: "new",
     icon: <Clock className="h-6 w-6 text-yellow-600 md:h-7 md:w-7" />,
     iconBg: "bg-yellow-100",
-    title: "New",
+    title: "Pending",
     getValue: statusStats => statusStats.find(stat => stat.status.toLowerCase() === "pending")?.count || 0,
   },
 ];
