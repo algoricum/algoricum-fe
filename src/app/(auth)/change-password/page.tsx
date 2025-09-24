@@ -4,16 +4,14 @@ import PasswordInput from "@/components/elements/PasswordInput";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { PasswordIcon } from "@/icons";
 import AuthLayout from "@/layouts/AuthLayout";
-import { updateLoggedStatus } from "@/utils/supabase/auth-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { Flex, Form, Typography } from "antd";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMutation } from "react-query";
 const { Title, Text } = Typography;
 
 const PasswordSetupPage = () => {
-  const { push } = useRouter();
   const [form] = Form.useForm();
   const supabase = createClient();
   const [loadingSession, setLoadingSession] = useState(true);
@@ -43,7 +41,12 @@ const PasswordSetupPage = () => {
 
   const { mutate, isLoading } = useMutation(
     async (password: string) => {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await supabase.auth.updateUser({
+        password,
+        data: {
+          logged_first: false,
+        },
+      });
       if (error) throw error;
       return true;
     },
@@ -51,8 +54,10 @@ const PasswordSetupPage = () => {
       onSuccess: async () => {
         SuccessToast("Password updated successfully");
         form.resetFields();
-        await updateLoggedStatus(form.getFieldValue("password"));
-        push("/dashboard");
+
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 1500);
       },
       onError: (error: any) => {
         ErrorToast(error?.message || "Failed to update password");

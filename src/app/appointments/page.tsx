@@ -12,7 +12,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import { appointmentHelper, type AppointmentStatus, type MeetingSchedule } from "@/utils/appointment-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import { Form, Pagination } from "antd";
+import { Form, Pagination, Select } from "antd";
 import dayjs from "dayjs";
 import { Calendar, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -44,47 +44,42 @@ export default function AppointmentsPage() {
   });
 
   // Initialize pagination with default page size of 10
-  const { currentPage, pageSize, paginationConfig, setTotal } = usePagination(10);
+  const { currentPage, pageSize, paginationConfig, setTotal, setCurrentPage } = usePagination(10);
 
   const supabase = createClient();
 
   // Load appointments data from Supabase with pagination
+  const loadAppointments = async () => {
+    if (!clinicId) return;
+    setIsLoading(true);
+    setStatsLoading(true);
+    try {
+      const {
+        data: meetings,
+        error,
+        count,
+      } = await supabase
+        .from("meeting_schedule")
+        .select("*", { count: "exact" })
+        .eq("clinic_id", clinicId)
+        .order("created_at", { ascending: false })
+        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+
+      if (error) throw error;
+
+      // Set both data and total count from single query
+      setAppointmentsData(meetings || []);
+      setTotal(count || 0);
+    } catch (error) {
+      console.error("Error loading appointments:", error);
+      ErrorToast("Failed to load appointments. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadAppointments = async () => {
-      if (!clinicId) return;
-      setIsLoading(true);
-      setStatsLoading(true);
-      try {
-        // Fetch total count for pagination
-        const { count, error: countError } = await supabase
-          .from("meeting_schedule")
-          .select("*", { count: "exact", head: true })
-          .eq("clinic_id", clinicId);
-
-        if (countError) throw countError;
-
-        // Set total items for pagination
-        setTotal(count || 0);
-
-        // Fetch paginated data
-        const { data: meetings, error } = await supabase
-          .from("meeting_schedule")
-          .select("*")
-          .eq("clinic_id", clinicId)
-          .order("created_at", { ascending: false })
-          .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-
-        if (error) throw error;
-
-        setAppointmentsData(meetings || []);
-      } catch (error) {
-        console.error("Error loading appointments:", error);
-        ErrorToast("Failed to load appointments. Please try again.");
-      } finally {
-        setIsLoading(false);
-        setStatsLoading(false);
-      }
-    };
     loadAppointments();
   }, [clinicId, currentPage, pageSize, setTotal]);
 
@@ -110,7 +105,7 @@ export default function AppointmentsPage() {
     if (clinicId) {
       loadStatusStats();
     }
-  }, [clinicId]);
+  }, [clinicId, appointmentsData]);
 
   // Clear copied link indicator after 2 seconds
   useEffect(() => {
@@ -198,18 +193,7 @@ export default function AppointmentsPage() {
         return;
       }
 
-      const { data: meetings } = await supabase
-        .from("meeting_schedule")
-        .select("*")
-        .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false })
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
-
-      setAppointmentsData(meetings || []);
-
-      // Update total count
-      const { count } = await supabase.from("meeting_schedule").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId);
-      setTotal(count || 0);
+      await loadAppointments();
 
       SuccessToast("Meeting schedule saved successfully!");
       form.resetFields();
@@ -247,18 +231,24 @@ export default function AppointmentsPage() {
   };
 
   const handleDeleteAppointment = async () => {
-    if (!selectedAppointment) {
-      return;
-    }
+    if (!selectedAppointment) return;
+
     setIsSubmitting(true);
     try {
       await appointmentHelper.deleteMeeting(selectedAppointment.id);
-      // Update local state
+
       setAppointmentsData(prev => prev.filter(apt => apt.id !== selectedAppointment.id));
 
-      // Update total count
-      const { count } = await supabase.from("meeting_schedule").select("*", { count: "exact", head: true }).eq("clinic_id", clinicId);
-      setTotal(count || 0);
+      // Calculate if current page will be empty after deletion
+      const newTotalItems = appointmentsData.length - 1;
+      const totalPages = Math.ceil(newTotalItems / pageSize);
+
+      // If current page is now beyond total pages, go to the previous page
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(currentPage - 1); // This will trigger useEffect
+      } else if (newTotalItems === 0) {
+        setCurrentPage(1); // This will trigger useEffect
+      }
 
       setShowDeleteConfirmation(false);
       setSelectedAppointment(null);
@@ -350,15 +340,19 @@ export default function AppointmentsPage() {
           {/* Filter and Add Button */}
           <div className="flex gap-3">
             {/* Status Filter */}
-            <select
+            <Select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              onChange={setStatusFilter}
+              className="w-auto min-w-[120px]"
+              size="middle"
+              style={{
+                borderRadius: "8px",
+              }}
             >
-              <option value="all">All Status</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="pending">Pending</option>
-            </select>
+              <Select.Option value="all">All Status</Select.Option>
+              <Select.Option value="confirmed">Confirmed</Select.Option>
+              <Select.Option value="booked">Booked</Select.Option>
+            </Select>
 
             {/* Add Appointment Button */}
             <button
@@ -499,7 +493,7 @@ export default function AppointmentsPage() {
                                 appointment.status === "confirmed" ? "bg-green-600" : "bg-amber-600"
                               }`}
                             ></div>
-                            {appointment.status === "confirmed" ? "CONFIRMED" : "PENDING"}
+                            {appointment.status === "confirmed" ? "CONFIRMED" : "Booked"}
                           </span>
                         </td>
 

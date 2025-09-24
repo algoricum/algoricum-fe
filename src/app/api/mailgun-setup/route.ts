@@ -78,7 +78,7 @@ export async function POST(req: Request) {
       primaryContactEmail,
       clinicPhone,
       businessAddress,
-      slug, // --- ADDED SLUG TO PAYLOAD ---
+      slug,
     };
 
     const headers = {
@@ -98,7 +98,6 @@ export async function POST(req: Request) {
       method: "POST",
       headers,
       body: JSON.stringify(requestPayload),
-      // No timeout property for native fetch
     };
 
     // Add proxy if available

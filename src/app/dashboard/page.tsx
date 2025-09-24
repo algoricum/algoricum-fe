@@ -9,7 +9,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import { handleCsvUpload } from "@/utils/csvUtils";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
-import { Button } from "antd";
+import { Button, Select } from "antd";
 import { Bot, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -241,16 +241,20 @@ export default function DashboardPage() {
           <div className="lg:col-span-2 bg-white rounded-xl border-2 border-gray-200 p-6 shadow-sm hover:shadow-md transition-all">
             <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-4">
               <h3 className="text-lg font-semibold text-gray-900">Appointment Trends</h3>
-              <select
-                className="rounded-lg border-2 border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
+              <Select
                 value={appointmentFilter}
-                onChange={e => setAppointmentFilter(e.target.value as typeof appointmentFilter)}
+                onChange={value => setAppointmentFilter(value as typeof appointmentFilter)}
+                className="w-auto min-w-[140px]"
+                size="middle"
+                style={{
+                  borderRadius: "8px",
+                }}
               >
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="year">This Year</option>
-              </select>
+                <Select.Option value="today">Today</Select.Option>
+                <Select.Option value="week">This Week</Select.Option>
+                <Select.Option value="month">This Month</Select.Option>
+                <Select.Option value="year">This Year</Select.Option>
+              </Select>
             </div>
             <div className="mt-4">
               <SimpleBarChart leadsData={leadsData} filter={appointmentFilter} />
@@ -310,10 +314,8 @@ export default function DashboardPage() {
             await handleCsvUpload(leads, true); // The second parameter triggers the upload
             setShowManualLeadsModal(false); // Close modal after successful upload
             await fetchLeads(); // Refresh the leads data
-            // You might want to show a success toast here
           } catch (error) {
             console.error("Upload failed:", error);
-            // Error is already handled in handleCsvUpload, but modal stays open
           }
         }}
         onCancel={() => setShowManualLeadsModal(false)}

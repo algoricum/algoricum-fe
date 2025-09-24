@@ -119,6 +119,11 @@ const LoginPage = () => {
         ErrorToast("Too many login attempts. Please wait a moment and try again.");
         return;
       }
+
+      if (error.code == "PGRST116") {
+        ErrorToast("Account does not exist in system");
+        return;
+      }
       // Generic error handling
       ErrorToast(error?.message || error?.error_description || "Login failed. Please try again.");
     },

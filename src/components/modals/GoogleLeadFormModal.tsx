@@ -111,8 +111,6 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                   <Text strong className="text-gray-800">
                     Google Ads Lead Forms Integration Active
                   </Text>
-                  <br />
-                  <Text className="text-gray-600 text-sm">{accountInfo.responseCount || 0} responses synced</Text>
                 </div>
                 <div className="flex space-x-2">
                   <Button

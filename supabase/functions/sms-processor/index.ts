@@ -305,6 +305,9 @@ async function processSMSMessage(
       console.log(`✅ Found existing lead: ${leadData.id}`);
     }
 
+    // Update lead status to "Responded" for existing leads (will be overridden to "Cold" if stop keyword)
+    let shouldUpdateToResponded = !!existingLead;
+
     // Check for stop keywords and mark lead as Cold if found
     const stopKeywords = ["stop", "unsubscribe", "opt out", "optout", "quit", "cancel", "end", "remove"];
     const messageBodyLower = messageBody.toLowerCase().trim();
@@ -337,6 +340,28 @@ async function processSMSMessage(
         console.error("❌ Error updating lead status to Cold:", statusUpdateError);
       } else {
         console.log(`✅ Lead ${leadData.id} marked as Cold due to stop keyword`);
+      }
+
+      // Don't update to "Responded" if we marked as Cold
+      shouldUpdateToResponded = false;
+    }
+
+    // Update lead status to "Responded" if this is an existing lead responding (and not a stop keyword)
+    if (shouldUpdateToResponded && leadData.status !== "Responded") {
+      console.log(`📬 Updating lead ${leadData.id} status to "Responded"`);
+
+      const { error: respondedUpdateError } = await supabaseClient
+        .from("lead")
+        .update({
+          status: "Responded",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", leadData.id);
+
+      if (respondedUpdateError) {
+        console.error("❌ Error updating lead status to Responded:", respondedUpdateError);
+      } else {
+        console.log(`✅ Lead ${leadData.id} status updated to "Responded"`);
       }
     }
 

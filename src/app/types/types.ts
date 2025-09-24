@@ -63,9 +63,22 @@ export interface PreviousQuestionsProps {
 export interface CurrentInputProps {
   currentQuestion: any;
   currentValue: any;
-
   handleInputChange: (value: any) => void;
   isSubmitting: boolean;
+
+  // Connection statuses
+  hubspotStatus?: ConnectionStatus;
+  hubspotAccountInfo?: any;
+  pipedriveStatus?: ConnectionStatus;
+  pipedriveAccountInfo?: any;
+  goHighLevelStatus?: ConnectionStatus;
+  nextHealthStatus?: ConnectionStatus;
+  googleFormStatus?: ConnectionStatus;
+  googleFormAccountInfo?: any;
+  googleLeadFormStatus?: ConnectionStatus;
+  googleLeadFormAccountInfo?: any;
+  facebookLeadFormStatus?: ConnectionStatus;
+  facebookLeadFormAccountInfo?: any;
 }
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected";
