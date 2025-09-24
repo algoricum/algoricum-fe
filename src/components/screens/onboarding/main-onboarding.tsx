@@ -192,8 +192,6 @@ export default function MainOnboarding() {
     }
   };
 
-  // Map new flow data to old flow structure for Supabase
-  // Map new flow data to old flow structure for Supabase
   const mapDataForSubmission = (data: Record<string, any>) => {
     const clinicInfo = data["clinic-info"] || {};
     const staffHours = data["staff-hours"] || {};
@@ -214,7 +212,7 @@ export default function MainOnboarding() {
       };
     });
 
-    return {
+    const mappedData = {
       // Step 1 - Clinic Info
       legalBusinessName: clinicInfo.clinicName || "",
       dbaName: clinicInfo.primaryContactName || "",
@@ -225,7 +223,7 @@ export default function MainOnboarding() {
       fullName: "", // Not collected in new flow
       emailAddress: clinicInfo.primaryContactEmail || "",
       phoneNumber: clinicInfo.clinicPhone || "",
-      calendlyLink: bookingSetup.hasBookingLink === "Yes, I have a booking link" ? bookingSetup.bookingLinkUrl : "",
+      calendlyLink: bookingSetup.bookingLinkUrl || "",
 
       // AI Assistant Configuration
       toneSelector: toneIdentity.toneSelector || "friendly",
@@ -244,6 +242,8 @@ export default function MainOnboarding() {
       // Business hours for generateClinicInstructions
       businessHoursText: clinicInfo.businessHours || "",
     };
+
+    return mappedData;
   };
 
   // Helper function to convert file path to File object
@@ -269,12 +269,14 @@ export default function MainOnboarding() {
   }
 
   // Main submission function (updated to handle three document types)
-  const handleCompleteOnboarding = async () => {
+  const handleCompleteOnboarding = async (dataToUse?: Record<string, any>) => {
     try {
       setIsSubmitting(true);
 
+      const finalData = dataToUse || allData;
+
       // Map the new flow data to the old structure
-      const mappedData = mapDataForSubmission(allData);
+      const mappedData = mapDataForSubmission(finalData);
 
       // Get current user
       const user = await getUserData();
@@ -317,8 +319,6 @@ export default function MainOnboarding() {
       if (!clinicSlug || clinicSlug.trim() === "") {
         throw new Error("Failed to generate valid clinic slug");
       }
-
-      console.log("🏷️ Generated clinic slug:", clinicSlug);
 
       const clinicData = {
         id: clinic.id, // Include clinic ID for update
@@ -536,7 +536,7 @@ export default function MainOnboarding() {
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     } else {
-      handleCompleteOnboarding();
+      handleCompleteOnboarding(newAllData);
     }
   };
 

@@ -16,6 +16,8 @@ const publicRoutes = [
   "/inactive",
   "/unauthorized",
   "/unsubscribe-lead", // Add unauthorized page to public routes
+  "/redirect-form", // OAuth redirect handler
+  "/redirect-lead", // Lead form redirect handler
 ];
 // Paths that should redirect to dashboard if already authenticated
 const authRoutes = ["/login", "/signup", "/forgot-password"];
@@ -157,11 +159,40 @@ export async function middleware(request: NextRequest) {
       if (
         !hasClinic &&
         pathname !== "/onboarding" &&
+        pathname !== "/redirect-form" &&
+        pathname !== "/redirect-lead" &&
         !isChangePasswordRoute &&
         !(isStaff && loggedFirst === true) &&
         !isUnauthorizedRoute
       ) {
-        return redirect("/onboarding");
+        // Preserve OAuth callback parameters when redirecting to onboarding
+        const searchParams = request.nextUrl.searchParams;
+        const oauthParams = new URLSearchParams();
+
+        // Preserve important OAuth status parameters
+        [
+          "google_form_status",
+          "google_lead_form_status",
+          "hubspot_status",
+          "pipedrive_status",
+          "typeform_status",
+          "facebook_lead_form_status",
+          "connection_id",
+          "account_name",
+          "contact_count",
+          "deal_count",
+          "error_message",
+        ].forEach(param => {
+          const value = searchParams.get(param);
+          if (value) oauthParams.set(param, value);
+        });
+
+        const onboardingUrl = new URL("/onboarding", request.url);
+        if (oauthParams.toString()) {
+          onboardingUrl.search = oauthParams.toString();
+        }
+
+        return NextResponse.redirect(onboardingUrl);
       }
       // If user is on homepage, redirect based on clinic status
       if (pathname === "/") {
@@ -176,7 +207,15 @@ export async function middleware(request: NextRequest) {
       }
       // If user has clinic and is on other public routes, redirect to dashboard
       // But don't redirect staff on first login from change-password or unauthorized page
-      if (isPublicRoute && hasClinic && !(isStaff && loggedFirst === true && isChangePasswordRoute) && !isUnauthorizedRoute) {
+      // Also don't redirect from OAuth callback handlers
+      if (
+        isPublicRoute &&
+        hasClinic &&
+        !(isStaff && loggedFirst === true && isChangePasswordRoute) &&
+        !isUnauthorizedRoute &&
+        pathname !== "/redirect-form" &&
+        pathname !== "/redirect-lead"
+      ) {
         return redirect("/dashboard");
       }
     }

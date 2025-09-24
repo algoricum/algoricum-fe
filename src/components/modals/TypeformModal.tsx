@@ -131,8 +131,6 @@ export const TypeformModal: React.FC<ModalProps> = ({
                   <Text strong className="text-white">
                     Typeform Integration Active
                   </Text>
-                  <br />
-                  <Text className="text-gray-300 text-sm">0 responses synced</Text>
                 </div>
                 <div className="flex space-x-2">
                   <Button

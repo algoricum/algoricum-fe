@@ -176,18 +176,17 @@ export const updatePassword = async (password: string): Promise<void> => {
   }
 };
 
-export const updateLoggedStatus = async (newPassword: string) => {
+export const updateLoggedStatus = async () => {
   const { error: updateError } = await supabase.auth.updateUser({
-    password: newPassword,
     data: {
       logged_first: false, // ✅ prevent future redirects
     },
   });
 
   if (updateError) {
-    console.error("Error resetting password: " + updateError.message);
+    console.error("Error updating logged status: " + updateError.message);
   } else {
-    SuccessToast("Moving to Dashboard"); // redirect after success
+    SuccessToast("Status updated successfully");
   }
 };
 
