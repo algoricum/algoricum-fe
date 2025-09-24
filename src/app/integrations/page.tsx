@@ -654,7 +654,7 @@ export default function IntegrationsPage() {
           onCancel={() => toggleModal("Google Lead Forms", false)}
           onOk={() => toggleModal("Google Lead Forms", false)}
           onConnect={() => connectToGoogleLeadForm(setButtonLoading)}
-          accountInfo={{}}
+          accountInfo={{ accountName: "your GoogleLeadForm account successfully" }}
           onSyncLeads={syncGoogleLeadFormLeads}
           onDisconnect={async () => {
             deleteIntegrationConnections(await getClinicId(), "Google Lead Forms");
@@ -680,7 +680,7 @@ export default function IntegrationsPage() {
             connectToGoogleForm(setButtonLoading);
           }}
           buttonLoading={buttonLoading}
-          accountInfo={{}}
+          accountInfo={{ accountName: "your GoogleForm account successfully" }}
           treeData={googleFormTreeData}
           selectedWorksheets={selectedSheets}
           onSelectWorksheets={setSelectedSheets}
@@ -730,7 +730,7 @@ export default function IntegrationsPage() {
             connectToGHL(setButtonLoading);
           }}
           buttonLoading={buttonLoading}
-          accountInfo={null}
+          accountInfo={{ accountName: "your GoHighLevelForm account successfully" }}
         />
 
         {/* Typeform Modal */}
@@ -750,7 +750,7 @@ export default function IntegrationsPage() {
           }}
           buttonLoading={buttonLoading}
           treeData={TypeformTreeData}
-          accountInfo={{}}
+          accountInfo={{ accountName: "your typeform account successfully" }}
           onSyncLeads={() => {
             syncTypeformLeads(selectedTypeformForms);
             setTypeformLeadsSynced(true);
@@ -819,7 +819,7 @@ export default function IntegrationsPage() {
           onConnect={(token: any) => {
             connectToNextHealth(token, setButtonLoading);
           }}
-          accountInfo={null}
+          accountInfo={{ accountName: "your NexHealthLeadForm account successfully" }}
           buttonLoading={buttonLoading}
         />
 
