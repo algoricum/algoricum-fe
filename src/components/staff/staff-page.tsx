@@ -27,10 +27,10 @@ import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
 import { AddStaffModal } from "@/components/staff/add-staff-modal";
 import { DeleteConfirmModal } from "@/components/staff/delete-confirm-modal";
 import { EditStaffModal } from "@/components/staff/edit-staff-modal";
-import { staffStatsConfig } from "@/components/staff/statCardUtils";
 import { getInitials, mapDatabaseStatusToFrontend, mapFrontendStatusToDatabase } from "@/components/staff/staffUtilFunctions";
-import { Pagination } from "antd";
+import { staffStatsConfig } from "@/components/staff/statCardUtils";
 import { usePagination } from "@/hooks/usePagination";
+import { Pagination } from "antd";
 
 interface Staff {
   id: string;
