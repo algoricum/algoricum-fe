@@ -112,8 +112,6 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
                   <Text strong className="text-yellow-800">
                     Google Forms Integration Active
                   </Text>
-                  <br />
-                  <Text className="text-yellow-600 text-sm">{accountInfo.responseCount || 0} responses synced</Text>
                 </div>
                 <div className="flex space-x-2">
                   <Button
