@@ -55,7 +55,10 @@ const PasswordSetupPage = () => {
       onSuccess: async () => {
         SuccessToast("Password updated successfully");
         form.resetFields();
-        push("/dashboard");
+
+        setTimeout(() => {
+          push("/dashboard");
+        }, 1500);
       },
       onError: (error: any) => {
         ErrorToast(error?.message || "Failed to update password");
