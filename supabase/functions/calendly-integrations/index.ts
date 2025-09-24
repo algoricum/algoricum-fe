@@ -120,7 +120,8 @@ async function handleRequest(request: Request): Promise<Response> {
         }
 
         // Redirect to frontend with success
-        const frontendUrl = `http://localhost:3000/onboarding?calendly_status=success&integration_id=${integration.id}`; //`${FRONTEND_URL}/onboarding?calendly_status=success&integration_id=${integration.id}`;
+        // `http://localhost:3000/onboarding?calendly_status=success&integration_id=${integration.id}`
+        const frontendUrl = `${FRONTEND_URL}/onboarding?calendly_status=success&integration_id=${integration.id}`;
 
         return new Response(null, {
           status: 302,
