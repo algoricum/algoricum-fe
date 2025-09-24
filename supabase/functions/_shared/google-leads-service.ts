@@ -14,7 +14,7 @@ export async function startAuth(clinic_id: string, redirectTo: string) {
 
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
     client_id: googleClientId,
-    redirect_uri: new URL(redirectTo).origin + "/Redirect-lead",
+    redirect_uri: new URL(redirectTo).origin + "/redirect-lead",
     response_type: "code",
     scope: scopes,
     access_type: "offline",
@@ -39,7 +39,7 @@ export async function handleOAuthCallback(code: string, clinic_id: string, redir
       code,
       client_id: googleClientId,
       client_secret: googleClientSecret,
-      redirect_uri: new URL(redirectTo).origin + "/Redirect-lead",
+      redirect_uri: new URL(redirectTo).origin + "/redirect-lead",
       grant_type: "authorization_code",
     }),
   });
