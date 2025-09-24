@@ -43,7 +43,8 @@ export async function initiateOAuthFlow(req: any) {
 
     const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     authUrl.searchParams.set("client_id", googleClientId);
-    authUrl.searchParams.set("redirect_uri", new URL(redirectTo).origin + "/Redirect-form");
+    authUrl.searchParams.set("redirect_uri", new URL(redirectTo).origin + "/redirect-form");
+
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("scope", scopes.join(" "));
     authUrl.searchParams.set("access_type", "offline");
@@ -91,7 +92,7 @@ export async function handleOAuthCallback(req: any, supabase: any) {
     const state = url.searchParams.get("state");
     const error = url.searchParams.get("error");
     if (!code || !state) {
-      const redirectUrl = new URL(`${APP_URL}onboarding`);
+      const redirectUrl = new URL(`${APP_URL}/onboarding`);
       redirectUrl.searchParams.set("google_form_status", "error");
       redirectUrl.searchParams.set("error", "missing_parameters");
 
@@ -109,7 +110,7 @@ export async function handleOAuthCallback(req: any, supabase: any) {
       redirectUri = stateData.redirectTo;
     } catch (e: any) {
       console.error("Error parsing state:", e.message);
-      const redirectUrl = new URL(`${APP_URL}onboarding`);
+      const redirectUrl = new URL(`${APP_URL}/onboarding`);
       redirectUrl.searchParams.set("google_form_status", "error");
       redirectUrl.searchParams.set("error", "invalid_state");
 
@@ -142,7 +143,7 @@ export async function handleOAuthCallback(req: any, supabase: any) {
       client_secret: googleClientSecret,
       code: code,
       grant_type: "authorization_code",
-      redirect_uri: new URL(redirectUri).origin + "/Redirect-form",
+      redirect_uri: new URL(redirectUri).origin + "/redirect-form",
     });
 
     const tokenResponse = await fetch(tokenUrl, {
@@ -216,7 +217,7 @@ export async function handleOAuthCallback(req: any, supabase: any) {
     });
   } catch (error) {
     console.error("OAuth callback error:", error);
-    const redirectUrl = new URL(`${APP_URL}`);
+    const redirectUrl = new URL(`${APP_URL}/onboarding`);
     redirectUrl.searchParams.set("google_form_status", "error");
     redirectUrl.searchParams.set("error", "unexpected_error");
 
