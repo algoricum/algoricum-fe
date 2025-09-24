@@ -510,7 +510,7 @@ async function handleInviteeCanceled(payload: any, supabase: any) {
     const { data, error } = await supabase
       .from("meeting_schedule")
       .update({
-        status: "pending",
+        status: "booked",
         meeting_notes: JSON.stringify({
           ...existingNotes,
           canceled_at: new Date().toISOString(),
