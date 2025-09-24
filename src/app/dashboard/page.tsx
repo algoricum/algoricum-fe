@@ -314,10 +314,8 @@ export default function DashboardPage() {
             await handleCsvUpload(leads, true); // The second parameter triggers the upload
             setShowManualLeadsModal(false); // Close modal after successful upload
             await fetchLeads(); // Refresh the leads data
-            // You might want to show a success toast here
           } catch (error) {
             console.error("Upload failed:", error);
-            // Error is already handled in handleCsvUpload, but modal stays open
           }
         }}
         onCancel={() => setShowManualLeadsModal(false)}
