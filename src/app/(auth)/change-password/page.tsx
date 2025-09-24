@@ -6,13 +6,12 @@ import { PasswordIcon } from "@/icons";
 import AuthLayout from "@/layouts/AuthLayout";
 import { createClient } from "@/utils/supabase/config/client";
 import { Flex, Form, Typography } from "antd";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useMutation } from "react-query";
 const { Title, Text } = Typography;
 
 const PasswordSetupPage = () => {
-  const { push } = useRouter();
   const [form] = Form.useForm();
   const supabase = createClient();
   const [loadingSession, setLoadingSession] = useState(true);
@@ -57,7 +56,7 @@ const PasswordSetupPage = () => {
         form.resetFields();
 
         setTimeout(() => {
-          push("/dashboard");
+          window.location.href = "/dashboard";
         }, 1500);
       },
       onError: (error: any) => {
