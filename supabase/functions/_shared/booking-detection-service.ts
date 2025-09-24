@@ -107,7 +107,7 @@ export async function detectBookingRequestAndCreateSchedule(
       calendly_link: options.clinicData.calendly_link || "",
       meeting_notes: createMeetingNotes(options),
       phone_number: options.leadData.phone || options.senderPhone || null,
-      status: "pending",
+      status: "booked",
       created_at: new Date().toISOString(),
     };
 
