@@ -56,7 +56,6 @@ interface IntegrationStates {
 const supabase = createClient();
 
 export default function TodayTasks({ clinicId }: { clinicId: string }) {
-  console.log(clinicId);
   const [integrationStates, setIntegrationStates] = useState<IntegrationStates>({
     statuses: {
       "Facebook Lead Forms": "disconnected",
@@ -170,7 +169,7 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
   ]);
 
   const availableIntegrations = integrations.filter(i => !i.connected);
-  console.log("Faizan look ", availableIntegrations);
+
   const fetchTasks = async () => {
     const start = dayjs().startOf("day").toISOString();
     const end = dayjs().endOf("day").toISOString();
