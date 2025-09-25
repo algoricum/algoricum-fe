@@ -33,7 +33,7 @@ export const syncPipedriveLeads = async () => {
     });
 
     if (!response.ok) throw new Error("Failed to sync Pipedrive leads");
-    SuccessToast("Pipedrive leads synced successfully");
+    SuccessToast("Pipedrive leads sync in progress");
   } catch (error) {
     ErrorToast("Failed to sync Pipedrive leads");
     console.error(error);
@@ -66,7 +66,7 @@ export const syncGoogleFormLeads = async (worksheets: any) => {
     });
     console.log("response");
     if (!response.ok) throw new Error("Failed to sync Google Form leads");
-    SuccessToast("Google Form leads synced successfully");
+    SuccessToast("Google Form leads sync in progress");
     return true;
   } catch (error) {
     ErrorToast("Failed to sync Google Form leads");
@@ -89,7 +89,7 @@ export const syncGoogleLeadFormLeads = async () => {
     });
 
     if (!response.ok) throw new Error("Failed to sync Google Lead Form leads");
-    SuccessToast("Google Lead Form leads synced successfully");
+    SuccessToast("Google Lead Form leads sync in progress");
   } catch (error) {
     ErrorToast("Failed to sync Google Lead Form leads");
     console.error(error);
@@ -118,7 +118,7 @@ export const syncTypeformLeads = async (forms: string[]) => {
     });
 
     if (!response.ok) throw new Error("Failed to sync Typeform leads");
-    SuccessToast("Typeform leads synced successfully");
+    SuccessToast("Typeform leads sync in progress");
     return true;
   } catch (error) {
     ErrorToast("Failed to sync Typeform leads");
@@ -149,7 +149,7 @@ export const syncJotformLeads = async (forms: string[]) => {
     });
 
     if (!response.ok) throw new Error("Failed to sync Typeform leads");
-    SuccessToast("Jotform leads synced successfully");
+    SuccessToast("Jotform leads sync in progress");
     return true;
   } catch (error) {
     ErrorToast("Failed to sync Jotform leads");
@@ -421,7 +421,7 @@ export const connectToNextHealth = async (apiKey: string, setButtonLoading: any)
   setButtonLoading(true);
   const clinicId = await getClinicId();
   try {
-    const res = await fetch("https://eypitkzntyiyvwrndkgy.supabase.co/functions/v1/NextHealth-integration", {
+    const res = await fetch("https://ozmytbghfvrfhbjvabor.supabase.co/functions/v1/NextHealth-integration", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
