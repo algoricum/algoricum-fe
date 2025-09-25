@@ -109,9 +109,9 @@ async function handleRequest(request: Request): Promise<Response> {
         await storeAvailableEventTypes(serviceSupabase, state);
         logInfo("Available event types stored successfully");
 
-        // Auto-create webhook subscription
+        // Auto-create webhook subscription with clinic-specific URL
         try {
-          const webhookUrl = `${SUPABASE_URL}/functions/v1/calendly-integrations/webhook`;
+          const webhookUrl = `${SUPABASE_URL}/functions/v1/calendly-integrations/webhook?clinic_id=${state}`;
           await createWebhookSubscription(serviceSupabase, state, webhookUrl);
           logInfo("Webhook subscription created automatically");
         } catch (webhookError) {
@@ -239,20 +239,33 @@ async function handleRequest(request: Request): Promise<Response> {
     // Handle webhook
     if (method === "POST" && url.pathname.includes("/webhook")) {
       try {
+        const clinic_id = url.searchParams.get("clinic_id");
         const webhookData = await request.json();
-        logInfo("Calendly webhook received", { event: webhookData.event });
 
-        // Process webhook directly to avoid import issues
+        logInfo("Calendly webhook received", {
+          event: webhookData.event,
+          clinic_id: clinic_id,
+          hasClinicId: !!clinic_id,
+        });
+
+        if (!clinic_id) {
+          logError("Missing clinic_id in webhook URL", { url: url.toString() });
+          return createErrorResponse("Missing clinic_id parameter in webhook URL", 400);
+        }
+
+        // Process webhook with clinic context
         let result;
         try {
           if (typeof handleCalendlyWebhook === "function") {
-            result = await handleCalendlyWebhook(webhookData, supabase);
+            // Pass clinic_id to the webhook handler
+            result = await handleCalendlyWebhook(webhookData, supabase, clinic_id);
           } else {
             logError("handleCalendlyWebhook function not available - processing inline");
-            // Simple inline processing
+            // Simple inline processing with clinic context
             result = {
               handled: true,
               event: webhookData.event,
+              clinic_id: clinic_id,
               message: "Webhook received but not fully processed - function import issue",
             };
           }
@@ -262,6 +275,7 @@ async function handleRequest(request: Request): Promise<Response> {
             handled: false,
             error: handlerError.message,
             event: webhookData.event,
+            clinic_id: clinic_id,
           };
         }
 
@@ -281,7 +295,7 @@ async function handleRequest(request: Request): Promise<Response> {
       if (!clinic_id) return createErrorResponse("clinic_id is required", 400);
 
       try {
-        const webhookUrl = `${SUPABASE_URL}/functions/v1/calendly-integrations/webhook`;
+        const webhookUrl = `${SUPABASE_URL}/functions/v1/calendly-integrations/webhook?clinic_id=${clinic_id}`;
         const webhook = await createWebhookSubscription(supabase, clinic_id, webhookUrl);
         return new Response(
           JSON.stringify({
