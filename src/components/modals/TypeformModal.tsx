@@ -109,7 +109,7 @@ export const TypeformModal: React.FC<ModalProps> = ({
               description={`Connected to ${accountInfo.accountName}. Your form integration is ready!`}
               type="success"
               showIcon
-              className="mb-4"
+              className="mb-4 !border-gray-300"
             />
             <div className="mt-4">
               <Text className="block mb-2">Select forms to sync leads from:</Text>
@@ -125,10 +125,10 @@ export const TypeformModal: React.FC<ModalProps> = ({
                 onChange={onSelectForms}
               />
             </div>
-            <div className="bg-black rounded-lg p-4 mt-4">
+            <div className="bg-gray-100 rounded-lg p-4 mt-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <Text strong className="text-white">
+                  <Text strong className="text-gray-600">
                     Typeform Integration Active
                   </Text>
                 </div>
@@ -137,18 +137,18 @@ export const TypeformModal: React.FC<ModalProps> = ({
                     type="primary"
                     size="small"
                     onClick={() => onSyncLeads?.()}
-                    className="bg-gray-800 border-gray-800 hover:bg-gray-900"
+                    className="bg-gray-500 border-gray-700 text-white hover:!bg-gray-600 hover:!text-white"
                   >
                     Sync Leads
                   </Button>
-                  <Button type="link" danger onClick={onDisconnect} className="text-red-500">
+                  <Button type="link" danger onClick={onDisconnect} className="text-red-500 hover:!text-red-500">
                     Disconnect
                   </Button>
                 </div>
               </div>
             </div>
             <div className="mt-4 text-center">
-              <Text className="text-gray-600">⚡ Your Typeform integration is ready! Need help?</Text>
+              <Text className="text-gray-600">⚡ Your Typeform integration is ready!</Text>
               <br />
             </div>
             <BookingLinkComponent

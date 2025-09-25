@@ -135,7 +135,7 @@ export const JotformModal: React.FC<ModalProps> = ({
         )}
         {status === "connected" && (
           <>
-            <Alert message="Successfully Connected!" type="success" showIcon className="mb-4" />
+            <Alert message="Successfully Connected!" type="success" showIcon className="mb-4 !border-gray-100" />
             <div className="mt-4">
               <Text className="block mb-2">Select forms to sync leads from:</Text>
               <TreeSelect
@@ -150,32 +150,31 @@ export const JotformModal: React.FC<ModalProps> = ({
                 onChange={onSelectForms}
               />
             </div>
-            <div className="bg-blue-50 rounded-lg p-4 mt-4">
+            <div className="bg-gray-100 rounded-lg p-4 mt-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <Text strong className="text-blue-800">
+                  <Text strong className="text-gray-800">
                     Jotform Integration Active
                   </Text>
                   <br />
-                  <Text className="text-blue-600 text-sm"></Text>
                 </div>
                 <div className="flex space-x-2">
                   <Button
                     type="primary"
                     size="small"
                     onClick={() => onSyncLeads?.()}
-                    className="bg-blue-700 border-blue-700 hover:bg-blue-800"
+                    className="bg-gray-500 border-gray-700 text-white hover:!bg-gray-600 hover:!text-white"
                   >
                     Sync Leads
                   </Button>
-                  <Button type="link" danger onClick={onDisconnect} className="text-red-500">
+                  <Button type="link" danger onClick={onDisconnect} className="text-red-500 hover:!text-red-600 ">
                     Disconnect
                   </Button>
                 </div>
               </div>
             </div>
             <div className="mt-4 text-center">
-              <Text className="text-gray-600">⚡ Your Jotform integration is ready! Need help?</Text>
+              <Text className="text-gray-600">⚡ Your Jotform integration is ready!</Text>
               <br />
             </div>
             <BookingLinkComponent
