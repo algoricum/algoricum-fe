@@ -47,18 +47,34 @@ export default function DashboardPage() {
   // Data
   const [leadsData, setLeadsData] = useState<LeadRow[]>([]);
   const [clinicId, setClinicId] = useState<string>("");
+  const [clinicData, setClinicData] = useState<any>(null);
+  const [twilioPhoneNumber, setTwilioPhoneNumber] = useState<string>("");
 
   // Fetch clinic info
   useEffect(() => {
-    const fetchClinicId = async () => {
+    const fetchClinicData = async () => {
       try {
         const data = await getClinicData();
-        if (data?.id) setClinicId(data.id);
+        if (data?.id) {
+          setClinicId(data.id);
+          setClinicData(data);
+
+          // Fetch Twilio phone number separately
+          const { data: twilioData, error } = await supabase
+            .from("twilio_config")
+            .select("twilio_phone_number")
+            .eq("clinic_id", data.id)
+            .single();
+
+          if (twilioData && !error) {
+            setTwilioPhoneNumber(twilioData.twilio_phone_number || "");
+          }
+        }
       } catch (e) {
         console.error("Error fetching clinic data:", e);
       }
     };
-    fetchClinicId();
+    fetchClinicData();
   }, []);
 
   // Centralized function to fetch leads data
@@ -225,6 +241,53 @@ export default function DashboardPage() {
                     <Bot className="h-4 w-4 mr-2" />
                     Train Now
                   </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Nurturing Email & SMS Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {/* Nurturing Email Stats */}
+            <div className="w-full rounded-xl border-2 p-4 bg-green-50 border-green-200 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="rounded-lg p-3 bg-green-100 border border-green-200">
+                  <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <span className="font-semibold text-gray-900 block mb-1">Nurturing Email</span>
+                  <div className="text-sm text-gray-600">
+                    <div>{clinicData?.mailgun_email || "Not configured"}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Nurturing SMS Stats */}
+            <div className="w-full rounded-xl border-2 p-4 bg-orange-50 border-orange-200 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="rounded-lg p-3 bg-orange-100 border border-orange-200">
+                  <svg className="h-5 w-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <span className="font-semibold text-gray-900 block mb-1">Nurturing Phone Number</span>
+                  <div className="text-sm text-gray-600">
+                    <div>{twilioPhoneNumber || "Not configured"}</div>
+                  </div>
                 </div>
               </div>
             </div>
