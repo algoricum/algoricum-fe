@@ -8,6 +8,7 @@ import {
   type LeadData,
 } from "../_shared/reply-response.ts";
 import { detectBookingRequestAndCreateSchedule, type BookingDetectionOptions } from "../_shared/booking-detection-service.ts";
+import { sendSMS } from "../_shared/nurturing-service.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,9 +44,7 @@ function normalizePhoneNumber(phone: string): string {
   return digits.startsWith("+") ? digits : `+${digits}`;
 }
 
-function escapeXml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-}
+// Removed escapeXml function as we're no longer using TwiML for sending messages
 
 serve(async req => {
   if (req.method === "OPTIONS") {
@@ -105,22 +104,39 @@ serve(async req => {
       });
     }
 
-    // Process SMS message directly
-    const result = await processSMSMessage(webhookData, supabaseClient, clinicId);
+    // Return empty TwiML immediately to avoid Twilio timeout
+    const twimlResponse = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
+    console.log("📤 Returning empty TwiML to avoid timeout");
 
-    const processingTime = Date.now() - startTime;
-    console.log(`⏱️ SMS processed in ${processingTime}ms`);
+    // Process SMS in background and send via Twilio API
+    processSMSMessage(webhookData, supabaseClient, clinicId)
+      .then(async result => {
+        const processingTime = Date.now() - startTime;
+        console.log(`⏱️ SMS processed in ${processingTime}ms`);
 
-    // Generate TwiML response
-    let twimlResponse = '<?xml version="1.0" encoding="UTF-8"?><Response>';
+        if (result.success && result.data?.ai_response && result.data?.sender) {
+          console.log("📱 Sending SMS via Twilio API...");
+          console.log("SMS Response Length:", result.data.ai_response.length);
+          console.log("SMS Content:", JSON.stringify(result.data.ai_response));
 
-    if (result.success && result.data?.ai_response) {
-      // Include the AI response in TwiML to send back immediately
-      twimlResponse += `<Message>${escapeXml(result.data.ai_response)}</Message>`;
-      console.log("✅ AI response included in TwiML");
-    }
+          // Send the actual SMS using Twilio API
+          const smsResult = await sendSMS(
+            result.data.sender, // toPhone
+            result.data.ai_response, // message
+            clinicId,
+            supabaseClient,
+          );
 
-    twimlResponse += "</Response>";
+          if (smsResult.success) {
+            console.log("✅ SMS sent successfully via Twilio API");
+          } else {
+            console.error("❌ Failed to send SMS:", smsResult.error);
+          }
+        }
+      })
+      .catch(error => {
+        console.error("❌ Background SMS processing error:", error);
+      });
 
     return new Response(twimlResponse, {
       status: 200,
@@ -489,7 +505,9 @@ async function processSMSMessage(
       await saveAIResponseToConversation(threadId, aiResponseText, messageSid, supabaseClient);
     } else {
       // Generate normal AI response for non-stop messages
-      console.log("🤖 Generating AI response...");
+      const aiStartTime = Date.now();
+      console.log("🤖 Starting AI response generation...");
+
       aiResponse = await generateAIResponse(
         leadData as LeadData,
         {
@@ -501,8 +519,13 @@ async function processSMSMessage(
         clinicData as ClinicData,
       );
 
+      const aiEndTime = Date.now();
+      console.log(`⏱️ AI response generation took ${aiEndTime - aiStartTime}ms`);
+
       if (aiResponse.success && aiResponse.response) {
         aiResponseText = aiResponse.response;
+        console.log("AI Response Length:", aiResponseText.length);
+        console.log("AI Response Content:", JSON.stringify(aiResponseText));
 
         console.log("💾 Saving AI response to conversation...");
         await saveAIResponseToConversation(threadId, aiResponseText, messageSid, supabaseClient);
