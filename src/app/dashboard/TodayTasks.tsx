@@ -194,7 +194,7 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
         {
           id: "add-integrations",
           clinic_id: clinicId,
-          task: "Integrate CRM & Tools",
+          task: "More CRM & Tools are available. Connect now!",
           priority: "low",
           completed: false,
         },
