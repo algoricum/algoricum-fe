@@ -245,9 +245,9 @@ export default function AppointmentsPage() {
 
       // If current page is now beyond total pages, go to the previous page
       if (currentPage > totalPages && totalPages > 0) {
-        setCurrentPage(currentPage - 1); // This will trigger useEffect
+        setCurrentPage(currentPage - 1);
       } else if (newTotalItems === 0) {
-        setCurrentPage(1); // This will trigger useEffect
+        setCurrentPage(1);
       }
 
       setShowDeleteConfirmation(false);
