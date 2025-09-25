@@ -90,7 +90,7 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
               description={`Connected to ${accountInfo.accountName}. Your form integration is ready!`}
               type="success"
               showIcon
-              className="mb-4"
+              className="mb-4 !border-gray-300"
             />
             <div className="mt-4">
               <Text className="block mb-2">Select worksheets to sync leads from:</Text>
@@ -106,30 +106,29 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
                 onChange={onSelectWorksheets}
               />
             </div>
-            <div className="bg-yellow-50 rounded-lg p-4">
+            <div className="bg-gray-100 rounded-lg p-4 mt-2">
               <div className="flex justify-between items-center">
                 <div>
-                  <Text strong className="text-yellow-800">
+                  <Text strong className="text-gray-800">
                     Google Forms Integration Active
                   </Text>
                 </div>
                 <div className="flex space-x-2">
                   <Button
-                    type="primary"
                     size="small"
                     onClick={() => onSyncLeads?.()}
-                    className="bg-yellow-600 border-yellow-600 hover:bg-yellow-700"
+                    className="bg-gray-500 text-white border-gray-600 hover:!bg-gray-700 hover:!text-white"
                   >
                     Sync Leads
                   </Button>
-                  <Button type="link" danger onClick={onDisconnect} className="text-red-500">
+                  <Button type="link" danger onClick={onDisconnect} className="text-red-500 hover:!text-red-600">
                     Disconnect
                   </Button>
                 </div>
               </div>
             </div>
             <div className="mt-4 text-center">
-              <Text className="text-gray-600">⚡ Your Google Forms integration is ready! Need further help? Book a support meeting.</Text>
+              <Text className="text-gray-600">Your Google Forms integration is ready! Need further help? Book a support meeting.</Text>
               <br />
             </div>
             <BookingLinkComponent

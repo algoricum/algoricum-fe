@@ -7,7 +7,7 @@ import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { useDropdown } from "@/hooks/useDropdown";
-import { usePagination } from "@/hooks/usePagination"; // Import the usePagination hook
+import { usePagination } from "@/hooks/usePagination";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { appointmentHelper, type AppointmentStatus, type MeetingSchedule } from "@/utils/appointment-helper";
 import { createClient } from "@/utils/supabase/config/client";
