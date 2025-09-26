@@ -471,11 +471,11 @@ export default function LeadsPage() {
             setSelectedLead(null);
           }}
           footer={null}
-          width={1400}
+          width={900}
           centered
           destroyOnClose
           className="conversation-history-modal"
-          bodyStyle={{ padding: 0, height: "80vh", overflow: "hidden" }}
+          bodyStyle={{ padding: 0, height: "70vh", overflow: "hidden" }}
           styles={{
             body: {
               padding: 0,
