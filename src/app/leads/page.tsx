@@ -19,9 +19,10 @@ import {
   type StatusStats,
 } from "@/utils/supabase/leads-helper";
 import { Modal, Pagination, Select } from "antd";
-import { Edit, MoreVertical, SearchIcon, Trash2 } from "lucide-react";
+import { Edit, MoreVertical, SearchIcon, Trash2, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { leadsStatsConfig } from "./statsUtil";
+import LeadPage from "@/components/screens/Leads/LeadPage";
 
 interface Lead {
   id: string;
@@ -51,12 +52,13 @@ export default function LeadsPage() {
 
   const { activeDropdown, dropdownPosition, dropdownRef, toggleDropdown, closeDropdown } = useDropdown({
     dropdownWidth: 192,
-    dropdownHeight: 120,
+    dropdownHeight: 160, // Increased height to accommodate new button
     offset: 8,
   });
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [conversationHistoryModalOpen, setConversationHistoryModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const { currentPage, pageSize, totalItems, offset, paginationConfig, setTotal } = usePagination(10);
 
@@ -156,6 +158,12 @@ export default function LeadsPage() {
   const handleDeleteLead = (lead: Lead) => {
     setSelectedLead(lead);
     setDeleteModalOpen(true);
+    closeDropdown();
+  };
+
+  const handleConversationHistory = (lead: Lead) => {
+    setSelectedLead(lead);
+    setConversationHistoryModalOpen(true);
     closeDropdown();
   };
 
@@ -397,6 +405,14 @@ export default function LeadsPage() {
                       Edit Lead
                     </button>
                     <button
+                      onClick={() => handleConversationHistory(lead)}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
+                      type="button"
+                    >
+                      <MessageCircle className="w-4 h-4 text-green-500" />
+                      Conversation History
+                    </button>
+                    <button
                       onClick={() => handleDeleteLead(lead)}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
                       type="button"
@@ -418,10 +434,13 @@ export default function LeadsPage() {
             </div>
           </div>
         )}
+
+        {/* Lead Generation Modal */}
         <Modal open={showLeadForm} onCancel={() => setShowLeadForm(false)} footer={null} width={800}>
           {clinicId && <LeadGenerationForm clinicId={clinicId} onSuccess={handleClose} />}
         </Modal>
 
+        {/* Edit Lead Modal */}
         <EditLeadModal
           lead={selectedLead}
           isOpen={editModalOpen}
@@ -432,6 +451,7 @@ export default function LeadsPage() {
           onUpdate={handleUpdateLead}
         />
 
+        {/* Delete Lead Modal */}
         <DeleteLeadModal
           lead={selectedLead}
           isOpen={deleteModalOpen}
@@ -441,6 +461,33 @@ export default function LeadsPage() {
           }}
           onDelete={handleConfirmDelete}
         />
+
+        {/* Conversation History Modal */}
+        <Modal
+          title={`Conversation History - ${selectedLead?.name || "Lead"}`}
+          open={conversationHistoryModalOpen}
+          onCancel={() => {
+            setConversationHistoryModalOpen(false);
+            setSelectedLead(null);
+          }}
+          footer={null}
+          width={1400}
+          centered
+          destroyOnClose
+          className="conversation-history-modal"
+          bodyStyle={{ padding: 0, height: "80vh", overflow: "hidden" }}
+          styles={{
+            body: {
+              padding: 0,
+              height: "80vh",
+              overflow: "hidden",
+            },
+          }}
+        >
+          <div className="h-full w-full overflow-hidden">
+            <LeadPage lead={selectedLead} clinicId={clinicId!} />
+          </div>
+        </Modal>
       </div>
     </DashboardLayout>
   );
