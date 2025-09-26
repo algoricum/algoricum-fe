@@ -3,6 +3,7 @@
 import { type Lead, fetchMessagesForLead } from "@/utils/supabase/leads-helper";
 import { useEffect, useState, useRef } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 
 interface LeadPageProps {
   lead: Partial<Lead> | null;
@@ -85,8 +86,10 @@ const LeadPage = ({ lead, clinicId }: LeadPageProps) => {
       <div className="flex-1 relative overflow-hidden">
         <div ref={messagesContainerRef} className="absolute inset-0 overflow-y-auto p-4 space-y-4">
           {loadingMessages ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
+            <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+              <div className="rounded-lg bg-white/60 p-3">
+                <LoadingSpinner message="Loading your leads..." size="md" />
+              </div>
             </div>
           ) : messages.length > 0 ? (
             messages.map((message: any) => (
