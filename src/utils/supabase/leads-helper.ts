@@ -275,7 +275,7 @@ export async function fetchMessagesForLead(leadId: string, clinicId: string, thr
     return messages.map(msg => ({
       ...msg,
       content: msg.message,
-      isFromLead: msg.is_from_user === true,
+      isFromLead: msg.sender_type === "lead" || msg.sender_type === "user",
       leadId: leadId,
     }));
   } catch (error) {

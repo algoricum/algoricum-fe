@@ -1,5 +1,6 @@
 // supabase/functions/typeform-integration/typeformService.ts
 import { corsHeaders } from "./cors.ts";
+import { chunkArray, enqueueLead } from "./Lead-enqueue.ts";
 import { supabase } from "./supabaseClient.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -154,34 +155,34 @@ export async function updateForms(req: Request) {
 
         if (res.ok) {
           const respData = await res.json();
-          for (const r of respData.items || []) {
-            const answers: Record<string, any> = {};
-            for (const ans of r.answers || []) {
-              if (ans.field && ans.field.type) {
-                const normalized = normalizeFieldName(ans.field.type);
-                answers[normalized] = ans[ans.type];
-              }
-            }
-const { data: source } = await supabase
-    .from("lead_source")
-    .select("id")
-    .eq("name", "Others")
-    .single();
-            await supabase.from("lead").insert({
-              clinic_id,
-              source_id: source.id, // lead_source FK
-              first_name: answers.first_name || null,
-              last_name: answers.last_name || null,
-              email: answers.email || null,
-              phone: answers.phone || null,
-              form_data: {
-                form_id: formId,
-                submitted_at: r.submitted_at,
-                answers,
-                raw: r,
-              },
-            });
+          const chunks = chunkArray(respData.items, 10);
+          for (const chunk of chunks) {
+            enqueueLead(chunk, clinic_id);
           }
+          // for (const r of respData.items || []) {
+          //   const answers: Record<string, any> = {};
+          //   for (const ans of r.answers || []) {
+          //     if (ans.field && ans.field.type) {
+          //       const normalized = normalizeFieldName(ans.field.type);
+          //       answers[normalized] = ans[ans.type];
+          //     }
+          //   }
+          //   const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
+          //   await supabase.from("lead").insert({
+          //     clinic_id,
+          //     source_id: source.id, // lead_source FK
+          //     first_name: answers.first_name || null,
+          //     last_name: answers.last_name || null,
+          //     email: answers.email || null,
+          //     phone: answers.phone || null,
+          //     form_data: {
+          //       form_id: formId,
+          //       submitted_at: r.submitted_at,
+          //       answers,
+          //       raw: r,
+          //     },
+          //   });
+          // }
           console.log(`📥 Imported old responses for form ${formId}`);
         } else {
           console.error(`❌ Failed fetching old responses for ${formId}: ${res.status}`);
@@ -220,37 +221,37 @@ export async function handleWebhook(req: Request, url: URL) {
   }
 
   const payload = await req.json();
-  const answers: Record<string, any> = {};
+  const chunks = chunkArray(payload.form_response.answers, 10);
+  for (const chunk of chunks) {
+    enqueueLead(chunk, clinic_id);
+  }
+  // const answers: Record<string, any> = {};
 
-  for (const ans of payload.form_response.answers) {
-    if (ans.field && ans.field.type) {
-      const normalized = normalizeFieldName(ans.field.type);
-      answers[normalized] = ans[ans.type];
-    }
-  }
-const { data: source } = await supabase
-    .from("lead_source")
-    .select("id")
-    .eq("name", "Others")
-    .single();
-  const webhok = await supabase.from("lead").insert({
-    clinic_id,
-    source_id: source.id,
-    first_name: answers.first_name || null,
-    last_name: answers.last_name || null,
-    email: answers.email || null,
-    phone: answers.phone || null,
-    form_data: {
-      form_id: payload.form_response.form_id,
-      submitted_at: payload.form_response.submitted_at,
-      answers,
-      raw: payload,
-    },
-  });
-  if (webhok.error) {
-    console.error("Error inserting lead:", webhok.error);
-    return new Response("Error inserting lead", { status: 500 });
-  }
+  // for (const ans of payload.form_response.answers) {
+  //   if (ans.field && ans.field.type) {
+  //     const normalized = normalizeFieldName(ans.field.type);
+  //     answers[normalized] = ans[ans.type];
+  //   }
+  // }
+  // const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
+  // const webhok = await supabase.from("lead").insert({
+  //   clinic_id,
+  //   source_id: source.id,
+  //   first_name: answers.first_name || null,
+  //   last_name: answers.last_name || null,
+  //   email: answers.email || null,
+  //   phone: answers.phone || null,
+  //   form_data: {
+  //     form_id: payload.form_response.form_id,
+  //     submitted_at: payload.form_response.submitted_at,
+  //     answers,
+  //     raw: payload,
+  //   },
+  // });
+  // if (webhok.error) {
+  //   console.error("Error inserting lead:", webhok.error);
+  //   return new Response("Error inserting lead", { status: 500 });
+  // }
   return new Response("ok", { status: 200 });
 }
 
@@ -285,7 +286,7 @@ export async function getForms(req: Request) {
     return new Response(JSON.stringify({ forms: forms.items }), {
       headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
-  } catch (err) {
+  } catch (err: unknown) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { ...corsHeaders(), "Content-Type": "application/json" },
@@ -294,19 +295,19 @@ export async function getForms(req: Request) {
 }
 
 // Utility
-function normalizeFieldName(title: string): string {
-  const lower = title.toLowerCase().trim();
-  if (["first name", "firstname", "given name"].includes(lower)) {
-    return "first_name";
-  }
-  if (["last name", "lastname", "surname", "family name"].includes(lower)) {
-    return "last_name";
-  }
-  if (["email", "e-mail", "mail"].includes(lower)) {
-    return "email";
-  }
-  if (["phone", "phone number", "mobile", "telephone", "phone_number"].includes(lower)) {
-    return "phone";
-  }
-  return lower.replace(/\s+/g, "_");
-}
+// function normalizeFieldName(title: string): string {
+//   const lower = title.toLowerCase().trim();
+//   if (["first name", "firstname", "given name"].includes(lower)) {
+//     return "first_name";
+//   }
+//   if (["last name", "lastname", "surname", "family name"].includes(lower)) {
+//     return "last_name";
+//   }
+//   if (["email", "e-mail", "mail"].includes(lower)) {
+//     return "email";
+//   }
+//   if (["phone", "phone number", "mobile", "telephone", "phone_number"].includes(lower)) {
+//     return "phone";
+//   }
+//   return lower.replace(/\s+/g, "_");
+// }

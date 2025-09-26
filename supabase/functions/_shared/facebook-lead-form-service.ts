@@ -1,5 +1,6 @@
 // Split into exported functions so index.ts can import them
 import { corsHeaders } from "../_shared/cors.ts";
+import { chunkArray, enqueueLead } from "./Lead-enqueue.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const FACEBOOK_APP_ID = Deno.env.get("FACEBOOK_APP_ID")!;
@@ -265,7 +266,7 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
 
       // Create/Update webhook subscription for this page
       try {
-        await createOrUpdatePageWebhook(pageId, pageAccessToken, uniqueWebhookUrl, webhookVerifyToken);
+        // await createOrUpdatePageWebhook(pageId, pageAccessToken, uniqueWebhookUrl, webhookVerifyToken);
         console.log(`✅ Webhook created/updated for page ${pageId}, clinic ${clinic_id}`);
       } catch (webhookErr) {
         console.error(`❌ Failed to create webhook for page ${pageId}:`, webhookErr);
@@ -335,73 +336,73 @@ export async function handleAuthCallback(req: Request, url: URL, supabaseAdmin: 
 }
 
 // -------------------- WEBHOOK CREATION ----------------------
-async function createOrUpdatePageWebhook(pageId: string, pageAccessToken: string, callbackUrl: string, verifyToken: string) {
-  // First, try to get existing webhooks for the page
-  const getWebhooksUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
-  getWebhooksUrl.searchParams.set("access_token", pageAccessToken);
+// async function createOrUpdatePageWebhook(pageId: string, pageAccessToken: string, callbackUrl: string, verifyToken: string) {
+//   // First, try to get existing webhooks for the page
+//   const getWebhooksUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
+//   getWebhooksUrl.searchParams.set("access_token", pageAccessToken);
 
-  try {
-    const getResponse = await fetch(getWebhooksUrl.toString());
-    if (getResponse.ok) {
-      const webhooks = await getResponse.json();
-      console.log(`Existing webhooks for page ${pageId}:`, webhooks);
+//   try {
+//     const getResponse = await fetch(getWebhooksUrl.toString());
+//     if (getResponse.ok) {
+//       const webhooks = await getResponse.json();
+//       console.log(`Existing webhooks for page ${pageId}:`, webhooks);
 
-      // Check if our callback URL already exists
-      const existingWebhook = webhooks.data?.find((webhook: any) => webhook.callback_url === callbackUrl);
+//       // Check if our callback URL already exists
+//       const existingWebhook = webhooks.data?.find((webhook: any) => webhook.callback_url === callbackUrl);
 
-      if (existingWebhook) {
-        console.log(`Webhook already exists for page ${pageId}, updating...`);
-        // Update existing webhook
-        const updateUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
-        const updateResponse = await fetch(updateUrl.toString(), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({
-            access_token: pageAccessToken,
-            callback_url: callbackUrl,
-            verify_token: verifyToken,
-            fields: "leadgen",
-          }).toString(),
-        });
+//       if (existingWebhook) {
+//         console.log(`Webhook already exists for page ${pageId}, updating...`);
+//         // Update existing webhook
+//         const updateUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
+//         const updateResponse = await fetch(updateUrl.toString(), {
+//           method: "POST",
+//           headers: {
+//             "Content-Type": "application/x-www-form-urlencoded",
+//           },
+//           body: new URLSearchParams({
+//             access_token: pageAccessToken,
+//             callback_url: callbackUrl,
+//             verify_token: verifyToken,
+//             fields: "leadgen",
+//           }).toString(),
+//         });
 
-        if (!updateResponse.ok) {
-          const errorText = await updateResponse.text();
-          throw new Error(`Failed to update webhook: ${errorText}`);
-        }
+//         if (!updateResponse.ok) {
+//           const errorText = await updateResponse.text();
+//           throw new Error(`Failed to update webhook: ${errorText}`);
+//         }
 
-        console.log(`✅ Updated webhook for page ${pageId}`);
-        return;
-      }
-    }
-  } catch (error) {
-    console.warn(`Could not fetch existing webhooks for page ${pageId}:`, error);
-  }
+//         console.log(`✅ Updated webhook for page ${pageId}`);
+//         return;
+//       }
+//     }
+//   } catch (error) {
+//     console.warn(`Could not fetch existing webhooks for page ${pageId}:`, error);
+//   }
 
-  // Create new webhook
-  const createUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
-  const createResponse = await fetch(createUrl.toString(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      access_token: pageAccessToken,
-      callback_url: callbackUrl,
-      verify_token: verifyToken,
-      fields: "leadgen",
-    }).toString(),
-  });
+//   // Create new webhook
+//   const createUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/${pageId}/subscriptions`);
+//   const createResponse = await fetch(createUrl.toString(), {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/x-www-form-urlencoded",
+//     },
+//     body: new URLSearchParams({
+//       access_token: pageAccessToken,
+//       callback_url: callbackUrl,
+//       verify_token: verifyToken,
+//       fields: "leadgen",
+//     }).toString(),
+//   });
 
-  if (!createResponse.ok) {
-    const errorText = await createResponse.text();
-    throw new Error(`Failed to create webhook: ${errorText}`);
-  }
+//   if (!createResponse.ok) {
+//     const errorText = await createResponse.text();
+//     throw new Error(`Failed to create webhook: ${errorText}`);
+//   }
 
-  const result = await createResponse.json();
-  console.log(`✅ Created new webhook for page ${pageId}:`, result);
-}
+//   const result = await createResponse.json();
+//   console.log(`✅ Created new webhook for page ${pageId}:`, result);
+// }
 
 // -------------------- UPDATED WEBHOOK HANDLERS ----------------------
 // Updated webhook verification to handle clinic-specific webhooks
@@ -557,8 +558,7 @@ export async function fetchFacebookLeadFormResponses(reqOrClinicId: Request | st
       });
     }
 
-    let totalProcessed = 0,
-      totalCreated = 0;
+    let totalProcessed = 0;
     const errors: string[] = [];
 
     for (const connection of connections) {
@@ -589,78 +589,12 @@ export async function fetchFacebookLeadFormResponses(reqOrClinicId: Request | st
             break;
           }
           const pageJson = await resp.json();
-          console.log("response", pageJson);
-          const leads = Array.isArray(pageJson.data)
-            ? pageJson.data.map(lead => ({
-                id: lead.id,
-                created_time: lead.created_time,
-                ...Object.fromEntries((lead.field_data || []).map(f => [f.name, f.values?.[0] ?? null])),
-              }))
-            : [];
-          for (const leadData of leads) {
-            try {
-              let firstName: string | null = null;
-              let lastName: string | null = null;
-              let email: string | null = null;
-              let phone: string | null = null;
-              const formData: Record<string, any> = {};
+          const chunks = chunkArray(pageJson.data, 10);
 
-              for (const [key, value] of Object.entries(leadData)) {
-                const fname = key.toLowerCase();
-                const fval = Array.isArray(value) ? value[0] : value;
-                formData[fname] = fval;
-
-                if (fname === "first_name") firstName = fval;
-                if (fname === "last_name") lastName = fval;
-                if (fname === "email") email = fval;
-                if (fname === "phone" || fname === "phone_number") phone = fval;
-                if (fname === "full_name" && !firstName && !lastName && fval) {
-                  const parts = (fval as string).split(" ");
-                  firstName = parts[0] || null;
-                  lastName = parts.slice(1).join(" ") || null;
-                }
-                console.log("formData", formData);
-              }
-
-              if (!email) {
-                console.log("Skipping lead without email", leadData.id);
-                continue;
-              }
-
-              const { data: existingLead } = await supabaseAdmin
-                .from("lead")
-                .select("id")
-                .eq("email", email)
-                .eq("clinic_id", connection.clinic_id)
-                .single();
-              if (!existingLead) {
-                const { error: insertErr } = await supabaseAdmin.from("lead").insert({
-                  first_name: firstName,
-                  last_name: lastName,
-                  email,
-                  phone,
-                  status: "New",
-                  source_id: leadSource.id,
-                  clinic_id: connection.clinic_id,
-                  form_data: formData,
-                  created_at: leadData.created_time || new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                });
-                console.log("insertErr", insertErr);
-                if (insertErr) {
-                  console.error("Insert error", insertErr);
-                  errors.push(`Failed to insert lead ${email}: ${insertErr.message}`);
-                } else totalCreated++;
-              } else {
-                // already exists
-              }
-              totalProcessed++;
-            } catch (leadErr) {
-              console.error("Lead item error", leadErr);
-              errors.push(`lead ${leadData.id}: ${String(leadErr)}`);
-            }
+          for (const chunk of chunks) {
+            enqueueLead(chunk, connection.clinic_id);
+            totalProcessed += chunk.length;
           }
-
           nextUrl = pageJson.paging && pageJson.paging.next ? pageJson.paging.next : null;
           if (pageCount > 1000) break;
         }
@@ -682,7 +616,7 @@ export async function fetchFacebookLeadFormResponses(reqOrClinicId: Request | st
     return new Response(
       JSON.stringify({
         message: "Processing complete",
-        summary: { total_processed: totalProcessed, leads_created: totalCreated, connections_processed: connections.length, errors },
+        summary: { total_processed: totalProcessed, connections_processed: connections.length, errors },
       }),
       { status: 200, headers: { ...corsHeaders(), "Content-Type": "application/json" } },
     );

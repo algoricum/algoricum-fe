@@ -52,6 +52,7 @@ export async function upsertIntegrationConnection(
       integration_id: integration.id,
       auth_data: { token, subdomain, location_id, api_key },
       status: "active",
+      updated_at: new Date().toISOString(),
     },
     { onConflict: ["clinic_id", "integration_id"] },
   );
@@ -87,12 +88,8 @@ export async function fetchPatients(token: string, subdomain: string, location_i
 }
 
 export async function insertPatientsAsLeads(clinic_id: string, patients: any[]) {
-  const { data: source } = await supabase
-      .from("lead_source")
-      .select("id")
-      .eq("name", "Others")
-      .single();
-  const rows = patients.map((p) => ({
+  const { data: source } = await supabase.from("lead_source").select("id").eq("name", "Others").single();
+  const rows = patients.map(p => ({
     clinic_id,
     source_id: source.id,
     first_name: p.first_name,

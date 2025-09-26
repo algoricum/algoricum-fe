@@ -1,10 +1,11 @@
 import { corsHeaders } from "./cors.ts";
+import { chunkArray, enqueueLead } from "./Lead-enqueue.ts";
 const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID");
 const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
 const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
 
 // Initiate OAuth Flow
-export async function initiateOAuthFlow(req) {
+export async function initiateOAuthFlow(req: any) {
   try {
     const body = await req.json();
     const { clinic_id, user_id, redirectTo } = body;
@@ -63,7 +64,7 @@ export async function initiateOAuthFlow(req) {
         },
       },
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error initiating OAuth:", error);
     return new Response(
       JSON.stringify({
@@ -82,7 +83,7 @@ export async function initiateOAuthFlow(req) {
 }
 
 // Handle OAuth Callback
-export async function handleOAuthCallback(req, supabase) {
+export async function handleOAuthCallback(req: any, supabase: any) {
   let redirectUri: string;
   try {
     let stateData;
@@ -107,7 +108,7 @@ export async function handleOAuthCallback(req, supabase) {
     try {
       stateData = JSON.parse(atob(state));
       redirectUri = stateData.redirectTo;
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error parsing state:", e.message);
       const redirectUrl = new URL(`${APP_URL}/onboarding`);
       redirectUrl.searchParams.set("google_form_status", "error");
@@ -231,7 +232,7 @@ export async function handleOAuthCallback(req, supabase) {
 }
 
 // List Google Spreadsheets
-export async function listGoogleSpreadsheets(req, supabase) {
+export async function listGoogleSpreadsheets(req: any, supabase: any) {
   try {
     const body = await req.json();
     const { connection_id } = body;
@@ -340,7 +341,7 @@ export async function listGoogleSpreadsheets(req, supabase) {
 }
 
 // Save Selected Sheets
-export async function saveSelectedSheets(req, supabase) {
+export async function saveSelectedSheets(req: any, supabase: any) {
   try {
     const body = await req.json();
     const { connection_id, selected_sheets } = body;
@@ -440,7 +441,7 @@ export async function saveSelectedSheets(req, supabase) {
         },
       },
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error saving selected sheets:", error);
     return new Response(
       JSON.stringify({
@@ -459,7 +460,7 @@ export async function saveSelectedSheets(req, supabase) {
 }
 
 // Sync Sheets
-export async function syncSheets(req, supabase) {
+export async function syncSheets(req: any, supabase: any) {
   try {
     const body = await req.json();
     const { connection_id, clinic_id } = body;
@@ -569,7 +570,7 @@ export async function syncSheets(req, supabase) {
         },
       },
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error syncing sheets:", error);
     return new Response(
       JSON.stringify({
@@ -588,7 +589,7 @@ export async function syncSheets(req, supabase) {
 }
 
 // Sync Sheets Data
-export async function syncSheetsData(connection, sheets, supabase) {
+export async function syncSheetsData(connection: any, sheets: any, supabase: any) {
   let totalProcessed = 0;
   let leadsCreated = 0;
   const errors = [];
@@ -602,11 +603,11 @@ export async function syncSheetsData(connection, sheets, supabase) {
 
   for (const sheet of sheets) {
     try {
-      const sheetResult = await syncSingleSheet(connection, sheet, leadSource.id, supabase);
+      const sheetResult = await syncSingleSheet(connection, sheet);
       totalProcessed += sheetResult.processed;
       leadsCreated += sheetResult.created;
       errors.push(...sheetResult.errors);
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error syncing sheet ${sheet.sheet_title}:`, error);
       errors.push(`Sheet ${sheet.sheet_title}: ${error.message}`);
     }
@@ -620,7 +621,7 @@ export async function syncSheetsData(connection, sheets, supabase) {
 }
 
 // Sync Single Sheet
-export async function syncSingleSheet(connection, sheet, leadSourceId, supabase) {
+export async function syncSingleSheet(connection: any, sheet: any) {
   let processed = 0;
   let created = 0;
   const errors = [];
@@ -650,18 +651,28 @@ export async function syncSingleSheet(connection, sheet, leadSourceId, supabase)
 
     const headers = values[0];
     const dataRows = values.slice(1);
-
-    // Process each row
-    for (const row of dataRows) {
-      try {
-        const result = await processSheetRow(row, headers, leadSourceId, connection.clinic_id, supabase);
-        if (result.created) created++;
-        processed++;
-      } catch (error) {
-        errors.push(`Row processing error: ${error.message}`);
-      }
+    console.error("Data rows:", dataRows);
+    const chunks = chunkArray(dataRows, 10).map(chunk => {
+      processed++;
+      created++;
+      return [headers, ...chunk];
+    });
+    console.log("Data chunks:", chunks);
+    for (const chunk of chunks) {
+      enqueueLead(chunk, connection.clinic_id);
     }
-  } catch (error) {
+
+    // // Process each row
+    // for (const row of dataRows) {
+    //   try {
+    //     const result = await processSheetRow(row, headers, leadSourceId, connection.clinic_id, supabase);
+    //     if (result.created) created++;
+    //     processed++;
+    //   } catch (error) {
+    //     errors.push(`Row processing error: ${error.message}`);
+    //   }
+    // }
+  } catch (error: any) {
     errors.push(`Sheet ${sheet.sheet_title}: ${error.message}`);
   }
 
@@ -673,7 +684,7 @@ export async function syncSingleSheet(connection, sheet, leadSourceId, supabase)
 }
 
 // Process Sheet Row
-export async function processSheetRow(row, headers, leadSourceId, clinicId, supabase) {
+export async function processSheetRow(row: any, headers: any, leadSourceId: any, clinicId: any, supabase: any) {
   const formData = {};
   let firstName = null;
   let lastName = null;
@@ -681,7 +692,7 @@ export async function processSheetRow(row, headers, leadSourceId, clinicId, supa
   let phone = null;
 
   // Map row data to form data
-  headers.forEach((header, index) => {
+  headers.forEach((header: any, index: any) => {
     const value = row[index] || "";
     formData[header] = value;
 
@@ -730,7 +741,7 @@ export async function processSheetRow(row, headers, leadSourceId, clinicId, supa
 }
 
 // Get Spreadsheet Sheets
-export async function getSpreadsheetSheets(spreadsheetId, accessToken) {
+export async function getSpreadsheetSheets(spreadsheetId: any, accessToken: any) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
   const response = await fetch(url, {
     headers: {
@@ -748,7 +759,7 @@ export async function getSpreadsheetSheets(spreadsheetId, accessToken) {
 }
 
 // Refresh Google Token
-export async function refreshGoogleToken(connection, supabase) {
+export async function refreshGoogleToken(connection: any, supabase: any) {
   try {
     const tokenUrl = "https://oauth2.googleapis.com/token";
     const tokenParams = new URLSearchParams({
