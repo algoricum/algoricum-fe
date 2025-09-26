@@ -1,5 +1,8 @@
-import { Lead, fetchMessagesForLead } from "@/utils/supabase/leads-helper";
-import { useEffect, useState } from "react";
+"use client";
+
+import { type Lead, fetchMessagesForLead } from "@/utils/supabase/leads-helper";
+import { useEffect, useState, useRef } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface LeadPageProps {
   lead: Partial<Lead> | null;
@@ -9,6 +12,22 @@ interface LeadPageProps {
 const LeadPage = ({ lead, clinicId }: LeadPageProps) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll functions
+  const scrollToTop = () => {
+    messagesContainerRef.current?.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  const scrollToBottom = () => {
+    messagesContainerRef.current?.scrollTo({
+      top: messagesContainerRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  };
 
   // Load messages whenever lead changes
   useEffect(() => {
@@ -63,34 +82,57 @@ const LeadPage = ({ lead, clinicId }: LeadPageProps) => {
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {loadingMessages ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
-          </div>
-        ) : messages.length > 0 ? (
-          messages.map((message: any) => (
-            <div key={message.id} className={`flex ${message.isFromLead ? "justify-start" : "justify-end"}`}>
-              <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                  message.isFromLead ? "bg-gray-100 text-gray-900" : "bg-brand-primary text-white"
-                }`}
-              >
-                <p className="text-sm">{message.content}</p>
-                <p className={`text-xs mt-1 ${message.isFromLead ? "text-gray-500" : "text-blue-100"}`}>
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                </p>
+      <div className="flex-1 relative overflow-hidden">
+        <div ref={messagesContainerRef} className="absolute inset-0 overflow-y-auto p-4 space-y-4">
+          {loadingMessages ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary"></div>
+            </div>
+          ) : messages.length > 0 ? (
+            messages.map((message: any) => (
+              <div key={message.id} className={`flex ${message.isFromLead ? "justify-start" : "justify-end"}`}>
+                <div
+                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                    message.isFromLead ? "bg-gray-100 text-gray-900" : "bg-brand-primary text-white"
+                  }`}
+                >
+                  <p className="text-sm">{message.content}</p>
+                  <p className={`text-xs mt-1 ${message.isFromLead ? "text-gray-500" : "text-blue-100"}`}>
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-500">
+              <div className="text-center">
+                <p className="text-lg mb-2">No messages yet</p>
+                <p className="text-sm">Start a conversation with this lead</p>
               </div>
             </div>
-          ))
-        ) : (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            <div className="text-center">
-              <p className="text-lg mb-2">No messages yet</p>
-              <p className="text-sm">Start a conversation with this lead</p>
-            </div>
-          </div>
+          )}
+        </div>
+
+        {messages.length > 20 && (
+          <>
+            {/* Scroll to bottom button (positioned at top) */}
+            <button
+              onClick={scrollToBottom}
+              className="absolute top-4 right-4 z-10 bg-white hover:bg-gray-50 border border-gray-200 rounded-full p-2 shadow-md transition-all duration-200 hover:shadow-lg"
+              title="Go to latest message"
+            >
+              <ChevronDown className="h-4 w-4 text-gray-600" />
+            </button>
+
+            {/* Scroll to top button (positioned at bottom) */}
+            <button
+              onClick={scrollToTop}
+              className="absolute bottom-4 right-4 z-10 bg-white hover:bg-gray-50 border border-gray-200 rounded-full p-2 shadow-md transition-all duration-200 hover:shadow-lg"
+              title="Go to first message"
+            >
+              <ChevronUp className="h-4 w-4 text-gray-600" />
+            </button>
+          </>
         )}
       </div>
     </div>
