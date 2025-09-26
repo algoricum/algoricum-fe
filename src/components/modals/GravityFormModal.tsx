@@ -6,13 +6,13 @@ import { getClinicId } from "@/utils/integration-utils";
 import { createClient } from "@/utils/supabase/config/client";
 import { InfoCircleOutlined, LinkOutlined } from "@ant-design/icons";
 import { Alert, Button, Input, Modal, Select, Spin, Typography } from "antd";
-import CryptoJS from "crypto-js";
 import Image from "next/image";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
 
+import CryptoJS from "crypto-js";
 const { Text, Title } = Typography;
 const supabase = createClient();
 
