@@ -510,7 +510,7 @@ async function handleInviteeCanceled(payload: any, supabase: any) {
     const { data, error } = await supabase
       .from("meeting_schedule")
       .update({
-        status: "pending",
+        status: "booked",
         meeting_notes: JSON.stringify({
           ...existingNotes,
           canceled_at: new Date().toISOString(),
@@ -617,6 +617,42 @@ async function updateLeadStatus(leadId: string, status: string, supabase: any) {
   }
 }
 
+// Helper function to get webhook callback URL from webhook URI
+async function getWebhookCallbackUrl(webhookUri: string, accessToken: string): Promise<string> {
+  try {
+    logInfo("Fetching webhook details", { webhookUri });
+
+    const response = await fetch(webhookUri, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.ok) {
+      const webhook = await response.json();
+      const callbackUrl = webhook.resource?.callback_url || webhook.callback_url || "";
+
+      logInfo("Webhook details fetched", {
+        webhookUri,
+        callbackUrl,
+        hasResource: !!webhook.resource,
+        hasDirectCallback: !!webhook.callback_url,
+      });
+
+      return callbackUrl;
+    } else {
+      logError("Failed to fetch webhook details", {
+        webhookUri,
+        status: response.status,
+        statusText: response.statusText,
+      });
+    }
+  } catch (error) {
+    logError("Error fetching webhook details", { error, webhookUri });
+  }
+  return "";
+}
+
 // Create webhook subscription for Calendly integration
 async function createWebhookSubscription(supabase: any, clinicId: string, webhookUrl: string): Promise<WebhookSubscription> {
   const integration = await getClinicIntegration(supabase, clinicId);
@@ -625,55 +661,75 @@ async function createWebhookSubscription(supabase: any, clinicId: string, webhoo
     throw new Error("Organization URI not found in integration configuration");
   }
 
-  // Check if webhook already exists for this organization
-  logInfo("Checking for existing webhook subscriptions", { clinicId, webhookUrl });
+  // Check if this clinic already has a webhook subscription
+  logInfo("Checking for existing clinic webhook subscription", { clinicId, webhookUrl });
 
   const organizationUri = integration.configuration.current_organization;
   if (!organizationUri) {
     throw new Error("Organization URI is missing from integration configuration");
   }
 
-  const listResponse = await fetch(
-    `https://api.calendly.com/webhook_subscriptions?organization=${encodeURIComponent(organizationUri)}&scope=organization`,
-    {
-      headers: {
-        Authorization: `Bearer ${integration.access_token}`,
-      },
-    },
-  );
+  // Check if this clinic already has a webhook subscription with this specific URL
+  if (integration.webhook_subscription_uri) {
+    // Extract clinic_id from stored webhook URL to compare
+    const storedWebhookUrl = await getWebhookCallbackUrl(integration.webhook_subscription_uri, integration.access_token);
 
-  if (listResponse.ok) {
-    const existingWebhooks = await listResponse.json();
-    const existingWebhook = existingWebhooks.collection?.find((webhook: any) => webhook.callback_url === webhookUrl);
-
-    if (existingWebhook) {
-      logInfo("Found existing webhook subscription", { clinicId, webhookUri: existingWebhook.uri });
-
-      // Store the existing webhook URI in database
-      const { error: updateError } = await supabase
-        .from("calendly_integrations")
-        .update({
-          webhook_subscription_uri: existingWebhook.uri,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("clinic_id", clinicId);
-
-      if (updateError) {
-        logError("Failed to store existing webhook subscription URI", updateError);
-      }
-
-      return existingWebhook;
-    }
-  } else {
-    const errorText = await listResponse.text();
-    logError("Failed to list existing webhooks", {
-      status: listResponse.status,
-      statusText: listResponse.statusText,
-      error: errorText,
-      organizationUri: organizationUri,
+    logInfo("Comparing webhook URLs", {
       clinicId,
+      storedWebhookUrl,
+      newWebhookUrl: webhookUrl,
+      areEqual: storedWebhookUrl === webhookUrl,
+      storedLength: storedWebhookUrl.length,
+      newLength: webhookUrl.length,
     });
+
+    if (storedWebhookUrl && storedWebhookUrl === webhookUrl) {
+      logInfo("Clinic already has webhook with same URL - reusing existing", {
+        clinicId,
+        existingWebhookUri: integration.webhook_subscription_uri,
+        webhookUrl,
+      });
+
+      // Return the existing webhook data
+      return {
+        uri: integration.webhook_subscription_uri,
+        callback_url: webhookUrl,
+        events: ["invitee.created", "invitee.canceled"],
+        scope: "organization",
+      };
+    } else {
+      logInfo("Clinic has different webhook URL - deleting old one", {
+        clinicId,
+        existingWebhookUri: integration.webhook_subscription_uri,
+        oldUrl: storedWebhookUrl,
+        newUrl: webhookUrl,
+      });
+
+      // Delete the old webhook with different URL
+      try {
+        const deleteResponse = await fetch(integration.webhook_subscription_uri, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${integration.access_token}`,
+          },
+        });
+
+        if (deleteResponse.ok) {
+          logInfo("Successfully deleted old webhook", { clinicId });
+        } else {
+          logError("Failed to delete old webhook", {
+            status: deleteResponse.status,
+            clinicId,
+          });
+        }
+      } catch (deleteError) {
+        logError("Error deleting old webhook", { deleteError, clinicId });
+      }
+    }
   }
+
+  // Create a new webhook for this clinic with clinic-specific URL
+  logInfo("Creating new clinic-specific webhook subscription", { clinicId, webhookUrl });
 
   const requestBody = {
     url: webhookUrl,

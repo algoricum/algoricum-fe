@@ -26,9 +26,9 @@ interface Task {
   id: string;
   task: string;
   priority: "low" | "medium" | "high";
-  time: string;
+  time?: string;
   completed: boolean;
-  due_at: string;
+  due_at?: string;
   clinic_id: string;
 }
 
@@ -56,7 +56,6 @@ interface IntegrationStates {
 const supabase = createClient();
 
 export default function TodayTasks({ clinicId }: { clinicId: string }) {
-  console.log(clinicId);
   const [integrationStates, setIntegrationStates] = useState<IntegrationStates>({
     statuses: {
       "Facebook Lead Forms": "disconnected",
@@ -170,7 +169,7 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
   ]);
 
   const availableIntegrations = integrations.filter(i => !i.connected);
-  console.log(availableIntegrations);
+
   const fetchTasks = async () => {
     const start = dayjs().startOf("day").toISOString();
     const end = dayjs().endOf("day").toISOString();
@@ -183,21 +182,27 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
       .lte("due_at", end)
       .order("due_at", { ascending: true });
 
-    if (error) console.error("Error fetching tasks:", error);
-    else {
-      const int = availableIntegrations.map(int => {
-        return {
-          id: int.id,
-          clinic_id: null,
-          task: `Add ${int.name} integration`,
+    if (error) {
+      console.error("Error fetching tasks:", error);
+      return;
+    }
+
+    // ✅ Only one "Add more integrations" task if any are available
+    let integrationTask: Task[] = [];
+    if (availableIntegrations.length > 0) {
+      integrationTask = [
+        {
+          id: "add-integrations",
+          clinic_id: clinicId,
+          task: "More CRM & Tools are available. Connect now!",
           priority: "low",
           completed: false,
-        };
-      });
-      const task = [...data, ...int];
-      console.log("sdffsdf", task);
-      setTasks(task);
+        },
+      ];
     }
+
+    const taskList = [...data, ...integrationTask];
+    setTasks(taskList);
   };
 
   const toggleTask = async (taskId: string) => {
@@ -284,7 +289,13 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
                     {task.task}
                   </p>
                   <span className="text-xs text-gray-500 whitespace-nowrap">
-                    {task.clinic_id ? new Date(task.due_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Today"}
+                    {task.due_at && !Number.isNaN(Date.parse(task.due_at))
+                      ? new Date(task.due_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })
+                      : "Today"}
                   </span>{" "}
                 </div>
               </div>

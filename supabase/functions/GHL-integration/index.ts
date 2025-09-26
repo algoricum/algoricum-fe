@@ -89,7 +89,7 @@ serve(async req => {
       if (!clinic_id) return new Response("Missing clinic_id", { status: 400 });
 
       await importLeads(clinic_id);
-      return new Response("Leads synced successfully", {
+      return new Response("Leads sync in progress", {
         headers: { "Content-Type": "text/plain" },
       });
     }

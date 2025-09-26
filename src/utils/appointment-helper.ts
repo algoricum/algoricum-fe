@@ -107,7 +107,7 @@ export class AppointmentHelper {
         .insert([
           {
             ...meetingData,
-            status: meetingData.status || "pending",
+            status: meetingData.status || "booked",
           },
         ])
         .select()

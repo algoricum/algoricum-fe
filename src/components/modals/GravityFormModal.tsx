@@ -206,7 +206,7 @@ export const GravityFormModal: React.FC<ModalProps> = ({ open, status, onCancel,
                     icon={<LinkOutlined />}
                     onClick={handleConnect}
                     disabled={!selectedForms.length}
-                    className="bg-green-600 border-green-600 hover:bg-green-700 h-12 w-full text-lg font-medium"
+                    className="bg-green-600 border-green-600 hover:!bg-green-700 h-12 w-full text-lg font-medium"
                   >
                     Connect Selected Forms
                   </Button>
