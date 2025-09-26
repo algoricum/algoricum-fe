@@ -464,7 +464,7 @@ export default function LeadsPage() {
 
         {/* Conversation History Modal */}
         <Modal
-          title={`Conversation History - ${selectedLead?.name || "Lead"}`}
+          title={`Conversation History`}
           open={conversationHistoryModalOpen}
           onCancel={() => {
             setConversationHistoryModalOpen(false);
