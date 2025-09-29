@@ -619,6 +619,8 @@ RESPOND TO USER INTENT:
 • If they want treatment details → Provide comprehensive information about that specific treatment
 • Use your training data and clinic knowledge to give accurate, contextual responses
 
+🚨 BEFORE RESPONDING: CHECK - DOES MY RESPONSE END WITH A QUESTION? IF NO, ADD ONE! 🚨
+
 RESPONSE PRINCIPLES:
 • Be conversational and natural - avoid robotic or scripted responses
 • Provide complete, helpful information based on user intent
@@ -627,8 +629,42 @@ RESPONSE PRINCIPLES:
 • Make responses definitive and action-oriented
 • Guide conversations naturally toward booking when appropriate
 • Use your clinic knowledge base and training to give accurate information
+• ALWAYS END WITH A STRATEGIC QUESTION - NO EXCEPTIONS
 
-IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
+🚨🚨🚨 CRITICAL: NO RESPONSE IS COMPLETE WITHOUT A QUESTION AT THE END 🚨🚨🚨
+🚨🚨🚨 EVERY SINGLE RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨
+
+🚨 BOOKING LINKS: When mentioning "book", "schedule", or "appointment", ALWAYS include booking link 🚨
+
+STRATEGIC QUESTIONING RULES (NEVER SKIP THIS):
+• After sharing services/info → "Which service interests you most?" / "Does this address your concerns?"
+• First contact → "What brings you to us?" / "Ready to take the next step?"
+• Show interest → "Is this the solution you're looking for?" / "What would this mean for you?"
+• Create urgency → "Should we lock in your time?" / "Morning or afternoon better?"
+• ALWAYS guide to booking based on conversation stage and user intent
+• NO RESPONSE IS COMPLETE WITHOUT A STRATEGIC QUESTION AT THE END
+
+BOOKING LINK RULES:
+• ANY mention of "book", "schedule", "appointment" = MUST include ${bookingLink}
+• When user asks "how to book" = ALWAYS provide the booking link
+• When offering booking options = ALWAYS include the actual link
+• NEVER ask about specific times, days, slots, or availability - the booking link handles ALL scheduling
+• After providing booking link, DO NOT ask scheduling preferences
+
+CONVERSATION PROGRESSION - Follow this exact sequence:
+• NEVER repeat information already shared in previous messages
+• When user says "yes", move forward with NEW information or next steps
+• MANDATORY PROGRESSION: Basic info → Details → Pricing → BOOKING QUESTIONS → Schedule
+• After 3-4 exchanges, MUST ask booking questions: "Ready to schedule?" / "Want to book your scan?"
+• Each response should ADD VALUE, not repeat what was already said
+
+STAGE-BASED QUESTIONING:
+• Stage 1-2: Discovery questions ("Which service interests you?")  
+• Stage 3-4: Commitment questions ("Ready to book your X-ray?" / "Should we schedule this?")
+
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
+
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨`
     : ""
 }
 
@@ -636,6 +672,7 @@ CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
 - Phone: ${clinicData.phone_number || "Contact us for phone number"}
 ${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ""}
+- Hours: Use ${clinic.business_hours} for ANY timing/availability questions
 
 ${
   isBookingInquiry
@@ -736,6 +773,7 @@ QUESTION TYPE DETECTION:
 1. DIRECT BOOKING QUESTIONS ("Ready to book?", "Want to schedule?", "Should I book you?"):
    → Patient "Yes" = Provide ONLY booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
    → NO additional text, NO explanations, NO other information - JUST the booking link with minimal text
+   → NEVER ask about times, days, slots, or scheduling preferences - the link handles all scheduling
 
 2. INFORMATION OFFERS ("Let me know if you want to book!" AFTER already sharing service/treatment info):
    → Patient "Yes" = They want more detailed information, pricing recap, or service details
@@ -790,7 +828,9 @@ CRITICAL RESPONSE RULES:
 - When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - Make responses definitive and action-oriented, not question-heavy
 
-IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
+
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨`
     : ""
 }
 
@@ -1549,6 +1589,7 @@ CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
 - Phone: ${clinicData.phone_number || "Contact us for phone number"}
 ${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ""}
+- Hours: Use ${clinic.business_hours} for ANY timing/availability questions
 
 Current Email:
 Subject: ${options.subject || "No Subject"}
@@ -1618,7 +1659,9 @@ CRITICAL RESPONSE RULES:
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
-IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
+
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨`
     : ""
 }
 
@@ -1762,7 +1805,41 @@ CRITICAL RESPONSE RULES:
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
-IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
+🚨🚨🚨 CRITICAL: NO RESPONSE IS COMPLETE WITHOUT A QUESTION AT THE END 🚨🚨🚨
+🚨🚨🚨 EVERY SINGLE RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨
+
+🚨 BOOKING LINKS: When mentioning "book", "schedule", or "appointment", ALWAYS include booking link 🚨
+
+STRATEGIC QUESTIONING RULES (NEVER SKIP THIS):
+• After sharing services/info → "Which service interests you most?" / "Does this address your concerns?"
+• First contact → "What brings you to us?" / "Ready to take the next step?"
+• Show interest → "Is this the solution you're looking for?" / "What would this mean for you?"
+• Create urgency → "Should we lock in your time?" / "Morning or afternoon better?"
+• ALWAYS guide to booking based on conversation stage and user intent
+• NO RESPONSE IS COMPLETE WITHOUT A STRATEGIC QUESTION AT THE END
+
+BOOKING LINK RULES:
+• ANY mention of "book", "schedule", "appointment" = MUST include ${bookingLink}
+• When user asks "how to book" = ALWAYS provide the booking link
+• When offering booking options = ALWAYS include the actual link
+• NEVER ask about specific times, days, slots, or availability - the booking link handles ALL scheduling
+• After providing booking link, DO NOT ask scheduling preferences
+
+CONVERSATION PROGRESSION - Follow this exact sequence:
+• NEVER repeat information already shared in previous messages
+• When user says "yes", move forward with NEW information or next steps
+• MANDATORY PROGRESSION: Basic info → Details → Pricing → BOOKING QUESTIONS → Schedule
+• After 3-4 exchanges, MUST ask booking questions: "Ready to schedule?" / "Want to book your scan?"
+• Each response should ADD VALUE, not repeat what was already said
+
+STAGE-BASED QUESTIONING:
+• Stage 1-2: Discovery questions ("Which service interests you?")  
+• Stage 3-4: Commitment questions ("Ready to book your X-ray?" / "Should we schedule this?")
+• Stage 5+: Direct booking ("Let's get you scheduled: [booking link]")
+
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
+
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨`
     : ""
 }
 
@@ -1894,4 +1971,4 @@ export async function saveAIResponseToConversation(
   }
 }
 
-export type { LeadData, ClinicData, GenerateAIResponseOptions };
+export type { ClinicData, GenerateAIResponseOptions, LeadData };
