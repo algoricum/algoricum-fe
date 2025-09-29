@@ -4,6 +4,8 @@ import { type Lead, fetchMessagesForLead } from "@/utils/supabase/leads-helper";
 import { useEffect, useState, useRef } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import DOMPurify from "dompurify";
+import parse from "html-react-parser";
 
 interface LeadPageProps {
   lead: Partial<Lead> | null;
@@ -14,6 +16,11 @@ const LeadPage = ({ lead, clinicId }: LeadPageProps) => {
   const [messages, setMessages] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to check if content contains HTML tags
+  const containsHTML = (str: string) => {
+    return /<\/?[a-z][\s\S]*>/i.test(str);
+  };
 
   // Scroll functions
   const scrollToTop = () => {
@@ -96,11 +103,16 @@ const LeadPage = ({ lead, clinicId }: LeadPageProps) => {
               <div key={message.id} className={`flex ${message.isFromLead ? "justify-start" : "justify-end"}`}>
                 <div
                   className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                    message.isFromLead ? "bg-gray-100 text-gray-900" : "bg-brand-primary text-white"
+                    message.isFromLead ? "bg-gray-100 text-gray-900" : "bg-blue-100 text-gray-900"
                   }`}
                 >
-                  <p className="text-sm">{message.content}</p>
-                  <p className={`text-xs mt-1 ${message.isFromLead ? "text-gray-500" : "text-blue-100"}`}>
+                  {containsHTML(message.content) ? (
+                    <div className="text-sm prose prose-sm max-w-none">{parse(DOMPurify.sanitize(message.content))}</div>
+                  ) : (
+                    <p className="text-sm">{message.content}</p>
+                  )}
+
+                  <p className={`text-xs mt-1 ${message.isFromLead ? "text-gray-500" : "text-gray-500"}`}>
                     {new Date(message.timestamp).toLocaleTimeString()}
                   </p>
                 </div>
