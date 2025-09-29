@@ -397,20 +397,20 @@ export default function LeadsPage() {
                 >
                   <div className="py-1">
                     <button
-                      onClick={() => handleEditLead(lead)}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
-                      type="button"
-                    >
-                      <Edit className="w-4 h-4 text-blue-500" />
-                      Edit Lead
-                    </button>
-                    <button
                       onClick={() => handleConversationHistory(lead)}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
                       type="button"
                     >
                       <MessageCircle className="w-4 h-4 text-green-500" />
                       Conversation History
+                    </button>
+                    <button
+                      onClick={() => handleEditLead(lead)}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200 flex items-center gap-2"
+                      type="button"
+                    >
+                      <Edit className="w-4 h-4 text-blue-500" />
+                      Edit Lead
                     </button>
                     <button
                       onClick={() => handleDeleteLead(lead)}
