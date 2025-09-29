@@ -15,6 +15,11 @@ const LeadPage = ({ lead, clinicId }: LeadPageProps) => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
+  // Helper function to check if content contains HTML tags
+  const containsHTML = (str: string) => {
+    return /<\/?[a-z][\s\S]*>/i.test(str);
+  };
+
   // Scroll functions
   const scrollToTop = () => {
     messagesContainerRef.current?.scrollTo({
@@ -96,11 +101,21 @@ const LeadPage = ({ lead, clinicId }: LeadPageProps) => {
               <div key={message.id} className={`flex ${message.isFromLead ? "justify-start" : "justify-end"}`}>
                 <div
                   className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                    message.isFromLead ? "bg-gray-100 text-gray-900" : "bg-brand-primary text-white"
+                    message.isFromLead ? "bg-gray-100 text-gray-900" : "bg-blue-100 text-gray-900"
                   }`}
                 >
-                  <p className="text-sm">{message.content}</p>
-                  <p className={`text-xs mt-1 ${message.isFromLead ? "text-gray-500" : "text-blue-100"}`}>
+                  {containsHTML(message.content) ? (
+                    <div
+                      className="text-sm prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: message.content }}
+                      style={{
+                        color: "inherit",
+                      }}
+                    />
+                  ) : (
+                    <p className="text-sm">{message.content}</p>
+                  )}
+                  <p className={`text-xs mt-1 ${message.isFromLead ? "text-gray-500" : "text-gray-500"}`}>
                     {new Date(message.timestamp).toLocaleTimeString()}
                   </p>
                 </div>
