@@ -66,18 +66,43 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
       }
 
       case "Facebook Lead Forms": {
-        const { data, error } = await supabase
+        // Check for actual active form connections first
+        const { data: activeConnection, error: activeError } = await supabase
           .from("facebook_lead_form_connections")
           .select("*")
           .eq("clinic_id", clinicId)
+          .eq("sync_status", "active")
+          .neq("lead_form_id", "pending_selection")
           .limit(1)
           .maybeSingle();
 
-        if (error) {
-          console.error(`Error checking Facebook Lead Forms status:`, error);
+        if (activeError) {
+          console.error(`Error checking Facebook Lead Forms active status:`, activeError);
           return "disconnected";
         }
-        connection = data;
+
+        // If there are active connections, return connected
+        if (activeConnection) {
+          connection = activeConnection;
+          break;
+        }
+
+        // Check for pending setup (OAuth completed but forms not selected)
+        const { data: pendingConnection, error: pendingError } = await supabase
+          .from("facebook_lead_form_connections")
+          .select("*")
+          .eq("clinic_id", clinicId)
+          .eq("lead_form_id", "pending_selection")
+          .limit(1)
+          .maybeSingle();
+
+        if (pendingError) {
+          console.error(`Error checking Facebook Lead Forms pending status:`, pendingError);
+          return "disconnected";
+        }
+
+        // If there's a pending connection, consider it "connected" so user can select forms
+        connection = pendingConnection;
         break;
       }
 

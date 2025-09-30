@@ -91,6 +91,9 @@ serve(async req => {
     console.log("Checking Twilio credentials");
     const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+    // A2P 10DLC Campaign SID (OPTIONAL - costs money to register)
+    // Only set this if you have a registered campaign and want to avoid 30034 errors
+    const twilioCampaignSid = Deno.env.get("TWILIO_CAMPAIGN_SID");
 
     // SMS Processor webhook URL with clinic_id parameter - Update this to your actual Supabase project URL
     const smsWebhookUrl = `${supabaseUrl}/functions/v1/sms-processor?clinic_id=${clinic_id}`;
@@ -98,6 +101,7 @@ serve(async req => {
     console.log("Twilio environment variables", {
       twilioAccountSid: twilioAccountSid ? "set" : "not set",
       twilioAuthToken: twilioAuthToken ? "set" : "not set",
+      twilioCampaignSid: twilioCampaignSid ? "set" : "not set",
       smsWebhookUrl,
     });
 
@@ -259,6 +263,61 @@ serve(async req => {
       );
     }
 
+    // Step 2.5: Register phone number with A2P 10DLC campaign if campaign SID is provided
+    let campaignRegistrationSuccess = true;
+    if (twilioCampaignSid) {
+      console.log("Registering phone number with A2P 10DLC campaign", {
+        phoneNumber: purchaseData.phone_number,
+        campaignSid: twilioCampaignSid,
+      });
+
+      const campaignRegistrationUrl = `https://messaging.twilio.com/v1/Services/${twilioCampaignSid}/PhoneNumbers`;
+      const campaignRegistrationBody = new URLSearchParams({
+        PhoneNumberSid: purchaseData.sid,
+      });
+
+      try {
+        const campaignResponse = await fetch(campaignRegistrationUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${authHeader}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: campaignRegistrationBody,
+        });
+
+        const campaignData = await campaignResponse.json();
+        console.log("Campaign registration response", {
+          status: campaignResponse.status,
+          ok: campaignResponse.ok,
+          data: campaignData,
+        });
+
+        if (!campaignResponse.ok) {
+          console.log("Warning: Failed to register phone number with campaign", {
+            error: campaignData,
+            phoneNumber: purchaseData.phone_number,
+            campaignSid: twilioCampaignSid,
+          });
+          campaignRegistrationSuccess = false;
+        } else {
+          console.log("Successfully registered phone number with campaign", {
+            phoneNumber: purchaseData.phone_number,
+            campaignSid: twilioCampaignSid,
+          });
+        }
+      } catch (error) {
+        console.error("Error during campaign registration", {
+          error: error.message,
+          phoneNumber: purchaseData.phone_number,
+          campaignSid: twilioCampaignSid,
+        });
+        campaignRegistrationSuccess = false;
+      }
+    } else {
+      console.log("No campaign SID provided, skipping A2P 10DLC registration");
+    }
+
     // Step 3: Update or insert into twilio_config
     const twilioConfigData = {
       clinic_id,
@@ -266,6 +325,7 @@ serve(async req => {
       twilio_account_sid: twilioAccountSid,
       twilio_auth_token: twilioAuthToken,
       twilio_phone_number: purchaseData.phone_number,
+      campaign_sid: twilioCampaignSid || null,
       status: "active",
     };
     console.log("Preparing to upsert twilio_config", { twilioConfigData, twilio_config_id });
@@ -339,17 +399,28 @@ serve(async req => {
       clinic_id,
       twilio_config_id: data.id,
       webhook_url: smsWebhookUrl,
+      campaign_registered: campaignRegistrationSuccess,
     });
+
+    const responseMessage =
+      campaignRegistrationSuccess && twilioCampaignSid
+        ? "SMS number assigned and registered with A2P 10DLC campaign successfully"
+        : twilioCampaignSid && !campaignRegistrationSuccess
+          ? "SMS number assigned successfully, but A2P 10DLC campaign registration failed"
+          : "SMS number assigned successfully";
+
     return new Response(
       JSON.stringify({
         success: true,
-        message: "SMS number assigned successfully",
+        message: responseMessage,
         phone_number: purchaseData.phone_number,
         formatted_number: formatPhoneNumber(purchaseData.phone_number),
         twilio_sid: purchaseData.sid,
         clinic_id,
         twilio_config_id: data.id,
         webhook_url: smsWebhookUrl, // Include webhook URL in response for verification
+        campaign_registered: campaignRegistrationSuccess,
+        campaign_sid: twilioCampaignSid || null,
       }),
       {
         status: 200,
