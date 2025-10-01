@@ -251,6 +251,63 @@ export default function IntegrationsPage() {
     }
   }, [clinicId]);
 
+  // Fetch Typeform data when modal opens
+  useEffect(() => {
+    const fetchTypeformData = async () => {
+      if (isModalOpen("Typeform") && getIntegrationStatus("Typeform") === "connected") {
+        try {
+          fetchTypeformForms(setTypeFormTreeData);
+          const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Typeform").limit(1).single();
+
+          const { data: typeform } = await supabase
+            .from("integration_connections")
+            .select("*")
+            .eq("clinic_id", await getClinicId())
+            .eq("integration_id", connection?.id)
+            .single();
+          console.warn("typeform", typeform);
+          setSelectedTypeformForms(typeform.auth_data?.forms);
+        } catch (error) {
+          console.error("Error fetching Typeform data:", error);
+        }
+      }
+    };
+
+    fetchTypeformData();
+  }, [isModalOpen("Typeform")]);
+
+  // Fetch Jotform data when modal opens
+  useEffect(() => {
+    const fetchJotformData = async () => {
+      if (isModalOpen("Jotform") && getIntegrationStatus("Jotform") === "connected") {
+        try {
+          fetchJotformForms(setJotformTreeData);
+          const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Jotform").limit(1).single();
+
+          const { data: jotformData } = await supabase
+            .from("integration_connections")
+            .select("*")
+            .eq("clinic_id", await getClinicId())
+            .eq("integration_id", connection?.id)
+            .single();
+          console.warn("jotformData", jotformData);
+          setSelectedJotformForms(jotformData.auth_data?.forms.map((form: any) => form.form_id));
+        } catch (error) {
+          console.error("Error fetching Jotform data:", error);
+        }
+      }
+    };
+
+    fetchJotformData();
+  }, [isModalOpen("Jotform")]);
+
+  // Fetch Google Forms data when modal opens
+  useEffect(() => {
+    if (isModalOpen("Google Forms") && getIntegrationStatus("Google Forms") === "connected") {
+      fetchGoogleFormData();
+    }
+  }, [isModalOpen("Google Forms")]);
+
   useEffect(() => {
     const initializeAllIntegrationStatuses = async () => {
       setLoading(true);
@@ -343,36 +400,12 @@ export default function IntegrationsPage() {
     const name = integration.name as IntegrationName;
 
     if (name === "Google Forms") {
-      await fetchGoogleFormData();
       toggleModal(name, true);
     } else if (name === "Gravity Form") {
-      updateIntegrationStatus(name, "connecting");
       toggleModal(name, true);
     } else if (name === "Typeform") {
-      fetchTypeformForms(setTypeFormTreeData);
-      const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Typeform").limit(1).single();
-
-      const { data: typeform } = await supabase
-        .from("integration_connections")
-        .select("*")
-        .eq("clinic_id", await getClinicId())
-        .eq("integration_id", connection?.id)
-        .single();
-      console.warn("typeform", typeform);
-      setSelectedTypeformForms(typeform.auth_data?.forms);
       toggleModal(name, true);
     } else if (name === "Jotform") {
-      fetchJotformForms(setJotformTreeData);
-      const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Jotform").limit(1).single();
-
-      const { data: jotformData } = await supabase
-        .from("integration_connections")
-        .select("*")
-        .eq("clinic_id", await getClinicId())
-        .eq("integration_id", connection?.id)
-        .single();
-      console.warn("jotformData", jotformData);
-      setSelectedJotformForms(jotformData.auth_data?.forms.map((form: any) => form.form_id));
       toggleModal(name, true);
     }
   };
@@ -555,30 +588,17 @@ export default function IntegrationsPage() {
 
                           {/* Special handling for Facebook Lead Forms */}
                           {integration.name === "Facebook Lead Forms" ? (
-                            <div className="flex gap-2">
-                              <Button
-                                type="primary"
-                                size="small"
-                                className="!bg-[#3D5DCF] !border-[#3D5DCF] hover:!bg-blue-800"
-                                onClick={() => {
-                                  console.log("Opening Facebook form selection modal");
-                                  toggleModal("Facebook Lead Forms", true);
-                                }}
-                              >
-                                Manage Forms
-                              </Button>
-                              <Button
-                                size="small"
-                                className="text-white bg-red-500 hover:bg-red-700"
-                                onClick={async () => {
-                                  const clinicId = await getClinicId();
-                                  deleteIntegrationConnections(clinicId, integration.name);
-                                  updateIntegrationStatus("Facebook Lead Forms", "disconnected");
-                                }}
-                              >
-                                Disconnect
-                              </Button>
-                            </div>
+                            <Button
+                              type="primary"
+                              size="small"
+                              className="!bg-[#3D5DCF] !border-[#3D5DCF] hover:!bg-blue-800"
+                              onClick={() => {
+                                console.log("Opening Facebook form selection modal");
+                                toggleModal("Facebook Lead Forms", true);
+                              }}
+                            >
+                              Manage Forms
+                            </Button>
                           ) : (
                             <Button
                               type="primary"
@@ -682,6 +702,11 @@ export default function IntegrationsPage() {
           onConnect={async () => {
             setButtonLoading(true);
             window.location.href = `${SUPABASE_URL}/functions/v1/facebook-lead-form/auth/start?clinic_id=${clinicId}&redirect_to=${window.location.href}`;
+          }}
+          onDisconnect={async () => {
+            const clinicId = await getClinicId();
+            deleteIntegrationConnections(clinicId, "Facebook Lead Forms");
+            updateIntegrationStatus("Facebook Lead Forms", "disconnected");
           }}
           buttonLoading={buttonLoading}
         />

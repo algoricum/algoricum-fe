@@ -1,7 +1,7 @@
 "use client";
 
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
-import { Alert, Button, Modal, Spin, Typography, List, Checkbox, Card, Divider, Badge } from "antd";
+import { Alert, Button, Modal, Spin, Typography, Divider, Badge, Select } from "antd";
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/config/client";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
@@ -35,6 +35,7 @@ interface FacebookForm {
 
 interface FacebookModalProps extends ModalProps {
   clinicId?: string;
+  onDisconnect?: () => void;
 }
 
 const supabase = createClient();
@@ -49,6 +50,7 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
   onConnect,
   buttonLoading,
   clinicId,
+  onDisconnect,
 }) => {
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
@@ -192,9 +194,6 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
     }
   }, [selectedPageId]);
 
-  const handleFormToggle = (formId: string) => {
-    setSelectedFormIds(prev => (prev.includes(formId) ? prev.filter(id => id !== formId) : [...prev, formId]));
-  };
   return (
     <Modal
       title={
@@ -222,6 +221,18 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
               <Button key="cancel" onClick={onCancel}>
                 Cancel
               </Button>,
+              onDisconnect && (
+                <Button
+                  key="disconnect"
+                  danger
+                  onClick={() => {
+                    onDisconnect();
+                    onCancel?.();
+                  }}
+                >
+                  Disconnect
+                </Button>
+              ),
               <Button
                 key="save"
                 type="primary"
@@ -233,7 +244,26 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
                 Connect Selected Forms ({selectedFormIds.length})
               </Button>,
             ]
-          : undefined
+          : status === "connected" && onDisconnect
+            ? [
+                <Button key="cancel" onClick={onCancel}>
+                  Cancel
+                </Button>,
+                <Button
+                  key="disconnect"
+                  danger
+                  onClick={() => {
+                    onDisconnect();
+                    onCancel?.();
+                  }}
+                >
+                  Disconnect
+                </Button>,
+                <Button key="ok" type="primary" onClick={onOk} className="!bg-[#3D5DCF] !border-[#3D5DCF] hover:!bg-blue-800">
+                  Continue
+                </Button>,
+              ]
+            : undefined
       }
     >
       <div className="py-6">
@@ -314,37 +344,36 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
                   <Text strong className="block mb-3">
                     Select a Facebook Page:
                   </Text>
-                  <List
-                    grid={{ gutter: 16, column: 1 }}
-                    dataSource={pages}
-                    renderItem={page => (
-                      <List.Item>
-                        <Card
-                          hoverable
-                          className={`cursor-pointer ${selectedPageId === page.id ? "border-blue-500 bg-blue-50" : ""}`}
-                          onClick={() => setSelectedPageId(page.id)}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center mr-3">
-                                {page.picture?.data?.url ? (
-                                  <img src={page.picture.data.url} alt={page.name} className="w-10 h-10 rounded-full" />
-                                ) : (
-                                  <span className="text-gray-500">📄</span>
-                                )}
-                              </div>
-                              <div>
-                                <Text strong>{page.name}</Text>
-                                <br />
-                                <Text className="text-sm text-gray-500">{page.connected_forms_count} form(s) connected</Text>
-                              </div>
+                  <Select
+                    value={selectedPageId}
+                    onChange={setSelectedPageId}
+                    placeholder="Choose a Facebook page..."
+                    className="w-full"
+                    size="large"
+                    optionLabelProp="label"
+                  >
+                    {pages.map(page => (
+                      <Select.Option key={page.id} value={page.id} label={page.name}>
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
+                              {page.picture?.data?.url ? (
+                                <img src={page.picture.data.url} alt={page.name} className="w-8 h-8 rounded-full" />
+                              ) : (
+                                <span className="text-gray-500 text-sm">📄</span>
+                              )}
                             </div>
-                            <Badge status={page.connection_status === "active" ? "success" : "processing"} text={page.connection_status} />
+                            <div>
+                              <Text strong>{page.name}</Text>
+                              <br />
+                              <Text className="text-xs text-gray-500">{page.connected_forms_count} form(s) connected</Text>
+                            </div>
                           </div>
-                        </Card>
-                      </List.Item>
-                    )}
-                  />
+                          <Badge status={page.connection_status === "active" ? "success" : "processing"} text={page.connection_status} />
+                        </div>
+                      </Select.Option>
+                    ))}
+                  </Select>
                 </div>
 
                 {/* Forms Selection */}
@@ -355,45 +384,43 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
                       <Text strong className="block mb-3">
                         Select Forms to Connect:
                       </Text>
-                      {formsLoading ? (
+                      <Select
+                        mode="multiple"
+                        value={selectedFormIds}
+                        onChange={setSelectedFormIds}
+                        placeholder="Choose forms to connect..."
+                        className="w-full mb-4"
+                        size="large"
+                        optionLabelProp="label"
+                      >
+                        {forms.map(form => (
+                          <Select.Option key={form.id} value={form.id} label={form.name}>
+                            <div className="flex items-center justify-between py-2">
+                              <div className="flex items-center">
+                                <div>
+                                  <Text strong>{form.name}</Text>
+                                  <br />
+                                  <div className="flex gap-2 mt-1">
+                                    <Badge status={form.is_active ? "success" : "default"} text={form.status} />
+                                    {form.is_recent && <Badge color="blue" text="Recent" />}
+                                    {form.is_connected && <Badge color="green" text="Connected" />}
+                                  </div>
+                                  <Text className="text-xs text-gray-500">
+                                    Created {form.days_since_created} days ago • {form.estimated_leads} leads
+                                  </Text>
+                                </div>
+                              </div>
+                            </div>
+                          </Select.Option>
+                        ))}
+                      </Select>
+                      {formsLoading && (
                         <div className="text-center py-4">
                           <Spin />
                           <div className="mt-2">
                             <Text className="text-sm">Loading forms...</Text>
                           </div>
                         </div>
-                      ) : (
-                        <List
-                          grid={{ gutter: 16, column: 1 }}
-                          dataSource={forms}
-                          renderItem={form => (
-                            <List.Item>
-                              <Card className={`${form.is_connected ? "border-green-500" : ""}`}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center">
-                                    <Checkbox
-                                      checked={selectedFormIds.includes(form.id)}
-                                      onChange={() => handleFormToggle(form.id)}
-                                      className="mr-3"
-                                    />
-                                    <div>
-                                      <Text strong>{form.name}</Text>
-                                      <br />
-                                      <div className="flex gap-2 mt-1">
-                                        <Badge status={form.is_active ? "success" : "default"} text={form.status} />
-                                        {form.is_recent && <Badge color="blue" text="Recent" />}
-                                        {form.is_connected && <Badge color="green" text="Connected" />}
-                                      </div>
-                                      <Text className="text-sm text-gray-500">
-                                        Created {form.days_since_created} days ago • {form.estimated_leads} leads
-                                      </Text>
-                                    </div>
-                                  </div>
-                                </div>
-                              </Card>
-                            </List.Item>
-                          )}
-                        />
                       )}
                     </div>
                   </>
