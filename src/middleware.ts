@@ -18,7 +18,7 @@ const publicRoutes = [
   "/unsubscribe-lead", // Add unauthorized page to public routes
   "/redirect-form", // OAuth redirect handler
   "/redirect-lead", // Lead form redirect handler
-  "/hubspot-setup",
+  "/hubspot-setup", // Hubspot setup guide page
 ];
 // Paths that should redirect to dashboard if already authenticated
 const authRoutes = ["/login", "/signup", "/forgot-password"];
