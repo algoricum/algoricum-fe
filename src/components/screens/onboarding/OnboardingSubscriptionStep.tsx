@@ -115,8 +115,10 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
                     <div className="text-center mb-6">
                       <h3 className="text-2xl font-bold text-gray-800 break-words">{plan.name}</h3>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">Start free for 14 days</h2>
-                    <p className="text-base text-gray-600 mb-4">{`$${plan.amount}/${plan.interval} after trial. Cancel anytime.`}</p>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">
+                      {plan.name == "Free Plan" ? "Free for LifeTime" : "Start free for 14 days"}
+                    </h2>
+                    <p className="text-base text-gray-600 mb-4">{`$${plan.amount}/${plan.interval} ${plan.amount == 0 ? "" : "after trial. Cancel anytime."}`}</p>
                     <h4 className="text-lg font-bold text-gray-800 mb-3">What You get</h4>
                     <ul className="text-sm text-gray-700 space-y-2 mb-4">
                       {plan.features?.map((feature: string, index: number) => (
