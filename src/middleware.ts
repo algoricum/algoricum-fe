@@ -208,14 +208,15 @@ export async function middleware(request: NextRequest) {
       }
       // If user has clinic and is on other public routes, redirect to dashboard
       // But don't redirect staff on first login from change-password or unauthorized page
-      // Also don't redirect from OAuth callback handlers
+      // Also don't redirect from OAuth callback handlers or hubspot setup page
       if (
         isPublicRoute &&
         hasClinic &&
         !(isStaff && loggedFirst === true && isChangePasswordRoute) &&
         !isUnauthorizedRoute &&
         pathname !== "/redirect-form" &&
-        pathname !== "/redirect-lead"
+        pathname !== "/redirect-lead" &&
+        pathname !== "/hubspot-setup"
       ) {
         return redirect("/dashboard");
       }
