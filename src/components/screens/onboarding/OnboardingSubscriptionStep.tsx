@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Card, Typography, Skeleton, Tabs } from "antd";
+import { Button, Card, Typography, Skeleton } from "antd";
 // import { CheckCircle } from 'lucide-react';
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
@@ -74,20 +74,10 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
   }
 
   const PricingSelector = ({ plans, subscribingId, handleSubscribe }: PricingSelectorProps) => {
-    const [billingCycle, setBillingCycle] = useState("month");
-    const filteredPlans = plans.filter(plan => plan.interval === billingCycle);
-
-    const tabItems = [
-      { key: "month", label: "Monthly" },
-      // { key: "year", label: "Yearly" },
-    ];
-
     return (
       <div className="mt-10 flex flex-col items-center">
-        <Tabs defaultActiveKey="month" onChange={setBillingCycle} centered items={tabItems} className="px-6 mb-2" />
-
-        <div className={`mt-6 mx-auto ${filteredPlans.length === 1 ? "flex justify-center" : "grid grid-cols-1 md:grid-cols-2 gap-10"}`}>
-          {filteredPlans.map(plan => {
+        <div className={`mt-6 mx-auto ${plans.length === 1 ? "flex justify-center" : "grid grid-cols-1 md:grid-cols-2 gap-10"}`}>
+          {plans.map(plan => {
             const isPopular = plan.name.toLowerCase().includes("conversion"); // Highlight "Most Popular" plan
             const notAvailble = plan.name.toLowerCase().includes("nurturing"); // Highlight "Not Available" plan
 
@@ -96,7 +86,7 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
                 key={plan.id}
                 className={`rounded-2xl shadow-2xl border border-gray-100 flex flex-col justify-between transition-all duration-300 hover:scale-[1.02] hover:shadow-3xl ${
                   isPopular ? "border-brand-primary ring-2 ring-brand-primary/20" : ""
-                } ${filteredPlans.length === 1 ? "w-96" : ""}`}
+                } ${plans.length === 1 ? "w-96" : ""}`}
                 styles={{
                   body: {
                     padding: "2rem",
