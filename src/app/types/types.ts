@@ -141,6 +141,9 @@ export type Props = {
   onFacebookLeadFormOk: () => void;
   onFacebookLeadFormCancel: () => void;
   onFacebookLeadFormConnect: () => void;
+  onFacebookLeadFormDisconnect?: () => void;
+  clinicId?: string;
+  forceShowFormSelection?: boolean;
 
   // Typeform
   showTypeformModal: boolean;

@@ -1,12 +1,12 @@
 "use client";
 
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
-import { Alert, Button, Modal, Spin, Typography, Divider, Badge, Select } from "antd";
-import { useState, useEffect } from "react";
-import { createClient } from "@/utils/supabase/config/client";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { createClient } from "@/utils/supabase/config/client";
+import { Alert, Badge, Button, Divider, Modal, Select, Spin, Typography } from "antd";
 import Image from "next/image";
 import type React from "react";
+import { useEffect, useState } from "react";
 import { ModalProps } from "./types";
 
 const { Text } = Typography;
@@ -36,6 +36,7 @@ interface FacebookForm {
 interface FacebookModalProps extends ModalProps {
   clinicId?: string;
   onDisconnect?: () => void;
+  forceShowFormSelection?: boolean;
 }
 
 const supabase = createClient();
@@ -51,6 +52,7 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
   buttonLoading,
   clinicId,
   onDisconnect,
+  forceShowFormSelection = false,
 }) => {
   const [pages, setPages] = useState<FacebookPage[]>([]);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
@@ -184,9 +186,14 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
 
   useEffect(() => {
     if (open && status === "connected" && clinicId) {
-      checkPendingSetup();
+      if (forceShowFormSelection) {
+        setShowFormSelection(true);
+        fetchPages();
+      } else {
+        checkPendingSetup();
+      }
     }
-  }, [open, status, clinicId]);
+  }, [open, status, clinicId, forceShowFormSelection]);
 
   useEffect(() => {
     if (selectedPageId) {
@@ -239,7 +246,7 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
                 loading={saving}
                 disabled={selectedFormIds.length === 0}
                 onClick={saveSelectedForms}
-                className="!bg-[#3D5DCF] !border-[#3D5DCF] hover:!bg-blue-800"
+                className="!bg-[#3D5DCF] !border-[#3D5DCF] hover:!bg-blue-800 !text-white"
               >
                 Connect Selected Forms ({selectedFormIds.length})
               </Button>,
