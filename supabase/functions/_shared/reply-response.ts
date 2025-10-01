@@ -154,20 +154,18 @@ export async function generateAIResponse(
         messageBodyLower === "pricing" ||
         messageBodyLower === "cost");
 
-    const isShortBookingQuery =
-      isShortMessage &&
-      (messageBodyLower === "book" ||
-        messageBodyLower === "schedule" ||
-        messageBodyLower === "appointment" ||
-        messageBodyLower === "book appointment" ||
-        messageBodyLower === "schedule appointment");
+    // Regex-based booking detection - matches any message containing booking-related keywords
+    const bookingRegex =
+      /\b(book|booking|schedule|appointment|ready to book|want to book|would like to book|i'd like to book|can i book|how do i book|ready to schedule|want to schedule|would like to schedule|i'd like to schedule|can i schedule|how do i schedule|need an appointment|want an appointment|would like an appointment|can i get an appointment|book an appointment|schedule an appointment|set up an appointment|make an appointment)\b/i;
 
-    logInfo("🔍 Short message analysis:", {
+    const isBookingRequest = bookingRegex.test(options.messageBody);
+
+    logInfo("🔍 Message analysis:", {
       messageBody: options.messageBody,
       messageLength: options.messageBody.trim().length,
       isShortMessage: isShortMessage,
       isShortPricingQuery: isShortPricingQuery,
-      isShortBookingQuery: isShortBookingQuery,
+      isBookingRequest: isBookingRequest,
       hasConversationContext: !!conversationContext,
     });
 
@@ -318,6 +316,48 @@ export async function generateAIResponse(
         }
       } catch (bookingError) {
         logError(`❌ Error in booking detection for yes response:`, bookingError);
+      }
+    }
+
+    // Handle direct booking requests detected by regex
+    if (isBookingRequest && !shouldTriggerBookingProcess) {
+      try {
+        logInfo("📅 Direct booking request detected via regex, triggering booking service...");
+
+        const bookingOptions: BookingDetectionOptions = {
+          messageBody: options.messageBody,
+          subject: options.subject || "",
+          leadData: {
+            id: leadData.id,
+            first_name: leadData.first_name,
+            last_name: leadData.last_name,
+            email: leadData.email,
+            phone: leadData.phone,
+          },
+          clinicData: {
+            id: clinicData.id,
+            name: clinicData.name,
+            calendly_link: clinicData.calendly_link,
+          },
+          communicationType: isEmailResponse ? "email" : "sms",
+          senderPhone: leadData.phone,
+          forceBooking: true,
+        };
+
+        const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
+
+        logInfo("📅 Booking detection result:", {
+          isBookingRequest: bookingResult.isBookingRequest,
+          meetingScheduleCreated: bookingResult.meetingScheduleCreated,
+          meetingScheduleId: bookingResult.meetingScheduleId,
+        });
+
+        if (bookingResult.meetingScheduleCreated) {
+          const bookingResponseText = `Awesome! Let's lock in your appointment: ${clinicData.calendly_link || "https://calendly.com/book"}`;
+          return { success: true, response: bookingResponseText };
+        }
+      } catch (bookingError) {
+        logError(`❌ Error in booking detection:`, bookingError);
       }
     }
 
@@ -629,10 +669,11 @@ RESPONSE PRINCIPLES:
 • Make responses definitive and action-oriented
 • Guide conversations naturally toward booking when appropriate
 • Use your clinic knowledge base and training to give accurate information
-• ALWAYS END WITH A STRATEGIC QUESTION - NO EXCEPTIONS
+• ALWAYS END WITH A STRATEGIC QUESTION - EXCEPT when providing booking link in response to booking request
 
 🚨🚨🚨 CRITICAL: NO RESPONSE IS COMPLETE WITHOUT A QUESTION AT THE END 🚨🚨🚨
 🚨🚨🚨 EVERY SINGLE RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨
+🚨🚨🚨 EXCEPTION: When providing a booking link in response to booking request, DO NOT ask questions 🚨🚨🚨
 
 🚨 BOOKING LINKS: When mentioning "book", "schedule", or "appointment", ALWAYS include booking link 🚨
 
@@ -650,6 +691,7 @@ BOOKING LINK RULES:
 • When offering booking options = ALWAYS include the actual link
 • NEVER ask about specific times, days, slots, or availability - the booking link handles ALL scheduling
 • After providing booking link, DO NOT ask scheduling preferences
+• When responding to direct booking requests with booking link, DO NOT ask any follow-up questions
 
 CONVERSATION PROGRESSION - Follow this exact sequence:
 • NEVER repeat information already shared in previous messages
@@ -664,7 +706,7 @@ STAGE-BASED QUESTIONING:
 
 IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
 
-🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨`
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION (EXCEPT when providing booking link) 🚨🚨🚨`
     : ""
 }
 
@@ -672,7 +714,7 @@ CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
 - Phone: ${clinicData.phone_number || "Contact us for phone number"}
 ${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ""}
-- Hours: Use ${clinic.business_hours} for ANY timing/availability questions
+- **Hours: Use ${clinic.business_hours} for ANY timing/availability questions**
 
 ${
   isBookingInquiry
@@ -830,7 +872,7 @@ CRITICAL RESPONSE RULES:
 
 IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
 
-🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨`
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION (EXCEPT when providing booking link) 🚨🚨🚨`
     : ""
 }
 
@@ -1563,6 +1605,48 @@ async function generateFallbackResponse(
       }
     }
 
+    // Handle direct booking requests detected by regex in fallback
+    if (isBookingRequest && !shouldTriggerBookingProcess) {
+      try {
+        logInfo("📅 Direct booking request detected via regex in fallback, triggering booking service...");
+
+        const bookingOptions: BookingDetectionOptions = {
+          messageBody: options.messageBody,
+          subject: options.subject || "",
+          leadData: {
+            id: leadData.id,
+            first_name: leadData.first_name,
+            last_name: leadData.last_name,
+            email: leadData.email,
+            phone: leadData.phone,
+          },
+          clinicData: {
+            id: clinicData.id,
+            name: clinicData.name,
+            calendly_link: clinicData.calendly_link,
+          },
+          communicationType: isEmailResponse ? "email" : "sms",
+          senderPhone: leadData.phone,
+          forceBooking: true,
+        };
+
+        const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
+
+        logInfo("📅 Booking detection result in fallback:", {
+          isBookingRequest: bookingResult.isBookingRequest,
+          meetingScheduleCreated: bookingResult.meetingScheduleCreated,
+          meetingScheduleId: bookingResult.meetingScheduleId,
+        });
+
+        if (bookingResult.meetingScheduleCreated) {
+          const bookingResponseText = `Awesome! Let's lock in your appointment: ${clinicData.calendly_link || "https://calendly.com/book"}`;
+          return { success: true, response: bookingResponseText };
+        }
+      } catch (bookingError) {
+        logError(`❌ Error in booking detection in fallback:`, bookingError);
+      }
+    }
+
     const bookingLink = clinicData.calendly_link || "https://calendly.com/book";
     const unsubscribeLink = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
 
@@ -1589,7 +1673,7 @@ CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
 - Phone: ${clinicData.phone_number || "Contact us for phone number"}
 ${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ""}
-- Hours: Use ${clinic.business_hours} for ANY timing/availability questions
+- **Hours: Use ${clinic.business_hours} for ANY timing/availability questions**
 
 Current Email:
 Subject: ${options.subject || "No Subject"}
@@ -1661,7 +1745,7 @@ CRITICAL RESPONSE RULES:
 
 IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
 
-🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨`
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION (EXCEPT when providing booking link) 🚨🚨🚨`
     : ""
 }
 
@@ -1807,6 +1891,7 @@ CRITICAL RESPONSE RULES:
 
 🚨🚨🚨 CRITICAL: NO RESPONSE IS COMPLETE WITHOUT A QUESTION AT THE END 🚨🚨🚨
 🚨🚨🚨 EVERY SINGLE RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨
+🚨🚨🚨 EXCEPTION: When providing a booking link in response to booking request, DO NOT ask questions 🚨🚨🚨
 
 🚨 BOOKING LINKS: When mentioning "book", "schedule", or "appointment", ALWAYS include booking link 🚨
 
@@ -1824,6 +1909,7 @@ BOOKING LINK RULES:
 • When offering booking options = ALWAYS include the actual link
 • NEVER ask about specific times, days, slots, or availability - the booking link handles ALL scheduling
 • After providing booking link, DO NOT ask scheduling preferences
+• When responding to direct booking requests with booking link, DO NOT ask any follow-up questions
 
 CONVERSATION PROGRESSION - Follow this exact sequence:
 • NEVER repeat information already shared in previous messages
@@ -1839,7 +1925,7 @@ STAGE-BASED QUESTIONING:
 
 IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
 
-🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨`
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION (EXCEPT when providing booking link) 🚨🚨🚨`
     : ""
 }
 
