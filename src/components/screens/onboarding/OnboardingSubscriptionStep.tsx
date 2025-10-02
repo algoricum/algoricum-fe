@@ -1,77 +1,98 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button, Card, Typography, Skeleton } from "antd";
-// import { CheckCircle } from 'lucide-react';
-import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { createClient } from "@/utils/supabase/config/client";
 import { ErrorToast } from "@/helpers/toast";
 import { handleSubscribe } from "@/utils/stripe";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
+import { Button, Card, Skeleton, Typography } from "antd";
+import { useEffect, useState } from "react";
 const supabase = createClient();
 
 interface OnboardingSubscriptionStepProps {
   onNext: (data?: any) => void;
 }
 
+interface PricingSelectorProps {
+  plans: {
+    id: string;
+    name: string;
+    interval: "month" | "year";
+    price_id: string;
+    amount: number;
+    features?: string[];
+  }[];
+  subscribingId: string | null;
+  handleSubscribe: (priceId: string) => void;
+}
+
 export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscriptionStepProps) {
   const [plans, setPlans] = useState<any[]>([]);
   const [clinicId, setClinicId] = useState<string | null>(null);
-  const [, setStatus] = useState<string | null>(null);
   const [subscribingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Fetch plans immediately (no dependencies)
   useEffect(() => {
-    const fetchInitialData = async () => {
-      const clinic = await getClinicData();
-      console.log(".......Clinic data:.....", clinic);
-      if (!clinic) {
-        ErrorToast("Clinic data not found.");
-        return;
+    const fetchPlans = async () => {
+      try {
+        const { data } = await supabase.from("plans").select("*").eq("active", true).order("amount", { ascending: true });
+        setPlans(data || []);
+      } catch (error) {
+        console.error("Error fetching plans:", error);
+        ErrorToast("Failed to load plans.");
       }
-
-      setClinicId(clinic.id);
-
-      const { data: planData } = await supabase.from("plans").select("*").eq("active", true).order("amount", { ascending: true });
-
-      setPlans(planData || []);
-
-      await checkSubscription(clinic.id);
     };
-
-    fetchInitialData();
+    fetchPlans();
   }, []);
 
-  const checkSubscription = async (id: string) => {
-    const { data: sub } = await supabase
-      .from("stripe_subscriptions")
-      .select("status")
-      .eq("clinic_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  // Fetch clinic data
+  useEffect(() => {
+    const fetchClinic = async () => {
+      try {
+        const clinic = await getClinicData();
+        console.log(".......Clinic data:.....", clinic);
+        if (clinic) {
+          setClinicId(clinic.id);
+        } else {
+          ErrorToast("Clinic data not found.");
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Error fetching clinic data:", error);
+        ErrorToast("Failed to load clinic data.");
+        setLoading(false);
+      }
+    };
+    fetchClinic();
+  }, []);
 
-    if (sub?.status === "active" || sub?.status === "trialing") {
-      setStatus(sub.status);
-      onNext(); // Move to next onboarding step
-    } else {
-      setStatus(sub?.status ?? null);
-    }
+  // Check subscription when clinic ID is available
+  useEffect(() => {
+    if (!clinicId) return;
 
-    setLoading(false);
-  };
+    const checkSubscription = async () => {
+      try {
+        const { data: sub } = await supabase
+          .from("stripe_subscriptions")
+          .select("status")
+          .eq("clinic_id", clinicId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-  interface PricingSelectorProps {
-    plans: {
-      id: string;
-      name: string;
-      interval: "month" | "year";
-      price_id: string;
-      amount: number;
-      features?: string[];
-    }[];
-    subscribingId: string | null;
-    handleSubscribe: (priceId: string) => void;
-  }
+        if (sub?.status === "active" || sub?.status === "trialing") {
+          onNext();
+        }
+      } catch (error) {
+        console.error("Error checking subscription:", error);
+        ErrorToast("Failed to check subscription status.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSubscription();
+  }, [clinicId, onNext]);
 
   const PricingSelector = ({ plans, subscribingId, handleSubscribe }: PricingSelectorProps) => {
     return (
