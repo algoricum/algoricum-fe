@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const supabaseUrl = deno.env.get("SUPABASE_URL");
+const supabaseUrl = Deno.env.get("SUPABASE_URL");
 
 serve(async req => {
   // Handle CORS preflight requests
@@ -325,7 +325,6 @@ serve(async req => {
       twilio_account_sid: twilioAccountSid,
       twilio_auth_token: twilioAuthToken,
       twilio_phone_number: purchaseData.phone_number,
-      messaging_service_sid: twilioMessagingServiceSid || null,
       status: "active",
     };
     console.log("Preparing to upsert twilio_config", { twilioConfigData, twilio_config_id });
@@ -399,7 +398,7 @@ serve(async req => {
       clinic_id,
       twilio_config_id: data.id,
       webhook_url: smsWebhookUrl,
-      campaign_registered: campaignRegistrationSuccess,
+      messaging_service_registered: messagingServiceRegistrationSuccess,
     });
 
     const responseMessage =

@@ -592,7 +592,7 @@ Please generate a helpful email response that addresses their message.`;
 MANDATORY STEPS:
 1. ALWAYS use file_search tool to search uploaded documents
 2. Base response ONLY on file_search results  
-3. If no results found, say "Let me connect you with our team for that detail"
+3. If no results found, say "we donot offer this service, tell what we offer"
 
 NEVER respond without using file_search tool first!
 
@@ -740,7 +740,7 @@ Please generate a helpful SMS response that addresses their message.`;
 MANDATORY STEPS:
 1. ALWAYS use file_search tool to search uploaded documents
 2. Base response ONLY on file_search results  
-3. If no results found, say "Let me connect you with our team for that detail"
+3. If no results found, say "we donot offer this service, tell what we offer"
 
 NEVER respond without using file_search tool first!
 
