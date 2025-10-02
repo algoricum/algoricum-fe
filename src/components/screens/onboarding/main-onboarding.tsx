@@ -25,8 +25,8 @@ import { useCallback, useEffect, useState } from "react";
 import BookingSetupStep from "./booking-setup-step";
 import ClinicInfoStep from "./clinic-info-step";
 import IntegrationsStep from "./Integration";
-import StaffHoursStep from "./staff-hours-step";
 import OnboardingSubscriptionStep from "./OnboardingSubscriptionStep";
+import StaffHoursStep from "./staff-hours-step";
 
 const { Text } = Typography;
 const supabase = createClient();
@@ -34,9 +34,6 @@ const BASE_STEPS = [
   { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
   { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
   { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
-  // { id: "tone-identity", title: "Tone", description: "Style", icon: "🎨" },
-  // { id: "ai-assistant", title: "AI Setup", description: "Documents", icon: "💬" },
-  // { id: "chatbot-setup", title: "Chatbot-Integration", description: "AI Assistant", icon: "🤖" },
   { id: "integrations", title: "Lead Capture Setup", description: "Tools", icon: "⚡" },
   { id: "booking-setup", title: "Booking Link Setup", description: "Appointments", icon: "⚙️" },
 ];
@@ -60,38 +57,6 @@ export default function MainOnboarding() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
 
-  // const checkSubscription = async (id: string) => {
-  //   const { data: sub } = await supabase
-  //     .from("stripe_subscriptions")
-  //     .select("id,status")
-  //     .eq("clinic_id", id)
-  //     .order("created_at", { ascending: false })
-  //     .limit(1)
-  //     .maybeSingle();
-  //   if (!sub) {
-  //     const { data: planData } = await supabase.from("plans").select("*").limit(1);
-  //     if (planData && planData[0]?.price_id) {
-  //       console.log("asdf", !sub, planData);
-  //       await handleSubscribe(planData[0]?.price_id, id);
-  //     }
-  //   }
-  // };
-
-  // useEffect(() => {
-  //   const fetchInitialData = async () => {
-  //     const clinic = await getClinicData();
-  //     console.log(".......Clinic data:.....", clinic);
-  //     if (!clinic) {
-  //       ErrorToast("Clinic data not found.");
-  //       return;
-  //     }
-
-  //     await checkSubscription(clinic.id);
-  //   };
-  //   if (currentStepIndex > 1) {
-  //     fetchInitialData();
-  //   }
-  // }, [currentStepIndex]);
   // Only use BASE_STEPS for sidebar and navigation
   const STEPS = BASE_STEPS;
   const currentStep = STEPS[currentStepIndex];
