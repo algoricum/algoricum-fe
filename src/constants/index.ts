@@ -167,3 +167,11 @@ export const questions = [
     options: ["Yes", "No"],
   },
 ];
+
+export const BASE_STEPS = [
+  { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
+  { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
+  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
+  { id: "integrations", title: "Lead Capture Setup", description: "Tools", icon: "⚡" },
+  { id: "booking-setup", title: "Booking Link Setup", description: "Appointments", icon: "⚙️" },
+];
