@@ -1,7 +1,7 @@
 "use client";
 
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { BOOKING_LINK } from "@/constants/";
+import { BASE_STEPS, BOOKING_LINK } from "@/constants/";
 import {
   ONBOARDING_COMPLETED_STEPS_KEY,
   ONBOARDING_LEADS_FILE_NAME,
@@ -30,13 +30,6 @@ import StaffHoursStep from "./staff-hours-step";
 
 const { Text } = Typography;
 const supabase = createClient();
-const BASE_STEPS = [
-  { id: "clinic-info", title: "Clinic Profile", description: "Basic details", icon: "📋" },
-  { id: "staff-hours", title: "Hours of operation", description: "Schedule", icon: "👥" },
-  { id: "billing", title: "Billing", description: "Plan & Payment", icon: "💳" },
-  { id: "integrations", title: "Lead Capture Setup", description: "Tools", icon: "⚡" },
-  { id: "booking-setup", title: "Booking Link Setup", description: "Appointments", icon: "⚙️" },
-];
 
 // Helper function to generate slug from clinic name
 const generateSlug = (name: string): string => {
