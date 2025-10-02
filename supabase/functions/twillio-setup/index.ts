@@ -91,9 +91,9 @@ serve(async req => {
     console.log("Checking Twilio credentials");
     const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
     const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-    // A2P 10DLC Campaign SID (OPTIONAL - costs money to register)
-    // Only set this if you have a registered campaign and want to avoid 30034 errors
-    const twilioCampaignSid = Deno.env.get("TWILIO_CAMPAIGN_SID");
+    // A2P Messaging Service SID (OPTIONAL - for automatic A2P registration)
+    // Set this to automatically register phone numbers with your A2P messaging service
+    const twilioMessagingServiceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID");
 
     // SMS Processor webhook URL with clinic_id parameter - Update this to your actual Supabase project URL
     const smsWebhookUrl = `${supabaseUrl}/functions/v1/sms-processor?clinic_id=${clinic_id}`;
@@ -101,7 +101,7 @@ serve(async req => {
     console.log("Twilio environment variables", {
       twilioAccountSid: twilioAccountSid ? "set" : "not set",
       twilioAuthToken: twilioAuthToken ? "set" : "not set",
-      twilioCampaignSid: twilioCampaignSid ? "set" : "not set",
+      twilioMessagingServiceSid: twilioMessagingServiceSid ? "set" : "not set",
       smsWebhookUrl,
     });
 
@@ -263,59 +263,59 @@ serve(async req => {
       );
     }
 
-    // Step 2.5: Register phone number with A2P 10DLC campaign if campaign SID is provided
-    let campaignRegistrationSuccess = true;
-    if (twilioCampaignSid) {
-      console.log("Registering phone number with A2P 10DLC campaign", {
+    // Step 2.5: Register phone number with A2P messaging service if messaging service SID is provided
+    let messagingServiceRegistrationSuccess = true;
+    if (twilioMessagingServiceSid) {
+      console.log("Registering phone number with A2P messaging service", {
         phoneNumber: purchaseData.phone_number,
-        campaignSid: twilioCampaignSid,
+        messagingServiceSid: twilioMessagingServiceSid,
       });
 
-      const campaignRegistrationUrl = `https://messaging.twilio.com/v1/Services/${twilioCampaignSid}/PhoneNumbers`;
-      const campaignRegistrationBody = new URLSearchParams({
+      const messagingServiceUrl = `https://messaging.twilio.com/v1/Services/${twilioMessagingServiceSid}/PhoneNumbers`;
+      const messagingServiceBody = new URLSearchParams({
         PhoneNumberSid: purchaseData.sid,
       });
 
       try {
-        const campaignResponse = await fetch(campaignRegistrationUrl, {
+        const messagingServiceResponse = await fetch(messagingServiceUrl, {
           method: "POST",
           headers: {
             Authorization: `Basic ${authHeader}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: campaignRegistrationBody,
+          body: messagingServiceBody,
         });
 
-        const campaignData = await campaignResponse.json();
-        console.log("Campaign registration response", {
-          status: campaignResponse.status,
-          ok: campaignResponse.ok,
-          data: campaignData,
+        const messagingServiceData = await messagingServiceResponse.json();
+        console.log("Messaging service registration response", {
+          status: messagingServiceResponse.status,
+          ok: messagingServiceResponse.ok,
+          data: messagingServiceData,
         });
 
-        if (!campaignResponse.ok) {
-          console.log("Warning: Failed to register phone number with campaign", {
-            error: campaignData,
+        if (!messagingServiceResponse.ok) {
+          console.log("Warning: Failed to register phone number with messaging service", {
+            error: messagingServiceData,
             phoneNumber: purchaseData.phone_number,
-            campaignSid: twilioCampaignSid,
+            messagingServiceSid: twilioMessagingServiceSid,
           });
-          campaignRegistrationSuccess = false;
+          messagingServiceRegistrationSuccess = false;
         } else {
-          console.log("Successfully registered phone number with campaign", {
+          console.log("Successfully registered phone number with messaging service", {
             phoneNumber: purchaseData.phone_number,
-            campaignSid: twilioCampaignSid,
+            messagingServiceSid: twilioMessagingServiceSid,
           });
         }
       } catch (error) {
-        console.error("Error during campaign registration", {
+        console.error("Error during messaging service registration", {
           error: error.message,
           phoneNumber: purchaseData.phone_number,
-          campaignSid: twilioCampaignSid,
+          messagingServiceSid: twilioMessagingServiceSid,
         });
-        campaignRegistrationSuccess = false;
+        messagingServiceRegistrationSuccess = false;
       }
     } else {
-      console.log("No campaign SID provided, skipping A2P 10DLC registration");
+      console.log("No messaging service SID provided, skipping A2P messaging service registration");
     }
 
     // Step 3: Update or insert into twilio_config
@@ -325,7 +325,7 @@ serve(async req => {
       twilio_account_sid: twilioAccountSid,
       twilio_auth_token: twilioAuthToken,
       twilio_phone_number: purchaseData.phone_number,
-      campaign_sid: twilioCampaignSid || null,
+      messaging_service_sid: twilioMessagingServiceSid || null,
       status: "active",
     };
     console.log("Preparing to upsert twilio_config", { twilioConfigData, twilio_config_id });
@@ -403,10 +403,10 @@ serve(async req => {
     });
 
     const responseMessage =
-      campaignRegistrationSuccess && twilioCampaignSid
-        ? "SMS number assigned and registered with A2P 10DLC campaign successfully"
-        : twilioCampaignSid && !campaignRegistrationSuccess
-          ? "SMS number assigned successfully, but A2P 10DLC campaign registration failed"
+      messagingServiceRegistrationSuccess && twilioMessagingServiceSid
+        ? "SMS number assigned and registered with A2P messaging service successfully"
+        : twilioMessagingServiceSid && !messagingServiceRegistrationSuccess
+          ? "SMS number assigned successfully, but A2P messaging service registration failed"
           : "SMS number assigned successfully";
 
     return new Response(
@@ -419,8 +419,8 @@ serve(async req => {
         clinic_id,
         twilio_config_id: data.id,
         webhook_url: smsWebhookUrl, // Include webhook URL in response for verification
-        campaign_registered: campaignRegistrationSuccess,
-        campaign_sid: twilioCampaignSid || null,
+        messaging_service_registered: messagingServiceRegistrationSuccess,
+        messaging_service_sid: twilioMessagingServiceSid || null,
       }),
       {
         status: 200,
