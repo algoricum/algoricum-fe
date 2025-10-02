@@ -1,9 +1,8 @@
 "use client";
 
+import { TIME_OPTIONS } from "@/constants";
 import { ErrorToast } from "@/helpers/toast";
-import { handleSubscribe } from "@/utils/stripe";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { createClient } from "@/utils/supabase/config/client";
 import { Button, Select, Switch, Typography } from "antd";
 import { useEffect, useState } from "react";
 
@@ -15,43 +14,7 @@ interface StaffHoursStepProps {
   onPrev?: () => void;
   initialData?: any;
 }
-const supabase = createClient();
-
-const TIME_OPTIONS = [
-  "6:00 AM",
-  "6:30 AM",
-  "7:00 AM",
-  "7:30 AM",
-  "8:00 AM",
-  "8:30 AM",
-  "9:00 AM",
-  "9:30 AM",
-  "10:00 AM",
-  "10:30 AM",
-  "11:00 AM",
-  "11:30 AM",
-  "12:00 PM",
-  "12:30 PM",
-  "1:00 PM",
-  "1:30 PM",
-  "2:00 PM",
-  "2:30 PM",
-  "3:00 PM",
-  "3:30 PM",
-  "4:00 PM",
-  "4:30 PM",
-  "5:00 PM",
-  "5:30 PM",
-  "6:00 PM",
-  "6:30 PM",
-  "7:00 PM",
-  "7:30 PM",
-  "8:00 PM",
-  "8:30 PM",
-  "9:00 PM",
-  "9:30 PM",
-  "10:00 PM",
-];
+// const supabase = createClient();
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -67,8 +30,8 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
       Sunday: { enabled: false, start: "9:00 AM", end: "5:00 PM" },
     },
   );
-  const [clinicId, setClinicId] = useState<string | null>(null);
-  const [subscribingId, setSubscribingId] = useState<string | null>(null);
+  // const [, setClinicId] = useState<string | null>(null);
+  // const [subscribingId, setSubscribingId] = useState<string | null>(null);
 
   const handlePreset = (preset: string) => {
     const newHours = { ...businessHours };
@@ -110,19 +73,7 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
       [day]: { ...prev[day], [timeType]: time },
     }));
   };
-  const checkSubscription = async (id: string) => {
-    const { data: sub } = await supabase
-      .from("stripe_subscriptions")
-      .select("id,status")
-      .eq("clinic_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
 
-    if (sub?.status === "active" || sub?.status === "trialing") {
-setSubscribingId(sub.id)    }
-
-  };
   useEffect(() => {
     const fetchInitialData = async () => {
       const clinic = await getClinicData();
@@ -131,26 +82,12 @@ setSubscribingId(sub.id)    }
         ErrorToast("Clinic data not found.");
         return;
       }
-
-      setClinicId(clinic.id);
-
-      
-      
-      await checkSubscription(clinic.id);
     };
-    
+
     fetchInitialData();
   }, []);
-  
-  const handleNext = async() => {
-    if(!subscribingId){
 
-      const { data: planData } = await supabase.from("plans").select("*").limit(1);
-      if(planData && planData[0]?.price_id){
-     
-      await handleSubscribe(planData[0]?.price_id,clinicId)
-    }
-  }
+  const handleNext = async () => {
     onNext({ businessHours });
   };
 
@@ -162,11 +99,6 @@ setSubscribingId(sub.id)    }
       <Title level={5} className="text-gray-900 mb-5 text-3xl font-bold leading-tight" style={{ marginBottom: "25px" }}>
         Welcome! Let’s set up your clinic so that we can start following up with leads right away.
       </Title>
-      {/* <Title level={3} className="text-gray-800 mb-5 text-3xl font-semibold leading-tight" style={{ margin: 0, marginBottom: "21px" }}>
-        Business Hours
-      </Title>
-
-      <Text className="text-gray-600 text-sm block mb-8">Set your clinic&apos;s operating hours</Text> */}
 
       {/* Quick Presets */}
       <div className="mb-8">
