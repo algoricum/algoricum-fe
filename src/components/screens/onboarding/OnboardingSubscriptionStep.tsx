@@ -169,8 +169,6 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
     <div className="max-w-7xl mx-auto flex flex-col items-center">
       <Typography.Title level={1} className="text-center">
         Get started
-        <br />
-        No credit card required
       </Typography.Title>
 
       {loading ? (
