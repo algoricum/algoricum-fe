@@ -78,8 +78,8 @@ export const PipedriveModal: React.FC<ModalProps> = ({
               bgColor="bg-green-50"
               borderColor="border-green-200"
               textColor="green-700"
-              buttonBgColor="green-700" // Normal button color
-              hoverBgColor="green-900" // Hover color
+              buttonBgColor="green-700"
+              hoverBgColor="green-900"
             />
           </>
         )}
