@@ -41,23 +41,37 @@ serve(async req => {
         headers: corsHeaders,
       });
     }
-    const {data:user,error:userError}=await supabase
-    .from("user")
-    .select("id, email")
-    .eq("id", clinic.owner_id)
-    .single();
+    const { data: user, error: userError } = await supabase.from("user").select("id, email").eq("id", clinic.owner_id).single();
     if (userError || !user) {
       return new Response("User not found", {
         status: 404,
         headers: corsHeaders,
       });
     }
+
+    // Fetch plan details based on price_id
+    const { data: plan, error: planError } = await supabase
+      .from("plans")
+      .select("id, name, amount, interval, features, trial_days")
+      .eq("price_id", price_id)
+      .eq("active", true)
+      .single();
+
+    if (planError || !plan) {
+      return new Response("Plan not found", {
+        status: 404,
+        headers: corsHeaders,
+      });
+    }
+
+    // Determine plan type based on amount (0 = free, >0 = paid)
+    const plan_type = plan.amount === 0 ? "free" : "paid";
     const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
     let stripeCustomerId = clinic.stripe_customer_id;
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         name: clinic.name || "Unknown Client",
-        email: clinic.email || user.email||undefined,
+        email: clinic.email || user.email || undefined,
         metadata: {
           clinic_id,
         },
@@ -72,89 +86,91 @@ serve(async req => {
     }
     const { data: existingSub } = await supabase
       .from("stripe_subscriptions")
-      .select("status, trial_end")
+      .select("status")
       .eq("clinic_id", clinic_id)
       .order("created_at", {
         ascending: false,
       })
       .limit(1)
       .single();
-    const now = new Date();
-    if (existingSub) {
-      const isActive = existingSub.status === "active";
-      const isTrialing = existingSub.status === "trialing" && existingSub.trial_end && new Date(existingSub.trial_end) > now;
-      if (isActive || isTrialing) {
-        // Redirect to billing portal
-        const portalSession = await stripe.billingPortal.sessions.create({
-          customer: stripeCustomerId,
-          return_url: `${APP_URL}/dashboard`,
-        });
-        return new Response(
-          JSON.stringify({
-            url: portalSession.url,
-          }),
-          {
-            status: 200,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-      }
-      if (existingSub.status === "paused") {
-        // Create checkout session without trial
-        const session = await stripe.checkout.sessions.create({
-          customer: stripeCustomerId,
-          mode: "subscription",
-          line_items: [
-            {
-              price: price_id,
-              quantity: 1,
-            },
-          ],
-          subscription_data: {
-            metadata: {
-              clinic_id,
-            },
-          },
-          success_url: `${APP_URL}/billing`,
-          cancel_url: `${APP_URL}/biling`,
-        });
-        return new Response(
-          JSON.stringify({
-            url: session.url,
-          }),
-          {
-            status: 200,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-      }
-    }
-    // No existing subscription — allow trial
-    const session = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
-      mode: "subscription",
-      line_items: [
+
+    if (existingSub && existingSub.status === "active") {
+      // Redirect to billing portal for active subscriptions
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: stripeCustomerId,
+        return_url: `${APP_URL}/dashboard`,
+      });
+      return new Response(
+        JSON.stringify({
+          url: portalSession.url,
+        }),
         {
-          price: price_id,
-          quantity: 1,
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
         },
-      ],
-      subscription_data: {
-        metadata: {
-          clinic_id,
+      );
+    }
+
+    // Create checkout session based on plan type
+    let sessionConfig;
+
+    if (plan_type === "free") {
+      // Free plan: only prefilled email checkbox, no payment required
+      sessionConfig = {
+        customer: stripeCustomerId,
+        mode: "subscription",
+        line_items: [
+          {
+            price: price_id,
+            quantity: 1,
+          },
+        ],
+        subscription_data: {
+          metadata: {
+            clinic_id,
+            plan_type: "free",
+            plan_id: plan.id,
+            plan_name: plan.name,
+          },
         },
-        trial_period_days: 14,
-      },
-      payment_method_collection: "if_required",
-      success_url: `${APP_URL}/billing`,
-      cancel_url: `${APP_URL}/billing`,
-    });
+        payment_method_collection: "if_required",
+        customer_update: {
+          address: "never",
+          name: "never",
+          shipping: "never",
+        },
+        success_url: `${APP_URL}/billing`,
+        cancel_url: `${APP_URL}/billing`,
+      };
+    } else {
+      // Paid plan: require card info collection
+      sessionConfig = {
+        customer: stripeCustomerId,
+        mode: "subscription",
+        line_items: [
+          {
+            price: price_id,
+            quantity: 1,
+          },
+        ],
+        subscription_data: {
+          metadata: {
+            clinic_id,
+            plan_type: "paid",
+            plan_id: plan.id,
+            plan_name: plan.name,
+          },
+        },
+        payment_method_collection: "always",
+        success_url: `${APP_URL}/billing`,
+        cancel_url: `${APP_URL}/billing`,
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
     return new Response(
       JSON.stringify({
         url: session.url,

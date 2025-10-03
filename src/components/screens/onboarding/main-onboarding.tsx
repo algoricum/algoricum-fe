@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import apiKeyService from "@/services/apiKey";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
+import { checkClinicSubscription, shouldAllowTwilioSetup } from "@/utils/subscription-utils";
 // import { handleSubscribe } from "@/utils/stripe";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getClinicData, updateClinic, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
@@ -420,30 +421,42 @@ export default function MainOnboarding() {
         clinicId: updatedClinic.id,
       });
 
-      // Setup Twilio phone number for cinic
+      // Setup Twilio phone number for clinic (only for paid plans)
       try {
-        const session = await getSupabaseSession();
-        if (!session.access_token) {
-          throw new Error("Not authenticated");
-        }
+        // Check clinic subscription before attempting Twilio setup
+        const subscriptionInfo = await checkClinicSubscription(updatedClinic.id);
 
-        const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            clinic_id: updatedClinic.id,
-            phone_number: mappedData.phoneNumber,
-            name: mappedData.legalBusinessName,
-          }),
-        });
+        if (shouldAllowTwilioSetup(subscriptionInfo)) {
+          console.log("✅ Clinic has paid subscription - proceeding with Twilio setup");
 
-        const twilioResult = await twilioResponse.json();
+          const session = await getSupabaseSession();
+          if (!session.access_token) {
+            throw new Error("Not authenticated");
+          }
 
-        if (!twilioResponse.ok) {
-          console.error("Twilio setup error:", twilioResult.error);
+          const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              clinic_id: updatedClinic.id,
+              phone_number: mappedData.phoneNumber,
+              name: mappedData.legalBusinessName,
+            }),
+          });
+
+          const twilioResult = await twilioResponse.json();
+
+          if (!twilioResponse.ok) {
+            console.error("Twilio setup error:", twilioResult.error);
+          } else {
+            console.log("✅ Twilio setup completed successfully");
+          }
+        } else {
+          console.log("❌ Clinic has free subscription - skipping Twilio setup");
+          console.log(`Subscription details: ${subscriptionInfo.isDemo ? "demo" : "production"} + ${subscriptionInfo.planType} plan`);
         }
       } catch (twilioError) {
         console.error("Failed to set up Twilio:", twilioError);

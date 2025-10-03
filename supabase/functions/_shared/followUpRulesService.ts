@@ -1,3 +1,4 @@
+import { getClinicType } from "./nurturing-service.ts";
 import type { FollowUpRule } from "./nurturing-types.ts";
 
 // PAID PLAN - Full flow: 5 SMS + 15 emails = 20 total
@@ -184,7 +185,6 @@ const FOLLOW_UP_RULES_PAID: FollowUpRule[] = [
 
 // DEMO RULES - PAID PLAN: SMS + Emails for testing
 const FOLLOW_UP_RULES_DEMO_PAID: FollowUpRule[] = [
-  // SMS FLOW - 3-minute gaps between each rule
   {
     name: "sms_5min_initial",
     timeFromCreated: 30 * 1000,
@@ -392,77 +392,77 @@ const FOLLOW_UP_RULES_DEMO_PAID: FollowUpRule[] = [
 // FREE PLAN - Email only: 14 emails following sequence: 5min → 2d → 5d → 8d → 11d → 14d → 17d → 20d → 30d → 35d → 50d → 60d → 70d → 90d
 const FOLLOW_UP_RULES_FREE: FollowUpRule[] = [
   {
-    name: "email_5min_followup",
+    name: "email_21day_followup",
     timeFromCreated: 5 * 60 * 1000, // 5 minutes
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_2day_followup",
+    name: "email_24day_followup",
     timeFromCreated: 2 * 24 * 60 * 60 * 1000, // 2 days
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_5day_followup",
+    name: "email_27day_followup",
     timeFromCreated: 5 * 24 * 60 * 60 * 1000, // 5 days
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_8day_followup",
+    name: "email_30day_followup",
     timeFromCreated: 8 * 24 * 60 * 60 * 1000, // 8 days
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_11day_followup",
+    name: "email_33day_followup",
     timeFromCreated: 11 * 24 * 60 * 60 * 1000, // 11 days
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_14day_followup",
+    name: "email_36day_followup",
     timeFromCreated: 14 * 24 * 60 * 60 * 1000, // 14 days
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_17day_followup",
+    name: "email_39day_followup",
     timeFromCreated: 17 * 24 * 60 * 60 * 1000, // 17 days
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_20day_followup",
+    name: "email_42day_followup",
     timeFromCreated: 20 * 24 * 60 * 60 * 1000, // 20 days
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_30day_followup",
+    name: "email_45day_followup",
     timeFromCreated: 30 * 24 * 60 * 60 * 1000, // 30 days
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_35day_followup",
+    name: "email_50day_followup",
     timeFromCreated: 35 * 24 * 60 * 60 * 1000, // 35 days
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
   },
   {
-    name: "email_50day_followup",
+    name: "email_55day_followup",
     timeFromCreated: 50 * 24 * 60 * 60 * 1000, // 50 days
     communicationType: "email",
     onlyOnce: true,
@@ -483,7 +483,7 @@ const FOLLOW_UP_RULES_FREE: FollowUpRule[] = [
     checkLastActivity: true,
   },
   {
-    name: "email_90day_followup",
+    name: "email_100day_followup",
     timeFromCreated: 90 * 24 * 60 * 60 * 1000, // 90 days
     communicationType: "email",
     onlyOnce: true,
@@ -501,7 +501,7 @@ const FOLLOW_UP_RULES_FREE: FollowUpRule[] = [
 // DEMO RULES - FREE PLAN: 14 emails matching free plan sequence with 3-minute intervals for testing
 const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
   {
-    name: "email_5min_followup",
+    name: "email_21day_followup",
     timeFromCreated: 30 * 1000, // 30 seconds
     communicationType: "email",
     onlyOnce: true,
@@ -509,7 +509,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_2day_followup",
+    name: "email_24day_followup",
     timeFromCreated: 5 * 60 * 1000, // 3 minutes
     communicationType: "email",
     onlyOnce: true,
@@ -517,7 +517,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_5day_followup",
+    name: "email_27day_followup",
     timeFromCreated: 10 * 60 * 1000, // 6 minutes
     communicationType: "email",
     onlyOnce: true,
@@ -525,7 +525,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_8day_followup",
+    name: "email_30day_followup",
     timeFromCreated: 15 * 60 * 1000, // 9 minutes
     communicationType: "email",
     onlyOnce: true,
@@ -533,7 +533,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_11day_followup",
+    name: "email_33day_followup",
     timeFromCreated: 20 * 60 * 1000, // 12 minutes
     communicationType: "email",
     onlyOnce: true,
@@ -541,7 +541,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_14day_followup",
+    name: "email_36day_followup",
     timeFromCreated: 25 * 60 * 1000, // 15 minutes
     communicationType: "email",
     onlyOnce: true,
@@ -549,7 +549,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_17day_followup",
+    name: "email_39day_followup",
     timeFromCreated: 30 * 60 * 1000, // 18 minutes
     communicationType: "email",
     onlyOnce: true,
@@ -557,7 +557,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_20day_followup",
+    name: "email_42day_followup",
     timeFromCreated: 35 * 60 * 1000, // 21 minutes
     communicationType: "email",
     onlyOnce: true,
@@ -565,7 +565,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_30day_followup",
+    name: "email_45day_followup",
     timeFromCreated: 40 * 60 * 1000, // 24 minutes
     communicationType: "email",
     onlyOnce: true,
@@ -573,7 +573,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_35day_followup",
+    name: "email_50day_followup",
     timeFromCreated: 45 * 60 * 1000, // 27 minutes
     communicationType: "email",
     onlyOnce: true,
@@ -633,50 +633,19 @@ export async function getClinicPlanType(clinicId: string, supabase?: any): Promi
       return "free";
     }
 
-    // Check if clinic has an active subscription
-    const { data: subscription, error: subscriptionError } = await supabase
-      .from("stripe_subscriptions")
-      .select(
-        `
-        status,
-        current_period_end,
-        trial_end,
-        stripe_price_id,
-        plans!inner(
-          name,
-          features
-        )
-      `,
-      )
-      .eq("clinic_id", clinicId)
-      .single();
+    // Use the robust getClinicType function from nurturing-service
+    const clinicType = await getClinicType(supabase, clinicId);
 
-    if (subscriptionError) {
-      console.log(`No subscription found for clinic ${clinicId}, defaulting to free plan`);
+    // Map to the PlanType format expected by this service
+    if (clinicType.isDemo && clinicType.isPaid) {
+      return "demo_paid";
+    } else if (clinicType.isDemo && !clinicType.isPaid) {
+      return "demo_free";
+    } else if (!clinicType.isDemo && clinicType.isPaid) {
+      return "paid";
+    } else {
       return "free";
     }
-
-    if (!subscription) {
-      console.log(`No subscription data for clinic ${clinicId}, defaulting to free plan`);
-      return "free";
-    }
-
-    // Check if subscription is active
-    const now = new Date();
-    const isActive =
-      subscription.status === "active" ||
-      subscription.status === "trialing" ||
-      (subscription.trial_end && new Date(subscription.trial_end) > now) ||
-      (subscription.current_period_end && new Date(subscription.current_period_end) > now);
-
-    if (!isActive) {
-      console.log(`Subscription inactive for clinic ${clinicId}, defaulting to free plan`);
-      return "free";
-    }
-
-    // If subscription is active, return paid plan
-    console.log(`Active subscription found for clinic ${clinicId}, using paid plan`);
-    return "paid";
   } catch (error: any) {
     console.error(`Error checking plan type for clinic ${clinicId}:`, error);
     // Default to free plan on error
@@ -696,8 +665,12 @@ export async function getDemoClinicPlanType(clinicId: string, supabase?: any): P
     // Check subscription status to determine if demo_free or demo_paid
     const planType = await getClinicPlanType(clinicId, supabase);
 
-    // Convert regular plan types to demo equivalents
-    return planType === "paid" ? "demo_paid" : "demo_free";
+    // Handle both old and new return values
+    if (planType === "paid" || planType === "demo_paid") {
+      return "demo_paid";
+    } else {
+      return "demo_free";
+    }
   } catch (error: any) {
     console.error(`Error checking demo plan type for clinic ${clinicId}:`, error);
     // Default to demo_free on error

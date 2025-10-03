@@ -30,16 +30,15 @@ async function getClinicFollowUpRules(supabase: any, clinicId: string): Promise<
   }
 }
 
-// Check if clinic has specific role
-async function checkClinicRole(
+// Check clinic type: determines demo/non-demo + free/paid status
+async function getClinicType(
   supabase: any,
   clinicId: string,
-  requiredRole: string = "demo_user",
-): Promise<{ isAuthorized: boolean; roleType?: string }> {
+): Promise<{ isDemo: boolean; isPaid: boolean; roleType: string; planType: string }> {
   try {
-    logInfo(`Checking role for clinic: ${clinicId}`);
+    logInfo(`Checking clinic type for: ${clinicId}`);
 
-    // Check if any user associated with this clinic has the required role
+    // Get user roles for this clinic
     const { data: userClinics, error: userClinicError } = await supabase
       .from("user_clinic")
       .select(
@@ -57,32 +56,87 @@ async function checkClinicRole(
 
     if (userClinicError) {
       logError("Error fetching clinic roles", userClinicError);
-      return { isAuthorized: false };
+      return { isDemo: false, isPaid: false, roleType: "unknown", planType: "unknown" };
     }
 
-    if (!userClinics || userClinics.length === 0) {
-      logInfo(`No active users found for clinic: ${clinicId}`);
-      return { isAuthorized: false };
+    // Get subscription status
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from("stripe_subscriptions")
+      .select("stripe_price_id, status")
+      .eq("clinic_id", clinicId)
+      .single();
+
+    if (subscriptionError && subscriptionError.code !== "PGRST116") {
+      logError("Error fetching subscription", subscriptionError);
     }
 
-    // Check if any user has the required role
-    const roleUser = userClinics.find(uc => uc.role?.type === requiredRole);
+    // Determine demo status
+    const roleTypes = userClinics?.map(uc => uc.role?.type).filter(Boolean) || [];
+    const isDemo = roleTypes.includes("demo_user");
+    const roleType = roleTypes.join(", ") || "unknown";
 
-    if (roleUser) {
-      logInfo(`Clinic ${clinicId} has ${requiredRole} role through user ${roleUser.user_id}`);
+    // Determine paid status based on plan name
+    let isPaid = false;
+    let planType = "free";
+
+    if (subscription && subscription.stripe_price_id) {
+      // Fetch plan name using the stripe_price_id
+      const { data: plan, error: planError } = await supabase
+        .from("plans")
+        .select("name")
+        .eq("price_id", subscription.stripe_price_id)
+        .single();
+
+      if (planError) {
+        logError("Error fetching plan details", planError);
+        // Default to free if we can't determine the plan
+        isPaid = false;
+        planType = "unknown";
+      } else if (plan) {
+        const planName = plan.name;
+        isPaid = planName !== "Free Plan";
+        planType = planName;
+      }
+    }
+
+    logInfo(`Clinic ${clinicId} type: ${isDemo ? "demo" : "non-demo"} + ${isPaid ? "paid" : "free"} (roles: ${roleType})`);
+
+    return {
+      isDemo,
+      isPaid,
+      roleType,
+      planType,
+    };
+  } catch (error: any) {
+    logError("Error in getClinicType", error);
+    return { isDemo: false, isPaid: false, roleType: "unknown", planType: "unknown" };
+  }
+}
+
+// Legacy function for backwards compatibility
+async function checkClinicRole(
+  supabase: any,
+  clinicId: string,
+  requiredRole: string = "demo_user",
+): Promise<{ isAuthorized: boolean; roleType?: string }> {
+  try {
+    const clinicType = await getClinicType(supabase, clinicId);
+
+    if (requiredRole === "demo_user") {
       return {
-        isAuthorized: true,
-        roleType: requiredRole,
+        isAuthorized: clinicType.isDemo,
+        roleType: clinicType.roleType,
+      };
+    } else if (requiredRole === "owner") {
+      return {
+        isAuthorized: !clinicType.isDemo,
+        roleType: clinicType.roleType,
       };
     }
 
-    // Log all roles found for debugging
-    const roleTypes = userClinics.map(uc => uc.role?.type).filter(Boolean);
-    logInfo(`Clinic ${clinicId} roles found: ${roleTypes.join(", ")} - NOT AUTHORIZED for ${requiredRole}`);
-
     return {
-      isAuthorized: false,
-      roleType: roleTypes.join(", ") || "unknown",
+      isAuthorized: clinicType.roleType.includes(requiredRole),
+      roleType: clinicType.roleType,
     };
   } catch (error: any) {
     logError("Error in checkClinicRole", error);
@@ -214,8 +268,12 @@ async function processAllLeads(supabase: any, communicationType?: "sms" | "email
   }
 }
 
-// Process scheduled follow-ups with role filtering
-async function processScheduledFollowUps(supabase: any, filterType?: "demo_only" | "non_demo_only", clinicIds?: string[]) {
+// Process scheduled follow-ups with comprehensive filtering
+async function processScheduledFollowUps(
+  supabase: any,
+  filterType?: "demo_only" | "non_demo_only" | "demo_free" | "demo_paid" | "non_demo_free" | "non_demo_paid",
+  clinicIds?: string[],
+) {
   try {
     let clinicQuery = supabase
       .from("clinic")
@@ -262,35 +320,57 @@ async function processScheduledFollowUps(supabase: any, filterType?: "demo_only"
     let clinicsProcessed = 0;
     let clinicsSkipped = 0;
 
-    // Filter clinics based on role if filterType is specified
+    // Filter clinics based on type (demo/non-demo + free/paid) if filterType is specified
     const authorizedClinicIds = [];
 
-    if (filterType === "demo_only") {
-      // Only process clinics with demo_user role
+    if (filterType) {
       for (const clinic of clinics) {
-        const roleCheck = await checkClinicRole(supabase, clinic.id, "demo_user");
+        const clinicType = await getClinicType(supabase, clinic.id);
+        let shouldProcess = false;
+        let reason = "";
 
-        if (roleCheck.isAuthorized) {
-          authorizedClinicIds.push(clinic.id);
-          clinicsProcessed++;
-          logInfo(`Processing authorized demo clinic: ${clinic.name}`);
-        } else {
-          clinicsSkipped++;
-          logInfo(`Skipping clinic ${clinic.name} - no demo_user role (roles: ${roleCheck.roleType})`);
+        switch (filterType) {
+          case "demo_only":
+            shouldProcess = clinicType.isDemo;
+            reason = shouldProcess ? "demo clinic" : `non-demo clinic (${clinicType.roleType})`;
+            break;
+          case "non_demo_only":
+            shouldProcess = !clinicType.isDemo;
+            reason = shouldProcess ? "non-demo clinic" : `demo clinic (${clinicType.roleType})`;
+            break;
+          case "demo_free":
+            shouldProcess = clinicType.isDemo && !clinicType.isPaid;
+            reason = shouldProcess
+              ? "demo + free clinic"
+              : `${clinicType.isDemo ? "demo" : "non-demo"} + ${clinicType.isPaid ? "paid" : "free"} clinic`;
+            break;
+          case "demo_paid":
+            shouldProcess = clinicType.isDemo && clinicType.isPaid;
+            reason = shouldProcess
+              ? "demo + paid clinic"
+              : `${clinicType.isDemo ? "demo" : "non-demo"} + ${clinicType.isPaid ? "paid" : "free"} clinic`;
+            break;
+          case "non_demo_free":
+            shouldProcess = !clinicType.isDemo && !clinicType.isPaid;
+            reason = shouldProcess
+              ? "non-demo + free clinic"
+              : `${clinicType.isDemo ? "demo" : "non-demo"} + ${clinicType.isPaid ? "paid" : "free"} clinic`;
+            break;
+          case "non_demo_paid":
+            shouldProcess = !clinicType.isDemo && clinicType.isPaid;
+            reason = shouldProcess
+              ? "non-demo + paid clinic"
+              : `${clinicType.isDemo ? "demo" : "non-demo"} + ${clinicType.isPaid ? "paid" : "free"} clinic`;
+            break;
         }
-      }
-    } else if (filterType === "non_demo_only") {
-      // Only process clinics WITHOUT demo_user role
-      for (const clinic of clinics) {
-        const roleCheck = await checkClinicRole(supabase, clinic.id, "owner");
 
-        if (!roleCheck.isAuthorized) {
+        if (shouldProcess) {
           authorizedClinicIds.push(clinic.id);
           clinicsProcessed++;
-          logInfo(`Processing non-demo clinic: ${clinic.name} (roles: ${roleCheck.roleType})`);
+          logInfo(`Processing ${reason}: ${clinic.name || clinic.id}`);
         } else {
           clinicsSkipped++;
-          logInfo(`Skipping demo clinic ${clinic.name} - has demo_user role`);
+          logInfo(`Skipping clinic ${clinic.name || clinic.id} - is ${reason}, filtering for ${filterType}`);
         }
       }
     } else {
@@ -300,12 +380,15 @@ async function processScheduledFollowUps(supabase: any, filterType?: "demo_only"
     }
 
     if (authorizedClinicIds.length === 0) {
-      const message =
-        filterType === "demo_only"
-          ? "No demo clinics found to process"
-          : filterType === "non_demo_only"
-            ? "No non-demo clinics found to process"
-            : "No clinics found to process";
+      const messageMap = {
+        demo_only: "No demo clinics found to process",
+        non_demo_only: "No non-demo clinics found to process",
+        demo_free: "No demo + free clinics found to process",
+        demo_paid: "No demo + paid clinics found to process",
+        non_demo_free: "No non-demo + free clinics found to process",
+        non_demo_paid: "No non-demo + paid clinics found to process",
+      };
+      const message = messageMap[filterType] || "No clinics found to process";
 
       logInfo(message);
       return {
@@ -850,7 +933,7 @@ CRITICAL EMAIL FORMATTING RULES:
 • **SUBJECT LINE**: NEVER write "Subject:" in the subject line - write ONLY the subject text without any prefix
 • Do NOT include "Subject:" prefix or clinic signatures
 • Do NOT include unsubscribe text (system handles this automatically)
-• Include booking links when appropriate for email follow-ups
+• ALWAYS include booking links in ALL email follow-ups using this format: <a href="${bookingLink}" style="color: #10b981; text-decoration: none; font-weight: bold;">Schedule your consultation</a>
 
 BOOKING LINK FOR EMAILS:
 ${bookingLink ? `Available booking link: ${bookingLink}` : "No booking link configured"}
@@ -900,7 +983,7 @@ GENERATE AN EMAIL FOLLOWING THIS PATTERN:
 5. Extract the universal principle or psychology concept
 6. Connect to human behavior and decision-making
 7. Relate back to reader's ${clinic.clinic_type} situation
-8. End with conversational call-to-action
+8. End with conversational call-to-action that MUST include the booking link: <a href="${bookingLink}" style="color: #10b981; text-decoration: none; font-weight: bold;">Schedule your consultation</a>
 
 🚨🚨🚨 ABSOLUTELY CRITICAL FORMATTING REQUIREMENTS - NO EXCEPTIONS 🚨🚨🚨
 
@@ -1460,6 +1543,7 @@ export {
   checkClinicRole,
   determineFollowUpsForLead,
   generateIntelligentResponse,
+  getClinicType,
   logError,
   logInfo,
   processAllLeads,

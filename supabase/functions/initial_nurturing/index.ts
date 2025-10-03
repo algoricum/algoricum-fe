@@ -3,41 +3,91 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Import shared logic from _shared folder
-import { processAllLeads } from "../_shared/nurturing.ts";
-import { getFollowUpRules } from "../_shared/followUpRulesService.ts";
+import { processAllLeads, getClinicType } from "../_shared/nurturing-service.ts";
+import { getFollowUpRulesForClinic } from "../_shared/followUpRulesService.ts";
 import { createLogger } from "../_shared/logger.ts";
 
 // Create logger with INITIAL prefix
 const { info: logInfo, error: logError } = createLogger("INITIAL");
-
-// Get only initial contact rule from paid plan (you can adjust this based on requirements)
-const INITIAL_RULE = getFollowUpRules("paid").find(rule => rule.name === "sms_5min_initial");
 
 // Process initial nurturing contacts
 async function processNurturingInitial(supabase: any) {
   logInfo("=== Starting Initial Nurturing Processing ===");
 
   try {
-    if (!INITIAL_RULE) {
-      logError("SMS initial contact rule not found in FOLLOW_UP_RULES");
+    // Get all clinics to process their individual initial rules
+    const { data: clinics, error: clinicError } = await supabase.from("clinic").select("id, name");
+
+    if (clinicError) {
+      logError("Failed to fetch clinics", clinicError);
       return {
         success: false,
-        error: "SMS initial contact rule not configured",
+        error: "Failed to fetch clinics",
         summary: { sent: 0, skipped: 0, errors: 1 },
       };
     }
 
-    logInfo(`Processing initial contact rule: ${INITIAL_RULE.name}`);
-
-    // Use the shared service to process only initial contacts (first rule only)
-    const result = await processAllLeads(supabase, "sms", [INITIAL_RULE]);
-
-    if (!result.success) {
+    if (!clinics || clinics.length === 0) {
+      logInfo("No clinics found");
       return {
-        success: false,
-        error: result.error,
-        summary: { sent: 0, skipped: 0, errors: 1 },
+        success: true,
+        results: [],
+        summary: { sent: 0, skipped: 0, errors: 0 },
       };
+    }
+
+    const allResults: any[] = [];
+    let totalSent = 0;
+    let totalSkipped = 0;
+    let totalErrors = 0;
+
+    // Process each clinic with their appropriate initial rule
+    for (const clinic of clinics) {
+      try {
+        // Get clinic type to determine correct initial rule
+        const clinicType = await getClinicType(supabase, clinic.id);
+        const clinicRules = await getFollowUpRulesForClinic(clinic.id, supabase);
+
+        // Determine initial rule based on clinic type
+        let initialRule;
+        let communicationType;
+
+        if (clinicType.isDemo && !clinicType.isPaid) {
+          // Demo + Free: Start with first email rule
+          initialRule = clinicRules.find(rule => rule.communicationType === "email");
+          communicationType = "email";
+          logInfo(`Clinic ${clinic.name} (demo + free): Using email initial rule`);
+        } else {
+          // Demo + Paid or Production: Start with SMS rule
+          initialRule = clinicRules.find(rule => rule.name === "sms_5min_initial");
+          communicationType = "sms";
+          logInfo(`Clinic ${clinic.name} (${clinicType.isDemo ? "demo + paid" : "production"}): Using SMS initial rule`);
+        }
+
+        if (!initialRule) {
+          logError(`No initial rule found for clinic ${clinic.name}`);
+          totalErrors++;
+          continue;
+        }
+
+        logInfo(`Processing clinic ${clinic.name} with rule: ${initialRule.name}`);
+
+        // Process this clinic with their specific initial rule
+        const result = await processAllLeads(supabase, communicationType, [initialRule], [clinic.id]);
+
+        if (result.success) {
+          allResults.push(...(result.results || []));
+          totalSent += result.summary?.sent || 0;
+          totalSkipped += result.summary?.skipped || 0;
+          totalErrors += result.summary?.errors || 0;
+        } else {
+          logError(`Failed processing clinic ${clinic.name}:`, result.error);
+          totalErrors++;
+        }
+      } catch (clinicError) {
+        logError(`Error processing clinic ${clinic.id}:`, clinicError);
+        totalErrors++;
+      }
     }
 
     logInfo(`Initial nurturing processing completed`);
@@ -45,13 +95,12 @@ async function processNurturingInitial(supabase: any) {
     return {
       success: true,
       summary: {
-        sent: result.summary.sent,
-        skipped: result.summary.skipped,
-        errors: result.summary.errors,
-        total: result.summary.sent + result.summary.skipped,
+        sent: totalSent,
+        skipped: totalSkipped,
+        errors: totalErrors,
+        total: totalSent + totalSkipped,
       },
-      results: result.results,
-      rule: INITIAL_RULE.name,
+      results: allResults,
       timestamp: new Date().toISOString(),
     };
   } catch (error: any) {
