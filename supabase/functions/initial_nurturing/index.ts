@@ -52,16 +52,16 @@ async function processNurturingInitial(supabase: any) {
         let initialRule;
         let communicationType;
 
-        if (clinicType.isDemo && !clinicType.isPaid) {
-          // Demo + Free: Start with first email rule
+        if (!clinicType.isPaid) {
+          // ANY Free Plan (demo or non-demo): Start with first email rule
           initialRule = clinicRules.find(rule => rule.communicationType === "email");
           communicationType = "email";
-          logInfo(`Clinic ${clinic.name} (demo + free): Using email initial rule`);
+          logInfo(`Clinic ${clinic.name} (${clinicType.isDemo ? "demo" : "production"} + free): Using email initial rule`);
         } else {
-          // Demo + Paid or Production: Start with SMS rule
+          // ANY Paid Plan (demo or non-demo): Start with SMS rule
           initialRule = clinicRules.find(rule => rule.name === "sms_5min_initial");
           communicationType = "sms";
-          logInfo(`Clinic ${clinic.name} (${clinicType.isDemo ? "demo + paid" : "production"}): Using SMS initial rule`);
+          logInfo(`Clinic ${clinic.name} (${clinicType.isDemo ? "demo" : "production"} + paid): Using SMS initial rule`);
         }
 
         if (!initialRule) {
