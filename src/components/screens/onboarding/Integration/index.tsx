@@ -77,6 +77,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const [TypeformTreeData, setTypeFormTreeData] = useState([]);
   const [jotformTreeData, setJotformTreeData] = useState([]);
   const [selectedGoogleFormWorksheets, setSelectedGoogleFormWorksheets] = useState<any[]>([]);
+  const [clinicId, setClinicId] = useState<string>("");
   const [selectedTypeformForms, setSelectedTypeformForms] = useState<any[]>([]);
   const [selectedJotformForms, setSelectedJotformForms] = useState<any[]>([]);
   const [googleFormLeadsSynced, setGoogleFormLeadsSynced] = useState(false);
@@ -296,6 +297,19 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     }
   }, []);
 
+  // Initialize clinicId
+  useEffect(() => {
+    const initializeClinicId = async () => {
+      try {
+        const id = await getClinicId();
+        setClinicId(id);
+      } catch (error) {
+        console.error("Error getting clinic ID:", error);
+      }
+    };
+    initializeClinicId();
+  }, []);
+
   useEffect(() => {
     const handleOAuthRedirect = () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -433,7 +447,11 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
 
         clearTemporaryOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
-        autoProgressToNext();
+
+        // Open modal for form selection after successful connection
+        setTimeout(() => {
+          setShowFacebookLeadFormModal(true);
+        }, 500);
       } else if (facebookLeadFormStatus === "error") {
         console.log("❌ Facebook Lead Form OAuth error detected from URL:", errorMessage);
         setFacebookLeadFormStatus("disconnected");
@@ -895,6 +913,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             setFormData(prev => ({ ...prev, adsConnections: "" }));
             localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, adsConnections: "" }));
           }}
+          onFacebookLeadFormDisconnect={() => {
+            setFacebookLeadFormStatus("disconnected");
+            setFacebookLeadFormAccountInfo(null);
+            localStorage.removeItem("facebook_lead_form_oauth_status");
+            localStorage.removeItem("facebook_lead_form_oauth_account_info");
+          }}
+          clinicId={clinicId}
+          forceShowFormSelection={true}
           // Typeform
           showTypeformModal={showTypeformModal}
           typeformStatus={typeformStatus}

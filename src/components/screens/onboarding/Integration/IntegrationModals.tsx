@@ -70,6 +70,9 @@ const IntegrationsModals: React.FC<Props> = ({
   onFacebookLeadFormOk,
   onFacebookLeadFormCancel,
   onFacebookLeadFormConnect,
+  onFacebookLeadFormDisconnect,
+  clinicId,
+  forceShowFormSelection,
 
   // Typeform
   showTypeformModal,
@@ -193,6 +196,9 @@ const IntegrationsModals: React.FC<Props> = ({
         onOk={onFacebookLeadFormOk}
         onCancel={onFacebookLeadFormCancel}
         onConnect={onFacebookLeadFormConnect}
+        onDisconnect={onFacebookLeadFormDisconnect}
+        clinicId={clinicId}
+        forceShowFormSelection={forceShowFormSelection}
       />
 
       {/* Typeform */}

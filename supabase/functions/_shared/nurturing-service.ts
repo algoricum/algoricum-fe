@@ -752,15 +752,17 @@ GENERATE AN EMAIL FOLLOWING THIS PATTERN:
 7. Relate back to reader's ${clinic.clinic_type} situation
 8. End with conversational call-to-action
 
-CRITICAL FORMATTING REQUIREMENTS:
+🚨🚨🚨 ABSOLUTELY CRITICAL FORMATTING REQUIREMENTS - NO EXCEPTIONS 🚨🚨🚨
+
 - Subject line: Write ONLY the text, never include "Subject:"
-- Paragraphs: ABSOLUTE 20-word limit - count EVERY single word including "a", "the", "and"
-- If a sentence is 25 words, split it into TWO paragraphs
-- NO EXCEPTIONS to the 20-word rule - sacrifice sentence flow if needed
-- Better to have short, choppy paragraphs than exceed 20 words
+- Paragraphs: MAXIMUM 20 WORDS EACH - COUNT EVERY SINGLE WORD INCLUDING "A", "THE", "AND"
+- If ANY sentence exceeds 20 words, IMMEDIATELY split into TWO paragraphs
+- ZERO EXCEPTIONS to the 20-word rule - sacrifice sentence flow if needed
+- Better to have short, choppy paragraphs than exceed 20 words EVER
 - Count words like this: "In(1) 1999(2), a(3) pivotal(4) study(5)..." and STOP at word 20
 - Start each new paragraph on a NEW LINE with proper line breaks between them
-- Do NOT combine multiple sentences into one paragraph block
+- NEVER combine multiple sentences into one paragraph block
+- RECOUNT YOUR WORDS IN EVERY PARAGRAPH BEFORE FINALIZING
 
 MAKE IT COMPLETELY UNIQUE - USE DIVERSE STORY TYPES:
 - Historical events: Wright brothers, Marie Curie, Alexander Fleming discoveries
