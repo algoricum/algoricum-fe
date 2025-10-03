@@ -1,89 +1,151 @@
 // _shared/nurturing-service.ts
 
+import { getDemoFollowUpRulesForClinic, getFollowUpRulesForClinic } from "./followUpRulesService.ts";
+import { logError, logInfo } from "./logger.ts";
+import type { Clinic, Conversation, FollowUpRule, Lead, ProcessingResult } from "./nurturing-types.ts";
+
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const MAILGUN_API_KEY = Deno.env.get("MAILGUN_API_KEY");
 
-interface Lead {
-  id: string;
-  first_name?: string;
-  last_name?: string;
-  phone: string;
-  email?: string;
-  status: string;
-  source_id: string;
-  clinic_id: string;
-  notes?: string;
-  interest_level: string;
-  urgency: string;
-  created_at: string;
-  updated_at: string;
+// Get appropriate follow-up rules for a clinic based on demo status and subscription
+async function getClinicFollowUpRules(supabase: any, clinicId: string): Promise<FollowUpRule[]> {
+  try {
+    // Check if clinic is demo
+    const roleCheck = await checkClinicRole(supabase, clinicId, "demo_user");
+    const isDemo = roleCheck.isAuthorized;
+
+    // Get appropriate rules based on demo status
+    if (isDemo) {
+      logInfo(`Getting demo rules for clinic ${clinicId}`);
+      return await getDemoFollowUpRulesForClinic(clinicId, supabase);
+    } else {
+      logInfo(`Getting production rules for clinic ${clinicId}`);
+      return await getFollowUpRulesForClinic(clinicId, supabase);
+    }
+  } catch (error: any) {
+    logError(`Error getting follow-up rules for clinic ${clinicId}:`, error);
+    // Default to production free rules on error
+    return await getFollowUpRulesForClinic(clinicId, supabase);
+  }
 }
 
-interface Conversation {
-  id?: string;
-  thread_id: string;
-  message: string;
-  timestamp: string;
-  created_at: string;
-  updated_at: string;
-  is_from_user: boolean;
-  sender_type: "user" | "assistant";
+// Check clinic type: determines demo/non-demo + free/paid status
+async function getClinicType(
+  supabase: any,
+  clinicId: string,
+): Promise<{ isDemo: boolean; isPaid: boolean; roleType: string; planType: string }> {
+  try {
+    logInfo(`Checking clinic type for: ${clinicId}`);
+
+    // Get user roles for this clinic
+    const { data: userClinics, error: userClinicError } = await supabase
+      .from("user_clinic")
+      .select(
+        `
+        user_id,
+        role_id,
+        is_active,
+        role!inner(
+          type
+        )
+      `,
+      )
+      .eq("clinic_id", clinicId)
+      .eq("is_active", true);
+
+    if (userClinicError) {
+      logError("Error fetching clinic roles", userClinicError);
+      return { isDemo: false, isPaid: false, roleType: "unknown", planType: "unknown" };
+    }
+
+    // Get subscription status
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from("stripe_subscriptions")
+      .select("stripe_price_id, status")
+      .eq("clinic_id", clinicId)
+      .single();
+
+    if (subscriptionError && subscriptionError.code !== "PGRST116") {
+      logError("Error fetching subscription", subscriptionError);
+    }
+
+    // Determine demo status
+    const roleTypes = userClinics?.map(uc => uc.role?.type).filter(Boolean) || [];
+    const isDemo = roleTypes.includes("demo_user");
+    const roleType = roleTypes.join(", ") || "unknown";
+
+    // Determine paid status based on plan name
+    let isPaid = false;
+    let planType = "free";
+
+    if (subscription && subscription.stripe_price_id) {
+      // Fetch plan name using the stripe_price_id
+      const { data: plan, error: planError } = await supabase
+        .from("plans")
+        .select("name")
+        .eq("price_id", subscription.stripe_price_id)
+        .single();
+
+      if (planError) {
+        logError("Error fetching plan details", planError);
+        // Default to free if we can't determine the plan
+        isPaid = false;
+        planType = "unknown";
+      } else if (plan) {
+        const planName = plan.name;
+        isPaid = planName !== "Free Plan";
+        planType = planName;
+      }
+    }
+
+    logInfo(`Clinic ${clinicId} type: ${isDemo ? "demo" : "non-demo"} + ${isPaid ? "paid" : "free"} (roles: ${roleType})`);
+
+    return {
+      isDemo,
+      isPaid,
+      roleType,
+      planType,
+    };
+  } catch (error: any) {
+    logError("Error in getClinicType", error);
+    return { isDemo: false, isPaid: false, roleType: "unknown", planType: "unknown" };
+  }
 }
 
-interface Clinic {
-  id: string;
-  name: string;
-  mailgun_domain?: string;
-  mailgun_email?: string;
-  calendly_link?: string;
-  clinic_type?: string;
-  twilio_config?: Array<{
-    twilio_account_sid: string;
-    twilio_auth_token: string;
-    twilio_phone_number: string;
-    status: string;
-  }>;
-  assistants?: Array<{
-    assistant_name?: string;
-    instructions?: string;
-  }>;
-}
+// Legacy function for backwards compatibility
+async function checkClinicRole(
+  supabase: any,
+  clinicId: string,
+  requiredRole: string = "demo_user",
+): Promise<{ isAuthorized: boolean; roleType?: string }> {
+  try {
+    const clinicType = await getClinicType(supabase, clinicId);
 
-interface FollowUpRule {
-  name: string;
-  timeFromCreated: number; // milliseconds
-  maxTimeFromCreated?: number; // milliseconds
-  leadStatus?: string[]; // which lead statuses to target
-  communicationType: "sms" | "email";
-  onlyOnce: boolean;
-  checkLastActivity?: boolean;
-  toleranceWindow?: number; // For demo version scheduling
-}
+    if (requiredRole === "demo_user") {
+      return {
+        isAuthorized: clinicType.isDemo,
+        roleType: clinicType.roleType,
+      };
+    } else if (requiredRole === "owner") {
+      return {
+        isAuthorized: !clinicType.isDemo,
+        roleType: clinicType.roleType,
+      };
+    }
 
-interface ProcessingResult {
-  leadId: string;
-  action: "sent" | "skipped" | "error";
-  reason: string;
-  followUpType: string;
-  communicationType: "sms" | "email";
-  error?: string;
-}
-
-// Enhanced logging
-function logInfo(message: string, data?: any) {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] SHARED: ${message}`, data ? JSON.stringify(data, null, 2) : "");
-}
-
-function logError(message: string, error?: any) {
-  const timestamp = new Date().toISOString();
-  console.error(`[${timestamp}] SHARED ERROR: ${message}`, error);
+    return {
+      isAuthorized: clinicType.roleType.includes(requiredRole),
+      roleType: clinicType.roleType,
+    };
+  } catch (error: any) {
+    logError("Error in checkClinicRole", error);
+    return { isAuthorized: false };
+  }
 }
 
 async function processAllLeads(supabase: any, communicationType?: "sms" | "email", followUpRules?: FollowUpRule[], clinicIds?: string[]) {
   logInfo(`=== Starting processAllLeads - Type: ${communicationType || "all"} ===`);
-  logInfo(`Clinic filter: ${clinicIds ? `${clinicIds.length} specific clinics` : "all clinics"}`);
 
   const allResults: ProcessingResult[] = [];
   let totalProcessed = 0;
@@ -150,10 +212,13 @@ async function processAllLeads(supabase: any, communicationType?: "sms" | "email
 
         logInfo(`Found ${leads.length} leads for clinic ${clinic.name}`);
 
+        // Get appropriate follow-up rules for this clinic
+        const clinicFollowUpRules = followUpRules || (await getClinicFollowUpRules(supabase, clinic.id));
+
         // Process each lead
         for (const lead of leads) {
           try {
-            const leadResults = await processLeadForClinic(lead, clinic, supabase, followUpRules);
+            const leadResults = await processLeadForClinic(lead, clinic, supabase, clinicFollowUpRules);
             allResults.push(...leadResults);
             totalProcessed++;
           } catch (leadError) {
@@ -198,6 +263,174 @@ async function processAllLeads(supabase: any, communicationType?: "sms" | "email
       success: false,
       error: error.message,
       results: allResults,
+      summary: { sent: 0, skipped: 0, errors: 1 },
+    };
+  }
+}
+
+// Process scheduled follow-ups with comprehensive filtering
+async function processScheduledFollowUps(
+  supabase: any,
+  filterType?: "demo_only" | "non_demo_only" | "demo_free" | "demo_paid" | "non_demo_free" | "non_demo_paid",
+  clinicIds?: string[],
+) {
+  try {
+    let clinicQuery = supabase
+      .from("clinic")
+      .select(
+        `
+        id,
+        mailgun_domain,
+        mailgun_email,
+        twilio_config!inner(
+          twilio_phone_number,
+          status
+        ),
+        assistants(*)
+      `,
+      )
+      .eq("twilio_config.status", "active");
+
+    // Apply clinic filter if provided
+    if (clinicIds && clinicIds.length > 0) {
+      clinicQuery = clinicQuery.in("id", clinicIds);
+    }
+
+    const { data: clinics, error: clinicError } = await clinicQuery;
+
+    if (clinicError) {
+      logError("Failed to fetch clinics", clinicError);
+      return {
+        success: false,
+        error: "Failed to fetch clinics",
+        results: [],
+        summary: { sent: 0, skipped: 0, errors: 1 },
+      };
+    }
+
+    if (!clinics || clinics.length === 0) {
+      logInfo("No clinics found");
+      return {
+        success: true,
+        results: [],
+        summary: { sent: 0, skipped: 0, errors: 0 },
+      };
+    }
+
+    let clinicsProcessed = 0;
+    let clinicsSkipped = 0;
+
+    // Filter clinics based on type (demo/non-demo + free/paid) if filterType is specified
+    const authorizedClinicIds = [];
+
+    if (filterType) {
+      for (const clinic of clinics) {
+        const clinicType = await getClinicType(supabase, clinic.id);
+        let shouldProcess = false;
+        let reason = "";
+
+        switch (filterType) {
+          case "demo_only":
+            shouldProcess = clinicType.isDemo;
+            reason = shouldProcess ? "demo clinic" : `non-demo clinic (${clinicType.roleType})`;
+            break;
+          case "non_demo_only":
+            shouldProcess = !clinicType.isDemo;
+            reason = shouldProcess ? "non-demo clinic" : `demo clinic (${clinicType.roleType})`;
+            break;
+          case "demo_free":
+            shouldProcess = clinicType.isDemo && !clinicType.isPaid;
+            reason = shouldProcess
+              ? "demo + free clinic"
+              : `${clinicType.isDemo ? "demo" : "non-demo"} + ${clinicType.isPaid ? "paid" : "free"} clinic`;
+            break;
+          case "demo_paid":
+            shouldProcess = clinicType.isDemo && clinicType.isPaid;
+            reason = shouldProcess
+              ? "demo + paid clinic"
+              : `${clinicType.isDemo ? "demo" : "non-demo"} + ${clinicType.isPaid ? "paid" : "free"} clinic`;
+            break;
+          case "non_demo_free":
+            shouldProcess = !clinicType.isDemo && !clinicType.isPaid;
+            reason = shouldProcess
+              ? "non-demo + free clinic"
+              : `${clinicType.isDemo ? "demo" : "non-demo"} + ${clinicType.isPaid ? "paid" : "free"} clinic`;
+            break;
+          case "non_demo_paid":
+            shouldProcess = !clinicType.isDemo && clinicType.isPaid;
+            reason = shouldProcess
+              ? "non-demo + paid clinic"
+              : `${clinicType.isDemo ? "demo" : "non-demo"} + ${clinicType.isPaid ? "paid" : "free"} clinic`;
+            break;
+        }
+
+        if (shouldProcess) {
+          authorizedClinicIds.push(clinic.id);
+          clinicsProcessed++;
+          logInfo(`Processing ${reason}: ${clinic.name || clinic.id}`);
+        } else {
+          clinicsSkipped++;
+          logInfo(`Skipping clinic ${clinic.name || clinic.id} - is ${reason}, filtering for ${filterType}`);
+        }
+      }
+    } else {
+      // No filtering - process all clinics
+      authorizedClinicIds.push(...clinics.map(c => c.id));
+      clinicsProcessed = clinics.length;
+    }
+
+    if (authorizedClinicIds.length === 0) {
+      const messageMap = {
+        demo_only: "No demo clinics found to process",
+        non_demo_only: "No non-demo clinics found to process",
+        demo_free: "No demo + free clinics found to process",
+        demo_paid: "No demo + paid clinics found to process",
+        non_demo_free: "No non-demo + free clinics found to process",
+        non_demo_paid: "No non-demo + paid clinics found to process",
+      };
+      const message = messageMap[filterType] || "No clinics found to process";
+
+      logInfo(message);
+      return {
+        success: true,
+        summary: { sent: 0, skipped: 0, errors: 0 },
+        message,
+        clinicsProcessed: 0,
+        clinicsSkipped: clinicsSkipped,
+      };
+    }
+
+    // Use the existing processAllLeads function with authorized clinic IDs
+    const result = await processAllLeads(supabase, undefined, undefined, authorizedClinicIds);
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+        summary: { sent: 0, skipped: 0, errors: 1 },
+        clinicsProcessed: 0,
+        clinicsSkipped: clinicsSkipped,
+      };
+    }
+
+    return {
+      success: true,
+      summary: {
+        sent: result.summary.sent,
+        skipped: result.summary.skipped,
+        errors: result.summary.errors,
+        total: result.summary.sent + result.summary.skipped,
+        clinicsProcessed: clinicsProcessed,
+        clinicsSkipped: clinicsSkipped,
+      },
+      results: result.results,
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error: any) {
+    logError("Error in processScheduledFollowUps", error);
+    return {
+      success: false,
+      error: error.message,
       summary: { sent: 0, skipped: 0, errors: 1 },
     };
   }
@@ -700,7 +933,7 @@ CRITICAL EMAIL FORMATTING RULES:
 • **SUBJECT LINE**: NEVER write "Subject:" in the subject line - write ONLY the subject text without any prefix
 • Do NOT include "Subject:" prefix or clinic signatures
 • Do NOT include unsubscribe text (system handles this automatically)
-• Include booking links when appropriate for email follow-ups
+• ALWAYS include booking links in ALL email follow-ups using this format: <a href="${bookingLink}" style="color: #10b981; text-decoration: none; font-weight: bold;">Schedule your consultation</a>
 
 BOOKING LINK FOR EMAILS:
 ${bookingLink ? `Available booking link: ${bookingLink}` : "No booking link configured"}
@@ -750,7 +983,7 @@ GENERATE AN EMAIL FOLLOWING THIS PATTERN:
 5. Extract the universal principle or psychology concept
 6. Connect to human behavior and decision-making
 7. Relate back to reader's ${clinic.clinic_type} situation
-8. End with conversational call-to-action
+8. End with conversational call-to-action that MUST include the booking link: <a href="${bookingLink}" style="color: #10b981; text-decoration: none; font-weight: bold;">Schedule your consultation</a>
 
 🚨🚨🚨 ABSOLUTELY CRITICAL FORMATTING REQUIREMENTS - NO EXCEPTIONS 🚨🚨🚨
 
@@ -1306,5 +1539,15 @@ async function saveMessageToHistory(
   }
 }
 
-export { determineFollowUpsForLead, generateIntelligentResponse, logError, logInfo, processAllLeads, sendEmail, sendSMS };
-export type { Clinic, Conversation, FollowUpRule, Lead, ProcessingResult };
+export {
+  checkClinicRole,
+  determineFollowUpsForLead,
+  generateIntelligentResponse,
+  getClinicType,
+  logError,
+  logInfo,
+  processAllLeads,
+  processScheduledFollowUps,
+  sendEmail,
+  sendSMS,
+};

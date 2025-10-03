@@ -4,6 +4,10 @@ import { detectBookingRequestAndCreateSchedule, type BookingDetectionOptions } f
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 
+// Regex-based booking detection - matches any message containing booking-related keywords
+const BOOKING_REGEX =
+  /\b(book|booking|schedule|appointment|ready to book|want to book|would like to book|i'd like to book|can i book|how do i book|ready to schedule|want to schedule|would like to schedule|i'd like to schedule|can i schedule|how do i schedule|need an appointment|want an appointment|would like an appointment|can i get an appointment|book an appointment|schedule an appointment|set up an appointment|make an appointment)\b/i;
+
 interface LeadData {
   id: string;
   first_name?: string;
@@ -154,11 +158,7 @@ export async function generateAIResponse(
         messageBodyLower === "pricing" ||
         messageBodyLower === "cost");
 
-    // Regex-based booking detection - matches any message containing booking-related keywords
-    const bookingRegex =
-      /\b(book|booking|schedule|appointment|ready to book|want to book|would like to book|i'd like to book|can i book|how do i book|ready to schedule|want to schedule|would like to schedule|i'd like to schedule|can i schedule|how do i schedule|need an appointment|want an appointment|would like an appointment|can i get an appointment|book an appointment|schedule an appointment|set up an appointment|make an appointment)\b/i;
-
-    const isBookingRequest = bookingRegex.test(options.messageBody);
+    const isBookingRequest = BOOKING_REGEX.test(options.messageBody);
 
     logInfo("🔍 Message analysis:", {
       messageBody: options.messageBody,
@@ -361,7 +361,7 @@ export async function generateAIResponse(
       }
     }
 
-    const bookingLink = clinicData.calendly_link || "https://calendly.com/book";
+    const bookingLink = clinicData.calendly_link;
     const unsubscribeLink = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
 
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
@@ -465,115 +465,6 @@ export async function generateAIResponse(
         supabaseClient,
       );
     }
-
-    // Verify assistant exists first
-    logInfo("🔍 Verifying assistant exists...");
-    let assistant;
-    try {
-      assistant = await openai.beta.assistants.retrieve(assistantId);
-      const hasFileSearch = assistant.tools?.some(tool => tool.type === "file_search") || false;
-      const fileSearchTool = assistant.tools?.find(tool => tool.type === "file_search");
-
-      logInfo(`✅ Assistant verified:`, {
-        id: assistant.id,
-        name: assistant.name,
-        model: assistant.model,
-        tools: assistant.tools?.length || 0,
-        toolTypes: assistant.tools?.map(tool => tool.type) || [],
-        hasFileSearch: hasFileSearch,
-        fileSearchConfig: fileSearchTool,
-        tool_resources: assistant.tool_resources,
-        vector_store_ids: assistant.tool_resources?.file_search?.vector_store_ids || [],
-      });
-
-      // COMPREHENSIVE VECTOR STORE DEBUG
-      if (hasFileSearch && assistant.tool_resources?.file_search?.vector_store_ids?.length > 0) {
-        logInfo("📚 FULL VECTOR STORE DEBUG - Checking configuration...");
-        for (const vectorStoreId of assistant.tool_resources.file_search.vector_store_ids) {
-          try {
-            logInfo(`🔍 Debugging Vector Store: ${vectorStoreId}`);
-
-            const vectorStore = await openai.beta.vectorStores.retrieve(vectorStoreId);
-            logInfo(`📚 Vector Store ${vectorStoreId} Details:`, {
-              id: vectorStore.id,
-              name: vectorStore.name,
-              file_counts: vectorStore.file_counts,
-              status: vectorStore.status,
-              created_at: new Date(vectorStore.created_at * 1000).toISOString(),
-            });
-
-            // List files in vector store
-            const files = await openai.beta.vectorStores.files.list(vectorStoreId);
-            logInfo(`📄 Files in Vector Store ${vectorStoreId}:`, {
-              total_files: files.data.length,
-              file_list: files.data.map(f => ({
-                id: f.id,
-                status: f.status,
-                created_at: new Date(f.created_at * 1000).toISOString(),
-                usage_bytes: f.usage_bytes,
-              })),
-            });
-
-            // Get detailed file information for all files
-            for (const file of files.data) {
-              try {
-                const fileDetails = await openai.files.retrieve(file.id);
-                logInfo(`📄 DETAILED File ${file.id}:`, {
-                  filename: fileDetails.filename,
-                  purpose: fileDetails.purpose,
-                  bytes: fileDetails.bytes,
-                  status: fileDetails.status,
-                  created_at: new Date(fileDetails.created_at * 1000).toISOString(),
-                });
-
-                // Try to determine document type from filename
-                const filename = fileDetails.filename?.toLowerCase() || "";
-                let documentType = "unknown";
-                if (filename.includes("pricing")) documentType = "PRICING";
-                else if (filename.includes("service")) documentType = "SERVICE";
-                else if (filename.includes("testimonial")) documentType = "TESTIMONIALS";
-
-                logInfo(`📋 Document Type Detected: ${documentType} for file: ${fileDetails.filename}`);
-
-                // Note: File content reading not available for assistant files
-                if (documentType === "PRICING") {
-                  logInfo(`📄 PRICING DOCUMENT DETECTED: ${fileDetails.filename}`);
-                }
-              } catch (fileError) {
-                logError(`❌ Error getting file ${file.id} details:`, fileError.message);
-              }
-            }
-          } catch (vsError) {
-            logError(`❌ Error retrieving vector store ${vectorStoreId}:`, vsError.message);
-            logError(`❌ Vector store error details:`, {
-              message: vsError.message,
-              code: vsError.code,
-              status: vsError.status,
-            });
-          }
-        }
-      } else if (hasFileSearch) {
-        logError("⚠️ File search enabled but no vector stores found!");
-        logError("⚠️ Assistant tool_resources:", assistant.tool_resources);
-      } else {
-        logError("❌ File search not enabled for assistant!");
-        logError("❌ Assistant tools:", assistant.tools);
-      }
-    } catch (error) {
-      logError("❌ Assistant not found or not accessible:", error.message);
-      logError("Assistant verification error details:", error);
-      return await generateFallbackResponse(
-        leadData,
-        options,
-        clinicData,
-        conversationContext,
-        openaiApiKey,
-        isEmailResponse,
-        supabaseClient,
-      );
-    }
-
-    // Use only our custom instructions, not the stored assistant instructions
 
     // Create appropriate prompt based on communication type
     let userPrompt: string;
@@ -1471,6 +1362,8 @@ async function generateFallbackResponse(
 
     let shouldTriggerBookingProcess = false;
 
+    const isBookingRequest = BOOKING_REGEX.test(options.messageBody);
+
     if (isYesResponse && conversationContext) {
       // Get ONLY the most recent clinic message (not the entire conversation)
       const messages = conversationContext.split("\n\n");
@@ -1915,13 +1808,14 @@ CONVERSATION PROGRESSION - Follow this exact sequence:
 • NEVER repeat information already shared in previous messages
 • When user says "yes", move forward with NEW information or next steps
 • MANDATORY PROGRESSION: Basic info → Details → Pricing → BOOKING QUESTIONS → Schedule
+• 🚨 ULTRA CRITICAL: After 4 messages, MUST start asking for scheduling the meeting! 🚨
 • After 3-4 exchanges, MUST ask booking questions: "Ready to schedule?" / "Want to book your scan?"
 • Each response should ADD VALUE, not repeat what was already said
 
-STAGE-BASED QUESTIONING:
+STAGE-BASED QUESTIONING (ULTRA IMPORTANT - ENFORCE STRICTLY):
 • Stage 1-2: Discovery questions ("Which service interests you?")  
 • Stage 3-4: Commitment questions ("Ready to book your X-ray?" / "Should we schedule this?")
-• Stage 5+: Direct booking ("Let's get you scheduled: [booking link]")
+• Stage 4+: 🚨 MANDATORY 🚨 Start scheduling questions: "Ready to schedule your appointment?" / "Let's get you booked!"
 
 IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
 

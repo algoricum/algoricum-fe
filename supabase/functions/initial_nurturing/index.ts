@@ -1,95 +1,132 @@
 // supabase/functions/initial_nurturing/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Import shared logic from _shared folder
-import {
-  FOLLOW_UP_RULES,
-  processAllLeads
-} from '../_shared/nurturing.ts'
+import { processAllLeads, getClinicType } from "../_shared/nurturing-service.ts";
+import { getFollowUpRulesForClinic } from "../_shared/followUpRulesService.ts";
+import { createLogger } from "../_shared/logger.ts";
 
-
-// Enhanced logging function
-function logInfo(message: string, data?: any) {
-  const timestamp = new Date().toISOString()
-  console.log(`[${timestamp}] INITIAL: ${message}`, data ? JSON.stringify(data, null, 2) : '')
-}
-
-function logError(message: string, error?: any) {
-  const timestamp = new Date().toISOString()
-  console.error(`[${timestamp}] INITIAL ERROR: ${message}`, error)
-}
-
-// Get only initial contact rule
-const INITIAL_RULE = FOLLOW_UP_RULES.find(rule => rule.name === 'sms_5min_initial')
+// Create logger with INITIAL prefix
+const { info: logInfo, error: logError } = createLogger("INITIAL");
 
 // Process initial nurturing contacts
 async function processNurturingInitial(supabase: any) {
-  logInfo('=== Starting Initial Nurturing Processing ===')
-  
+  logInfo("=== Starting Initial Nurturing Processing ===");
+
   try {
-    if (!INITIAL_RULE) {
-      logError('SMS initial contact rule not found in FOLLOW_UP_RULES')
+    // Get all clinics to process their individual initial rules
+    const { data: clinics, error: clinicError } = await supabase.from("clinic").select("id, name");
+
+    if (clinicError) {
+      logError("Failed to fetch clinics", clinicError);
       return {
         success: false,
-        error: 'SMS initial contact rule not configured',
-        summary: { sent: 0, skipped: 0, errors: 1 }
-      }
+        error: "Failed to fetch clinics",
+        summary: { sent: 0, skipped: 0, errors: 1 },
+      };
     }
-    
-    logInfo(`Processing initial contact rule: ${INITIAL_RULE.name}`)
 
-    // Use the shared service to process only initial contacts (first rule only)
-    const result = await processAllLeads(supabase, 'sms', [INITIAL_RULE])
-
-    if (!result.success) {
+    if (!clinics || clinics.length === 0) {
+      logInfo("No clinics found");
       return {
-        success: false,
-        error: result.error,
-        summary: { sent: 0, skipped: 0, errors: 1 }
+        success: true,
+        results: [],
+        summary: { sent: 0, skipped: 0, errors: 0 },
+      };
+    }
+
+    const allResults: any[] = [];
+    let totalSent = 0;
+    let totalSkipped = 0;
+    let totalErrors = 0;
+
+    // Process each clinic with their appropriate initial rule
+    for (const clinic of clinics) {
+      try {
+        // Get clinic type to determine correct initial rule
+        const clinicType = await getClinicType(supabase, clinic.id);
+        const clinicRules = await getFollowUpRulesForClinic(clinic.id, supabase);
+
+        // Determine initial rule based on clinic type
+        let initialRule;
+        let communicationType;
+
+        if (clinicType.isDemo && !clinicType.isPaid) {
+          // Demo + Free: Start with first email rule
+          initialRule = clinicRules.find(rule => rule.communicationType === "email");
+          communicationType = "email";
+          logInfo(`Clinic ${clinic.name} (demo + free): Using email initial rule`);
+        } else {
+          // Demo + Paid or Production: Start with SMS rule
+          initialRule = clinicRules.find(rule => rule.name === "sms_5min_initial");
+          communicationType = "sms";
+          logInfo(`Clinic ${clinic.name} (${clinicType.isDemo ? "demo + paid" : "production"}): Using SMS initial rule`);
+        }
+
+        if (!initialRule) {
+          logError(`No initial rule found for clinic ${clinic.name}`);
+          totalErrors++;
+          continue;
+        }
+
+        logInfo(`Processing clinic ${clinic.name} with rule: ${initialRule.name}`);
+
+        // Process this clinic with their specific initial rule
+        const result = await processAllLeads(supabase, communicationType, [initialRule], [clinic.id]);
+
+        if (result.success) {
+          allResults.push(...(result.results || []));
+          totalSent += result.summary?.sent || 0;
+          totalSkipped += result.summary?.skipped || 0;
+          totalErrors += result.summary?.errors || 0;
+        } else {
+          logError(`Failed processing clinic ${clinic.name}:`, result.error);
+          totalErrors++;
+        }
+      } catch (clinicError) {
+        logError(`Error processing clinic ${clinic.id}:`, clinicError);
+        totalErrors++;
       }
     }
 
-    logInfo(`Initial nurturing processing completed`)
+    logInfo(`Initial nurturing processing completed`);
 
     return {
       success: true,
       summary: {
-        sent: result.summary.sent,
-        skipped: result.summary.skipped, 
-        errors: result.summary.errors,
-        total: result.summary.sent + result.summary.skipped
+        sent: totalSent,
+        skipped: totalSkipped,
+        errors: totalErrors,
+        total: totalSent + totalSkipped,
       },
-      results: result.results,
-      rule: INITIAL_RULE.name,
-      timestamp: new Date().toISOString()
-    }
-
+      results: allResults,
+      timestamp: new Date().toISOString(),
+    };
   } catch (error: any) {
-    logError('Error in processNurturingInitial', error)
+    logError("Error in processNurturingInitial", error);
     return {
       success: false,
       error: error.message,
-      summary: { sent: 0, skipped: 0, errors: 1 }
-    }
+      summary: { sent: 0, skipped: 0, errors: 1 },
+    };
   }
 }
-
 
 // Main Edge Function
 serve(async req => {
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
-
-  logInfo('=== Initial Nurturing Function Called ===')
-  logInfo(`Request method: ${req.method}`)
+  logInfo("=== Initial Nurturing Function Called ===");
+  logInfo(`Request method: ${req.method}`);
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -102,25 +139,20 @@ serve(async req => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     logInfo("Supabase client created successfully");
 
-    const contentType = req.headers.get("content-type") || "";
-
     // Process initial nurturing
-    logInfo('Starting initial nurturing processing')
-    const result = await processNurturingInitial(supabase)
-    
-    logInfo('Initial nurturing processing completed', {
+    logInfo("Starting initial nurturing processing");
+    const result = await processNurturingInitial(supabase);
+
+    logInfo("Initial nurturing processing completed", {
       sent: result.summary?.sent || 0,
       skipped: result.summary?.skipped || 0,
-      errors: result.summary?.errors || 0
-    })
-    
-    return new Response(
-      JSON.stringify(result),
-      { 
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
+      errors: result.summary?.errors || 0,
+    });
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
     logInfo("Initial contact processing completed", {
       processed: result.processed,
@@ -139,7 +171,7 @@ serve(async req => {
         success: false,
         error: error.message,
         summary: { sent: 0, skipped: 0, errors: 1 },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       }),
       {
         status: 500,
