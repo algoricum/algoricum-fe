@@ -13,7 +13,6 @@ import { useAuth } from "@/hooks/useAuth";
 import apiKeyService from "@/services/apiKey";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
-// import { handleSubscribe } from "@/utils/stripe";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getClinicData, updateClinic, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
