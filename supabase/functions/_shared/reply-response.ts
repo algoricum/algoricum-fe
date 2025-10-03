@@ -154,20 +154,18 @@ export async function generateAIResponse(
         messageBodyLower === "pricing" ||
         messageBodyLower === "cost");
 
-    const isShortBookingQuery =
-      isShortMessage &&
-      (messageBodyLower === "book" ||
-        messageBodyLower === "schedule" ||
-        messageBodyLower === "appointment" ||
-        messageBodyLower === "book appointment" ||
-        messageBodyLower === "schedule appointment");
+    // Regex-based booking detection - matches any message containing booking-related keywords
+    const bookingRegex =
+      /\b(book|booking|schedule|appointment|ready to book|want to book|would like to book|i'd like to book|can i book|how do i book|ready to schedule|want to schedule|would like to schedule|i'd like to schedule|can i schedule|how do i schedule|need an appointment|want an appointment|would like an appointment|can i get an appointment|book an appointment|schedule an appointment|set up an appointment|make an appointment)\b/i;
 
-    logInfo("🔍 Short message analysis:", {
+    const isBookingRequest = bookingRegex.test(options.messageBody);
+
+    logInfo("🔍 Message analysis:", {
       messageBody: options.messageBody,
       messageLength: options.messageBody.trim().length,
       isShortMessage: isShortMessage,
       isShortPricingQuery: isShortPricingQuery,
-      isShortBookingQuery: isShortBookingQuery,
+      isBookingRequest: isBookingRequest,
       hasConversationContext: !!conversationContext,
     });
 
@@ -318,6 +316,48 @@ export async function generateAIResponse(
         }
       } catch (bookingError) {
         logError(`❌ Error in booking detection for yes response:`, bookingError);
+      }
+    }
+
+    // Handle direct booking requests detected by regex
+    if (isBookingRequest && !shouldTriggerBookingProcess) {
+      try {
+        logInfo("📅 Direct booking request detected via regex, triggering booking service...");
+
+        const bookingOptions: BookingDetectionOptions = {
+          messageBody: options.messageBody,
+          subject: options.subject || "",
+          leadData: {
+            id: leadData.id,
+            first_name: leadData.first_name,
+            last_name: leadData.last_name,
+            email: leadData.email,
+            phone: leadData.phone,
+          },
+          clinicData: {
+            id: clinicData.id,
+            name: clinicData.name,
+            calendly_link: clinicData.calendly_link,
+          },
+          communicationType: isEmailResponse ? "email" : "sms",
+          senderPhone: leadData.phone,
+          forceBooking: true,
+        };
+
+        const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
+
+        logInfo("📅 Booking detection result:", {
+          isBookingRequest: bookingResult.isBookingRequest,
+          meetingScheduleCreated: bookingResult.meetingScheduleCreated,
+          meetingScheduleId: bookingResult.meetingScheduleId,
+        });
+
+        if (bookingResult.meetingScheduleCreated) {
+          const bookingResponseText = `Awesome! Let's lock in your appointment: ${clinicData.calendly_link || "https://calendly.com/book"}`;
+          return { success: true, response: bookingResponseText };
+        }
+      } catch (bookingError) {
+        logError(`❌ Error in booking detection:`, bookingError);
       }
     }
 
@@ -552,7 +592,7 @@ Please generate a helpful email response that addresses their message.`;
 MANDATORY STEPS:
 1. ALWAYS use file_search tool to search uploaded documents
 2. Base response ONLY on file_search results  
-3. If no results found, say "Let me connect you with our team for that detail"
+3. If no results found, say "we donot offer this service, tell what we offer"
 
 NEVER respond without using file_search tool first!
 
@@ -619,6 +659,8 @@ RESPOND TO USER INTENT:
 • If they want treatment details → Provide comprehensive information about that specific treatment
 • Use your training data and clinic knowledge to give accurate, contextual responses
 
+🚨 BEFORE RESPONDING: CHECK - DOES MY RESPONSE END WITH A QUESTION? IF NO, ADD ONE! 🚨
+
 RESPONSE PRINCIPLES:
 • Be conversational and natural - avoid robotic or scripted responses
 • Provide complete, helpful information based on user intent
@@ -627,8 +669,44 @@ RESPONSE PRINCIPLES:
 • Make responses definitive and action-oriented
 • Guide conversations naturally toward booking when appropriate
 • Use your clinic knowledge base and training to give accurate information
+• ALWAYS END WITH A STRATEGIC QUESTION - EXCEPT when providing booking link in response to booking request
 
-IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
+🚨🚨🚨 CRITICAL: NO RESPONSE IS COMPLETE WITHOUT A QUESTION AT THE END 🚨🚨🚨
+🚨🚨🚨 EVERY SINGLE RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨
+🚨🚨🚨 EXCEPTION: When providing a booking link in response to booking request, DO NOT ask questions 🚨🚨🚨
+
+🚨 BOOKING LINKS: When mentioning "book", "schedule", or "appointment", ALWAYS include booking link 🚨
+
+STRATEGIC QUESTIONING RULES (NEVER SKIP THIS):
+• After sharing services/info → "Which service interests you most?" / "Does this address your concerns?"
+• First contact → "What brings you to us?" / "Ready to take the next step?"
+• Show interest → "Is this the solution you're looking for?" / "What would this mean for you?"
+• Create urgency → "Should we lock in your time?" / "Morning or afternoon better?"
+• ALWAYS guide to booking based on conversation stage and user intent
+• NO RESPONSE IS COMPLETE WITHOUT A STRATEGIC QUESTION AT THE END
+
+BOOKING LINK RULES:
+• ANY mention of "book", "schedule", "appointment" = MUST include ${bookingLink}
+• When user asks "how to book" = ALWAYS provide the booking link
+• When offering booking options = ALWAYS include the actual link
+• NEVER ask about specific times, days, slots, or availability - the booking link handles ALL scheduling
+• After providing booking link, DO NOT ask scheduling preferences
+• When responding to direct booking requests with booking link, DO NOT ask any follow-up questions
+
+CONVERSATION PROGRESSION - Follow this exact sequence:
+• NEVER repeat information already shared in previous messages
+• When user says "yes", move forward with NEW information or next steps
+• MANDATORY PROGRESSION: Basic info → Details → Pricing → BOOKING QUESTIONS → Schedule
+• After 3-4 exchanges, MUST ask booking questions: "Ready to schedule?" / "Want to book your scan?"
+• Each response should ADD VALUE, not repeat what was already said
+
+STAGE-BASED QUESTIONING:
+• Stage 1-2: Discovery questions ("Which service interests you?")  
+• Stage 3-4: Commitment questions ("Ready to book your X-ray?" / "Should we schedule this?")
+
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
+
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION (EXCEPT when providing booking link) 🚨🚨🚨`
     : ""
 }
 
@@ -636,6 +714,7 @@ CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
 - Phone: ${clinicData.phone_number || "Contact us for phone number"}
 ${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ""}
+- **Hours: Use ${clinic.business_hours} for ANY timing/availability questions**
 
 ${
   isBookingInquiry
@@ -661,7 +740,7 @@ Please generate a helpful SMS response that addresses their message.`;
 MANDATORY STEPS:
 1. ALWAYS use file_search tool to search uploaded documents
 2. Base response ONLY on file_search results  
-3. If no results found, say "Let me connect you with our team for that detail"
+3. If no results found, say "we donot offer this service, tell what we offer"
 
 NEVER respond without using file_search tool first!
 
@@ -736,6 +815,7 @@ QUESTION TYPE DETECTION:
 1. DIRECT BOOKING QUESTIONS ("Ready to book?", "Want to schedule?", "Should I book you?"):
    → Patient "Yes" = Provide ONLY booking link: "Awesome! Let's lock in your appointment: ${bookingLink}"
    → NO additional text, NO explanations, NO other information - JUST the booking link with minimal text
+   → NEVER ask about times, days, slots, or scheduling preferences - the link handles all scheduling
 
 2. INFORMATION OFFERS ("Let me know if you want to book!" AFTER already sharing service/treatment info):
    → Patient "Yes" = They want more detailed information, pricing recap, or service details
@@ -790,7 +870,9 @@ CRITICAL RESPONSE RULES:
 - When providing booking links, keep it VERY brief: "Awesome! Let's lock in your appointment: ${bookingLink}"
 - Make responses definitive and action-oriented, not question-heavy
 
-IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
+
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION (EXCEPT when providing booking link) 🚨🚨🚨`
     : ""
 }
 
@@ -1523,6 +1605,48 @@ async function generateFallbackResponse(
       }
     }
 
+    // Handle direct booking requests detected by regex in fallback
+    if (isBookingRequest && !shouldTriggerBookingProcess) {
+      try {
+        logInfo("📅 Direct booking request detected via regex in fallback, triggering booking service...");
+
+        const bookingOptions: BookingDetectionOptions = {
+          messageBody: options.messageBody,
+          subject: options.subject || "",
+          leadData: {
+            id: leadData.id,
+            first_name: leadData.first_name,
+            last_name: leadData.last_name,
+            email: leadData.email,
+            phone: leadData.phone,
+          },
+          clinicData: {
+            id: clinicData.id,
+            name: clinicData.name,
+            calendly_link: clinicData.calendly_link,
+          },
+          communicationType: isEmailResponse ? "email" : "sms",
+          senderPhone: leadData.phone,
+          forceBooking: true,
+        };
+
+        const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
+
+        logInfo("📅 Booking detection result in fallback:", {
+          isBookingRequest: bookingResult.isBookingRequest,
+          meetingScheduleCreated: bookingResult.meetingScheduleCreated,
+          meetingScheduleId: bookingResult.meetingScheduleId,
+        });
+
+        if (bookingResult.meetingScheduleCreated) {
+          const bookingResponseText = `Awesome! Let's lock in your appointment: ${clinicData.calendly_link || "https://calendly.com/book"}`;
+          return { success: true, response: bookingResponseText };
+        }
+      } catch (bookingError) {
+        logError(`❌ Error in booking detection in fallback:`, bookingError);
+      }
+    }
+
     const bookingLink = clinicData.calendly_link || "https://calendly.com/book";
     const unsubscribeLink = `${SUPABASE_URL}/functions/v1/unsubscribe-lead?lead_id=${leadData.id}&clinic_id=${clinicData.id}`;
 
@@ -1549,6 +1673,7 @@ CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
 - Phone: ${clinicData.phone_number || "Contact us for phone number"}
 ${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ""}
+- **Hours: Use ${clinic.business_hours} for ANY timing/availability questions**
 
 Current Email:
 Subject: ${options.subject || "No Subject"}
@@ -1618,7 +1743,9 @@ CRITICAL RESPONSE RULES:
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
-IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
+
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION (EXCEPT when providing booking link) 🚨🚨🚨`
     : ""
 }
 
@@ -1762,7 +1889,43 @@ CRITICAL RESPONSE RULES:
 - NO treatment information when sending booking links - just the link
 - Make responses definitive and action-oriented, not question-heavy
 
-IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.`
+🚨🚨🚨 CRITICAL: NO RESPONSE IS COMPLETE WITHOUT A QUESTION AT THE END 🚨🚨🚨
+🚨🚨🚨 EVERY SINGLE RESPONSE MUST END WITH A STRATEGIC QUESTION 🚨🚨🚨
+🚨🚨🚨 EXCEPTION: When providing a booking link in response to booking request, DO NOT ask questions 🚨🚨🚨
+
+🚨 BOOKING LINKS: When mentioning "book", "schedule", or "appointment", ALWAYS include booking link 🚨
+
+STRATEGIC QUESTIONING RULES (NEVER SKIP THIS):
+• After sharing services/info → "Which service interests you most?" / "Does this address your concerns?"
+• First contact → "What brings you to us?" / "Ready to take the next step?"
+• Show interest → "Is this the solution you're looking for?" / "What would this mean for you?"
+• Create urgency → "Should we lock in your time?" / "Morning or afternoon better?"
+• ALWAYS guide to booking based on conversation stage and user intent
+• NO RESPONSE IS COMPLETE WITHOUT A STRATEGIC QUESTION AT THE END
+
+BOOKING LINK RULES:
+• ANY mention of "book", "schedule", "appointment" = MUST include ${bookingLink}
+• When user asks "how to book" = ALWAYS provide the booking link
+• When offering booking options = ALWAYS include the actual link
+• NEVER ask about specific times, days, slots, or availability - the booking link handles ALL scheduling
+• After providing booking link, DO NOT ask scheduling preferences
+• When responding to direct booking requests with booking link, DO NOT ask any follow-up questions
+
+CONVERSATION PROGRESSION - Follow this exact sequence:
+• NEVER repeat information already shared in previous messages
+• When user says "yes", move forward with NEW information or next steps
+• MANDATORY PROGRESSION: Basic info → Details → Pricing → BOOKING QUESTIONS → Schedule
+• After 3-4 exchanges, MUST ask booking questions: "Ready to schedule?" / "Want to book your scan?"
+• Each response should ADD VALUE, not repeat what was already said
+
+STAGE-BASED QUESTIONING:
+• Stage 1-2: Discovery questions ("Which service interests you?")  
+• Stage 3-4: Commitment questions ("Ready to book your X-ray?" / "Should we schedule this?")
+• Stage 5+: Direct booking ("Let's get you scheduled: [booking link]")
+
+IMPORTANT: This is a continuing conversation - use the full context above to understand what the patient needs and respond appropriately.
+
+🚨🚨🚨 FINAL REMINDER: YOUR RESPONSE MUST END WITH A STRATEGIC QUESTION (EXCEPT when providing booking link) 🚨🚨🚨`
     : ""
 }
 
@@ -1894,4 +2057,4 @@ export async function saveAIResponseToConversation(
   }
 }
 
-export type { LeadData, ClinicData, GenerateAIResponseOptions };
+export type { ClinicData, GenerateAIResponseOptions, LeadData };
