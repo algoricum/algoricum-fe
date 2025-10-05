@@ -120,141 +120,112 @@ serve(async req => {
     const authHeader = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
     console.log("Twilio auth header created");
 
-    // Step 1: Search for available numbers in both US and Canada
-    const countries = ["US", "CA"];
-    const allAvailableNumbers = [];
+    // Step 1: Get existing Twilio numbers from account and find ones without webhooks
+    console.log("Fetching existing Twilio phone numbers from account");
+    const existingNumbersUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers.json`;
 
-    // Extract area code from phone_number if provided
-    const areaCodeMatch = phone_number.match(/^\+1(\d{3})/);
-    const areaCode = areaCodeMatch ? areaCodeMatch[1] : null;
-
-    if (areaCode) {
-      console.log("Area code extracted from phone_number", { areaCode });
-    } else {
-      console.log("No area code provided in phone_number, proceeding without area code filter");
-    }
-
-    // Search in both countries
-    for (const country of countries) {
-      let searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/AvailablePhoneNumbers/${country}/Local.json?SmsEnabled=true&Limit=10`;
-
-      if (areaCode) {
-        searchUrl += `&AreaCode=${areaCode}`;
-      }
-
-      console.log(`Searching for available Twilio numbers in ${country}`, { searchUrl });
-
-      try {
-        const searchResponse = await fetch(searchUrl, {
-          method: "GET",
-          headers: {
-            Authorization: `Basic ${authHeader}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-        });
-
-        const searchData = await searchResponse.json();
-        console.log(`Twilio number search response for ${country}`, {
-          status: searchResponse.status,
-          ok: searchResponse.ok,
-          availableNumbersCount: searchData.available_phone_numbers?.length || 0,
-        });
-
-        if (searchData.available_phone_numbers && searchData.available_phone_numbers.length > 0) {
-          // Add country info to each number for tracking
-          const numbersWithCountry = searchData.available_phone_numbers.map(num => ({
-            ...num,
-            country: country,
-          }));
-          allAvailableNumbers.push(...numbersWithCountry);
-          console.log(`Added ${numbersWithCountry.length} numbers from ${country}`);
-        }
-      } catch (error) {
-        console.log(`Error searching ${country} numbers:`, error.message);
-        // Continue with other countries if one fails
-      }
-    }
-
-    console.log("Total available numbers found", {
-      total: allAvailableNumbers.length,
-      byCountry: countries.map(country => ({
-        country,
-        count: allAvailableNumbers.filter(num => num.country === country).length,
-      })),
+    const existingResponse = await fetch(existingNumbersUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Basic ${authHeader}`,
+      },
     });
 
-    if (allAvailableNumbers.length === 0) {
-      console.log("No available phone numbers found in any country, updating twilio_config to failed if exists", { twilio_config_id });
+    const existingData = await existingResponse.json();
+    console.log("Existing Twilio numbers response", {
+      status: existingResponse.status,
+      ok: existingResponse.ok,
+      totalNumbers: existingData.incoming_phone_numbers?.length || 0,
+    });
+
+    if (!existingResponse.ok || !existingData.incoming_phone_numbers) {
+      console.log("Failed to fetch existing phone numbers, updating twilio_config to failed if exists", { twilio_config_id });
       if (twilio_config_id) {
         await supabaseClient.from("twilio_config").update({ status: "failed" }).eq("id", twilio_config_id);
       }
-      return new Response(JSON.stringify({ error: "No available phone numbers found in US or Canada" }), {
+      return new Response(JSON.stringify({ error: "Failed to fetch existing phone numbers from Twilio account" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Filter numbers that don't have webhooks assigned
+    const numbersWithoutWebhooks = existingData.incoming_phone_numbers.filter(num => !num.sms_url || num.sms_url === "");
+
+    console.log("Numbers without webhooks found", {
+      totalNumbers: existingData.incoming_phone_numbers.length,
+      numbersWithoutWebhooks: numbersWithoutWebhooks.length,
+      availableNumbers: numbersWithoutWebhooks.map(num => ({
+        phoneNumber: num.phone_number,
+        sid: num.sid,
+        smsUrl: num.sms_url || "none",
+      })),
+    });
+
+    if (numbersWithoutWebhooks.length === 0) {
+      console.log("No numbers without webhooks found, updating twilio_config to failed if exists", { twilio_config_id });
+      if (twilio_config_id) {
+        await supabaseClient.from("twilio_config").update({ status: "failed" }).eq("id", twilio_config_id);
+      }
+      return new Response(JSON.stringify({ error: "No available phone numbers without webhooks found in Twilio account" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Prioritize numbers: if area code provided, prefer numbers from same area code
-    let selectedNumber;
-    if (areaCode) {
-      // Try to find a number matching the area code first
-      const matchingAreaCode = allAvailableNumbers.find(num => num.phone_number.includes(areaCode));
-      selectedNumber = matchingAreaCode || allAvailableNumbers[0];
-    } else {
-      selectedNumber = allAvailableNumbers[0];
-    }
-
+    // Select the first available number without webhook
+    const selectedNumber = numbersWithoutWebhooks[0];
     console.log("Selected Twilio phone number", {
       selectedNumber: selectedNumber.phone_number,
-      country: selectedNumber.country,
-      matchedAreaCode: areaCode && selectedNumber.phone_number.includes(areaCode),
+      sid: selectedNumber.sid,
+      currentSmsUrl: selectedNumber.sms_url || "none",
     });
 
-    // Step 2: Purchase the number with SMS processor webhook (including clinic_id)
-    const purchaseUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers.json`;
-    const purchaseBody = new URLSearchParams({
-      PhoneNumber: selectedNumber.phone_number,
+    // Step 2: Update the existing number with SMS processor webhook (including clinic_id)
+    const updateUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers/${selectedNumber.sid}.json`;
+    const updateBody = new URLSearchParams({
       SmsUrl: smsWebhookUrl, // Now includes clinic_id parameter
       SmsMethod: "POST",
       // Optional: Add status callback URL for delivery receipts (also with clinic_id)
       SmsStatusCallback: `${supabaseUrl}/functions/v1/sms-processor/status?clinic_id=${clinic_id}`,
     });
-    console.log("Purchasing Twilio phone number", {
-      purchaseUrl,
+    console.log("Updating Twilio phone number with webhook", {
+      updateUrl,
       phoneNumber: selectedNumber.phone_number,
+      sid: selectedNumber.sid,
       smsUrl: smsWebhookUrl,
     });
 
-    const purchaseResponse = await fetch(purchaseUrl, {
+    const updateResponse = await fetch(updateUrl, {
       method: "POST",
       headers: {
         Authorization: `Basic ${authHeader}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: purchaseBody,
+      body: updateBody,
     });
 
-    const purchaseData = await purchaseResponse.json();
-    console.log("Twilio purchase response", {
-      status: purchaseResponse.status,
-      ok: purchaseResponse.ok,
-      phone_number: purchaseData.phone_number,
-      sid: purchaseData.sid,
-      sms_url: purchaseData.sms_url, // Log to verify webhook was set correctly
+    const updateData = await updateResponse.json();
+    console.log("Twilio update response", {
+      status: updateResponse.status,
+      ok: updateResponse.ok,
+      phone_number: updateData.phone_number,
+      sid: updateData.sid,
+      sms_url: updateData.sms_url, // Log to verify webhook was set correctly
     });
 
-    if (!purchaseResponse.ok) {
-      console.log("Failed to purchase phone number, updating twilio_config to failed if exists", {
+    if (!updateResponse.ok) {
+      console.log("Failed to update phone number webhook, updating twilio_config to failed if exists", {
         twilio_config_id,
-        errorDetails: purchaseData,
+        errorDetails: updateData,
       });
       if (twilio_config_id) {
         await supabaseClient.from("twilio_config").update({ status: "failed" }).eq("id", twilio_config_id);
       }
       return new Response(
         JSON.stringify({
-          error: "Failed to purchase phone number",
-          details: purchaseData,
+          error: "Failed to update phone number webhook",
+          details: updateData,
         }),
         {
           status: 400,
@@ -263,53 +234,131 @@ serve(async req => {
       );
     }
 
+    // Use updateData instead of purchaseData for the rest of the function
+    const assignedNumberData = updateData;
+
     // Step 2.5: Register phone number with A2P messaging service if messaging service SID is provided
     let messagingServiceRegistrationSuccess = true;
+    let alreadyInCampaign = false;
+
     if (twilioMessagingServiceSid) {
-      console.log("Registering phone number with A2P messaging service", {
-        phoneNumber: purchaseData.phone_number,
+      // First check if number is already in the messaging service
+      console.log("Checking if phone number is already in A2P messaging service", {
+        phoneNumber: assignedNumberData.phone_number,
         messagingServiceSid: twilioMessagingServiceSid,
       });
 
-      const messagingServiceUrl = `https://messaging.twilio.com/v1/Services/${twilioMessagingServiceSid}/PhoneNumbers`;
-      const messagingServiceBody = new URLSearchParams({
-        PhoneNumberSid: purchaseData.sid,
-      });
+      const checkServiceUrl = `https://messaging.twilio.com/v1/Services/${twilioMessagingServiceSid}/PhoneNumbers`;
 
       try {
-        const messagingServiceResponse = await fetch(messagingServiceUrl, {
-          method: "POST",
+        const checkResponse = await fetch(checkServiceUrl, {
+          method: "GET",
           headers: {
             Authorization: `Basic ${authHeader}`,
-            "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: messagingServiceBody,
         });
 
-        const messagingServiceData = await messagingServiceResponse.json();
-        console.log("Messaging service registration response", {
-          status: messagingServiceResponse.status,
-          ok: messagingServiceResponse.ok,
-          data: messagingServiceData,
-        });
+        if (checkResponse.ok) {
+          const existingNumbers = await checkResponse.json();
+          const isAlreadyRegistered = existingNumbers.phone_numbers?.some(num => num.sid === assignedNumberData.sid);
 
-        if (!messagingServiceResponse.ok) {
-          console.log("Warning: Failed to register phone number with messaging service", {
-            error: messagingServiceData,
-            phoneNumber: purchaseData.phone_number,
-            messagingServiceSid: twilioMessagingServiceSid,
-          });
-          messagingServiceRegistrationSuccess = false;
+          if (isAlreadyRegistered) {
+            console.log("Phone number is already registered in messaging service", {
+              phoneNumber: assignedNumberData.phone_number,
+              messagingServiceSid: twilioMessagingServiceSid,
+            });
+            alreadyInCampaign = true;
+            messagingServiceRegistrationSuccess = true;
+          } else {
+            // Number not in campaign, proceed with registration
+            console.log("Registering phone number with A2P messaging service", {
+              phoneNumber: assignedNumberData.phone_number,
+              messagingServiceSid: twilioMessagingServiceSid,
+            });
+
+            const messagingServiceUrl = `https://messaging.twilio.com/v1/Services/${twilioMessagingServiceSid}/PhoneNumbers`;
+            const messagingServiceBody = new URLSearchParams({
+              PhoneNumberSid: assignedNumberData.sid,
+            });
+
+            const messagingServiceResponse = await fetch(messagingServiceUrl, {
+              method: "POST",
+              headers: {
+                Authorization: `Basic ${authHeader}`,
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+              body: messagingServiceBody,
+            });
+
+            const messagingServiceData = await messagingServiceResponse.json();
+            console.log("Messaging service registration response", {
+              status: messagingServiceResponse.status,
+              ok: messagingServiceResponse.ok,
+              data: messagingServiceData,
+            });
+
+            if (!messagingServiceResponse.ok) {
+              console.log("Warning: Failed to register phone number with messaging service", {
+                error: messagingServiceData,
+                phoneNumber: assignedNumberData.phone_number,
+                messagingServiceSid: twilioMessagingServiceSid,
+              });
+              messagingServiceRegistrationSuccess = false;
+            } else {
+              console.log("Successfully registered phone number with messaging service", {
+                phoneNumber: assignedNumberData.phone_number,
+                messagingServiceSid: twilioMessagingServiceSid,
+              });
+            }
+          }
         } else {
-          console.log("Successfully registered phone number with messaging service", {
-            phoneNumber: purchaseData.phone_number,
-            messagingServiceSid: twilioMessagingServiceSid,
+          console.log("Failed to check existing numbers in messaging service, proceeding with registration attempt");
+
+          // Proceed with registration attempt anyway
+          const messagingServiceUrl = `https://messaging.twilio.com/v1/Services/${twilioMessagingServiceSid}/PhoneNumbers`;
+          const messagingServiceBody = new URLSearchParams({
+            PhoneNumberSid: assignedNumberData.sid,
           });
+
+          const messagingServiceResponse = await fetch(messagingServiceUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Basic ${authHeader}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: messagingServiceBody,
+          });
+
+          const messagingServiceData = await messagingServiceResponse.json();
+
+          if (!messagingServiceResponse.ok) {
+            // Check if error is because number is already registered
+            if (messagingServiceData.code === 21710 || messagingServiceData.message?.includes("already")) {
+              console.log("Phone number is already registered in messaging service (detected from error)", {
+                phoneNumber: assignedNumberData.phone_number,
+                messagingServiceSid: twilioMessagingServiceSid,
+              });
+              alreadyInCampaign = true;
+              messagingServiceRegistrationSuccess = true;
+            } else {
+              console.log("Warning: Failed to register phone number with messaging service", {
+                error: messagingServiceData,
+                phoneNumber: assignedNumberData.phone_number,
+                messagingServiceSid: twilioMessagingServiceSid,
+              });
+              messagingServiceRegistrationSuccess = false;
+            }
+          } else {
+            console.log("Successfully registered phone number with messaging service", {
+              phoneNumber: assignedNumberData.phone_number,
+              messagingServiceSid: twilioMessagingServiceSid,
+            });
+          }
         }
       } catch (error) {
-        console.error("Error during messaging service registration", {
+        console.error("Error during messaging service check/registration", {
           error: error.message,
-          phoneNumber: purchaseData.phone_number,
+          phoneNumber: assignedNumberData.phone_number,
           messagingServiceSid: twilioMessagingServiceSid,
         });
         messagingServiceRegistrationSuccess = false;
@@ -324,7 +373,7 @@ serve(async req => {
       phone_number: phone_number,
       twilio_account_sid: twilioAccountSid,
       twilio_auth_token: twilioAuthToken,
-      twilio_phone_number: purchaseData.phone_number,
+      twilio_phone_number: assignedNumberData.phone_number,
       status: "active",
     };
     console.log("Preparing to upsert twilio_config", { twilioConfigData, twilio_config_id });
@@ -372,7 +421,7 @@ serve(async req => {
 
     // Optionally: Verify webhook was set correctly by fetching the number details
     console.log("Verifying webhook configuration...");
-    const verifyUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers/${purchaseData.sid}.json`;
+    const verifyUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers/${assignedNumberData.sid}.json`;
     const verifyResponse = await fetch(verifyUrl, {
       method: "GET",
       headers: {
@@ -393,33 +442,36 @@ serve(async req => {
 
     // Success response
     console.log("Returning success response", {
-      phone_number: purchaseData.phone_number,
-      twilio_sid: purchaseData.sid,
+      phone_number: assignedNumberData.phone_number,
+      twilio_sid: assignedNumberData.sid,
       clinic_id,
       twilio_config_id: data.id,
       webhook_url: smsWebhookUrl,
       messaging_service_registered: messagingServiceRegistrationSuccess,
     });
 
-    const responseMessage =
-      messagingServiceRegistrationSuccess && twilioMessagingServiceSid
-        ? "SMS number assigned and registered with A2P messaging service successfully"
-        : twilioMessagingServiceSid && !messagingServiceRegistrationSuccess
-          ? "SMS number assigned successfully, but A2P messaging service registration failed"
-          : "SMS number assigned successfully";
+    const responseMessage = twilioMessagingServiceSid
+      ? alreadyInCampaign
+        ? "Existing SMS number webhook assigned successfully (number was already in A2P messaging service)"
+        : messagingServiceRegistrationSuccess
+          ? "Existing SMS number webhook assigned and registered with A2P messaging service successfully"
+          : "Existing SMS number webhook assigned successfully, but A2P messaging service registration failed"
+      : "Existing SMS number webhook assigned successfully";
 
     return new Response(
       JSON.stringify({
         success: true,
         message: responseMessage,
-        phone_number: purchaseData.phone_number,
-        formatted_number: formatPhoneNumber(purchaseData.phone_number),
-        twilio_sid: purchaseData.sid,
+        phone_number: assignedNumberData.phone_number,
+        formatted_number: formatPhoneNumber(assignedNumberData.phone_number),
+        twilio_sid: assignedNumberData.sid,
         clinic_id,
         twilio_config_id: data.id,
         webhook_url: smsWebhookUrl, // Include webhook URL in response for verification
         messaging_service_registered: messagingServiceRegistrationSuccess,
         messaging_service_sid: twilioMessagingServiceSid || null,
+        assigned_from_existing: true, // Indicate this was assigned from existing numbers
+        already_in_campaign: alreadyInCampaign, // Indicate if number was already in campaign
       }),
       {
         status: 200,

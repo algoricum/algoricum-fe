@@ -929,7 +929,8 @@ CRITICAL EMAIL FORMATTING RULES:
   - Personal anecdotes from clinic experience
 • **TONE**: Conversational, educational, story-driven, never pushy
 • **FORMAT**: Natural paragraph flow, not forced short lines
-• **PARAGRAPH LENGTH**: ABSOLUTE 20-word maximum - count EVERY word including "a", "the", "and". NO EXCEPTIONS. Split long sentences into multiple paragraphs rather than exceed 20 words.
+• **PARAGRAPH LENGTH**: ABSOLUTE 15-word maximum - count EVERY word including "a", "the", "and". NO EXCEPTIONS. Split long sentences into multiple paragraphs rather than exceed 15 words.
+• **TOTAL RESPONSE LENGTH**: Aim for 12-15 paragraphs total for optimal email length.
 • **SUBJECT LINE**: NEVER write "Subject:" in the subject line - write ONLY the subject text without any prefix
 • Do NOT include "Subject:" prefix or clinic signatures
 • Do NOT include unsubscribe text (system handles this automatically)
@@ -988,14 +989,15 @@ GENERATE AN EMAIL FOLLOWING THIS PATTERN:
 🚨🚨🚨 ABSOLUTELY CRITICAL FORMATTING REQUIREMENTS - NO EXCEPTIONS 🚨🚨🚨
 
 - Subject line: Write ONLY the text, never include "Subject:"
-- Paragraphs: MAXIMUM 20 WORDS EACH - COUNT EVERY SINGLE WORD INCLUDING "A", "THE", "AND"
-- If ANY sentence exceeds 20 words, IMMEDIATELY split into TWO paragraphs
-- ZERO EXCEPTIONS to the 20-word rule - sacrifice sentence flow if needed
-- Better to have short, choppy paragraphs than exceed 20 words EVER
-- Count words like this: "In(1) 1999(2), a(3) pivotal(4) study(5)..." and STOP at word 20
+- Paragraphs: MAXIMUM 15 WORDS EACH - COUNT EVERY SINGLE WORD INCLUDING "A", "THE", "AND"
+- If ANY sentence exceeds 15 words, IMMEDIATELY split into TWO paragraphs
+- ZERO EXCEPTIONS to the 15-word rule - sacrifice sentence flow if needed
+- Better to have short, choppy paragraphs than exceed 15 words EVER
+- Count words like this: "In(1) 1999(2), a(3) pivotal(4) study(5)..." and STOP at word 15
 - Start each new paragraph on a NEW LINE with proper line breaks between them
 - NEVER combine multiple sentences into one paragraph block
 - RECOUNT YOUR WORDS IN EVERY PARAGRAPH BEFORE FINALIZING
+- AIM FOR 12-15 TOTAL PARAGRAPHS for optimal email length and engagement
 
 MAKE IT COMPLETELY UNIQUE - USE DIVERSE STORY TYPES:
 - Historical events: Wright brothers, Marie Curie, Alexander Fleming discoveries
