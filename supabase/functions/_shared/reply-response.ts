@@ -606,7 +606,7 @@ CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
 - Phone: ${clinicData.phone_number || "Contact us for phone number"}
 ${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ""}
-- **Hours: Use ${clinic.business_hours} for ANY timing/availability questions**
+- **Hours: Use ${clinicData.business_hours} for ANY timing/availability questions**
 
 ${
   isBookingInquiry
@@ -1567,7 +1567,7 @@ CLINIC INFORMATION (include when asked):
 - Clinic Name: ${clinicData.name}
 - Phone: ${clinicData.phone_number || "Contact us for phone number"}
 ${clinicData.mailgun_email ? `- Email: ${clinicData.mailgun_email}` : ""}
-- **Hours: Use ${clinic.business_hours} for ANY timing/availability questions**
+- **Hours: Use ${clinicData.business_hours} for ANY timing/availability questions**
 
 Current Email:
 Subject: ${options.subject || "No Subject"}

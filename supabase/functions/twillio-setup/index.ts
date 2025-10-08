@@ -173,12 +173,41 @@ serve(async req => {
       });
     }
 
-    // Select the first available number without webhook
-    const selectedNumber = numbersWithoutWebhooks[0];
+    // Extract area code from the input phone number (first 3 digits after country code)
+    const inputAreaCode = phone_number.replace(/\D/g, "").slice(-10, -7); // Get area code from 10-digit number
+
+    console.log("Looking for numbers with matching area code", {
+      inputPhoneNumber: phone_number,
+      inputAreaCode: inputAreaCode,
+      availableNumbers: numbersWithoutWebhooks.length,
+    });
+
+    // First, try to find a number with the same area code
+    let selectedNumber = numbersWithoutWebhooks.find(num => {
+      const numAreaCode = num.phone_number.replace(/\D/g, "").slice(-10, -7);
+      return numAreaCode === inputAreaCode;
+    });
+
+    // If no matching area code found, use the first available number
+    if (!selectedNumber) {
+      selectedNumber = numbersWithoutWebhooks[0];
+      console.log("No matching area code found, using first available number", {
+        selectedNumber: selectedNumber.phone_number,
+        selectedAreaCode: selectedNumber.phone_number.replace(/\D/g, "").slice(-10, -7),
+        requestedAreaCode: inputAreaCode,
+      });
+    } else {
+      console.log("Found number with matching area code", {
+        selectedNumber: selectedNumber.phone_number,
+        matchingAreaCode: inputAreaCode,
+      });
+    }
+
     console.log("Selected Twilio phone number", {
       selectedNumber: selectedNumber.phone_number,
       sid: selectedNumber.sid,
       currentSmsUrl: selectedNumber.sms_url || "none",
+      areaCodeMatch: selectedNumber.phone_number.replace(/\D/g, "").slice(-10, -7) === inputAreaCode,
     });
 
     // Step 2: Update the existing number with SMS processor webhook (including clinic_id)
