@@ -65,7 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
           setIsLoggingOut(true);
           const success = await signOut();
           if (success) {
-            localStorage.clear(); // Clear local storage on logout
+            // localStorage.clear(); // Clear local storage on logout
             SuccessToast("Logout Successfully");
             setTimeout(() => {
               push("/login");
