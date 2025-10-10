@@ -251,6 +251,10 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
 
       setPickerTreeData(treeData);
 
+      // Auto-select all the sheet values for better UX
+      const autoSelectedValues = treeData.flatMap((file: any) => file.children.map((child: any) => child.value));
+      onSelectWorksheets?.(autoSelectedValues);
+
       // Process files through backend to get detailed sheet info
       if (accountInfo?.connection_id) {
         try {
@@ -357,8 +361,8 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
                   onClick={openPicker}
                   disabled={initializationState !== "ready"}
                   loading={initializationState === "loading"}
-                  icon={initializationState !== "loading" && <Image src="/google.svg" alt="Google" width={16} height={16} />}
-                  className="bg-gray-500 hover:bg-gray-600 text-white border-gray-500 px-6 py-2 h-10"
+                  icon={initializationState !== "loading" && <Image src="/drive.png" alt="Google Drive" width={18} height={18} />}
+                  className="bg-blue-50 hover:bg-blue-700 text-blue-600 border-blue-300 px-6 py-2 h-10 flex items-center justify-center gap-2"
                 >
                   {initializationState === "loading"
                     ? "Initializing..."
