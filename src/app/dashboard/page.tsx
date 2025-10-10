@@ -286,7 +286,7 @@ export default function DashboardPage() {
                 <div className="flex-1">
                   <span className="font-semibold text-gray-900 block mb-1">Nurturing Phone Number</span>
                   <div className="text-sm text-gray-600">
-                    <div>{twilioPhoneNumber || "Not configured"}</div>
+                    <div>{twilioPhoneNumber || ""}</div>
                   </div>
                 </div>
               </div>

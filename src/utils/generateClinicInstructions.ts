@@ -342,52 +342,49 @@ Day 20: "Still curious about [Service], or should I hit pause for now? Totally f
 
 EMAIL FOLLOW-UP PATTERNS (Include Unsubscribe Footer):
 
-STORY PATTERN (Day 21+):
-- Use clinic-specific success stories or case studies from document
+EMAIL CONTENT PATTERNS:
+
+STORY-BASED EMAILS:
+- Use diverse success stories and case studies
 - Format: Challenge → Solution → Results → Lesson
-- Example subjects: "The [clinic-specific] story that changed everything" / "What [patient story] taught us about [service]"
-- End with: "If you're ready to take a decisive step for yourself with [Service], reply and I'll help you explore what that could look like."
-- Footer: Standard unsubscribe footer (see below)
+- Vary subjects to avoid repetition and create unique hooks
+- End with: "If you're ready to take a step forward with [Service], reply and I'll help you explore what that could look like."
 
-EDUCATION PATTERN (Day 24+):
-- Share clinic-specific insights, research, or "why we ignore problems that matter most"
+EDUCATIONAL EMAILS:
+- Share varied insights, research, and healthcare perspectives
 - Format: Observation → Explanation → Connection to Service → Solution
-- Example subjects: "Why [clinic insight] matters for [Service]" / "The psychology behind [service decision]"
+- Create fresh subjects that connect to current healthcare trends
 - End with: "If [Service] has been on your mind, reply and I'll help you understand how this applies to your situation."
-- Footer: Standard unsubscribe footer (see below)
 
-PSYCHOLOGY PATTERN (Day 27+):
-- Use behavioral insights related to decision-making and clinic services
-- Examples: "The myth of perfect time" / "What surgeons know about confidence"
-- Connect psychological principles to taking action on self-care
-- End with: "If [Service] has been on your 'someday' list, maybe it's time to challenge that assumption."
-- Footer: Standard unsubscribe footer (see below)
+PSYCHOLOGY-BASED EMAILS:
+- Use different behavioral insights related to decision-making
+- Connect various psychological principles to taking action on self-care
+- Generate unique subjects that reflect human behavior patterns
+- End with: "If [Service] has been on your consideration list, maybe it's time to explore that further."
 
-MOMENTUM PATTERN (Day 30+):
+MOMENTUM EMAILS:
 - Focus on taking action, building confidence, overcoming hesitation
-- Use clinic expertise and patient success patterns
-- Examples: "The 10-minute rule for doing anything hard" / "How to build confidence through action"
+- Use varied clinic expertise and patient success patterns
+- Create subjects that inspire action without being formulaic
 - End with: "If you want help taking that first step with [Service], just reply."
-- Footer: Standard unsubscribe footer (see below)
 
-SOCIAL PROOF PATTERN (Day 45+):
-- Share patient feedback patterns (customize from clinic document)
-- Format: "Over the years, we've heard a lot from patients who finally decided to make a change..."
-- Include common responses: "I wish I'd done this sooner" / "I was nervous for nothing" / "I thought I'd have to have it all figured out"
+SOCIAL PROOF EMAILS:
+- Share diverse patient feedback patterns (customize from clinic document)
+- Format: "We've heard from many patients who made positive changes..."
+- Include varied common responses while avoiding repetitive language
 - End with: "If you want to talk through what that looks like for [Service], just reply."
-- Footer: Standard unsubscribe footer (see below)
 
-URGENCY/SCARCITY PATTERN (Day 60+):
-- "The quiet cost of putting yourself last" / "The invisible opportunity cost"
+VALUE-FOCUSED EMAILS:
 - Focus on what waiting costs vs. benefits of action
-- End with: "If you've been pushing [Service] to the bottom of the list, maybe it's time to ask: What would change if I put myself first?"
-- Footer: Standard unsubscribe footer (see below)
+- Use varied approaches to discussing priorities and self-care
+- Create subjects that address different aspects of value and timing
+- End with: "If you've been considering [Service], maybe it's time to ask: What would taking action mean for you?"
 
-FINAL SEQUENCE (Day 100+):
-- Direct close: "Are you still curious about [Service], or should I close your file?"
-- One-year challenge: "Picture yourself one year from today..."
-- Final offer: "This is my last email. If you want to finally explore [Service], reply."
-- Footer: Standard unsubscribe footer (see below)
+FINAL SEQUENCE EMAILS:
+- Direct close with varied approaches to urgency
+- Use different perspectives on future planning and decision-making
+- Create unique final offers while maintaining professionalism
+- End with clear next steps and genuine helpfulness
 
 EMAIL RESPONSE RULES:
 • End email content naturally without signatures or footers

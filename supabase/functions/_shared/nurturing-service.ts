@@ -929,7 +929,8 @@ CRITICAL EMAIL FORMATTING RULES:
   - Personal anecdotes from clinic experience
 • **TONE**: Conversational, educational, story-driven, never pushy
 • **FORMAT**: Natural paragraph flow, not forced short lines
-• **PARAGRAPH LENGTH**: ABSOLUTE 20-word maximum - count EVERY word including "a", "the", "and". NO EXCEPTIONS. Split long sentences into multiple paragraphs rather than exceed 20 words.
+• **PARAGRAPH LENGTH**: ABSOLUTE 15-word maximum - count EVERY word including "a", "the", "and". NO EXCEPTIONS. Split long sentences into multiple paragraphs rather than exceed 15 words.
+• **TOTAL RESPONSE LENGTH**: Aim for 12-15 paragraphs total for optimal email length.
 • **SUBJECT LINE**: NEVER write "Subject:" in the subject line - write ONLY the subject text without any prefix
 • Do NOT include "Subject:" prefix or clinic signatures
 • Do NOT include unsubscribe text (system handles this automatically)
@@ -952,50 +953,48 @@ Patient Details:
 - Urgency: ${lead.urgency || "unknown"}
 - Clinic Type: ${clinic.clinic_type || "healthcare"}
 
-FOLLOW THESE EXACT EMAIL EXAMPLES FOR INSPIRATION:
+CREATE UNIQUE EMAIL CONTENT BASED ON THESE GENERAL THEMES:
 
-**Day 21 Example**: "The $20 million mistake that started a movement" - J&J Tylenol story showing decisive action
-**Day 24 Example**: "Why we ignore problems that matter most" - Psychology of urgency effect  
-**Day 27 Example**: "The hospital with no waiting room" - Virginia Mason Medical Center innovation
-**Day 30 Example**: "The myth of the 'perfect time'" - Present bias and cost of waiting
-**Day 33 Example**: "The placebo effect is weirder than you think" - 2002 knee surgery study
-**Day 36 Example**: "The woman who walked into a clinic and changed medicine" - Fanny Longfellow ether story
-**Day 39 Example**: "What surgeons know about confidence" - Confidence through preparation
-**Day 42 Example**: "The lost art of follow-through" - Duke habits research (45% of actions)
-**Day 45 Example**: "The experiment that shocked psychologists" - Milgram authority study
-**Day 50 Example**: "The 10-minute rule for doing anything hard" - Starting momentum technique
-**Day 55 Example**: "Lessons from 1,000 patient conversations" - Three common myths
-**Day 60 Example**: "The quiet cost of putting yourself last" - Self-care prioritization
-**Day 70 Example**: "How billion-dollar companies make decisions fast" - Speed over perfection
-**Day 80 Example**: "The psychology of momentum (and how to get it)" - Zeigarnik effect
-**Day 90 Example**: "The 3 most common myths I hear in this clinic" - Patient misconceptions
-**Day 100 Example**: "Are you still curious, or should I close your file?" - Direct final sequence
-**Day 110 Example**: "The one-year challenge" - Long-term perspective mental exercise
-**Day 115 Example**: "The invisible opportunity cost" - Hidden costs of inaction
-**Day 118 Example**: "The best time to start (and it's not what you think)" - Tree planting proverb
-**Day 120 Example**: "Before I stop bugging you..." - Final email sequence
+Use varied storytelling approaches:
+- Historical discoveries and innovations
+- Psychology and behavioral science insights  
+- Medical breakthroughs and research findings
+- Business success and transformation stories
+- Cultural phenomena and social changes
+- Scientific studies and surprising findings
+- Personal development and growth concepts
+- Decision-making and momentum psychology
+
+Create subjects that are completely unique and avoid repetitive patterns.
 
 GENERATE AN EMAIL FOLLOWING THIS PATTERN:
-1. Create unique subject using patterns above (vary the hook completely) - NO "Subject:" prefix
+1. Create a completely unique subject line based on the lead's specific situation and journey (day ${leadAge}) - NO "Subject:" prefix
 2. Start with personalized greeting: "Hi ${lead.first_name || "there"},"
-3. Begin with specific story, statistic, or historical example
-4. Build narrative with concrete details (names, dates, numbers)
-5. Extract the universal principle or psychology concept
+3. Begin with a fresh story, insight, or perspective relevant to healthcare decisions
+4. Build narrative with concrete details but avoid overused examples
+5. Extract a universal principle or psychology concept
 6. Connect to human behavior and decision-making
 7. Relate back to reader's ${clinic.clinic_type} situation
 8. End with conversational call-to-action that MUST include the booking link: <a href="${bookingLink}" style="color: #10b981; text-decoration: none; font-weight: bold;">Schedule your consultation</a>
 
+CRITICAL FOR UNIQUENESS:
+- Include lead identifier: ${lead.id.slice(-4)} in your creative process to ensure uniqueness
+- Vary your opening hook completely from common patterns
+- Use diverse, less predictable story sources and angles
+- Make the subject line specific to this lead's timeline and context
+
 🚨🚨🚨 ABSOLUTELY CRITICAL FORMATTING REQUIREMENTS - NO EXCEPTIONS 🚨🚨🚨
 
 - Subject line: Write ONLY the text, never include "Subject:"
-- Paragraphs: MAXIMUM 20 WORDS EACH - COUNT EVERY SINGLE WORD INCLUDING "A", "THE", "AND"
-- If ANY sentence exceeds 20 words, IMMEDIATELY split into TWO paragraphs
-- ZERO EXCEPTIONS to the 20-word rule - sacrifice sentence flow if needed
-- Better to have short, choppy paragraphs than exceed 20 words EVER
-- Count words like this: "In(1) 1999(2), a(3) pivotal(4) study(5)..." and STOP at word 20
+- Paragraphs: MAXIMUM 15 WORDS EACH - COUNT EVERY SINGLE WORD INCLUDING "A", "THE", "AND"
+- If ANY sentence exceeds 15 words, IMMEDIATELY split into TWO paragraphs
+- ZERO EXCEPTIONS to the 15-word rule - sacrifice sentence flow if needed
+- Better to have short, choppy paragraphs than exceed 15 words EVER
+- Count words like this: "In(1) 1999(2), a(3) pivotal(4) study(5)..." and STOP at word 15
 - Start each new paragraph on a NEW LINE with proper line breaks between them
 - NEVER combine multiple sentences into one paragraph block
 - RECOUNT YOUR WORDS IN EVERY PARAGRAPH BEFORE FINALIZING
+- AIM FOR 20-25 TOTAL PARAGRAPHS for optimal email length and engagement
 
 MAKE IT COMPLETELY UNIQUE - USE DIVERSE STORY TYPES:
 - Historical events: Wright brothers, Marie Curie, Alexander Fleming discoveries
@@ -1005,21 +1004,20 @@ MAKE IT COMPLETELY UNIQUE - USE DIVERSE STORY TYPES:
 - Scientific discoveries: Medical breakthroughs, unexpected findings, paradigm shifts
 - Human behavior studies: Why people procrastinate, decision-making patterns, social psychology
 
-SUBJECT LINE VARIATIONS:
-- "The accidental discovery that changed everything"
-- "Why 89% of people make this same mistake"  
-- "What kindergarteners taught us about [topic]"
-- "The 15-minute rule that transformed lives"
-- "Before you decide, read this"
+SUBJECT LINE APPROACH:
+- Generate fresh, contextual subjects based on the lead's specific journey
+- Avoid formulaic templates and overused patterns
+- Draw inspiration from current events, seasonal themes, or unexpected angles
+- Make it personal and relevant to their healthcare decision timeline
+- Include subtle references to their stage in the process
 
-AVOID REPETITIVE PATTERNS:
-- NEVER use "$X million lesson" or "$X cost" templates repeatedly  
-- DON'T start with "In [year], [entity] faced..." every time
-- AVOID corporate loss/cost stories if recently used
-- ROTATE between: historical events, psychology studies, scientific discoveries, cultural phenomena, innovations
-- COMPLETELY different opening hooks: questions, statistics, quotes, observations, scenarios
-- VARY the lesson types: behavioral psychology, decision science, innovation stories, cultural shifts
-- NO MORE than one "cost/loss" story per sequence
+ENSURE UNIQUENESS:
+- Avoid clichéd openings and overused story templates
+- Don't rely on dollar amounts or corporate disaster stories
+- Use original perspectives and fresh angles on universal themes
+- Rotate between different types of evidence and examples
+- Make each email feel personally crafted, not template-generated
+- Consider the recipient's unique context and timeline
 
 REMEMBER: End naturally without signatures, footers, or closing formalities. The system will add unsubscribe links automatically.
 
