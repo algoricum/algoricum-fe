@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { google } from "https://esm.sh/googleapis@140.0.0";
+import { corsHeaders } from "../_shared/cors.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -13,7 +14,7 @@ const googleAdsDeveloperToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN")!;
 serve(async req => {
   // Handle CORS
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders() });
   }
 
   try {
@@ -38,14 +39,14 @@ serve(async req => {
       default:
         return new Response(JSON.stringify({ error: "Route not found" }), {
           status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
         });
     }
   } catch (error) {
     console.error("Error:", error);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 });
@@ -57,7 +58,7 @@ async function handleOAuthCallback(req: Request, supabase: any) {
   if (!code) {
     return new Response(JSON.stringify({ error: "No authorization code provided" }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
@@ -66,11 +67,11 @@ async function handleOAuthCallback(req: Request, supabase: any) {
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
-  return new Response(JSON.stringify({ data }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ data }), { headers: { ...corsHeaders(), "Content-Type": "application/json" } });
 }
 
 async function refreshGoogleToken(oauth2Client: any, connection: any, supabaseAdmin: any) {
@@ -113,14 +114,14 @@ async function fetchGoogleLeadFormResponses(req: Request, supabaseAdmin: any) {
   if (!clinic_id) {
     return new Response(JSON.stringify({ error: "clinic_id is required" }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
   if (!googleAdsDeveloperToken) {
     return new Response(JSON.stringify({ error: "Google Ads Developer Token not configured" }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
@@ -134,14 +135,14 @@ async function fetchGoogleLeadFormResponses(req: Request, supabaseAdmin: any) {
   if (connError) {
     return new Response(JSON.stringify({ error: "Failed to fetch connections: " + connError.message }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
   if (!connections || connections.length === 0) {
     return new Response(JSON.stringify({ error: "No active Google Lead Form connections found" }), {
       status: 404,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
@@ -155,7 +156,7 @@ async function fetchGoogleLeadFormResponses(req: Request, supabaseAdmin: any) {
   if (leadSourceError || !leadSource) {
     return new Response(JSON.stringify({ error: "Lead source not found" }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   }
 
@@ -373,6 +374,6 @@ async function fetchGoogleLeadFormResponses(req: Request, supabaseAdmin: any) {
         errors: errors,
       },
     }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    { headers: { ...corsHeaders(), "Content-Type": "application/json" } },
   );
 }
