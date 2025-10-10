@@ -133,8 +133,8 @@ export const useAuth = () => {
       // First ensure the Supabase signOut succeeds
       await signOut();
       // Then clear local storage data
-      localStorage.clear();
-      clearAll();
+      // localStorage.clear();
+      // clearAll();
       return true;
     } catch (error) {
       console.error("Detailed logout error:", error);
