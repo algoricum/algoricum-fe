@@ -26,7 +26,7 @@ const Header = ({ title = "", description = "", showHamburgerMenu = false }: Hea
       setIsLoggingOut(true);
       const success = await signOut();
       if (success) {
-        localStorage.clear();
+        // localStorage.clear();
         SuccessToast("Logout Successfully");
         router.push("/login");
       } else {
