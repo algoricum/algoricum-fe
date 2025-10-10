@@ -531,11 +531,11 @@ export default function MainOnboarding() {
     try {
       const success = await logout();
       if (success) {
-        localStorage.clear();
-        localStorage.removeItem(ONBOARDING_STORAGE_KEY);
-        localStorage.removeItem(ONBOARDING_STEP_KEY);
-        localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
-        localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
+        // localStorage.clear();
+        // localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+        // localStorage.removeItem(ONBOARDING_STEP_KEY);
+        // localStorage.removeItem(ONBOARDING_COMPLETED_STEPS_KEY);
+        // localStorage.removeItem(ONBOARDING_LEADS_FILE_NAME);
 
         SuccessToast("Logout Successfully");
         router.push("/login");
