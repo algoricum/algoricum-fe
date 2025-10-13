@@ -328,7 +328,7 @@ export async function fetchAccountsAndLeadForms(connection_id: string, supabase:
 
     // Try to fetch accessible customers using Google Ads API
     const GOOGLE_ADS_DEVELOPER_TOKEN = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
-    const API_VERSION = "v16"; // Latest stable version
+    const API_VERSION = "v21"; // Latest stable version
 
     if (!GOOGLE_ADS_DEVELOPER_TOKEN) {
       console.warn(`[FETCH_ACCOUNTS] No Google Ads Developer Token found. Manual customer ID setup required.`);
@@ -336,7 +336,7 @@ export async function fetchAccountsAndLeadForms(connection_id: string, supabase:
       console.log(`[FETCH_ACCOUNTS] Attempting to fetch accessible customers with Developer Token`);
 
       try {
-        const customersResponse = await fetch(`https://googleads.googleapis.com/v${API_VERSION}/customers:listAccessibleCustomers`, {
+        const customersResponse = await fetch(`https://googleads.googleapis.com/${API_VERSION}/customers:listAccessibleCustomers`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

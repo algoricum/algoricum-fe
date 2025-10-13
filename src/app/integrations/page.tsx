@@ -21,7 +21,6 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   connectToGHL,
   connectToGoogleForm,
-  connectToGoogleLeadForm,
   connectToHubSpot,
   connectToNextHealth,
   connectToPipedrive,
@@ -152,6 +151,19 @@ export default function IntegrationsPage() {
   //  pipedrive
   const [pipedriveAccountInfo, setPipedriveAccountInfo] = useState<any>(null);
 
+  // Google Lead Forms
+  const [googleLeadFormData, setGoogleLeadFormData] = useState<{
+    accountInfo: any;
+    availableForms: any[];
+    connectionId: string;
+    availableCustomerIds: string[];
+  }>({
+    accountInfo: null,
+    availableForms: [],
+    connectionId: "",
+    availableCustomerIds: [],
+  });
+
   // Helper functions for state management
   const updateIntegrationStatus = (name: IntegrationName, status: ConnectionStatus) => {
     setIntegrationStates(prev => ({
@@ -251,6 +263,40 @@ export default function IntegrationsPage() {
     }
   }, [clinicId]);
 
+  // Handle Google Lead Forms OAuth callback
+  useEffect(() => {
+    const handleGoogleLeadFormCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const googleLeadFormStatus = urlParams.get("google_lead_form_status");
+
+      if (googleLeadFormStatus === "success" && clinicId) {
+        console.log("Google Lead Form OAuth success detected, refreshing status");
+
+        // Actually check the database status
+        const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
+        console.log("Real Google Lead Form status from database:", realStatus);
+
+        // Update the UI status (this will move it to connected section)
+        updateIntegrationStatus("Google Lead Forms", realStatus);
+
+        // Wait a moment for state to update, then open the modal
+        setTimeout(() => {
+          console.log("Opening Google Lead Form modal after status update");
+          toggleModal("Google Lead Forms", true);
+        }, 100);
+
+        // Clean up URL parameters
+        const url = new URL(window.location.href);
+        url.searchParams.delete("google_lead_form_status");
+        window.history.replaceState({}, "", url.toString());
+      }
+    };
+
+    if (clinicId) {
+      handleGoogleLeadFormCallback();
+    }
+  }, [clinicId]);
+
   // Fetch Typeform data when modal opens
   useEffect(() => {
     const fetchTypeformData = async () => {
@@ -300,6 +346,42 @@ export default function IntegrationsPage() {
 
     fetchJotformData();
   }, [isModalOpen("Jotform")]);
+
+  // Fetch Google Lead Forms data when modal opens
+  useEffect(() => {
+    const fetchGoogleLeadFormData = async () => {
+      if (isModalOpen("Google Lead Forms") && getIntegrationStatus("Google Lead Forms") === "connected") {
+        try {
+          const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Google Lead Forms").limit(1).single();
+
+          const { data: googleLeadFormConnection } = await supabase
+            .from("integration_connections")
+            .select("*")
+            .eq("clinic_id", await getClinicId())
+            .eq("integration_id", connection?.id)
+            .single();
+
+          console.log("Google Lead Form connection data:", googleLeadFormConnection);
+
+          if (googleLeadFormConnection) {
+            setGoogleLeadFormData({
+              accountInfo: {
+                accountName: googleLeadFormConnection.auth_data?.account_name || "Google Ads",
+                selectedFormsCount: googleLeadFormConnection.auth_data?.selected_forms?.length || 0,
+              },
+              availableForms: googleLeadFormConnection.auth_data?.available_forms || [],
+              connectionId: googleLeadFormConnection.id,
+              availableCustomerIds: googleLeadFormConnection.auth_data?.accessible_customer_ids || [],
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching Google Lead Form data:", error);
+        }
+      }
+    };
+
+    fetchGoogleLeadFormData();
+  }, [isModalOpen("Google Lead Forms")]);
 
   // Fetch Google Forms data when modal opens
   useEffect(() => {
@@ -586,7 +668,7 @@ export default function IntegrationsPage() {
                             <p className="text-gray-500 text-sm">{integration.description || "No description available"}</p>
                           </div>
 
-                          {/* Special handling for Facebook Lead Forms */}
+                          {/* Special handling for Facebook Lead Forms and Google Lead Forms */}
                           {integration.name === "Facebook Lead Forms" ? (
                             <Button
                               type="primary"
@@ -595,6 +677,18 @@ export default function IntegrationsPage() {
                               onClick={() => {
                                 console.log("Opening Facebook form selection modal");
                                 toggleModal("Facebook Lead Forms", true);
+                              }}
+                            >
+                              Manage Forms
+                            </Button>
+                          ) : integration.name === "Google Lead Forms" ? (
+                            <Button
+                              type="primary"
+                              size="small"
+                              className="!bg-[#4285F4] !border-[#4285F4] hover:!bg-blue-600"
+                              onClick={() => {
+                                console.log("Opening Google Lead Forms management modal");
+                                toggleModal("Google Lead Forms", true);
                               }}
                             >
                               Manage Forms
@@ -760,15 +854,129 @@ export default function IntegrationsPage() {
         <GoogleLeadFormModal
           open={isModalOpen("Google Lead Forms")}
           status={getIntegrationStatus("Google Lead Forms")}
-          onCancel={() => toggleModal("Google Lead Forms", false)}
-          onOk={() => toggleModal("Google Lead Forms", false)}
-          onConnect={() => connectToGoogleLeadForm(setButtonLoading)}
-          accountInfo={{ accountName: "your GoogleLeadForm account successfully" }}
+          accountInfo={googleLeadFormData.accountInfo}
+          availableLeadForms={googleLeadFormData.availableForms}
+          availableCustomerIds={googleLeadFormData.availableCustomerIds}
+          connectionId={googleLeadFormData.connectionId}
+          onCancel={() => {
+            toggleModal("Google Lead Forms", false);
+            setButtonLoading(false);
+          }}
+          onOk={() => {
+            toggleModal("Google Lead Forms", false);
+            setButtonLoading(false);
+          }}
+          onConnect={async () => {
+            setButtonLoading(true);
+            window.location.href = `${SUPABASE_URL}/functions/v1/google-leads/auth/start?clinic_id=${clinicId}&redirect_to=${window.location.href}`;
+          }}
+          onSetCustomerId={async (customerId: string) => {
+            setButtonLoading(true);
+            try {
+              const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/set-customer-id`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                  apikey: SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({
+                  connection_id: googleLeadFormData.connectionId,
+                  google_customer_id: customerId,
+                }),
+              });
+
+              if (!response.ok) throw new Error(await response.text());
+
+              const result = await response.json();
+              console.log("Customer ID set successfully:", result);
+
+              // Refresh the modal data
+              const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
+              updateIntegrationStatus("Google Lead Forms", realStatus);
+            } catch (error) {
+              console.error("Error setting customer ID:", error);
+              ErrorToast("Failed to set customer ID");
+            } finally {
+              setButtonLoading(false);
+            }
+          }}
+          onSelectCustomerId={async (selectedCustomerId: string) => {
+            setButtonLoading(true);
+            try {
+              const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/select-customer`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                  apikey: SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({
+                  connection_id: googleLeadFormData.connectionId,
+                  selected_customer_id: selectedCustomerId,
+                }),
+              });
+
+              if (!response.ok) throw new Error(await response.text());
+
+              const result = await response.json();
+              console.log("Customer selected successfully:", result);
+
+              // Refresh the modal data
+              const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
+              updateIntegrationStatus("Google Lead Forms", realStatus);
+            } catch (error) {
+              console.error("Error selecting customer:", error);
+              ErrorToast("Failed to select customer");
+            } finally {
+              setButtonLoading(false);
+            }
+          }}
+          onSaveSelectedForms={async (selectedForms: any[]) => {
+            setButtonLoading(true);
+            try {
+              const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/save-selected-forms`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                  apikey: SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({
+                  connection_id: googleLeadFormData.connectionId,
+                  selected_forms: selectedForms,
+                }),
+              });
+
+              if (!response.ok) throw new Error(await response.text());
+
+              const result = await response.json();
+              console.log("Forms saved successfully:", result);
+
+              // Refresh the modal data and close
+              const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
+              updateIntegrationStatus("Google Lead Forms", realStatus);
+              toggleModal("Google Lead Forms", false);
+              SuccessToast(`Successfully configured ${selectedForms.length} lead forms!`);
+            } catch (error) {
+              console.error("Error saving forms:", error);
+              ErrorToast("Failed to save selected forms");
+            } finally {
+              setButtonLoading(false);
+            }
+          }}
           onSyncLeads={syncGoogleLeadFormLeads}
           onDisconnect={async () => {
-            deleteIntegrationConnections(await getClinicId(), "Google Lead Forms");
-            toggleModal("Google Lead Forms", false);
+            const clinicId = await getClinicId();
+            deleteIntegrationConnections(clinicId, "Google Lead Forms");
             updateIntegrationStatus("Google Lead Forms", "disconnected");
+            setGoogleLeadFormData({
+              accountInfo: null,
+              availableForms: [],
+              connectionId: "",
+              availableCustomerIds: [],
+            });
+            toggleModal("Google Lead Forms", false);
           }}
           buttonLoading={buttonLoading}
         />
