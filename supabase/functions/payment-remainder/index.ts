@@ -45,7 +45,7 @@ async function sendEmail(to: string, subject: string, html: string) {
 }
 
 // Generate trial reminder email HTML based on day
-function generateReminderEmail(clinicName: string, checkoutUrl: string, day: number, daysLeft: number) {
+function generateReminderEmail(clinicName: string, checkoutUrl: string, day: number, daysLeft: number, clinic: any) {
   const getSubject = (day: number) => {
     switch (day) {
       case 3:
@@ -112,51 +112,56 @@ function generateReminderEmail(clinicName: string, checkoutUrl: string, day: num
 
   return `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
-        <meta charset="utf-8">
+        <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${getSubject(day)}</title>
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #f8f9fa; padding: 20px; text-align: center; border-radius: 8px; }
-            .content { padding: 20px 0; }
-            .cta-button { 
-               display: inline-block; 
-                background: #800080; 
-                color: white; 
-                padding: 12px 30px; 
-                text-decoration: none; 
-                border-radius: 5px; 
-                margin: 20px 0; 
-
-            }
-                .cta-button, 
-.cta-button:link, 
-.cta-button:visited, 
-.cta-button:hover, 
-.cta-button:active {
-    color: white !important;
-    text-decoration: none;
-}
-            .footer { font-size: 12px; color: #666; text-align: center; margin-top: 30px; }
-            .urgent { color: #dc3545; font-weight: bold; }
-        </style>
     </head>
-    <body>
-        <div class="container">
-       
-            <div class="content">
-                ${getMainMessage(day, daysLeft)}
-                <div style="text-align: center;">
-                    <a href="${checkoutUrl}" class="cta-button">${getCTAText(day)}</a>
-                </div>
-               
-                <p>Algoricum</p>
-            </div>
-          
-        </div>
+    <body style="margin: 0; padding: 0; background-color: #f8fafc;">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f8fafc; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                        <!-- Main Content -->
+                        <tr>
+                            <td style="padding: 40px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 16px; color: #334155;">
+                                ${getMainMessage(day, daysLeft)}
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="${checkoutUrl}" style="display: inline-block; background: #800080; color: white; padding: 15px 35px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; border: none; cursor: pointer;">${getCTAText(day)}</a>
+                                </div>
+                                <p style="margin: 30px 0 0 0; color: #64748b; font-size: 14px;">If you have any questions about your account or billing, please don't hesitate to reach out to our support team.</p>
+                            </td>
+                        </tr>
+                        
+                        <!-- Contact Information Footer -->
+                        <tr>
+                            <td style="padding: 30px 40px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+                                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #64748b; text-align: center;">
+                                            <strong style="color: #2563eb; font-size: 16px; display: block; margin-bottom: 10px;">${clinic?.name || clinicName}</strong>
+                                            ${clinic?.address ? `<div style="margin-bottom: 8px;">${clinic.address}</div>` : ""}
+                                            ${clinic?.phone ? `<div style="margin-bottom: 8px;">Phone: <a href="tel:${clinic.phone}" style="color: #2563eb; text-decoration: none;">${clinic.phone}</a></div>` : ""}
+                                            ${clinic?.email ? `<div style="margin-bottom: 8px;">Email: <a href="mailto:${clinic.email}" style="color: #2563eb; text-decoration: none;">${clinic.email}</a></div>` : ""}
+                                            <div style="margin-top: 15px; font-size: 12px; color: #94a3b8;">
+                                                <div>Powered by Algoricum</div>
+                                                <div style="margin-top: 10px;">
+                                                    <a href="${Deno.env.get("SUPABASE_URL")}/functions/v1/unsubscribe-lead/unsubscribe-daily-remainder?clinic_id=${clinic?.id}" 
+                                                       style="color: #6b7280; text-decoration: underline; font-size: 11px;">
+                                                        Unsubscribe from daily reminders
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
     </body>
     </html>
   `;
@@ -224,8 +229,7 @@ async function processRemindersForDay(reminderConfig: any, subscriptions: any[])
     let checkoutUrl = null;
     try {
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://eypitkzntyiyvwrndkgy.supabase.co";
-      const SUPABASE_ANON_KEY =
-        Deno.env.get("SUPABASE_ANON_KEY") || "";
+      const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
       const checkoutResponse = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
         method: "POST",
@@ -259,7 +263,7 @@ async function processRemindersForDay(reminderConfig: any, subscriptions: any[])
     const emailSent = await sendEmail(
       clinic.email,
       reminderConfig.subject,
-      generateReminderEmail(clinic.name || "there", checkoutUrl, reminderConfig.day, daysLeft),
+      generateReminderEmail(clinic.name || "there", checkoutUrl, reminderConfig.day, daysLeft, clinic),
     );
 
     if (emailSent) {
