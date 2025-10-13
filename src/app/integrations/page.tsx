@@ -21,6 +21,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   connectToGHL,
   connectToGoogleForm,
+  connectToGoogleLeadForm,
   connectToHubSpot,
   connectToNextHealth,
   connectToPipedrive,
@@ -867,8 +868,7 @@ export default function IntegrationsPage() {
             setButtonLoading(false);
           }}
           onConnect={async () => {
-            setButtonLoading(true);
-            window.location.href = `${SUPABASE_URL}/functions/v1/google-leads/auth/start?clinic_id=${clinicId}&redirect_to=${window.location.href}`;
+            connectToGoogleLeadForm(setButtonLoading);
           }}
           onSetCustomerId={async (customerId: string) => {
             setButtonLoading(true);

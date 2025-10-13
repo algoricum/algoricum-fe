@@ -1,14 +1,14 @@
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders, handleOptions } from "../_shared/cors.ts";
 import {
+  fetchAccountsAndLeadForms,
+  fetchAvailableLeadForms,
   handleOAuthCallback,
   insertLead,
-  startAuth,
-  fetchAvailableLeadForms,
   saveSelectedLeadForms,
   setGoogleCustomerId,
-  fetchAccountsAndLeadForms,
+  startAuth,
 } from "../_shared/google-leads-service.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -32,7 +32,48 @@ serve(async req => {
     // Initialize Supabase Admin client
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 0️⃣ Start OAuth
+    // 0️⃣ OAuth Start (GET /auth/start)
+    if (pathname.includes("/auth/start") && method === "GET") {
+      console.log(`[GOOGLE_LEADS] Route matched: auth/start`);
+
+      const clinicId = url.searchParams.get("clinic_id");
+      const redirectTo = url.searchParams.get("redirect_to");
+
+      console.log(`[GOOGLE_LEADS] OAuth start request:`, { clinicId, redirectTo });
+
+      if (!clinicId) {
+        console.error(`[GOOGLE_LEADS] Missing clinic_id parameter`);
+        return new Response("Missing clinic_id parameter", {
+          status: 400,
+          headers: { ...corsHeaders(), "Content-Type": "text/plain" },
+        });
+      }
+
+      try {
+        console.log(`[GOOGLE_LEADS] Starting OAuth for clinic: ${clinicId}`);
+        const authUrl = await startAuth(clinicId, redirectTo, supabaseAdmin);
+        console.log(`[GOOGLE_LEADS] Redirecting to OAuth URL: ${authUrl}`);
+
+        return new Response(null, {
+          status: 302,
+          headers: { ...corsHeaders(), Location: authUrl },
+        });
+      } catch (error) {
+        console.error(`[GOOGLE_LEADS] Error starting OAuth:`, error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to start OAuth",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders(), "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
+    // 0️⃣ Start OAuth (Legacy POST endpoint)
     if (pathname.includes("/start-auth") && method === "POST") {
       console.log(`[GOOGLE_LEADS] Route matched: start-auth`);
 
