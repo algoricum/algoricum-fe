@@ -15,6 +15,7 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
   status,
   accountInfo,
   availableLeadForms = [],
+  availableCustomerIds = [],
   onOk,
   onCancel,
   onConnect,
@@ -22,10 +23,12 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
   onDisconnect,
   onSetCustomerId,
   onSaveSelectedForms,
+  onSelectCustomerId,
   buttonLoading,
 }) => {
   const [customerId, setCustomerId] = useState("");
   const [selectedForms, setSelectedForms] = useState<string[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
 
   const handleCustomerIdSubmit = () => {
     if (customerId.trim() && onSetCustomerId) {
@@ -45,6 +48,12 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
     const formsToSave = availableLeadForms.filter(form => selectedForms.includes(form.id));
     if (onSaveSelectedForms) {
       onSaveSelectedForms(formsToSave);
+    }
+  };
+
+  const handleCustomerSelection = () => {
+    if (selectedCustomerId && onSelectCustomerId) {
+      onSelectCustomerId(selectedCustomerId);
     }
   };
   return (
@@ -169,6 +178,70 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
               <Text className="text-gray-500">Getting available lead forms from Google Ads</Text>
             </div>
           </div>
+        )}
+
+        {status === "selecting_customer" && (
+          <>
+            <Alert
+              message="Select Google Ads Account"
+              description="Multiple Google Ads accounts found. Please select which account to use for lead form integration."
+              type="info"
+              showIcon
+              className="mb-4"
+            />
+            <div className="space-y-4">
+              {availableCustomerIds.length > 0 ? (
+                <>
+                  <List
+                    dataSource={availableCustomerIds}
+                    renderItem={customerid => (
+                      <List.Item>
+                        <Card size="small" className="w-full">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center">
+                                <Checkbox
+                                  checked={selectedCustomerId === customerid}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setSelectedCustomerId(customerid);
+                                    } else {
+                                      setSelectedCustomerId("");
+                                    }
+                                  }}
+                                />
+                                <div className="ml-3">
+                                  <Text strong className="block">
+                                    Customer ID: {customerid}
+                                  </Text>
+                                  <Text className="text-sm text-gray-500">Google Ads Account</Text>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      </List.Item>
+                    )}
+                  />
+                  <div className="text-center mt-4">
+                    <Button
+                      type="primary"
+                      onClick={handleCustomerSelection}
+                      disabled={!selectedCustomerId || buttonLoading}
+                      loading={buttonLoading}
+                      className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600"
+                    >
+                      Select Account
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <Text className="text-gray-500">No Google Ads accounts found.</Text>
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {status === "selecting_forms" && (

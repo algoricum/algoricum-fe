@@ -247,6 +247,55 @@ serve(async req => {
       }
     }
 
+    // 2️⃣.6 Select Customer from Multiple Options
+    if (pathname.includes("/select-customer") && method === "POST") {
+      console.log(`[GOOGLE_LEADS] Route matched: select-customer`);
+
+      let requestBody;
+      try {
+        requestBody = await req.json();
+        console.log(`[GOOGLE_LEADS] Select customer request:`, requestBody);
+      } catch (error) {
+        console.error(`[GOOGLE_LEADS] Failed to parse request body:`, error);
+        return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
+          status: 400,
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
+        });
+      }
+
+      const { connection_id, selected_customer_id } = requestBody;
+
+      if (!connection_id || !selected_customer_id) {
+        console.error(`[GOOGLE_LEADS] Missing required parameters`);
+        return new Response(JSON.stringify({ error: "connection_id and selected_customer_id are required" }), {
+          status: 400,
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
+        });
+      }
+
+      try {
+        console.log(`[GOOGLE_LEADS] Selecting customer ${selected_customer_id} for connection: ${connection_id}`);
+        const result = await setGoogleCustomerId(connection_id, selected_customer_id, supabaseAdmin);
+        console.log(`[GOOGLE_LEADS] Successfully selected customer`);
+
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.error(`[GOOGLE_LEADS] Error selecting customer:`, error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to select customer",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders(), "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
     // 3️⃣ Fetch Available Lead Forms
     if (pathname.includes("/fetch-lead-forms") && method === "POST") {
       console.log(`[GOOGLE_LEADS] Route matched: fetch-lead-forms`);

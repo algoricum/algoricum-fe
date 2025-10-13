@@ -326,7 +326,118 @@ export async function fetchAccountsAndLeadForms(connection_id: string, supabase:
       currentAuthData = await refreshGoogleTokenForIntegration(connection, supabase);
     }
 
-    // Update the auth_data to indicate that manual customer ID setup is needed
+    // Try to fetch accessible customers using Google Ads API
+    const GOOGLE_ADS_DEVELOPER_TOKEN = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
+    const API_VERSION = "v16"; // Latest stable version
+
+    if (!GOOGLE_ADS_DEVELOPER_TOKEN) {
+      console.warn(`[FETCH_ACCOUNTS] No Google Ads Developer Token found. Manual customer ID setup required.`);
+    } else {
+      console.log(`[FETCH_ACCOUNTS] Attempting to fetch accessible customers with Developer Token`);
+
+      try {
+        const customersResponse = await fetch(`https://googleads.googleapis.com/v${API_VERSION}/customers:listAccessibleCustomers`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "developer-token": GOOGLE_ADS_DEVELOPER_TOKEN,
+            Authorization: `Bearer ${currentAuthData.access_token}`,
+          },
+        });
+
+        console.log(`[FETCH_ACCOUNTS] Customers API response status: ${customersResponse.status}`);
+
+        if (customersResponse.ok) {
+          const customersData = await customersResponse.json();
+          console.log(`[FETCH_ACCOUNTS] Customers API response:`, {
+            hasResourceNames: !!customersData.resourceNames,
+            customersCount: customersData.resourceNames?.length || 0,
+          });
+
+          if (customersData.resourceNames && customersData.resourceNames.length > 0) {
+            // Extract customer IDs from resource names (format: customers/1234567890)
+            const customerIds = customersData.resourceNames.map((resource: string) => resource.replace("customers/", ""));
+
+            console.log(`[FETCH_ACCOUNTS] Found ${customerIds.length} accessible customers:`, customerIds);
+
+            // If only one customer, auto-select it
+            if (customerIds.length === 1) {
+              const autoSelectedCustomerId = customerIds[0];
+              console.log(`[FETCH_ACCOUNTS] Auto-selecting single customer: ${autoSelectedCustomerId}`);
+
+              const updatedAuthData = {
+                ...currentAuthData,
+                google_customer_id: autoSelectedCustomerId,
+                automatic_customer_discovery: true,
+                customers_discovered_at: new Date().toISOString(),
+                accessible_customer_ids: customerIds,
+              };
+
+              const { error: updateError } = await supabase
+                .from("integration_connections")
+                .update({
+                  auth_data: updatedAuthData,
+                })
+                .eq("id", connection_id);
+
+              if (updateError) {
+                console.error(`[FETCH_ACCOUNTS] Error updating connection with auto-selected customer:`, updateError);
+                throw new Error(`Failed to update connection: ${updateError.message}`);
+              }
+
+              return {
+                success: true,
+                connection_id: connection_id,
+                auto_selected_customer_id: autoSelectedCustomerId,
+                accessible_customers: customerIds,
+                message: "Customer ID automatically discovered and selected.",
+              };
+            } else {
+              // Multiple customers - let user choose
+              console.log(`[FETCH_ACCOUNTS] Multiple customers found - requiring user selection`);
+
+              const updatedAuthData = {
+                ...currentAuthData,
+                accessible_customer_ids: customerIds,
+                needs_customer_selection: true,
+                customers_discovered_at: new Date().toISOString(),
+              };
+
+              const { error: updateError } = await supabase
+                .from("integration_connections")
+                .update({
+                  auth_data: updatedAuthData,
+                })
+                .eq("id", connection_id);
+
+              if (updateError) {
+                console.error(`[FETCH_ACCOUNTS] Error updating connection with customer options:`, updateError);
+                throw new Error(`Failed to update connection: ${updateError.message}`);
+              }
+
+              return {
+                success: false,
+                connection_id: connection_id,
+                needs_customer_selection: true,
+                accessible_customers: customerIds,
+                message: "Multiple Google Ads accounts found. Please select which account to use.",
+              };
+            }
+          }
+        } else {
+          const errorText = await customersResponse.text();
+          console.error(`[FETCH_ACCOUNTS] Customers API error:`, {
+            status: customersResponse.status,
+            statusText: customersResponse.statusText,
+            error: errorText,
+          });
+        }
+      } catch (apiError) {
+        console.error(`[FETCH_ACCOUNTS] Google Ads API call failed:`, apiError);
+      }
+    }
+
+    // Fallback to manual customer ID setup
     const updatedAuthData = {
       ...currentAuthData,
       needs_manual_customer_id_setup: true,
@@ -335,7 +446,7 @@ export async function fetchAccountsAndLeadForms(connection_id: string, supabase:
       needs_customer_id_setup: true,
     };
 
-    console.log(`[FETCH_ACCOUNTS] Google Ads API requires manual customer ID setup`);
+    console.log(`[FETCH_ACCOUNTS] Falling back to manual customer ID setup`);
     console.log(`[FETCH_ACCOUNTS] Updating connection to indicate manual setup needed`);
 
     const { error: updateError } = await supabase
