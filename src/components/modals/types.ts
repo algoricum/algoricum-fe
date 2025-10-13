@@ -1,9 +1,11 @@
 export interface ModalProps {
   open: boolean;
   buttonLoading: boolean;
-  status: "disconnected" | "connecting" | "connected";
+  status: "disconnected" | "connecting" | "connected" | "needs_customer_id" | "loading_forms" | "selecting_forms";
   accountInfo?: any;
   availableEventTypes?: any[];
+  availableLeadForms?: any[];
+  connectionId?: string;
   onOk: () => void;
   onCancel: () => void;
 
@@ -19,6 +21,8 @@ export interface ModalProps {
   ) => void;
   onSyncLeads?: () => void;
   onDisconnect?: () => void;
+  onSetCustomerId?: (customerId: string) => void;
+  onSaveSelectedForms?: (selectedForms: any[]) => void;
   treeData?: any[];
   selectedWorksheets?: any[];
 
