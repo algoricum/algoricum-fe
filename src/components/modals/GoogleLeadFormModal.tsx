@@ -37,13 +37,6 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
     availableCustomerIds: availableCustomerIds?.length || 0,
   });
 
-  const handleSaveSelectedForms = () => {
-    const formsToSave = availableLeadForms.filter(form => selectedForms.includes(form.id));
-    if (onSaveSelectedForms) {
-      onSaveSelectedForms(formsToSave);
-    }
-  };
-
   return (
     <Modal
       title={
@@ -151,7 +144,15 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                   placeholder="Choose lead forms to sync"
                   style={{ width: "100%" }}
                   value={selectedForms}
-                  onChange={value => setSelectedForms(value)}
+                  onChange={value => {
+                    setSelectedForms(value);
+                    // Automatically save selected forms without closing modal
+                    const formsToSave = availableLeadForms.filter(form => value.includes(form.id));
+                    if (onSaveSelectedForms) {
+                      // Call the save function but prevent modal from closing
+                      onSaveSelectedForms(formsToSave);
+                    }
+                  }}
                   loading={buttonLoading}
                   disabled={buttonLoading}
                 >
@@ -162,20 +163,6 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                   ))}
                 </Select>
                 <Text className="text-xs text-gray-500 mt-1 block">Select one or more lead forms to sync leads from</Text>
-
-                {selectedForms.length > 0 && (
-                  <div className="mt-3">
-                    <Button
-                      type="primary"
-                      onClick={handleSaveSelectedForms}
-                      disabled={buttonLoading}
-                      loading={buttonLoading}
-                      className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600"
-                    >
-                      Save Selected Forms ({selectedForms.length})
-                    </Button>
-                  </div>
-                )}
               </div>
             )}
 

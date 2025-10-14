@@ -122,7 +122,9 @@ export const syncGoogleLeadFormLeads = async () => {
       return;
     }
 
-    if (!connection.auth_data?.selected_forms || connection.auth_data.selected_forms.length === 0) {
+    // Check for selected forms in the correct field name
+    const selectedForms = connection.auth_data?.selected_forms || connection.auth_data?.selected_lead_forms;
+    if (!selectedForms || selectedForms.length === 0) {
       ErrorToast("No forms selected for sync. Please open Google Lead Forms settings and select forms first.");
       return;
     }

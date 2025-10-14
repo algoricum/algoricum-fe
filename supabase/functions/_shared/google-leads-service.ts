@@ -1255,7 +1255,7 @@ export async function syncLeadsFromForms(connection_id: string, supabase: any) {
 
     const authData = connection.auth_data || {};
     const googleCustomerId = authData.google_customer_id;
-    const selectedForms = authData.selected_forms || [];
+    const selectedForms = authData.selected_forms || authData.selected_lead_forms || [];
 
     if (!googleCustomerId) {
       throw new Error("Google Ads customer ID not configured");
@@ -1293,17 +1293,16 @@ export async function syncLeadsFromForms(connection_id: string, supabase: any) {
     const googleAdsUrl = `https://googleads.googleapis.com/${API_VERSION}/customers/${googleCustomerId}/googleAds:searchStream`;
 
     // Query to fetch leads from the selected lead forms
+    // Updated for Google Ads API v21 - use asset resource instead
     const query = `
       SELECT 
         lead_form_submission_data.id,
-        lead_form_submission_data.asset_id,
-        lead_form_submission_data.asset_name,
-        lead_form_submission_data.form_submission_date_time,
         lead_form_submission_data.custom_lead_form_submission_fields,
-        lead_form_submission_data.lead_form_submission_fields
+        lead_form_submission_data.lead_form_submission_fields,
+        asset.id,
+        asset.name
       FROM lead_form_submission_data 
-      WHERE lead_form_submission_data.asset_id IN (${formAssetIds.join(", ")})
-      ORDER BY lead_form_submission_data.form_submission_date_time DESC
+      WHERE asset.id IN (${formAssetIds.join(", ")})
     `;
 
     console.log(`[SYNC_LEADS] Leads query: ${query.trim()}`);

@@ -500,14 +500,16 @@ serve(async req => {
           });
         }
 
-        if (!authData?.selected_forms || authData.selected_forms.length === 0) {
+        // Check for selected forms in the correct field name
+        const selectedForms = authData?.selected_forms || authData?.selected_lead_forms;
+        if (!selectedForms || selectedForms.length === 0) {
           return new Response(JSON.stringify({ error: "No forms selected for sync" }), {
             status: 400,
             headers: { ...corsHeaders(), "Content-Type": "application/json" },
           });
         }
 
-        console.log(`[GOOGLE_LEADS] Syncing ${authData.selected_forms.length} forms for customer ${authData.google_customer_id}`);
+        console.log(`[GOOGLE_LEADS] Syncing ${selectedForms.length} forms for customer ${authData.google_customer_id}`);
 
         // Call the actual sync function to fetch leads from Google Ads API
         const result = await syncLeadsFromForms(connection.id, supabaseAdmin);

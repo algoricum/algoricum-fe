@@ -973,10 +973,9 @@ export default function IntegrationsPage() {
               const result = await response.json();
               console.log("Forms saved successfully:", result);
 
-              // Refresh the modal data and close
+              // Refresh the modal data but keep modal open
               const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
               updateIntegrationStatus("Google Lead Forms", realStatus);
-              toggleModal("Google Lead Forms", false);
               SuccessToast(`Successfully configured ${selectedForms.length} lead forms!`);
             } catch (error) {
               console.error("Error saving forms:", error);
