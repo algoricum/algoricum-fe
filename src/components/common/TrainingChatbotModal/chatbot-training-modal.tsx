@@ -4,6 +4,7 @@ import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getAssistantByClinicId, getClincApiKey, getClinicData } from "@/utils/supabase/clinic-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
+import { Modal } from "antd";
 import { Bot, DollarSign, FileText, Star, Upload, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -287,23 +288,23 @@ const ChatbotTrainingModal: React.FC<ChatbotTrainingModalProps> = ({ open, onClo
     }
   }, [open]);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-md p-2 bg-purple-100">
-              <Bot className="h-6 w-6 text-purple-600" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900">Train Your ChatBot Efficiently</h3>
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      centered
+      width={900}
+      title={
+        <div className="flex items-center gap-3">
+          <div className="rounded-md p-2 bg-purple-100">
+            <Bot className="h-6 w-6 text-purple-600" />
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label="Close modal">
-            <X className="h-6 w-6" />
-          </button>
+          <h3 className="text-xl font-semibold text-gray-900">Train Your ChatBot Efficiently</h3>
         </div>
-
+      }
+    >
+      <div className="mt-4">
         <div className="mb-6 rounded-lg bg-purple-50 border border-purple-200 p-4">
           <div className="flex items-start gap-3">
             <div className="rounded-full bg-purple-100 p-1">
@@ -355,21 +356,21 @@ const ChatbotTrainingModal: React.FC<ChatbotTrainingModalProps> = ({ open, onClo
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             disabled={loading}
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            disabled={(!uploadedFiles.training && !uploadedFiles.pricing && !uploadedFiles.testimonial) || loading} // ✅ CORRECT - checks any file
-            className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            disabled={(!uploadedFiles.training && !uploadedFiles.pricing && !uploadedFiles.testimonial) || loading}
+            className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Training..." : "Start Training"}
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 

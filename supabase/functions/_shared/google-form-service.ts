@@ -12,7 +12,6 @@ console.log("🔧 Environment check:", {
 // Initiate OAuth Flow
 export async function initiateOAuthFlow(req) {
   try {
-    console.log("🚀 Starting OAuth flow initiation...");
     const body = await req.json();
     const { clinic_id, user_id, redirectTo } = body;
     console.log("📋 OAuth initiation parameters:", { clinic_id, user_id, redirectTo });

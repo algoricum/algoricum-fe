@@ -2,8 +2,9 @@
 import { ErrorToast } from "@/helpers/toast";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
+import { Modal } from "antd";
 import dayjs from "dayjs";
-import { Calendar, Plus, X } from "lucide-react";
+import { Calendar, CheckCircle, Clock, Plus } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { updateIntegrationConnectionStatus } from "../integrations/integrationUtils";
 import { ConnectionStatus } from "../types/types";
@@ -261,8 +262,11 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
     <div className="card h-96 overflow-y-auto">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold">{"Today's Tasks"}</h3>
-        <button onClick={() => setShowAddTaskModal(true)} className="btn btn-primary btn-sm flex items-center">
-          <Plus className="w-4 h-4 mr-1" />
+        <button
+          onClick={() => setShowAddTaskModal(true)}
+          className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
           Add Task
         </button>
       </div>
@@ -275,29 +279,34 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
           </div>
         ) : (
           tasks.map(task => (
-            <div key={task.id} className="flex items-start space-x-3">
-              <input
-                type="checkbox"
-                checked={task.completed}
-                onChange={() => toggleTask(task.id)}
-                disabled={!task?.clinic_id}
-                className="mt-1 cursor-pointer"
-              />
-              <div className="flex flex-col w-full">
-                <div className="flex justify-between">
-                  <p className={`text-sm break-words pr-2 ${task.completed ? "line-through text-gray-500" : "text-gray-900"} flex-1`}>
-                    {task.task}
-                  </p>
-                  <span className="text-xs text-gray-500 whitespace-nowrap">
-                    {task.due_at && !Number.isNaN(Date.parse(task.due_at))
-                      ? new Date(task.due_at).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        })
-                      : "Today"}
-                  </span>{" "}
+            <div
+              key={task.id}
+              className={`flex items-start space-x-3 rounded-lg p-3 hover:bg-gray-50 transition-colors ${
+                task?.clinic_id ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+              }`}
+              onClick={() => task?.clinic_id && toggleTask(task.id)}
+            >
+              {/* Icon with colored background */}
+              <div className="flex-shrink-0">
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full ${task.completed ? "bg-green-100" : "bg-purple-100"}`}
+                >
+                  {task.completed ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Clock className="w-4 h-4 text-purple-600" />}
                 </div>
+              </div>
+
+              {/* Task content */}
+              <div className="min-w-0 flex-1">
+                <p className={`text-sm font-medium ${task.completed ? "line-through text-gray-500" : "text-gray-900"}`}>{task.task}</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {task.due_at && !Number.isNaN(Date.parse(task.due_at))
+                    ? new Date(task.due_at).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
+                    : "Today"}
+                </p>
               </div>
             </div>
           ))
@@ -305,49 +314,47 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
       </div>
 
       {/* Add Task Modal */}
-      {showAddTaskModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Add New Task</h3>
-              <button onClick={() => setShowAddTaskModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <form onSubmit={handleAddTask} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
-                <input
-                  type="text"
-                  required
-                  value={newTask.task}
-                  onChange={e => setNewTask({ ...newTask, task: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                <input
-                  type="time"
-                  required
-                  value={newTask.time}
-                  onChange={e => setNewTask({ ...newTask, time: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setShowAddTaskModal(false)} className="flex-1 btn btn-secondary">
-                  Cancel
-                </button>
-                <button type="submit" className="flex-1 btn btn-primary">
-                  Add Task
-                </button>
-              </div>
-            </form>
+      <Modal title="Add New Task" open={showAddTaskModal} onCancel={() => setShowAddTaskModal(false)} footer={null} centered width={500}>
+        <form onSubmit={handleAddTask} className="space-y-4 mt-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Task Description</label>
+            <input
+              type="text"
+              required
+              value={newTask.task}
+              onChange={e => setNewTask({ ...newTask, task: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              placeholder="Enter task description..."
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+            <input
+              type="time"
+              required
+              value={newTask.time}
+              onChange={e => setNewTask({ ...newTask, time: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+          </div>
+          <div className="flex space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowAddTaskModal(false)}
+              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
+            >
+              Add Task
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
