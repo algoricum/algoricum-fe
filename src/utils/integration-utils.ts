@@ -13,6 +13,42 @@ export const getClinicId = async () => {
   return clinic?.id || "";
 };
 
+export const getIntegrationIdByName = async (integrationName: string) => {
+  const supabase = createClient();
+  const { data: connection, error } = await supabase.from("integrations").select("id").eq("name", integrationName).limit(1).single();
+
+  if (error) {
+    console.error(`Error fetching integration ID for ${integrationName}:`, error);
+    return null;
+  }
+
+  return connection?.id || null;
+};
+
+export const getIntegrationConnection = async (clinicId: string, integrationName: string) => {
+  const supabase = createClient();
+
+  // Get the integration ID first
+  const integrationId = await getIntegrationIdByName(integrationName);
+  if (!integrationId) {
+    return { data: null, error: new Error(`Integration ${integrationName} not found`) };
+  }
+
+  // Get the integration connection
+  const { data, error } = await supabase
+    .from("integration_connections")
+    .select("*")
+    .eq("clinic_id", clinicId)
+    .eq("integration_id", integrationId)
+    .single();
+
+  if (error) {
+    console.error(`Error fetching integration connection for ${integrationName}:`, error);
+  }
+
+  return { data, error };
+};
+
 export const handleCsvUpload = async (leads: any) => {
   if (leads) {
     localStorage.setItem(ONBOARDING_LEADS_FILE_NAME, JSON.stringify(leads));
@@ -78,7 +114,8 @@ export const syncGoogleFormLeads = async (worksheets: any) => {
 export const syncGoogleLeadFormLeads = async () => {
   try {
     const clinicId = await getClinicId();
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/sync-leads`, {
+    // Try the sync endpoint, but if 404, the endpoint might not be implemented yet
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/sync`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -88,10 +125,20 @@ export const syncGoogleLeadFormLeads = async () => {
       body: JSON.stringify({ clinic_id: clinicId }),
     });
 
-    if (!response.ok) throw new Error("Failed to sync Google Lead Form leads");
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("Google Lead Forms sync endpoint not available. Please contact support.");
+      }
+      throw new Error("Failed to sync Google Lead Form leads");
+    }
+
     SuccessToast("Google Lead Form leads sync in progress");
-  } catch (error) {
-    ErrorToast("Failed to sync Google Lead Form leads");
+  } catch (error: any) {
+    if (error?.message?.includes("not available")) {
+      ErrorToast("Google Lead Forms sync not available yet. Please contact support.");
+    } else {
+      ErrorToast("Failed to sync Google Lead Form leads");
+    }
     console.error(error);
   }
 };

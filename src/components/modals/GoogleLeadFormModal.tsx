@@ -1,7 +1,7 @@
 "use client";
 
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
-import { Alert, Button, Modal, Spin, Typography, Input, Checkbox, List, Card } from "antd";
+import { Alert, Button, Modal, Spin, Typography, Input, Checkbox, Select, List, Card } from "antd";
 import Image from "next/image";
 import type React from "react";
 import { useState } from "react";
@@ -51,11 +51,6 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
     }
   };
 
-  const handleCustomerSelection = () => {
-    if (selectedCustomerId && onSelectCustomerId) {
-      onSelectCustomerId(selectedCustomerId);
-    }
-  };
   return (
     <Modal
       title={
@@ -180,70 +175,6 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
           </div>
         )}
 
-        {status === "selecting_customer" && (
-          <>
-            <Alert
-              message="Select Google Ads Account"
-              description="Multiple Google Ads accounts found. Please select which account to use for lead form integration."
-              type="info"
-              showIcon
-              className="mb-4"
-            />
-            <div className="space-y-4">
-              {availableCustomerIds.length > 0 ? (
-                <>
-                  <List
-                    dataSource={availableCustomerIds}
-                    renderItem={customerid => (
-                      <List.Item>
-                        <Card size="small" className="w-full">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center">
-                                <Checkbox
-                                  checked={selectedCustomerId === customerid}
-                                  onChange={e => {
-                                    if (e.target.checked) {
-                                      setSelectedCustomerId(customerid);
-                                    } else {
-                                      setSelectedCustomerId("");
-                                    }
-                                  }}
-                                />
-                                <div className="ml-3">
-                                  <Text strong className="block">
-                                    Customer ID: {customerid}
-                                  </Text>
-                                  <Text className="text-sm text-gray-500">Google Ads Account</Text>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                      </List.Item>
-                    )}
-                  />
-                  <div className="text-center mt-4">
-                    <Button
-                      type="primary"
-                      onClick={handleCustomerSelection}
-                      disabled={!selectedCustomerId || buttonLoading}
-                      loading={buttonLoading}
-                      className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600"
-                    >
-                      Select Account
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <Text className="text-gray-500">No Google Ads accounts found.</Text>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
         {status === "selecting_forms" && (
           <>
             <Alert
@@ -314,6 +245,36 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
               showIcon
               className="mb-4"
             />
+
+            {/* Customer Selection Dropdown */}
+            {availableCustomerIds.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <Text strong className="block mb-3 text-gray-800">
+                  Select Google Ads Account:
+                </Text>
+                <Select
+                  placeholder="Choose your Google Ads account"
+                  style={{ width: "100%" }}
+                  value={selectedCustomerId || undefined}
+                  onChange={value => {
+                    setSelectedCustomerId(value);
+                    if (onSelectCustomerId) {
+                      onSelectCustomerId(value);
+                    }
+                  }}
+                  loading={buttonLoading}
+                  disabled={buttonLoading}
+                >
+                  {availableCustomerIds.map(customerId => (
+                    <Select.Option key={customerId} value={customerId}>
+                      Customer ID: {customerId}
+                    </Select.Option>
+                  ))}
+                </Select>
+                <Text className="text-xs text-gray-500 mt-1 block">Select the Google Ads account to sync lead forms from</Text>
+              </div>
+            )}
+
             <div className="bg-gray-50 rounded-lg p-4 mt-4">
               <div className="flex justify-between items-center">
                 <div>
