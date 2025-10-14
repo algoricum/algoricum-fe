@@ -585,11 +585,277 @@ export async function fetchAvailableLeadForms(connection_id: string, supabase: a
       throw new Error("Google Ads customer ID not configured. Please reconnect the integration.");
     }
 
-    // Get Google Ads Developer Token
+    console.log(`[LEAD_FORMS] Using Google Customer ID: ${googleCustomerId}`);
+
+    // Check if we already have available forms in auth_data - use those instead of API call
+    if (authData.available_forms && authData.available_forms.length > 0) {
+      console.log(`[LEAD_FORMS] Found ${authData.available_forms.length} forms already cached in auth_data`);
+      console.log(`[LEAD_FORMS] Using cached forms instead of API call to avoid permission issues`);
+
+      const cachedForms = authData.available_forms.map((form: any) => ({
+        id: form.id,
+        name: form.name,
+        business_name: form.business_name,
+        call_to_action_type: form.call_to_action_type,
+        resource_name: form.resource_name,
+        google_customer_id: googleCustomerId,
+      }));
+
+      // Update the auth_data to ensure it's consistent
+      const updatedAuthData = {
+        ...authData,
+        available_forms: cachedForms,
+        forms_last_fetched: new Date().toISOString(),
+      };
+
+      const { error: updateError } = await supabase
+        .from("integration_connections")
+        .update({ auth_data: updatedAuthData })
+        .eq("id", connection_id);
+
+      if (updateError) {
+        console.warn(`[LEAD_FORMS] Warning: Failed to update cached forms timestamp:`, updateError);
+      }
+
+      return {
+        success: true,
+        lead_forms: cachedForms,
+        connection_id: connection_id,
+        google_customer_id: googleCustomerId,
+        source: "cached",
+      };
+    }
+
+    console.log(`[LEAD_FORMS] No cached forms found. Trying searchStream endpoint since search endpoint failed...`);
+
+    // Get Google Ads Developer Token first (needed for all API calls)
     const googleAdsDeveloperToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
     if (!googleAdsDeveloperToken) {
       console.error(`[LEAD_FORMS] Google Ads Developer Token not configured`);
-      throw new Error("Google Ads Developer Token not configured");
+      return {
+        success: false,
+        error: "Google Ads Developer Token not configured",
+        connection_id: connection_id,
+        google_customer_id: googleCustomerId,
+      };
+    }
+
+    // Use searchStream endpoint for lead forms (works with Basic Access)
+    console.log(`[LEAD_FORMS] Attempting to fetch lead forms using searchStream endpoint...`);
+    const streamUrl = `https://googleads.googleapis.com/v21/customers/${googleCustomerId}/googleAds:searchStream`;
+    const leadFormsQuery = `
+      SELECT 
+        asset.id,
+        asset.name,
+        asset.lead_form_asset.business_name,
+        asset.lead_form_asset.call_to_action_type,
+        asset.lead_form_asset.call_to_action_description,
+        asset.resource_name
+      FROM asset 
+      WHERE asset.type = 'LEAD_FORM'
+      ORDER BY asset.name ASC
+    `;
+
+    try {
+      const response = await fetch(streamUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authData.access_token}`,
+          "developer-token": googleAdsDeveloperToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: leadFormsQuery }),
+      });
+
+      console.log(`[LEAD_FORMS] SearchStream API Response status: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[LEAD_FORMS] SearchStream API error:`, {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.substring(0, 500),
+        });
+
+        // If searchStream also fails, return empty forms with helpful message
+        return {
+          success: true,
+          lead_forms: [],
+          connection_id: connection_id,
+          google_customer_id: googleCustomerId,
+          source: "searchstream_failed",
+          message: `SearchStream endpoint also failed with ${response.status}. You may need Standard Access to Google Ads API.`,
+          upgrade_needed: true,
+        };
+      }
+
+      const responseData = await response.json();
+      console.log(`[LEAD_FORMS] SearchStream response:`, responseData);
+
+      // Process the searchStream response format
+      const leadForms = [];
+      if (responseData && Array.isArray(responseData)) {
+        for (const batch of responseData) {
+          if (batch.results && Array.isArray(batch.results)) {
+            leadForms.push(
+              ...batch.results.map((result: any) => {
+                const asset = result.asset;
+                return {
+                  id: asset.id,
+                  name: asset.name,
+                  business_name: asset.lead_form_asset?.business_name || "Unknown Business",
+                  call_to_action_type: asset.lead_form_asset?.call_to_action_type || "CONTACT_US",
+                  call_to_action_description: asset.lead_form_asset?.call_to_action_description || "",
+                  resource_name: asset.resource_name,
+                  google_customer_id: googleCustomerId,
+                };
+              }),
+            );
+          }
+        }
+      }
+
+      console.log(`[LEAD_FORMS] Successfully parsed ${leadForms.length} lead forms from searchStream`);
+
+      // If no forms found in manager account, try checking client accounts
+      if (leadForms.length === 0) {
+        console.log(`[LEAD_FORMS] No forms in manager account. Checking if this is a manager account with clients...`);
+
+        // Try to get client accounts
+        const clientsQuery = `
+          SELECT
+            customer_client.client_customer,
+            customer_client.descriptive_name,
+            customer_client.id
+          FROM customer_client
+          WHERE customer_client.level = 1
+        `;
+
+        try {
+          const clientsResponse = await fetch(streamUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${authData.access_token}`,
+              "developer-token": googleAdsDeveloperToken,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ query: clientsQuery }),
+          });
+
+          if (clientsResponse.ok) {
+            const clientsData = await clientsResponse.json();
+            console.log(`[LEAD_FORMS] Clients response:`, clientsData);
+
+            // Try to fetch forms from first client account if available
+            if (clientsData && Array.isArray(clientsData)) {
+              for (const batch of clientsData) {
+                if (batch.results && Array.isArray(batch.results) && batch.results.length > 0) {
+                  const firstClient = batch.results[0].customerClient;
+                  const clientId = firstClient.id;
+                  console.log(`[LEAD_FORMS] Trying to fetch forms from client account: ${clientId} (${firstClient.descriptiveName})`);
+
+                  const clientStreamUrl = `https://googleads.googleapis.com/v21/customers/${clientId}/googleAds:searchStream`;
+                  const clientFormsResponse = await fetch(clientStreamUrl, {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${authData.access_token}`,
+                      "developer-token": googleAdsDeveloperToken,
+                      "login-customer-id": googleCustomerId.replace(/-/g, ""), // Use manager account as login customer
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ query: leadFormsQuery }),
+                  });
+
+                  console.log(`[LEAD_FORMS] Client forms API status: ${clientFormsResponse.status} ${clientFormsResponse.statusText}`);
+
+                  if (clientFormsResponse.ok) {
+                    const clientFormsData = await clientFormsResponse.json();
+                    console.log(`[LEAD_FORMS] ✅ CLIENT FORMS DATA:`, JSON.stringify(clientFormsData, null, 2));
+
+                    if (clientFormsData && Array.isArray(clientFormsData)) {
+                      for (const clientBatch of clientFormsData) {
+                        if (clientBatch.results && Array.isArray(clientBatch.results)) {
+                          leadForms.push(
+                            ...clientBatch.results.map((result: any) => {
+                              const asset = result.asset;
+                              return {
+                                id: asset.id,
+                                name: asset.name,
+                                business_name: asset.lead_form_asset?.business_name || firstClient.descriptiveName,
+                                call_to_action_type: asset.lead_form_asset?.call_to_action_type || "CONTACT_US",
+                                call_to_action_description: asset.lead_form_asset?.call_to_action_description || "",
+                                resource_name: asset.resource_name,
+                                google_customer_id: clientId,
+                                client_account: true,
+                                client_name: firstClient.descriptiveName,
+                              };
+                            }),
+                          );
+                        }
+                      }
+                    }
+
+                    if (leadForms.length > 0) {
+                      console.log(`[LEAD_FORMS] Found ${leadForms.length} lead forms in client account ${clientId}`);
+                      break; // Stop after finding forms in first client
+                    }
+                  } else {
+                    const clientError = await clientFormsResponse.text();
+                    console.log(`[LEAD_FORMS] ❌ CLIENT FORMS API FAILED:`, clientFormsResponse.status, clientError.substring(0, 300));
+                  }
+                }
+              }
+            }
+          }
+        } catch (clientError) {
+          console.log(`[LEAD_FORMS] Error checking client accounts:`, clientError);
+        }
+      }
+
+      console.log(`[LEAD_FORMS] Final total: ${leadForms.length} lead forms found`);
+
+      // Update auth_data with the fetched forms
+      const updatedAuthData = {
+        ...authData,
+        available_forms: leadForms,
+        forms_last_fetched: new Date().toISOString(),
+        forms_source: "searchstream",
+        checked_client_accounts: leadForms.some(f => f.client_account),
+      };
+
+      const { error: updateError } = await supabase
+        .from("integration_connections")
+        .update({ auth_data: updatedAuthData })
+        .eq("id", connection_id);
+
+      if (updateError) {
+        console.warn(`[LEAD_FORMS] Warning: Failed to cache forms:`, updateError);
+      }
+
+      return {
+        success: true,
+        lead_forms: leadForms,
+        connection_id: connection_id,
+        google_customer_id: googleCustomerId,
+        source: "searchstream",
+        message:
+          leadForms.length > 0
+            ? `Found ${leadForms.length} lead forms using searchStream endpoint`
+            : "No lead forms found for this customer account",
+      };
+    } catch (error) {
+      console.error(`[LEAD_FORMS] Error with searchStream endpoint:`, error);
+
+      return {
+        success: true,
+        lead_forms: [],
+        connection_id: connection_id,
+        google_customer_id: googleCustomerId,
+        source: "searchstream_error",
+        message: "Failed to fetch lead forms. API access may be limited.",
+        error: error.message,
+        upgrade_needed: true,
+      };
     }
 
     // Refresh token if needed
@@ -606,7 +872,8 @@ export async function fetchAvailableLeadForms(connection_id: string, supabase: a
     }
 
     // Use Google Ads API to fetch available lead forms
-    const googleAdsUrl = `https://googleads.googleapis.com/v14/customers/${googleCustomerId}/googleAdsService:search`;
+    const API_VERSION = "v21"; // Use same version as other endpoints
+    const googleAdsUrl = `https://googleads.googleapis.com/${API_VERSION}/customers/${googleCustomerId}/googleAdsService:search`;
 
     const query = `
       SELECT 
@@ -627,6 +894,7 @@ export async function fetchAvailableLeadForms(connection_id: string, supabase: a
     const requestHeaders = {
       Authorization: `Bearer ${currentAuthData.access_token}`,
       "developer-token": googleAdsDeveloperToken,
+      "login-customer-id": googleCustomerId.replace(/-/g, ""), // Remove any dashes from customer ID
       "Content-Type": "application/json",
     };
 
@@ -634,8 +902,90 @@ export async function fetchAvailableLeadForms(connection_id: string, supabase: a
       ...requestHeaders,
       Authorization: `Bearer ${currentAuthData.access_token.substring(0, 20)}...`,
       "developer-token": `${googleAdsDeveloperToken.substring(0, 20)}...`,
+      "login-customer-id": requestHeaders["login-customer-id"],
     });
 
+    console.log(`[LEAD_FORMS] Customer ID details:`, {
+      original: googleCustomerId,
+      formatted: googleCustomerId.replace(/-/g, ""),
+      hasAccess: !!currentAuthData.accessible_customer_ids?.includes(googleCustomerId),
+      accessibleIds: currentAuthData.accessible_customer_ids || [],
+    });
+
+    // Step 1: Test basic API access and permissions
+    console.log(`[LEAD_FORMS] === PERMISSION DIAGNOSTIC START ===`);
+
+    // Test 1: Check if we can access the customer at all
+    console.log(`[LEAD_FORMS] Test 1: Basic customer access check...`);
+    const basicTestUrl = `https://googleads.googleapis.com/${API_VERSION}/customers/${googleCustomerId}`;
+    const basicTestResponse = await fetch(basicTestUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${currentAuthData.access_token}`,
+        "developer-token": googleAdsDeveloperToken,
+        "login-customer-id": googleCustomerId.replace(/-/g, ""),
+      },
+    });
+
+    console.log(`[LEAD_FORMS] Test 1 Result - Customer access: ${basicTestResponse.status} ${basicTestResponse.statusText}`);
+    if (!basicTestResponse.ok) {
+      const basicError = await basicTestResponse.text();
+      console.log(`[LEAD_FORMS] Test 1 Error Details:`, basicError.substring(0, 500));
+    }
+
+    // Test 2: Try to list accessible customers to verify our permissions
+    console.log(`[LEAD_FORMS] Test 2: Checking accessible customers...`);
+    const accessibleCustomersUrl = `https://googleads.googleapis.com/${API_VERSION}/customers:listAccessibleCustomers`;
+    const accessibleResponse = await fetch(accessibleCustomersUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${currentAuthData.access_token}`,
+        "developer-token": googleAdsDeveloperToken,
+      },
+    });
+
+    console.log(`[LEAD_FORMS] Test 2 Result - Accessible customers: ${accessibleResponse.status}`);
+    if (accessibleResponse.ok) {
+      const accessibleData = await accessibleResponse.json();
+      console.log(`[LEAD_FORMS] Accessible customers:`, accessibleData.resourceNames || []);
+      const hasAccess = accessibleData.resourceNames?.some((name: string) => name.includes(googleCustomerId));
+      console.log(`[LEAD_FORMS] Current customer ${googleCustomerId} in accessible list: ${hasAccess}`);
+    } else {
+      const accessError = await accessibleResponse.text();
+      console.log(`[LEAD_FORMS] Test 2 Error:`, accessError.substring(0, 300));
+    }
+
+    // Test 3: Try a simple search query to test API access level
+    console.log(`[LEAD_FORMS] Test 3: Testing API access level with simple query...`);
+    const simpleTestUrl = `https://googleads.googleapis.com/${API_VERSION}/customers/${googleCustomerId}/googleAdsService:search`;
+    const simpleQuery = `SELECT customer.id, customer.descriptive_name FROM customer LIMIT 1`;
+
+    const simpleTestResponse = await fetch(simpleTestUrl, {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify({ query: simpleQuery }),
+    });
+
+    console.log(`[LEAD_FORMS] Test 3 Result - Simple query: ${simpleTestResponse.status}`);
+    if (!simpleTestResponse.ok) {
+      const simpleError = await simpleTestResponse.text();
+      console.log(`[LEAD_FORMS] Test 3 Error Details:`, simpleError.substring(0, 500));
+
+      if (simpleTestResponse.status === 404) {
+        console.log(`[LEAD_FORMS] 404 indicates either:`);
+        console.log(`[LEAD_FORMS] - Basic Access only (need Standard Access for production)`);
+        console.log(`[LEAD_FORMS] - Invalid customer ID`);
+        console.log(`[LEAD_FORMS] - Customer not accessible with current token`);
+      }
+    } else {
+      const simpleData = await simpleTestResponse.json();
+      console.log(`[LEAD_FORMS] Test 3 Success - Customer data:`, simpleData);
+    }
+
+    console.log(`[LEAD_FORMS] === PERMISSION DIAGNOSTIC END ===`);
+
+    // Now proceed with the original lead forms query
+    console.log(`[LEAD_FORMS] Proceeding with lead forms query...`);
     const response = await fetch(googleAdsUrl, {
       method: "POST",
       headers: requestHeaders,
@@ -870,6 +1220,193 @@ async function refreshGoogleTokenForIntegration(connection: any, supabase: any) 
       })
       .eq("id", connection.id);
 
+    throw error;
+  }
+}
+
+/**
+ * Sync/Fetch Leads from Selected Lead Forms
+ */
+export async function syncLeadsFromForms(connection_id: string, supabase: any) {
+  console.log(`[SYNC_LEADS] Starting lead sync for connection: ${connection_id}`);
+
+  try {
+    // Get connection from database
+    const { data: connection, error: connectionError } = await supabase
+      .from("integration_connections")
+      .select(
+        `
+        id,
+        clinic_id,
+        status,
+        expires_at,
+        auth_data,
+        integrations!inner(name)
+      `,
+      )
+      .eq("id", connection_id)
+      .eq("integrations.name", "Google Lead Forms")
+      .single();
+
+    if (connectionError || !connection) {
+      console.error(`[SYNC_LEADS] Connection not found:`, connectionError);
+      throw new Error("Connection not found");
+    }
+
+    const authData = connection.auth_data || {};
+    const googleCustomerId = authData.google_customer_id;
+    const selectedForms = authData.selected_forms || [];
+
+    if (!googleCustomerId) {
+      throw new Error("Google Ads customer ID not configured");
+    }
+
+    if (selectedForms.length === 0) {
+      throw new Error("No forms selected for sync");
+    }
+
+    console.log(`[SYNC_LEADS] Syncing ${selectedForms.length} forms for customer ${googleCustomerId}`);
+
+    // Get Google Ads Developer Token
+    const googleAdsDeveloperToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
+    if (!googleAdsDeveloperToken) {
+      throw new Error("Google Ads Developer Token not configured");
+    }
+
+    // Refresh token if needed
+    let currentAuthData = authData;
+    const tokenExpiryDate = authData.token_expiry ? new Date(authData.token_expiry) : null;
+    const now = new Date();
+    const isTokenExpired = tokenExpiryDate && tokenExpiryDate <= now;
+
+    if (isTokenExpired) {
+      console.log(`[SYNC_LEADS] Token expired, refreshing...`);
+      currentAuthData = await refreshGoogleTokenForIntegration(connection, supabase);
+    }
+
+    // Create form asset IDs array for the query
+    const formAssetIds = selectedForms.map(form => form.id);
+    console.log(`[SYNC_LEADS] Form asset IDs:`, formAssetIds);
+
+    // Use Google Ads API to fetch leads for selected forms
+    const API_VERSION = "v21"; // Use same version as other endpoints
+    const googleAdsUrl = `https://googleads.googleapis.com/${API_VERSION}/customers/${googleCustomerId}/googleAds:searchStream`;
+
+    // Query to fetch leads from the selected lead forms
+    const query = `
+      SELECT 
+        lead_form_submission_data.id,
+        lead_form_submission_data.asset_id,
+        lead_form_submission_data.asset_name,
+        lead_form_submission_data.form_submission_date_time,
+        lead_form_submission_data.custom_lead_form_submission_fields,
+        lead_form_submission_data.lead_form_submission_fields
+      FROM lead_form_submission_data 
+      WHERE lead_form_submission_data.asset_id IN (${formAssetIds.join(", ")})
+      ORDER BY lead_form_submission_data.form_submission_date_time DESC
+    `;
+
+    console.log(`[SYNC_LEADS] Leads query: ${query.trim()}`);
+
+    const requestHeaders = {
+      Authorization: `Bearer ${currentAuthData.access_token}`,
+      "developer-token": googleAdsDeveloperToken,
+      "login-customer-id": googleCustomerId.replace(/-/g, ""), // Remove any dashes from customer ID
+      "Content-Type": "application/json",
+    };
+
+    const response = await fetch(googleAdsUrl, {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[SYNC_LEADS] Google Ads API error:`, {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+      });
+      throw new Error(`Google Ads API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`[SYNC_LEADS] SearchStream API response:`, JSON.stringify(data, null, 2));
+
+    // Process searchStream response format (array of batches)
+    const leads = [];
+    if (data && Array.isArray(data)) {
+      for (const batch of data) {
+        if (batch.results && Array.isArray(batch.results)) {
+          leads.push(...batch.results);
+        }
+      }
+    }
+    console.log(`[SYNC_LEADS] Found ${leads.length} leads to process`);
+
+    // Process and save leads to database
+    let processedCount = 0;
+    let duplicateCount = 0;
+
+    for (const leadData of leads) {
+      try {
+        const submissionData = leadData.leadFormSubmissionData;
+
+        // Extract lead information
+        const leadInfo = {
+          google_submission_id: submissionData.id,
+          asset_id: submissionData.assetId,
+          asset_name: submissionData.assetName,
+          submission_date: submissionData.formSubmissionDateTime,
+          form_fields: submissionData.leadFormSubmissionFields || [],
+          custom_fields: submissionData.customLeadFormSubmissionFields || [],
+        };
+
+        // Check if lead already exists
+        const { data: existingLead } = await supabase
+          .from("leads")
+          .select("id")
+          .eq("google_submission_id", leadInfo.google_submission_id)
+          .eq("clinic_id", connection.clinic_id)
+          .single();
+
+        if (existingLead) {
+          duplicateCount++;
+          continue;
+        }
+
+        // Save lead to database
+        const { error: insertError } = await supabase.from("leads").insert({
+          clinic_id: connection.clinic_id,
+          google_submission_id: leadInfo.google_submission_id,
+          source: "Google Lead Forms",
+          form_name: leadInfo.asset_name,
+          submission_data: leadInfo,
+          created_at: leadInfo.submission_date,
+        });
+
+        if (insertError) {
+          console.error(`[SYNC_LEADS] Error inserting lead:`, insertError);
+        } else {
+          processedCount++;
+        }
+      } catch (error) {
+        console.error(`[SYNC_LEADS] Error processing lead:`, error);
+      }
+    }
+
+    console.log(`[SYNC_LEADS] Sync completed - Processed: ${processedCount}, Duplicates: ${duplicateCount}`);
+
+    return {
+      success: true,
+      leads_found: leads.length,
+      leads_processed: processedCount,
+      duplicates_skipped: duplicateCount,
+      forms_synced: selectedForms.length,
+    };
+  } catch (error) {
+    console.error(`[SYNC_LEADS] Sync failed:`, error);
     throw error;
   }
 }

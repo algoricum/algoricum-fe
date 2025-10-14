@@ -910,6 +910,28 @@ export default function IntegrationsPage() {
               const result = await response.json();
               console.log("Customer selected successfully:", result);
 
+              // Now fetch available lead forms for the selected customer
+              console.log("Fetching lead forms for selected customer...");
+              const formsResponse = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/fetch-lead-forms`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                  apikey: SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({
+                  connection_id: googleLeadFormData.connectionId,
+                }),
+              });
+
+              if (!formsResponse.ok) {
+                console.error("Failed to fetch lead forms:", await formsResponse.text());
+                throw new Error("Failed to fetch available lead forms");
+              }
+
+              const formsResult = await formsResponse.json();
+              console.log("Lead forms fetched successfully:", formsResult);
+
               // Refresh the modal data to show the next step
               const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
               updateIntegrationStatus("Google Lead Forms", realStatus);

@@ -9,6 +9,7 @@ import {
   saveSelectedLeadForms,
   setGoogleCustomerId,
   startAuth,
+  syncLeadsFromForms,
 } from "../_shared/google-leads-service.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -433,6 +434,94 @@ serve(async req => {
         return new Response(
           JSON.stringify({
             error: "Failed to save selected forms",
+            details: error.message,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders(), "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
+    // 5️⃣ Sync Leads from Selected Forms
+    if (pathname.includes("/sync") && method === "POST") {
+      console.log(`[GOOGLE_LEADS] Route matched: sync`);
+
+      let requestBody;
+      try {
+        requestBody = await req.json();
+        console.log(`[GOOGLE_LEADS] Sync request:`, requestBody);
+      } catch (error) {
+        console.error(`[GOOGLE_LEADS] Failed to parse request body:`, error);
+        return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
+          status: 400,
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
+        });
+      }
+
+      const { clinic_id } = requestBody;
+
+      if (!clinic_id) {
+        console.error(`[GOOGLE_LEADS] Missing clinic_id parameter`);
+        return new Response(JSON.stringify({ error: "clinic_id is required" }), {
+          status: 400,
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
+        });
+      }
+
+      try {
+        console.log(`[GOOGLE_LEADS] Starting sync for clinic: ${clinic_id}`);
+
+        // Get the connection for this clinic
+        const { data: connection, error: connectionError } = await supabaseAdmin
+          .from("integration_connections")
+          .select("*")
+          .eq("clinic_id", clinic_id)
+          .eq("integration_id", (await supabaseAdmin.from("integrations").select("id").eq("name", "Google Lead Forms").single()).data?.id)
+          .single();
+
+        if (connectionError || !connection) {
+          console.error(`[GOOGLE_LEADS] Connection not found:`, connectionError);
+          return new Response(JSON.stringify({ error: "Google Lead Forms integration not found for this clinic" }), {
+            status: 404,
+            headers: { ...corsHeaders(), "Content-Type": "application/json" },
+          });
+        }
+
+        console.log(`[GOOGLE_LEADS] Found connection:`, connection.id);
+
+        // Check if we have selected forms and customer ID
+        const authData = connection.auth_data;
+        if (!authData?.google_customer_id) {
+          return new Response(JSON.stringify({ error: "No Google Customer ID configured" }), {
+            status: 400,
+            headers: { ...corsHeaders(), "Content-Type": "application/json" },
+          });
+        }
+
+        if (!authData?.selected_forms || authData.selected_forms.length === 0) {
+          return new Response(JSON.stringify({ error: "No forms selected for sync" }), {
+            status: 400,
+            headers: { ...corsHeaders(), "Content-Type": "application/json" },
+          });
+        }
+
+        console.log(`[GOOGLE_LEADS] Syncing ${authData.selected_forms.length} forms for customer ${authData.google_customer_id}`);
+
+        // Call the actual sync function to fetch leads from Google Ads API
+        const result = await syncLeadsFromForms(connection.id, supabaseAdmin);
+
+        console.log(`[GOOGLE_LEADS] Sync completed:`, result);
+
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.error(`[GOOGLE_LEADS] Error during sync:`, error);
+        return new Response(
+          JSON.stringify({
+            error: "Failed to sync leads",
             details: error.message,
           }),
           {

@@ -114,7 +114,20 @@ export const syncGoogleFormLeads = async (worksheets: any) => {
 export const syncGoogleLeadFormLeads = async () => {
   try {
     const clinicId = await getClinicId();
-    // Try the sync endpoint, but if 404, the endpoint might not be implemented yet
+
+    // First check if forms are selected
+    const { data: connection } = await getIntegrationConnection(clinicId, "Google Lead Forms");
+    if (!connection) {
+      ErrorToast("Google Lead Forms integration not found. Please connect first.");
+      return;
+    }
+
+    if (!connection.auth_data?.selected_forms || connection.auth_data.selected_forms.length === 0) {
+      ErrorToast("No forms selected for sync. Please open Google Lead Forms settings and select forms first.");
+      return;
+    }
+
+    // Try the sync endpoint
     const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/sync`, {
       method: "POST",
       headers: {
@@ -126,16 +139,21 @@ export const syncGoogleLeadFormLeads = async () => {
     });
 
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
       if (response.status === 404) {
         throw new Error("Google Lead Forms sync endpoint not available. Please contact support.");
+      } else if (response.status === 400 && errorData.error?.includes("No forms selected")) {
+        throw new Error("No forms selected for sync. Please open Google Lead Forms settings and select forms first.");
       }
-      throw new Error("Failed to sync Google Lead Form leads");
+      throw new Error(`Failed to sync Google Lead Form leads: ${errorData.error || response.statusText}`);
     }
 
     SuccessToast("Google Lead Form leads sync in progress");
   } catch (error: any) {
     if (error?.message?.includes("not available")) {
       ErrorToast("Google Lead Forms sync not available yet. Please contact support.");
+    } else if (error?.message?.includes("No forms selected")) {
+      ErrorToast(error.message);
     } else {
       ErrorToast("Failed to sync Google Lead Form leads");
     }
