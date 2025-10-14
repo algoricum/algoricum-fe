@@ -346,7 +346,7 @@ export default function IntegrationsPage() {
       console.log("📊 Current status at useEffect start:", currentStatus);
 
       // Don't re-fetch if we're already in a selection state - let user complete their selection
-      if (currentStatus === "selecting_customer" || currentStatus === "selecting_forms") {
+      if (currentStatus === "selecting_customer") {
         console.log("⏸️ Skipping data fetch - already in selection state:", currentStatus);
         return;
       }
@@ -369,15 +369,8 @@ export default function IntegrationsPage() {
             ) {
               // Only show manual input if we don't have any accessible customer IDs
               modalStatus = "needs_customer_id";
-            } else if (
-              googleLeadFormConnection.auth_data?.available_forms?.length > 0 &&
-              googleLeadFormConnection.auth_data?.google_customer_id &&
-              (!googleLeadFormConnection.auth_data?.selected_forms?.length ||
-                googleLeadFormConnection.auth_data?.selected_forms?.length === 0)
-            ) {
-              modalStatus = "selecting_forms";
             } else {
-              // Show connected status with customer dropdown if needed
+              // Always show connected status - form selection is handled within the connected modal
               modalStatus = "connected";
             }
 

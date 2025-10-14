@@ -1,7 +1,7 @@
 "use client";
 
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
-import { Alert, Button, Modal, Spin, Typography, Input, Checkbox, Select, List, Card } from "antd";
+import { Alert, Button, Modal, Select, Typography } from "antd";
 import Image from "next/image";
 import type React from "react";
 import { useState } from "react";
@@ -21,28 +21,21 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
   onConnect,
   onSyncLeads,
   onDisconnect,
-  onSetCustomerId,
   onSaveSelectedForms,
   onSelectCustomerId,
   buttonLoading,
 }) => {
-  const [customerId, setCustomerId] = useState("");
   const [selectedForms, setSelectedForms] = useState<string[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
 
-  const handleCustomerIdSubmit = () => {
-    if (customerId.trim() && onSetCustomerId) {
-      onSetCustomerId(customerId.trim());
-    }
-  };
-
-  const handleFormSelection = (formId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedForms([...selectedForms, formId]);
-    } else {
-      setSelectedForms(selectedForms.filter(id => id !== formId));
-    }
-  };
+  // Debug logging
+  console.log("🔍 GoogleLeadFormModal Debug:", {
+    open,
+    status,
+    accountInfo,
+    availableLeadForms: availableLeadForms?.length || 0,
+    availableCustomerIds: availableCustomerIds?.length || 0,
+  });
 
   const handleSaveSelectedForms = () => {
     const formsToSave = availableLeadForms.filter(form => selectedForms.includes(form.id));
@@ -116,136 +109,8 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
           </>
         )}
 
-        {status === "connecting" && (
-          <div className="text-center py-8">
-            <Spin size="large" />
-            <div className="mt-4">
-              <Text className="text-lg">Connecting to Google Ads Lead Forms...</Text>
-              <br />
-              <Text className="text-gray-500">Please complete the authorization process</Text>
-            </div>
-          </div>
-        )}
-
-        {status === "needs_customer_id" && (
+        {status === "connected" && (
           <>
-            <Alert
-              message="Google Ads Customer ID Required"
-              description="Please enter your Google Ads Customer ID to fetch your lead forms."
-              type="warning"
-              showIcon
-              className="mb-4"
-            />
-            <div className="space-y-4">
-              <div>
-                <Text strong className="block mb-2">
-                  Google Ads Customer ID:
-                </Text>
-                <Input
-                  placeholder="e.g., 1234567890"
-                  value={customerId}
-                  onChange={e => setCustomerId(e.target.value)}
-                  onPressEnter={handleCustomerIdSubmit}
-                />
-                <Text className="text-sm text-gray-500 mt-1 block">Find this in your Google Ads account under Account settings</Text>
-              </div>
-              <div className="text-center">
-                <Button
-                  type="primary"
-                  onClick={handleCustomerIdSubmit}
-                  disabled={!customerId.trim() || buttonLoading}
-                  loading={buttonLoading}
-                  className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600"
-                >
-                  Fetch Lead Forms
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {status === "loading_forms" && (
-          <div className="text-center py-8">
-            <Spin size="large" />
-            <div className="mt-4">
-              <Text className="text-lg">Fetching your lead forms...</Text>
-              <br />
-              <Text className="text-gray-500">Getting available lead forms from Google Ads</Text>
-            </div>
-          </div>
-        )}
-
-        {status === "selecting_forms" && (
-          <>
-            <Alert
-              message="Select Lead Forms to Sync"
-              description="Choose which lead forms you want to sync leads from."
-              type="info"
-              showIcon
-              className="mb-4"
-            />
-            <div className="space-y-4">
-              {availableLeadForms.length > 0 ? (
-                <>
-                  <List
-                    dataSource={availableLeadForms}
-                    renderItem={form => (
-                      <List.Item>
-                        <Card size="small" className="w-full">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center">
-                                <Checkbox
-                                  checked={selectedForms.includes(form.id)}
-                                  onChange={e => handleFormSelection(form.id, e.target.checked)}
-                                />
-                                <div className="ml-3">
-                                  <Text strong className="block">
-                                    {form.name}
-                                  </Text>
-                                  <Text className="text-sm text-gray-500">
-                                    Business: {form.business_name} • Action: {form.call_to_action_type}
-                                  </Text>
-                                  <Text className="text-xs text-gray-400">Customer ID: {form.google_customer_id}</Text>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Card>
-                      </List.Item>
-                    )}
-                  />
-                  <div className="text-center mt-4">
-                    <Button
-                      type="primary"
-                      onClick={handleSaveSelectedForms}
-                      disabled={selectedForms.length === 0 || buttonLoading}
-                      loading={buttonLoading}
-                      className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600"
-                    >
-                      Save Selected Forms ({selectedForms.length})
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <Text className="text-gray-500">No lead forms found for this Google Ads account.</Text>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {status === "connected" && accountInfo && (
-          <>
-            <Alert
-              message="Successfully Connected!"
-              description={`Connected to ${accountInfo.accountName || "Google Ads"}. Your lead form integration is ready!`}
-              type="success"
-              showIcon
-              className="mb-4"
-            />
-
             {/* Customer Selection Dropdown */}
             {availableCustomerIds.length > 0 && (
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
@@ -275,18 +140,51 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
               </div>
             )}
 
+            {/* Lead Forms Selection Dropdown */}
+            {availableLeadForms.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <Text strong className="block mb-3 text-gray-800">
+                  Select Lead Forms to Sync:
+                </Text>
+                <Select
+                  mode="multiple"
+                  placeholder="Choose lead forms to sync"
+                  style={{ width: "100%" }}
+                  value={selectedForms}
+                  onChange={value => setSelectedForms(value)}
+                  loading={buttonLoading}
+                  disabled={buttonLoading}
+                >
+                  {availableLeadForms.map(form => (
+                    <Select.Option key={form.id} value={form.id}>
+                      {form.name || `Form ${form.id}`} - {form.business_name}
+                    </Select.Option>
+                  ))}
+                </Select>
+                <Text className="text-xs text-gray-500 mt-1 block">Select one or more lead forms to sync leads from</Text>
+
+                {selectedForms.length > 0 && (
+                  <div className="mt-3">
+                    <Button
+                      type="primary"
+                      onClick={handleSaveSelectedForms}
+                      disabled={buttonLoading}
+                      loading={buttonLoading}
+                      className="!bg-gray-500 !border-gray-500 hover:!bg-gray-600"
+                    >
+                      Save Selected Forms ({selectedForms.length})
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="bg-gray-50 rounded-lg p-4 mt-4">
               <div className="flex justify-between items-center">
                 <div>
                   <Text strong className="text-gray-800">
                     Google Ads Lead Forms Integration Active
                   </Text>
-                  {accountInfo.selectedFormsCount && (
-                    <>
-                      <br />
-                      <Text className="text-sm text-gray-600">{accountInfo.selectedFormsCount} lead forms selected for sync</Text>
-                    </>
-                  )}
                 </div>
                 <div className="flex space-x-2">
                   <Button

@@ -150,18 +150,16 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
 
         // determine connected/disconnected with expires_at
         if (data) {
-          const isExpired = data.expires_at && new Date() > new Date(data.expires_at);
-          return isExpired ? "disconnected" : "connected";
+          return "connected";
         } else {
           return "disconnected";
         }
       }
     }
 
-    // For the special-case integrations: check token expiry if available
+    // For the special-case integrations: return connected if we have a connection
     if (connection) {
-      const isExpired = connection.expires_at && new Date() > new Date(connection.expires_at);
-      return isExpired ? "disconnected" : "connected";
+      return "connected";
     } else {
       return "disconnected";
     }
