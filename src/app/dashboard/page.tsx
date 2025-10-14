@@ -226,7 +226,7 @@ export default function DashboardPage() {
                     <Bot className="h-5 w-5 text-purple-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="font-semibold text-gray-900 block mb-1">Train Your ChatBot Now</span>
+                    <span className="font-semibold text-gray-900 block mb-1">Train Your Chatbot Now</span>
                     <p className="text-sm text-gray-600 leading-relaxed">
                       Upload training documents to enhance your ChatBot&apos;s knowledge and improve patient interactions.
                     </p>
