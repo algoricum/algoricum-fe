@@ -41,16 +41,35 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
           return "disconnected";
         }
         connection = data;
-        console.error("dsf", data);
         break;
       }
 
       case "Google Lead Forms": {
-        const { data, error } = await supabase.from("google_lead_form_connections").select("*").eq("clinic_id", clinicId).maybeSingle();
+        // Check integration_connections table (new approach)
+        console.log(`[INTEGRATION_STATUS] Checking Google Lead Forms for clinic: ${clinicId}`);
+        const { data, error } = await supabase
+          .from("integration_connections")
+          .select(
+            `
+            *,
+            integrations!inner(
+              name,
+              type,
+              auth_type
+            )
+          `,
+          )
+          .eq("clinic_id", clinicId)
+          .eq("integrations.name", "Google Lead Forms")
+          .maybeSingle();
+
+        console.log(`[INTEGRATION_STATUS] Google Lead Forms query result:`, { data, error });
+
         if (error) {
           console.error(`Error checking Google Lead Forms status:`, error);
           return "disconnected";
         }
+
         connection = data;
         break;
       }
@@ -139,8 +158,13 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
       }
     }
 
-    // For the special-case integrations: row existence = connected
-    return connection ? "connected" : "disconnected";
+    // For the special-case integrations: check token expiry if available
+    if (connection) {
+      const isExpired = connection.expires_at && new Date() > new Date(connection.expires_at);
+      return isExpired ? "disconnected" : "connected";
+    } else {
+      return "disconnected";
+    }
   } catch (error) {
     console.error(`Failed to check ${integrationName} status:`, error);
     return "disconnected";

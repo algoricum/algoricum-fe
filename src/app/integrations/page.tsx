@@ -353,18 +353,44 @@ export default function IntegrationsPage() {
     const fetchGoogleLeadFormData = async () => {
       if (isModalOpen("Google Lead Forms") && getIntegrationStatus("Google Lead Forms") === "connected") {
         try {
-          const { data: connection } = await supabase.from("integrations").select("id").eq("name", "Google Lead Forms").limit(1).single();
+          const { data: connection, error: integrationError } = await supabase
+            .from("integrations")
+            .select("id")
+            .eq("name", "Google Lead Forms")
+            .limit(1)
+            .single();
+          console.log("Google Lead Forms integration lookup:", { connection, integrationError });
 
-          const { data: googleLeadFormConnection } = await supabase
+          const clinicId = await getClinicId();
+          console.log("Clinic ID for connection lookup:", clinicId);
+
+          const { data: googleLeadFormConnection, error: connectionError } = await supabase
             .from("integration_connections")
             .select("*")
-            .eq("clinic_id", await getClinicId())
+            .eq("clinic_id", clinicId)
             .eq("integration_id", connection?.id)
             .single();
 
-          console.log("Google Lead Form connection data:", googleLeadFormConnection);
+          console.log("Google Lead Form connection query result:", { googleLeadFormConnection, connectionError });
 
           if (googleLeadFormConnection) {
+            // Determine the appropriate status based on auth_data
+            let modalStatus: ConnectionStatus = "connected";
+
+            if (googleLeadFormConnection.auth_data?.needs_customer_id_setup) {
+              modalStatus = "needs_customer_id";
+            } else if (googleLeadFormConnection.auth_data?.accessible_customer_ids?.length > 1) {
+              modalStatus = "selecting_customer";
+            } else if (
+              googleLeadFormConnection.auth_data?.available_forms?.length > 0 &&
+              !googleLeadFormConnection.auth_data?.selected_forms?.length
+            ) {
+              modalStatus = "selecting_forms";
+            }
+
+            // Update the integration status to reflect the correct modal state
+            updateIntegrationStatus("Google Lead Forms", modalStatus);
+
             setGoogleLeadFormData({
               accountInfo: {
                 accountName: googleLeadFormConnection.auth_data?.account_name || "Google Ads",
@@ -636,8 +662,6 @@ export default function IntegrationsPage() {
 
   const connectedIntegrations = integrations.filter(i => i.connected);
   const availableIntegrations = integrations.filter(i => !i.connected);
-  console.log("connectedIntegrations", connectedIntegrations);
-  console.log("available ");
   return (
     <DashboardLayout
       header={
