@@ -284,7 +284,7 @@ export default function IntegrationsPage() {
         setTimeout(() => {
           console.log("Opening Google Lead Form modal after status update");
           toggleModal("Google Lead Forms", true);
-        }, 100);
+        }, 500);
 
         // Clean up URL parameters
         const url = new URL(window.location.href);
@@ -351,7 +351,15 @@ export default function IntegrationsPage() {
   // Fetch Google Lead Forms data when modal opens
   useEffect(() => {
     const fetchGoogleLeadFormData = async () => {
-      if (isModalOpen("Google Lead Forms") && getIntegrationStatus("Google Lead Forms") === "connected") {
+      const currentStatus = getIntegrationStatus("Google Lead Forms");
+
+      // Don't re-fetch if we're already in a selection state - let user complete their selection
+      if (currentStatus === "selecting_customer" || currentStatus === "selecting_forms") {
+        console.log("Skipping data fetch - already in selection state:", currentStatus);
+        return;
+      }
+
+      if (isModalOpen("Google Lead Forms") && currentStatus !== "disconnected") {
         try {
           const { data: connection, error: integrationError } = await supabase
             .from("integrations")
@@ -377,19 +385,44 @@ export default function IntegrationsPage() {
             // Determine the appropriate status based on auth_data
             let modalStatus: ConnectionStatus = "connected";
 
-            if (googleLeadFormConnection.auth_data?.needs_customer_id_setup) {
-              modalStatus = "needs_customer_id";
-            } else if (googleLeadFormConnection.auth_data?.accessible_customer_ids?.length > 1) {
+            // Priority order: customer selection > customer setup > form selection > connected
+            if (
+              googleLeadFormConnection.auth_data?.accessible_customer_ids?.length > 1 &&
+              !googleLeadFormConnection.auth_data?.google_customer_id
+            ) {
+              // If we have multiple customers but no selected customer ID, show selection UI
               modalStatus = "selecting_customer";
             } else if (
+              googleLeadFormConnection.auth_data?.needs_customer_id_setup &&
+              !googleLeadFormConnection.auth_data?.accessible_customer_ids?.length
+            ) {
+              // Only show manual input if we don't have any accessible customer IDs
+              modalStatus = "needs_customer_id";
+            } else if (
               googleLeadFormConnection.auth_data?.available_forms?.length > 0 &&
-              !googleLeadFormConnection.auth_data?.selected_forms?.length
+              (!googleLeadFormConnection.auth_data?.selected_forms?.length ||
+                googleLeadFormConnection.auth_data?.selected_forms?.length === 0)
             ) {
               modalStatus = "selecting_forms";
             }
 
-            // Update the integration status to reflect the correct modal state
-            updateIntegrationStatus("Google Lead Forms", modalStatus);
+            console.log("Modal status determined:", modalStatus);
+            console.log("Auth data details:", {
+              needs_customer_id_setup: googleLeadFormConnection.auth_data?.needs_customer_id_setup,
+              accessible_customer_ids: googleLeadFormConnection.auth_data?.accessible_customer_ids,
+              google_customer_id: googleLeadFormConnection.auth_data?.google_customer_id,
+              available_forms: googleLeadFormConnection.auth_data?.available_forms?.length || 0,
+              selected_forms: googleLeadFormConnection.auth_data?.selected_forms?.length || 0,
+            });
+
+            // Only update status if it's different from current status to prevent loops
+            const currentStatus = getIntegrationStatus("Google Lead Forms");
+            if (currentStatus !== modalStatus) {
+              console.log("Updating status from", currentStatus, "to", modalStatus);
+              updateIntegrationStatus("Google Lead Forms", modalStatus);
+            } else {
+              console.log("Status unchanged, staying at:", currentStatus);
+            }
 
             setGoogleLeadFormData({
               accountInfo: {
@@ -926,6 +959,7 @@ export default function IntegrationsPage() {
             }
           }}
           onSelectCustomerId={async (selectedCustomerId: string) => {
+            console.log("Customer selection initiated for:", selectedCustomerId);
             setButtonLoading(true);
             try {
               const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/select-customer`, {
@@ -946,9 +980,9 @@ export default function IntegrationsPage() {
               const result = await response.json();
               console.log("Customer selected successfully:", result);
 
-              // Refresh the modal data
-              const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
-              updateIntegrationStatus("Google Lead Forms", realStatus);
+              // Don't immediately refresh - let the modal stay open to show next step
+              // The useEffect will handle status updates when the modal is interacted with next
+              console.log("Customer selection completed, modal will show next step");
             } catch (error) {
               console.error("Error selecting customer:", error);
               ErrorToast("Failed to select customer");
