@@ -1,6 +1,5 @@
 "use client";
 import { ConnectionStatus } from "@/app/types/types";
-import { IntegrationWithStatus, IntegrationName, IntegrationStates } from "@/types/integrations";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import {
@@ -19,6 +18,7 @@ import {
 } from "@/components/modals/Modals";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { IntegrationName, IntegrationStates, IntegrationWithStatus } from "@/types/integrations";
 import {
   connectToGHL,
   connectToGoogleForm,
@@ -240,18 +240,14 @@ export default function IntegrationsPage() {
       const facebookStatus = urlParams.get("facebook_lead_form_status");
 
       if (facebookStatus === "success" && clinicId) {
-        console.log("Facebook OAuth success detected, refreshing status");
-
         // Actually check the database status
         const realStatus = await updateIntegrationConnectionStatus(clinicId, "Facebook Lead Forms");
-        console.log("Real Facebook status from database:", realStatus);
 
         // Update the UI status (this will move it to connected section)
         updateIntegrationStatus("Facebook Lead Forms", realStatus);
 
         // Wait a moment for state to update, then open the modal
         setTimeout(() => {
-          console.log("Opening Facebook modal after status update");
           toggleModal("Facebook Lead Forms", true);
         }, 100);
 
@@ -274,18 +270,14 @@ export default function IntegrationsPage() {
       const googleLeadFormStatus = urlParams.get("google_lead_form_status");
 
       if (googleLeadFormStatus === "success" && clinicId) {
-        console.log("Google Lead Form OAuth success detected, refreshing status");
-
         // Actually check the database status
         const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
-        console.log("Real Google Lead Form status from database:", realStatus);
 
         // Update the UI status (this will move it to connected section)
         updateIntegrationStatus("Google Lead Forms", realStatus);
 
         // Wait a moment for state to update, then open the modal
         setTimeout(() => {
-          console.log("Opening Google Lead Form modal after status update");
           toggleModal("Google Lead Forms", true);
         }, 500);
 
@@ -339,25 +331,18 @@ export default function IntegrationsPage() {
 
   // Fetch Google Lead Forms data when modal opens
   useEffect(() => {
-    console.log("🔄 Google Lead Forms useEffect triggered - Modal open:", isModalOpen("Google Lead Forms"));
-
     const fetchGoogleLeadFormData = async () => {
       const currentStatus = getIntegrationStatus("Google Lead Forms");
-      console.log("📊 Current status at useEffect start:", currentStatus);
 
       // Don't re-fetch if we're already in a selection state - let user complete their selection
       if (currentStatus === "selecting_customer") {
-        console.log("⏸️ Skipping data fetch - already in selection state:", currentStatus);
         return;
       }
 
       if (isModalOpen("Google Lead Forms") && currentStatus !== "disconnected") {
         try {
-          console.log("Clinic ID for connection lookup:", clinicId);
-
           const { data: googleLeadFormConnection, error: connectionError } = await getIntegrationConnection(clinicId, "Google Lead Forms");
-          console.log("Google Lead Form connection query result:", { googleLeadFormConnection, connectionError });
-
+          if (connectionError) throw connectionError;
           if (googleLeadFormConnection) {
             // Determine the appropriate status based on auth_data
             let modalStatus: ConnectionStatus = "connected";
@@ -374,19 +359,9 @@ export default function IntegrationsPage() {
               modalStatus = "connected";
             }
 
-            console.log("Modal status determined:", modalStatus);
-            console.log("Auth data details:", {
-              needs_customer_id_setup: googleLeadFormConnection.auth_data?.needs_customer_id_setup,
-              accessible_customer_ids: googleLeadFormConnection.auth_data?.accessible_customer_ids,
-              google_customer_id: googleLeadFormConnection.auth_data?.google_customer_id,
-              available_forms: googleLeadFormConnection.auth_data?.available_forms?.length || 0,
-              selected_forms: googleLeadFormConnection.auth_data?.selected_forms?.length || 0,
-            });
-
             // Only update status if it's different from current status to prevent loops
             const currentStatus = getIntegrationStatus("Google Lead Forms");
             if (currentStatus !== modalStatus) {
-              console.log("Updating status from", currentStatus, "to", modalStatus);
               updateIntegrationStatus("Google Lead Forms", modalStatus);
             } else {
               console.log("Status unchanged, staying at:", currentStatus);
@@ -686,7 +661,6 @@ export default function IntegrationsPage() {
                               size="small"
                               className="!bg-[#3D5DCF] !border-[#3D5DCF] hover:!bg-blue-800"
                               onClick={() => {
-                                console.log("Opening Facebook form selection modal");
                                 toggleModal("Facebook Lead Forms", true);
                               }}
                             >
@@ -698,7 +672,6 @@ export default function IntegrationsPage() {
                               size="small"
                               className="!bg-[#4285F4] !border-[#4285F4] hover:!bg-blue-600"
                               onClick={() => {
-                                console.log("Opening Google Lead Forms management modal");
                                 toggleModal("Google Lead Forms", true);
                               }}
                             >
@@ -837,8 +810,6 @@ export default function IntegrationsPage() {
           open={isModalOpen("Google Lead Forms")}
           status={(() => {
             const status = getIntegrationStatus("Google Lead Forms");
-            console.log("🎭 Modal receiving status:", status);
-            console.log("🎭 Modal receiving customerIds:", googleLeadFormData.availableCustomerIds);
             return status;
           })()}
           accountInfo={googleLeadFormData.accountInfo}
@@ -867,9 +838,7 @@ export default function IntegrationsPage() {
               });
 
               if (!response.ok) throw new Error(await response.text());
-
-              const result = await response.json();
-              console.log("Customer ID set successfully:", result);
+              await response.json();
 
               // Refresh the modal data
               const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
@@ -882,7 +851,6 @@ export default function IntegrationsPage() {
             }
           }}
           onSelectCustomerId={async (selectedCustomerId: string) => {
-            console.log("Customer selection initiated for:", selectedCustomerId);
             setButtonLoading(true);
             try {
               const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/select-customer`, {
@@ -900,11 +868,7 @@ export default function IntegrationsPage() {
 
               if (!response.ok) throw new Error(await response.text());
 
-              const result = await response.json();
-              console.log("Customer selected successfully:", result);
-
-              // Now fetch available lead forms for the selected customer
-              console.log("Fetching lead forms for selected customer...");
+              await response.json();
               const formsResponse = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/fetch-lead-forms`, {
                 method: "POST",
                 headers: {
@@ -922,8 +886,7 @@ export default function IntegrationsPage() {
                 throw new Error("Failed to fetch available lead forms");
               }
 
-              const formsResult = await formsResponse.json();
-              console.log("Lead forms fetched successfully:", formsResult);
+              await formsResponse.json();
 
               // Refresh the modal data to show the next step
               const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
@@ -943,8 +906,6 @@ export default function IntegrationsPage() {
                   availableCustomerIds: googleLeadFormConnection.auth_data?.accessible_customer_ids || [],
                 });
               }
-
-              console.log("Customer selection completed, modal data refreshed");
             } catch (error) {
               console.error("Error selecting customer:", error);
               ErrorToast("Failed to select customer");
@@ -970,8 +931,7 @@ export default function IntegrationsPage() {
 
               if (!response.ok) throw new Error(await response.text());
 
-              const result = await response.json();
-              console.log("Forms saved successfully:", result);
+              await response.json();
 
               // Refresh the modal data but keep modal open
               const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
