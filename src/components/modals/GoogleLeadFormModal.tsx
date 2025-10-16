@@ -13,7 +13,6 @@ const { Text } = Typography;
 export const GoogleLeadFormModal: React.FC<ModalProps> = ({
   open,
   status,
-  accountInfo,
   availableLeadForms = [],
   availableCustomerIds = [],
   onOk,
@@ -24,18 +23,10 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
   onSaveSelectedForms,
   onSelectCustomerId,
   buttonLoading,
+  clinic_id,
 }) => {
   const [selectedForms, setSelectedForms] = useState<string[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
-
-  // Debug logging
-  console.log("🔍 GoogleLeadFormModal Debug:", {
-    open,
-    status,
-    accountInfo,
-    availableLeadForms: availableLeadForms?.length || 0,
-    availableCustomerIds: availableCustomerIds?.length || 0,
-  });
 
   return (
     <Modal
@@ -133,7 +124,6 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
               </div>
             )}
 
-            {/* Lead Forms Selection Dropdown */}
             {availableLeadForms.length > 0 && (
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
                 <Text strong className="block mb-3 text-gray-800">
@@ -146,10 +136,8 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                   value={selectedForms}
                   onChange={value => {
                     setSelectedForms(value);
-                    // Automatically save selected forms without closing modal
                     const formsToSave = availableLeadForms.filter(form => value.includes(form.id));
                     if (onSaveSelectedForms) {
-                      // Call the save function but prevent modal from closing
                       onSaveSelectedForms(formsToSave);
                     }
                   }}
@@ -166,6 +154,30 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
               </div>
             )}
 
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 mb-4 shadow-sm">
+              <Text strong className="block mb-2 text-gray-800">
+                Webhook URL
+              </Text>
+              <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <code className="text-gray-700 text-sm flex-1 overflow-hidden whitespace-nowrap text-ellipsis">
+                  {`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/google-leads/webhook?clinic_id=${clinic_id}`}
+                </code>
+                <Button
+                  size="small"
+                  type="default"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/google-leads/webhook?clinic_id=${clinic_id}`,
+                    );
+                  }}
+                  className="!ml-3 !bg-gray-600 hover:!bg-gray-700 !text-white !border-none"
+                >
+                  Copy
+                </Button>
+              </div>
+              <Text className="text-xs text-gray-500 mt-2 block">Use this webhook in your Google Ads Lead Form settings.</Text>
+            </div>
+
             <div className="bg-gray-50 rounded-lg p-4 mt-4">
               <div className="flex justify-between items-center">
                 <div>
@@ -173,7 +185,7 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                     Google Ads Lead Forms Integration Active
                   </Text>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex items-center space-x-2">
                   <Button
                     type="primary"
                     size="small"
@@ -198,8 +210,8 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
               bgColor="bg-gray-50"
               borderColor="border-gray-500"
               textColor="gray-700"
-              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
-              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+              buttonBgColor="gray-500"
+              hoverBgColor="gray-600"
             />
           </>
         )}

@@ -32,6 +32,7 @@ export interface ModalProps {
   selectedForms?: any[];
 
   onSelectForms?: (value: any[]) => void;
+  clinic_id?: string;
 }
 
 export interface CsvUploadModalProps {
