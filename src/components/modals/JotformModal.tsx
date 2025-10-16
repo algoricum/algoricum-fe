@@ -158,7 +158,7 @@ export const JotformModal: React.FC<ModalProps> = ({
                   </Text>
                   <br />
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex items-center space-x-2">
                   <Button
                     type="primary"
                     size="small"
