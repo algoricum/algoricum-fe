@@ -3,7 +3,9 @@ import { supabase } from "./supabaseClient.ts";
 const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
 const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
 const APP_URL = Deno.env.get("LIVE_APP_URL") || "http://localhost:3000";
-
+const API_VERSION = "v21";
+const GOOGLE_ADS_DEVELOPER_TOKEN = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
+const googleAdsDeveloperToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
 /**
  * Step 0 - Start OAuth Flow
  */
@@ -182,82 +184,77 @@ export async function handleOAuthCallback(code: string, clinic_id: string, redir
  */
 export async function insertLead(clinic_id: string, body: any) {
   console.log(`[LEAD_INSERT] Processing lead insertion for clinic: ${clinic_id}`);
-  console.log(`[LEAD_INSERT] Webhook body structure:`, {
-    hasLeadFormSubmissionData: !!body.leadFormSubmissionData,
-    hasFieldValues: !!body.leadFormSubmissionData?.fieldValues,
-    fieldValuesCount: body.leadFormSubmissionData?.fieldValues?.length || 0,
-    bodyKeys: Object.keys(body || {}),
-  });
 
-  const leadData = body.leadFormSubmissionData?.fieldValues || [];
-  console.log(`[LEAD_INSERT] Field values:`, leadData);
-
-  let first_name = "";
-  let last_name = "";
-  let email = "";
-  let phone = "";
-
-  console.log(`[LEAD_INSERT] Processing ${leadData.length} form fields`);
-
-  for (let i = 0; i < leadData.length; i++) {
-    const field = leadData[i];
-    const name = field.fieldName?.toLowerCase();
-    const value = field.stringValue || "";
-
-    console.log(`[LEAD_INSERT] Field ${i + 1}: ${name} = ${value}`);
-
-    if (name?.includes("first")) {
-      first_name = value;
-      console.log(`[LEAD_INSERT] Mapped first name: ${first_name}`);
-    } else if (name?.includes("last")) {
-      last_name = value;
-      console.log(`[LEAD_INSERT] Mapped last name: ${last_name}`);
-    } else if (name?.includes("email")) {
-      email = value;
-      console.log(`[LEAD_INSERT] Mapped email: ${email}`);
-    } else if (name?.includes("phone")) {
-      phone = value;
-      console.log(`[LEAD_INSERT] Mapped phone: ${phone}`);
-    }
+  if (!clinic_id) {
+    console.error(`[LEAD_INSERT] Missing clinic_id`);
+    throw new Error("Missing clinic_id");
   }
 
-  console.log(`[LEAD_INSERT] Extracted lead data:`, {
-    first_name,
-    last_name,
-    email,
-    phone,
-    hasRequiredFields: !!(first_name || last_name) && !!email,
+  let dataForAI = body;
+
+  console.log(`[LEAD_INSERT] Raw webhook body:`, JSON.stringify(body, null, 2));
+
+  // ✅ Handle Google Lead Form format (flatten user_column_data)
+  if (body.user_column_data && Array.isArray(body.user_column_data)) {
+    const flattened: Record<string, any> = {};
+    for (const field of body.user_column_data) {
+      const key = field.column_id?.toLowerCase() || field.column_name?.toLowerCase().replace(/\s+/g, "_");
+      flattened[key] = field.string_value || null;
+    }
+    dataForAI = flattened;
+    console.log(`[LEAD_INSERT] Flattened Google lead form data:`, dataForAI);
+  }
+
+  // ✅ Extract using GPT extractor function (same as webhook route)
+  console.log(`[LEAD_INSERT] Sending data to GPT-extractor-function...`);
+  const response = await fetch(`${supabaseUrl}/functions/v1/GPT-extractor-function`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+    },
+    body: JSON.stringify({ data: body }),
   });
 
-  const leadRecord = {
-    first_name,
-    last_name,
-    email,
-    phone,
+  const sanatizedData = await response.json();
+  console.log(`[LEAD_INSERT] GPT extractor response:`, sanatizedData);
+
+  // ✅ Fetch lead source (Google Lead Forms)
+  const { data: leadSource, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Google Lead Forms").single();
+
+  if (sourceError || !leadSource) {
+    console.error(`[LEAD_INSERT] Lead source not found: Google Lead Forms`);
+    throw new Error("Lead source not found: Google Lead Forms");
+  }
+
+  // ✅ Prepare lead record(s)
+  const leadRecords = (sanatizedData?.data || []).map((contact: any) => ({
+    first_name: contact.firstName,
+    last_name: contact.lastName,
+    email: contact.email,
+    phone: contact.phone,
     clinic_id,
-    source_id: "670f33cf-043d-407f-aca9-19613e329de4",
+    source_id: leadSource.id,
     status: "New",
     form_data: body,
-  };
+  }));
 
-  console.log(`[LEAD_INSERT] Inserting lead record:`, {
-    ...leadRecord,
-    form_data: `${Object.keys(body || {}).length} keys`,
-  });
+  console.log(`[LEAD_INSERT] Prepared lead records:`, leadRecords);
 
-  const { data, error } = await supabase.from("lead").insert(leadRecord);
+  // ✅ Insert into Supabase
+  const { data, error } = await supabase.from("lead").insert(leadRecords);
 
   if (error) {
-    console.error(`[LEAD_INSERT] Database insert error:`, error);
+    console.error(`[LEAD_INSERT] Error inserting lead:`, error);
     throw new Error(error.message);
   }
 
-  console.log(`[LEAD_INSERT] Successfully inserted lead`, {
-    email,
+  console.log(`[LEAD_INSERT] Successfully inserted lead(s)`, {
     clinic_id,
     insertedData: data,
   });
 
+  // ✅ Redirect handling
   console.log(`[LEAD_INSERT] Creating redirect URL with APP_URL: ${APP_URL}`);
   const redirectUrl = new URL(`${APP_URL}/onboarding`);
   redirectUrl.searchParams.set("google_lead_form_status", "success");
@@ -306,8 +303,6 @@ export async function fetchAccountsAndLeadForms(connection_id: string, supabase:
 
     const authData = connection.auth_data || {};
 
-    // Get Google Ads Developer Token
-    const googleAdsDeveloperToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
     if (!googleAdsDeveloperToken) {
       console.error(`[FETCH_ACCOUNTS] Google Ads Developer Token not configured`);
       throw new Error("Google Ads Developer Token not configured");
@@ -327,8 +322,6 @@ export async function fetchAccountsAndLeadForms(connection_id: string, supabase:
     }
 
     // Try to fetch accessible customers using Google Ads API
-    const GOOGLE_ADS_DEVELOPER_TOKEN = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
-    const API_VERSION = "v21"; // Latest stable version
 
     if (!GOOGLE_ADS_DEVELOPER_TOKEN) {
       console.warn(`[FETCH_ACCOUNTS] No Google Ads Developer Token found. Manual customer ID setup required.`);
@@ -628,8 +621,6 @@ export async function fetchAvailableLeadForms(connection_id: string, supabase: a
 
     console.log(`[LEAD_FORMS] No cached forms found. Trying searchStream endpoint since search endpoint failed...`);
 
-    // Get Google Ads Developer Token first (needed for all API calls)
-    const googleAdsDeveloperToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
     if (!googleAdsDeveloperToken) {
       console.error(`[LEAD_FORMS] Google Ads Developer Token not configured`);
       return {
@@ -872,7 +863,6 @@ export async function fetchAvailableLeadForms(connection_id: string, supabase: a
     }
 
     // Use Google Ads API to fetch available lead forms
-    const API_VERSION = "v21"; // Use same version as other endpoints
     const googleAdsUrl = `https://googleads.googleapis.com/${API_VERSION}/customers/${googleCustomerId}/googleAdsService:search`;
 
     const query = `
@@ -1145,9 +1135,6 @@ async function refreshGoogleTokenForIntegration(connection: any, supabase: any) 
   console.log(`[TOKEN_REFRESH] Starting token refresh for integration connection: ${connection.id}`);
 
   try {
-    const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID");
-    const googleClientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
-
     if (!googleClientId || !googleClientSecret) {
       throw new Error("Google OAuth credentials not configured");
     }
@@ -1231,7 +1218,7 @@ export async function syncLeadsFromForms(connection_id: string, supabase: any) {
   console.log(`[SYNC_LEADS] Starting lead sync for connection: ${connection_id}`);
 
   try {
-    // Get connection from database
+    // 1️⃣ Fetch connection info
     const { data: connection, error: connectionError } = await supabase
       .from("integration_connections")
       .select(
@@ -1257,43 +1244,27 @@ export async function syncLeadsFromForms(connection_id: string, supabase: any) {
     const googleCustomerId = authData.google_customer_id;
     const selectedForms = authData.selected_forms || authData.selected_lead_forms || [];
 
-    if (!googleCustomerId) {
-      throw new Error("Google Ads customer ID not configured");
-    }
-
-    if (selectedForms.length === 0) {
-      throw new Error("No forms selected for sync");
-    }
+    if (!googleCustomerId) throw new Error("Google Ads customer ID not configured");
+    if (selectedForms.length === 0) throw new Error("No forms selected for sync");
 
     console.log(`[SYNC_LEADS] Syncing ${selectedForms.length} forms for customer ${googleCustomerId}`);
 
-    // Get Google Ads Developer Token
-    const googleAdsDeveloperToken = Deno.env.get("GOOGLE_ADS_DEVELOPER_TOKEN");
-    if (!googleAdsDeveloperToken) {
-      throw new Error("Google Ads Developer Token not configured");
-    }
+    // 2️⃣ Handle auth
+    if (!googleAdsDeveloperToken) throw new Error("Google Ads Developer Token not configured");
 
-    // Refresh token if needed
     let currentAuthData = authData;
     const tokenExpiryDate = authData.token_expiry ? new Date(authData.token_expiry) : null;
-    const now = new Date();
-    const isTokenExpired = tokenExpiryDate && tokenExpiryDate <= now;
+    const isTokenExpired = tokenExpiryDate && tokenExpiryDate <= new Date();
 
     if (isTokenExpired) {
       console.log(`[SYNC_LEADS] Token expired, refreshing...`);
       currentAuthData = await refreshGoogleTokenForIntegration(connection, supabase);
     }
 
-    // Create form asset IDs array for the query
-    const formAssetIds = selectedForms.map(form => form.id);
-    console.log(`[SYNC_LEADS] Form asset IDs:`, formAssetIds);
-
-    // Use Google Ads API to fetch leads for selected forms
-    const API_VERSION = "v21"; // Use same version as other endpoints
+    // 3️⃣ Fetch leads from Google Ads API
+    const formAssetIds = selectedForms.map(f => f.id);
     const googleAdsUrl = `https://googleads.googleapis.com/${API_VERSION}/customers/${googleCustomerId}/googleAds:searchStream`;
 
-    // Query to fetch leads from the selected lead forms
-    // Updated for Google Ads API v21 - use asset resource instead
     const query = `
       SELECT 
         lead_form_submission_data.id,
@@ -1307,94 +1278,66 @@ export async function syncLeadsFromForms(connection_id: string, supabase: any) {
 
     console.log(`[SYNC_LEADS] Leads query: ${query.trim()}`);
 
-    const requestHeaders = {
-      Authorization: `Bearer ${currentAuthData.access_token}`,
-      "developer-token": googleAdsDeveloperToken,
-      "login-customer-id": googleCustomerId.replace(/-/g, ""), // Remove any dashes from customer ID
-      "Content-Type": "application/json",
-    };
-
     const response = await fetch(googleAdsUrl, {
       method: "POST",
-      headers: requestHeaders,
+      headers: {
+        Authorization: `Bearer ${currentAuthData.access_token}`,
+        "developer-token": googleAdsDeveloperToken,
+        "login-customer-id": googleCustomerId.replace(/-/g, ""),
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ query }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[SYNC_LEADS] Google Ads API error:`, {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText,
-      });
+      console.error(`[SYNC_LEADS] Google Ads API error:`, { status: response.status, body: errorText });
       throw new Error(`Google Ads API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     console.log(`[SYNC_LEADS] SearchStream API response:`, JSON.stringify(data, null, 2));
 
-    // Process searchStream response format (array of batches)
+    // 4️⃣ Extract results
     const leads = [];
-    if (data && Array.isArray(data)) {
+    if (Array.isArray(data)) {
       for (const batch of data) {
-        if (batch.results && Array.isArray(batch.results)) {
-          leads.push(...batch.results);
-        }
+        if (Array.isArray(batch.results)) leads.push(...batch.results);
       }
     }
     console.log(`[SYNC_LEADS] Found ${leads.length} leads to process`);
 
-    // Process and save leads to database
+    // 5️⃣ Process each lead
     let processedCount = 0;
     let duplicateCount = 0;
 
-    for (const leadData of leads) {
+    for (const lead of leads) {
       try {
-        const submissionData = leadData.leadFormSubmissionData;
+        const submissionData = lead.leadFormSubmissionData;
+        // const google_submission_id = submissionData?.id;
+        const formFields = submissionData?.leadFormSubmissionFields || [];
 
-        // Extract lead information
-        const leadInfo = {
-          google_submission_id: submissionData.id,
-          asset_id: submissionData.assetId,
-          asset_name: submissionData.assetName,
-          submission_date: submissionData.formSubmissionDateTime,
-          form_fields: submissionData.leadFormSubmissionFields || [],
-          custom_fields: submissionData.customLeadFormSubmissionFields || [],
-        };
-
-        // Check if lead already exists
-        const { data: existingLead } = await supabase
-          .from("leads")
-          .select("id")
-          .eq("google_submission_id", leadInfo.google_submission_id)
-          .eq("clinic_id", connection.clinic_id)
-          .single();
+        // Check duplicates
+        const { data: existingLead } = await supabase.from("lead").select("id").eq("clinic_id", connection.clinic_id).maybeSingle();
 
         if (existingLead) {
           duplicateCount++;
           continue;
         }
 
-        // Save lead to database
-        const { error: insertError } = await supabase.from("leads").insert({
-          clinic_id: connection.clinic_id,
-          google_submission_id: leadInfo.google_submission_id,
-          source: "Google Lead Forms",
-          form_name: leadInfo.asset_name,
-          submission_data: leadInfo,
-          created_at: leadInfo.submission_date,
+        // 🔁 Reuse your insertLead logic
+        console.log(`[SYNC_LEADS] Inserting new lead from Google Ads API...`);
+        await insertLead(connection.clinic_id, {
+          leadFormSubmissionData: { fieldValues: formFields },
         });
 
-        if (insertError) {
-          console.error(`[SYNC_LEADS] Error inserting lead:`, insertError);
-        } else {
-          processedCount++;
-        }
-      } catch (error) {
-        console.error(`[SYNC_LEADS] Error processing lead:`, error);
+        processedCount++;
+      } catch (err) {
+        console.error(`[SYNC_LEADS] Error processing lead:`, err);
       }
     }
 
+    // 6️⃣ Summary
     console.log(`[SYNC_LEADS] Sync completed - Processed: ${processedCount}, Duplicates: ${duplicateCount}`);
 
     return {

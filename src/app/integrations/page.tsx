@@ -958,6 +958,7 @@ export default function IntegrationsPage() {
             })
           }
           buttonLoading={buttonLoading}
+          clinic_id={clinicId}
         />
 
         {/* Google Form Modal */}

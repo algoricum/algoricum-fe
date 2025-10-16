@@ -114,7 +114,7 @@ export const PipedriveModal: React.FC<ModalProps> = ({
                   <br />
                   <Text className="text-green-600 text-sm">{accountInfo.responseCount || 0} leads synced</Text>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex items-center space-x-2">
                   <Button
                     type="primary"
                     size="small"
