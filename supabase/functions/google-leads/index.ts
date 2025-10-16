@@ -5,12 +5,12 @@ import {
   fetchAccountsAndLeadForms,
   fetchAvailableLeadForms,
   handleOAuthCallback,
-  insertLead,
   saveSelectedLeadForms,
   setGoogleCustomerId,
   startAuth,
   syncLeadsFromForms,
 } from "../_shared/google-leads-service.ts";
+import { supabase } from "../_shared/supabaseClient.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -162,11 +162,12 @@ serve(async req => {
       console.log(`[GOOGLE_LEADS] Route matched: webhook`);
 
       const clinic_id = url.searchParams.get("clinic_id");
-      console.log(`[GOOGLE_LEADS] Webhook clinic_id: ${clinic_id}`);
-
       if (!clinic_id) {
         console.error(`[GOOGLE_LEADS] Missing clinic_id parameter`);
-        return new Response("Missing clinic_id", { status: 400, headers: { ...corsHeaders() } });
+        return new Response("Missing clinic_id", {
+          status: 400,
+          headers: { ...corsHeaders(), "Content-Type": "text/plain" },
+        });
       }
 
       let webhookBody;
@@ -177,18 +178,73 @@ serve(async req => {
         console.error(`[GOOGLE_LEADS] Failed to parse webhook body:`, error);
         return new Response(JSON.stringify({ error: "Invalid JSON in webhook body" }), {
           status: 400,
-          headers: { ...corsHeaders() },
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
         });
       }
 
-      console.log(`[GOOGLE_LEADS] Processing lead insertion...`);
-      const redirectUrl = await insertLead(clinic_id, webhookBody);
-      console.log(`[GOOGLE_LEADS] Lead insertion completed, redirect URL: ${redirectUrl}`);
+      try {
+        console.log(`[GOOGLE_LEADS] Inserting lead for clinic ${clinic_id}...`);
 
-      return new Response(null, {
-        status: 302,
-        headers: { ...corsHeaders(), Location: redirectUrl },
-      });
+        let dataForAI = webhookBody;
+
+        console.log("webhook body response:", webhookBody);
+
+        // If it’s a Google Lead Form payload:
+        if (dataForAI.user_column_data && Array.isArray(dataForAI.user_column_data)) {
+          // Convert user_column_data to a simple key-value object
+          const flattened = {};
+          for (const field of dataForAI.user_column_data) {
+            const key = field.column_id?.toLowerCase() || field.column_name?.toLowerCase().replace(/\s+/g, "_");
+            flattened[key] = field.string_value || null;
+          }
+          dataForAI = flattened;
+        }
+
+        console.log("updated sanatized response:", dataForAI);
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/GPT-extractor-function`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+          },
+          body: JSON.stringify({ data: webhookBody }),
+        });
+
+        const sanatizedData = await response.json();
+        console.log("Extractor response:", sanatizedData);
+
+        const leadRecords = (sanatizedData?.data || []).map(contact => ({
+          first_name: contact.firstName,
+          last_name: contact.lastName,
+          email: contact.email,
+          phone: contact.phone,
+          clinic_id,
+          source_id: "670f33cf-043d-407f-aca9-19613e329de4",
+          status: "New",
+        }));
+
+        console.log("Prepared lead records:", leadRecords);
+
+        const { data, error } = await supabase.from("lead").insert(leadRecords);
+
+        if (error) {
+          console.error(`[GOOGLE_LEADS] Error inserting lead:`, error);
+        }
+
+        console.log(`[GOOGLE_LEADS] Lead inserted successfully`);
+
+        return new Response(JSON.stringify({ success: true, data }), {
+          status: 200,
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.error(`[GOOGLE_LEADS] Error inserting lead:`, error);
+        return new Response(JSON.stringify({ error: "Failed to insert lead", details: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders(), "Content-Type": "application/json" },
+        });
+      }
     }
 
     // 2️⃣.5 Fetch Accounts and Lead Forms
