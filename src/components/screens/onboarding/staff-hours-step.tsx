@@ -14,7 +14,6 @@ interface StaffHoursStepProps {
   onPrev?: () => void;
   initialData?: any;
 }
-// const supabase = createClient();
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -30,8 +29,6 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
       Sunday: { enabled: false, start: "9:00 AM", end: "5:00 PM" },
     },
   );
-  // const [, setClinicId] = useState<string | null>(null);
-  // const [subscribingId, setSubscribingId] = useState<string | null>(null);
 
   const handlePreset = (preset: string) => {
     const newHours = { ...businessHours };
