@@ -14,7 +14,7 @@ export interface IntegrationsStepProps {
 
 export interface ModalProps {
   open: boolean;
-  status: "disconnected" | "connecting" | "connected";
+  status: ConnectionStatus;
   accountInfo?: any;
   onOk: () => void;
   onCancel: () => void;
@@ -38,6 +38,16 @@ export interface ModalProps {
   selectedForms?: any[];
 
   onSelectForms?: (value: any[]) => void;
+
+  // Google Lead Forms specific props
+  availableLeadForms?: any[];
+  availableCustomerIds?: string[];
+  connectionId?: string;
+  onSetCustomerId?: (customerId: string) => void;
+  onSelectCustomerId?: (customerId: string) => void;
+  onSaveSelectedForms?: (selectedForms: any[]) => void;
+  buttonLoading?: boolean;
+  clinicId?: string;
 }
 
 export interface PreviousQuestionsProps {
@@ -81,7 +91,14 @@ export interface CurrentInputProps {
   facebookLeadFormAccountInfo?: any;
 }
 
-export type ConnectionStatus = "disconnected" | "connecting" | "connected";
+export type ConnectionStatus =
+  | "disconnected"
+  | "connecting"
+  | "connected"
+  | "needs_customer_id"
+  | "selecting_customer"
+  | "selecting_forms"
+  | "loading_forms";
 
 export type Props = {
   buttonLoading: boolean;

@@ -9,6 +9,66 @@ const supabase = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABA
 const MAILGUN_DOMAIN = "algoricum.com";
 const MAILGUN_KEY = Deno.env.get("MAILGUN_API_KEY");
 
+// Generate professional reminder email HTML with original content
+function generateReminderEmail(clinicName: string, clinic: any, clinic_id: string) {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Stay on top of today's patient leads</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f8fafc;">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #f8fafc; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                        <!-- Main Content -->
+                        <tr>
+                            <td style="padding: 40px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 16px; color: #334155;">
+                                <p style="margin: 0 0 20px 0; line-height: 1.6;">Hi ${clinicName},</p>
+                                <p style="margin: 0 0 20px 0; line-height: 1.6;">To keep your pipeline accurate, remember to enter any new inquiries from today - calls, walk-ins, or manual uploads.</p>
+                                <p style="margin: 0 0 20px 0; line-height: 1.6;">Also, please review today's appointments and update patient statuses accordingly.</p>
+                                <div style="text-align: center; margin: 30px 0;">
+                                    <a href="https://app.algoricum.com" style="display: inline-block; background: #800080; color: white; padding: 15px 35px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; border: none; cursor: pointer;">Manage Leads & Appointments</a>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Contact Information Footer -->
+                        <tr>
+                            <td style="padding: 30px 40px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+                                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                    <tr>
+                                        <td style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #64748b; text-align: center;">
+                                            <strong style="color: #2563eb; font-size: 16px; display: block; margin-bottom: 10px;">${clinic?.name || clinicName}</strong>
+                                            ${clinic?.address ? `<div style="margin-bottom: 8px;">${clinic.address}</div>` : ""}
+                                            ${clinic?.phone ? `<div style="margin-bottom: 8px;">Phone: <a href="tel:${clinic.phone}" style="color: #2563eb; text-decoration: none;">${clinic.phone}</a></div>` : ""}
+                                            ${clinic?.email ? `<div style="margin-bottom: 8px;">Email: <a href="mailto:${clinic.email}" style="color: #2563eb; text-decoration: none;">${clinic.email}</a></div>` : ""}
+                                            <div style="margin-top: 15px; font-size: 12px; color: #94a3b8;">
+                                                <div>Powered by Algoricum</div>
+                                                <div style="margin-top: 10px;">
+                                                    <a href="${Deno.env.get("SUPABASE_URL")}/functions/v1/unsubscribe-lead/unsubscribe-daily-remainder?clinic_id=${clinic_id}" 
+                                                       style="color: #6b7280; text-decoration: underline; font-size: 11px;">
+                                                        Unsubscribe from daily reminders
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+  `;
+}
+
 serve(async () => {
   // 1. Fetch receptionists whose local time = 3PM (with owner emails)
   const { data: users, error } = await supabase.rpc("get_receptionists_at_3pm");
@@ -28,6 +88,9 @@ serve(async () => {
   for (const row of users) {
     const { user_email, clinic_name, from_email, clinic_id, owner_email } = row;
 
+    // Fetch clinic details for dynamic footer
+    const { data: clinic } = await supabase.from("clinics").select("id, name, address, phone, email").eq("id", clinic_id).single();
+
     // Build email parameters
     const emailParams: Record<string, string> = {
       from: `Algoricum <no-reply@algoricum.com>`,
@@ -36,13 +99,12 @@ serve(async () => {
       text: `Hi ${clinic_name},
 To keep your pipeline accurate, remember to enter any new inquiries from today - calls, walk-ins, or manual uploads.
 
-Add new leads: https://app.algoricum.com
+Also, please review today's appointments and update patient statuses accordingly.
+
+Manage Leads & Appointments: https://app.algoricum.com
 
 Algoricum`,
-      html: `<p>Hi ${clinic_name},</p>
-<p>To keep your pipeline accurate, remember to enter any new inquiries from today - calls, walk-ins, or manual uploads.</p>
-<p><a href="https://app.algoricum.com">Add new leads</a></p>
-<p>Algoricum</p>`,
+      html: generateReminderEmail(clinic_name, clinic, clinic_id),
     };
 
     // CC the owner (only if owner email exists and is different from receptionist)
