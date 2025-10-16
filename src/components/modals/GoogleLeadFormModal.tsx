@@ -1,9 +1,10 @@
 "use client";
 
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
-import { Alert, Button, Modal, Spin, Typography } from "antd";
+import { Alert, Button, Modal, Select, Typography } from "antd";
 import Image from "next/image";
 import type React from "react";
+import { useState } from "react";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
 
@@ -12,14 +13,21 @@ const { Text } = Typography;
 export const GoogleLeadFormModal: React.FC<ModalProps> = ({
   open,
   status,
-  accountInfo,
+  availableLeadForms = [],
+  availableCustomerIds = [],
   onOk,
   onCancel,
   onConnect,
   onSyncLeads,
   onDisconnect,
+  onSaveSelectedForms,
+  onSelectCustomerId,
   buttonLoading,
+  clinic_id,
 }) => {
+  const [selectedForms, setSelectedForms] = useState<string[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+
   return (
     <Modal
       title={
@@ -85,26 +93,91 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
           </>
         )}
 
-        {status === "connecting" && (
-          <div className="text-center py-8">
-            <Spin size="large" />
-            <div className="mt-4">
-              <Text className="text-lg">Connecting to Google Ads Lead Forms...</Text>
-              <br />
-              <Text className="text-gray-500">Please complete the authorization process</Text>
-            </div>
-          </div>
-        )}
-
-        {status === "connected" && accountInfo && (
+        {status === "connected" && (
           <>
-            <Alert
-              message="Successfully Connected!"
-              description={`Connected to ${accountInfo.accountName}. Your lead form integration is ready!`}
-              type="success"
-              showIcon
-              className="mb-4"
-            />
+            {/* Customer Selection Dropdown */}
+            {availableCustomerIds.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <Text strong className="block mb-3 text-gray-800">
+                  Select Google Ads Account:
+                </Text>
+                <Select
+                  placeholder="Choose your Google Ads account"
+                  style={{ width: "100%" }}
+                  value={selectedCustomerId || undefined}
+                  onChange={value => {
+                    setSelectedCustomerId(value);
+                    if (onSelectCustomerId) {
+                      onSelectCustomerId(value);
+                    }
+                  }}
+                  loading={buttonLoading}
+                  disabled={buttonLoading}
+                >
+                  {availableCustomerIds.map(customerId => (
+                    <Select.Option key={customerId} value={customerId}>
+                      Customer ID: {customerId}
+                    </Select.Option>
+                  ))}
+                </Select>
+                <Text className="text-xs text-gray-500 mt-1 block">Select the Google Ads account to sync lead forms from</Text>
+              </div>
+            )}
+
+            {availableLeadForms.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <Text strong className="block mb-3 text-gray-800">
+                  Select Lead Forms to Sync:
+                </Text>
+                <Select
+                  mode="multiple"
+                  placeholder="Choose lead forms to sync"
+                  style={{ width: "100%" }}
+                  value={selectedForms}
+                  onChange={value => {
+                    setSelectedForms(value);
+                    const formsToSave = availableLeadForms.filter(form => value.includes(form.id));
+                    if (onSaveSelectedForms) {
+                      onSaveSelectedForms(formsToSave);
+                    }
+                  }}
+                  loading={buttonLoading}
+                  disabled={buttonLoading}
+                >
+                  {availableLeadForms.map(form => (
+                    <Select.Option key={form.id} value={form.id}>
+                      {form.name || `Form ${form.id}`} - {form.business_name}
+                    </Select.Option>
+                  ))}
+                </Select>
+                <Text className="text-xs text-gray-500 mt-1 block">Select one or more lead forms to sync leads from</Text>
+              </div>
+            )}
+
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 mb-4 shadow-sm">
+              <Text strong className="block mb-2 text-gray-800">
+                Webhook URL
+              </Text>
+              <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <code className="text-gray-700 text-sm flex-1 overflow-hidden whitespace-nowrap text-ellipsis">
+                  {`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/google-leads/webhook?clinic_id=${clinic_id}`}
+                </code>
+                <Button
+                  size="small"
+                  type="default"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/google-leads/webhook?clinic_id=${clinic_id}`,
+                    );
+                  }}
+                  className="!ml-3 !bg-gray-600 hover:!bg-gray-700 !text-white !border-none"
+                >
+                  Copy
+                </Button>
+              </div>
+              <Text className="text-xs text-gray-500 mt-2 block">Use this webhook in your Google Ads Lead Form settings.</Text>
+            </div>
+
             <div className="bg-gray-50 rounded-lg p-4 mt-4">
               <div className="flex justify-between items-center">
                 <div>
@@ -112,7 +185,7 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
                     Google Ads Lead Forms Integration Active
                   </Text>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex items-center space-x-2">
                   <Button
                     type="primary"
                     size="small"
@@ -137,8 +210,8 @@ export const GoogleLeadFormModal: React.FC<ModalProps> = ({
               bgColor="bg-gray-50"
               borderColor="border-gray-500"
               textColor="gray-700"
-              buttonBgColor="gray-500" // Normal button color (matches your Tailwind)
-              hoverBgColor="gray-600" // Hover color (matches your Tailwind)
+              buttonBgColor="gray-500"
+              hoverBgColor="gray-600"
             />
           </>
         )}

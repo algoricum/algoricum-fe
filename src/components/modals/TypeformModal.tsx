@@ -132,7 +132,7 @@ export const TypeformModal: React.FC<ModalProps> = ({
                     Typeform Integration Active
                   </Text>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex items-center space-x-2">
                   <Button
                     type="primary"
                     size="small"

@@ -4,9 +4,9 @@ import { CheckCircleOutlined, ExclamationCircleOutlined } from "@ant-design/icon
 import { Modal, Typography } from "antd";
 import Papa from "papaparse";
 import type React from "react";
-import { useRef, useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { normalizeHeaders, detectHeaderType, validateDatabaseFields } from "@/utils/csvUtils";
+import { detectHeaderType, normalizeHeaders, validateDatabaseFields } from "@/utils/csvUtils";
 
 const { Text } = Typography;
 

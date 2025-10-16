@@ -1,9 +1,11 @@
 export interface ModalProps {
   open: boolean;
   buttonLoading: boolean;
-  status: "disconnected" | "connecting" | "connected";
+  status: "disconnected" | "connecting" | "connected" | "needs_customer_id" | "loading_forms" | "selecting_forms" | "selecting_customer";
   accountInfo?: any;
   availableEventTypes?: any[];
+  availableLeadForms?: any[];
+  connectionId?: string;
   onOk: () => void;
   onCancel: () => void;
 
@@ -19,6 +21,10 @@ export interface ModalProps {
   ) => void;
   onSyncLeads?: () => void;
   onDisconnect?: () => void;
+  onSetCustomerId?: (customerId: string) => void;
+  onSaveSelectedForms?: (selectedForms: any[]) => void;
+  availableCustomerIds?: string[];
+  onSelectCustomerId?: (customerId: string) => void;
   treeData?: any[];
   selectedWorksheets?: any[];
 
@@ -26,6 +32,7 @@ export interface ModalProps {
   selectedForms?: any[];
 
   onSelectForms?: (value: any[]) => void;
+  clinic_id?: string;
 }
 
 export interface CsvUploadModalProps {

@@ -108,7 +108,7 @@ If you have run out of energy or time for your project, put a note at the top of
 - npx supabase login
 - npx supabase link
 
-- npx supabase db diff -f "initial_schema"
+- npx supabase db diff -f "initial_schema" --linked
 - npx supabase db reset
 - npx supabase functions list
 - npx supabase functions download
