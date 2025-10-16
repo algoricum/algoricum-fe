@@ -4,7 +4,7 @@ import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { Modal } from "antd";
 import dayjs from "dayjs";
-import { Calendar, CheckCircle, Clock, Plus } from "lucide-react";
+import { Calendar, CheckCircle, Clock, Info, Plus } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { updateIntegrationConnectionStatus } from "../integrations/integrationUtils";
 import { ConnectionStatus } from "../types/types";
@@ -49,47 +49,13 @@ interface IntegrationWithStatus {
   integration_logo: string;
   description: string;
 }
-interface IntegrationStates {
-  statuses: Record<IntegrationName, ConnectionStatus>;
-  modals: Record<IntegrationName, boolean>;
-}
 
 const supabase = createClient();
 
 export default function TodayTasks({ clinicId }: { clinicId: string }) {
-  const [integrationStates, setIntegrationStates] = useState<IntegrationStates>({
-    statuses: {
-      "Facebook Lead Forms": "disconnected",
-      Jotform: "disconnected",
-      "Google Lead Forms": "disconnected",
-      "Google Forms": "disconnected",
-      Hubspot: "disconnected",
-      GoHighLevel: "disconnected",
-      Typeform: "disconnected",
-      Pipedrive: "disconnected",
-      "Gravity Form": "disconnected",
-      NextHealth: "disconnected",
-      "CSV Upload": "disconnected",
-      "Custom CRM": "disconnected",
-    },
-    modals: {
-      "Facebook Lead Forms": false,
-      Jotform: false,
-      "Google Lead Forms": false,
-      "Google Forms": false,
-      Hubspot: false,
-      GoHighLevel: false,
-      Typeform: false,
-      Pipedrive: false,
-      "Gravity Form": false,
-      NextHealth: false,
-      "CSV Upload": false,
-      "Custom CRM": false,
-    },
-  });
-
   const [tasks, setTasks] = useState<Task[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationWithStatus[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [newTask, setNewTask] = useState({
@@ -97,11 +63,10 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
     priority: "low",
     time: "",
   });
-  const getIntegrationStatus = (name: IntegrationName): ConnectionStatus => {
-    return integrationStates.statuses[name];
-  };
+
   useEffect(() => {
-    const initializeAllIntegrationStatuses = async () => {
+    const initializeData = async () => {
+      setIsLoading(true);
       try {
         const clinicData = await getClinicData();
         if (!clinicData?.id) {
@@ -110,11 +75,10 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
         }
 
         // 1. Fetch all integrations from master table
-        const { data: allIntegrations, error } = await supabase.from("integrations").select("*");
+        const { data: allIntegrations, error: integrationsError } = await supabase.from("integrations").select("*");
 
-        if (error) {
-          console.error("Error fetching integrations:", error);
-
+        if (integrationsError) {
+          console.error("Error fetching integrations:", integrationsError);
           return;
         }
 
@@ -141,122 +105,127 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
           statusUpdates[name] = integration.connected ? "connected" : "disconnected";
         });
 
-        setIntegrationStates(prev => ({
-          ...prev,
-          statuses: { ...prev.statuses, ...statusUpdates },
-        }));
+        // 5. Fetch tasks immediately after integrations are ready
+        await fetchTasks(integrationsWithStatus);
       } catch (error) {
-        console.error("Failed to initialize integration statuses:", error);
-        ErrorToast("Failed to initialize integrations");
+        console.error("Failed to initialize data:", error);
+        ErrorToast("Failed to initialize data");
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    initializeAllIntegrationStatuses();
-  }, [
-    supabase,
+    initializeData();
+  }, [clinicId, supabase]);
 
-    getIntegrationStatus("Facebook Lead Forms"),
-    getIntegrationStatus("Jotform"),
-    getIntegrationStatus("Google Lead Forms"),
-    getIntegrationStatus("Google Forms"),
-    getIntegrationStatus("Hubspot"),
-    getIntegrationStatus("GoHighLevel"),
-    getIntegrationStatus("Typeform"),
-    getIntegrationStatus("Pipedrive"),
-    getIntegrationStatus("Gravity Form"),
-    getIntegrationStatus("NextHealth"),
-    getIntegrationStatus("CSV Upload"),
-    getIntegrationStatus("Custom CRM"),
-  ]);
+  const fetchTasks = async (integrations: IntegrationWithStatus[]) => {
+    try {
+      const start = dayjs().startOf("day").toISOString();
+      const end = dayjs().endOf("day").toISOString();
 
-  const availableIntegrations = integrations.filter(i => !i.connected);
+      const availableIntegrations = integrations.filter(i => !i.connected);
 
-  const fetchTasks = async () => {
-    const start = dayjs().startOf("day").toISOString();
-    const end = dayjs().endOf("day").toISOString();
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("clinic_id", clinicId)
+        .gte("due_at", start)
+        .lte("due_at", end)
+        .order("due_at", { ascending: true });
 
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("clinic_id", clinicId)
-      .gte("due_at", start)
-      .lte("due_at", end)
-      .order("due_at", { ascending: true });
+      if (error) {
+        console.error("Error fetching tasks:", error);
+        return;
+      }
 
-    if (error) {
+      // ✅ Only one "Add more integrations" task if any are available
+      let integrationTask: Task[] = [];
+      if (availableIntegrations.length > 0) {
+        integrationTask = [
+          {
+            id: "add-integrations",
+            clinic_id: clinicId,
+            task: "More CRM & Tools are available. Connect now!",
+            priority: "low",
+            completed: false,
+          },
+        ];
+      }
+
+      const taskList = [...data, ...integrationTask];
+      setTasks(taskList);
+    } catch (error) {
       console.error("Error fetching tasks:", error);
-      return;
     }
-
-    // ✅ Only one "Add more integrations" task if any are available
-    let integrationTask: Task[] = [];
-    if (availableIntegrations.length > 0) {
-      integrationTask = [
-        {
-          id: "add-integrations",
-          clinic_id: clinicId,
-          task: "More CRM & Tools are available. Connect now!",
-          priority: "low",
-          completed: false,
-        },
-      ];
-    }
-
-    const taskList = [...data, ...integrationTask];
-    setTasks(taskList);
   };
 
   const toggleTask = async (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    const { error } = await supabase.from("tasks").update({ completed: !task.completed }).eq("id", taskId);
+    // Store original state for rollback
+    const originalCompleted = task.completed;
 
-    if (!error) fetchTasks();
+    // Optimistically update UI immediately
+    setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, completed: !t.completed } : t)));
+
+    try {
+      // Update in database
+      const { error } = await supabase.from("tasks").update({ completed: !originalCompleted }).eq("id", taskId);
+
+      // If error, revert the optimistic update and show error message
+      if (error) {
+        console.error("Error updating task:", error);
+
+        // Revert the optimistic update
+        setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, completed: originalCompleted } : t)));
+
+        // Show user-friendly error message
+        ErrorToast("Failed to update task. Please try again.");
+      }
+    } catch (err) {
+      console.error("Unexpected error updating task:", err);
+
+      // Revert the optimistic update
+      setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, completed: originalCompleted } : t)));
+
+      // Show user-friendly error message
+      ErrorToast("Failed to update task. Please try again.");
+    }
   };
 
   const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const today = dayjs().format("YYYY-MM-DD");
-    const dueAt = dayjs(`${today}T${newTask.time}`).toISOString();
+    try {
+      const today = dayjs().format("YYYY-MM-DD");
+      const dueAt = dayjs(`${today}T${newTask.time}`).toISOString();
 
-    const { error } = await supabase.from("tasks").insert({
-      clinic_id: clinicId,
-      task: newTask.task,
-      priority: newTask.priority,
-      time: newTask.time,
-      due_at: dueAt,
-      completed: false,
-      is_automated: false,
-    });
+      const { error } = await supabase.from("tasks").insert({
+        clinic_id: clinicId,
+        task: newTask.task,
+        priority: newTask.priority,
+        time: newTask.time,
+        due_at: dueAt,
+        completed: false,
+        is_automated: false,
+      });
 
-    if (!error) {
+      if (error) {
+        console.error("Error adding task:", error);
+        ErrorToast("Failed to add task. Please try again.");
+        return;
+      }
+
+      // Success - clear form and close modal
       setNewTask({ task: "", priority: "low", time: "" });
       setShowAddTaskModal(false);
-      fetchTasks();
+      fetchTasks(integrations); // Don't show loader when adding task
+    } catch (err) {
+      console.error("Unexpected error adding task:", err);
+      ErrorToast("Failed to add task. Please try again.");
     }
   };
-
-  useEffect(() => {
-    fetchTasks();
-  }, [
-    clinicId,
-    supabase,
-
-    getIntegrationStatus("Facebook Lead Forms"),
-    getIntegrationStatus("Jotform"),
-    getIntegrationStatus("Google Lead Forms"),
-    getIntegrationStatus("Google Forms"),
-    getIntegrationStatus("Hubspot"),
-    getIntegrationStatus("GoHighLevel"),
-    getIntegrationStatus("Typeform"),
-    getIntegrationStatus("Pipedrive"),
-    getIntegrationStatus("Gravity Form"),
-    getIntegrationStatus("NextHealth"),
-    getIntegrationStatus("CSV Upload"),
-    getIntegrationStatus("Custom CRM"),
-  ]);
 
   return (
     <div className="card h-96 overflow-y-auto">
@@ -271,7 +240,12 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
         </button>
       </div>
       <div className="space-y-4">
-        {tasks.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center text-gray-500 py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
+            <p>Loading tasks...</p>
+          </div>
+        ) : tasks.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             <Calendar className="w-8 h-8 mx-auto mb-2 text-gray-300" />
             <p>No tasks for today</p>
@@ -281,17 +255,25 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
           tasks.map(task => (
             <div
               key={task.id}
-              className={`flex items-start space-x-3 rounded-lg p-3 hover:bg-gray-50 transition-colors ${
-                task?.clinic_id ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+              className={`flex items-start space-x-3 rounded-lg p-3 bg-gray-50 ${
+                task.id === "add-integrations" ? "cursor-default" : "hover:bg-gray-100 transition-colors cursor-pointer"
               }`}
-              onClick={() => task?.clinic_id && toggleTask(task.id)}
+              onClick={() => task.id !== "add-integrations" && toggleTask(task.id)}
             >
               {/* Icon with colored background */}
               <div className="flex-shrink-0">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full ${task.completed ? "bg-green-100" : "bg-purple-100"}`}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                    task.id === "add-integrations" ? "bg-blue-100" : task.completed ? "bg-green-100" : "bg-purple-100"
+                  }`}
                 >
-                  {task.completed ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Clock className="w-4 h-4 text-purple-600" />}
+                  {task.id === "add-integrations" ? (
+                    <Info className="w-4 h-4 text-blue-600" />
+                  ) : task.completed ? (
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Clock className="w-4 h-4 text-purple-600" />
+                  )}
                 </div>
               </div>
 
