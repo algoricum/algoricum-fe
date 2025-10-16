@@ -211,6 +211,16 @@ serve(async req => {
           body: JSON.stringify({ data: webhookBody }),
         });
 
+        const { data: leadSource, error: sourceError } = await supabase
+          .from("lead_source")
+          .select("id")
+          .eq("name", "Google Lead Forms")
+          .single();
+
+        if (sourceError || !leadSource) {
+          throw new Error("Lead source not found: Google Lead Forms");
+        }
+
         const sanatizedData = await response.json();
         console.log("Extractor response:", sanatizedData);
 
@@ -220,7 +230,7 @@ serve(async req => {
           email: contact.email,
           phone: contact.phone,
           clinic_id,
-          source_id: "670f33cf-043d-407f-aca9-19613e329de4",
+          source_id: leadSource.id,
           status: "New",
         }));
 
