@@ -43,7 +43,12 @@ import { Button, Card, Col, Divider, Row } from "antd";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { JSX, useEffect, useState } from "react";
-import { deleteIntegrationConnections, updateIntegrationConnectionStatus } from "./integrationUtils";
+import {
+  deleteIntegrationConnections,
+  updateIntegrationConnectionStatus,
+  createOAuthCallbackHandler,
+  callSupabaseFunction,
+} from "./integrationUtils";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -202,8 +207,27 @@ export default function IntegrationsPage() {
   useEffect(() => {
     const handleOAuthRedirect = () => {
       const urlParams = new URLSearchParams(window.location.search);
-      const pipedriveStatus = urlParams.get("pipedrive_status");
       const errorMessage = urlParams.get("error_message");
+
+      // Create OAuth callback handlers
+      const handleHubSpotCallback = createOAuthCallbackHandler(
+        "Hubspot",
+        "hubspot_status",
+        updateIntegrationStatus,
+        SuccessToast,
+        ErrorToast,
+      );
+
+      const handleGoogleFormsCallback = createOAuthCallbackHandler(
+        "Google Forms",
+        "google_form_status",
+        updateIntegrationStatus,
+        SuccessToast,
+        ErrorToast,
+      );
+
+      // Handle Pipedrive OAuth callback (custom logic for account info)
+      const pipedriveStatus = urlParams.get("pipedrive_status");
       const accountName = urlParams.get("account_name");
       const contactCount = urlParams.get("contact_count");
       const dealCount = urlParams.get("deal_count");
@@ -224,6 +248,10 @@ export default function IntegrationsPage() {
         updateIntegrationStatus("Pipedrive", "disconnected");
         window.history.replaceState({}, document.title, window.location.pathname);
       }
+
+      // Handle other OAuth callbacks
+      handleHubSpotCallback(urlParams, contactCount || undefined, errorMessage || undefined);
+      handleGoogleFormsCallback(urlParams, urlParams.get("contact_count") || undefined, errorMessage || undefined);
     };
 
     handleOAuthRedirect();
@@ -488,36 +516,25 @@ export default function IntegrationsPage() {
         setLoading(false);
         return;
       }
-      const { data: connection } = await supabase
-        .from("google_form_connections")
-        .select("id")
-        .eq("clinic_id", clinicData.id)
-        .limit(1)
-        .single();
+
+      // Get Google Forms integration connection
+      const { data: integrationConnection } = await getIntegrationConnection(clinicData.id, "Google Forms");
+
       const { data: savedSheets, error: savedError } = await supabase
         .from("google_form_sheets")
         .select("spreadsheet_id, sheet_id")
-        .eq("connection_id", connection?.id);
+        .eq("connection_id", integrationConnection?.id);
 
       if (savedError) throw savedError;
       console.error(savedSheets);
       const savedSheetKeys = savedSheets.map(s => `${s.spreadsheet_id}:${s.sheet_id}`);
 
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/list-spreadsheets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          connection_id: connection?.id,
-        }),
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      const { spreadsheets } = await res.json();
+      const { spreadsheets } = await callSupabaseFunction(
+        "google-form-integration/list-spreadsheets",
+        { connection_id: integrationConnection?.id },
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+      );
 
       const treeData = (spreadsheets || []).map((spreadsheet: any) => ({
         title: spreadsheet.spreadsheet_title,
@@ -540,17 +557,13 @@ export default function IntegrationsPage() {
 
   const syncGoogleFormLeads = async () => {
     try {
-      const { data: connection } = await supabase
-        .from("google_form_connections")
-        .select("*")
-        .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+      // Get Google Forms integration connection
+      const { data: integrationConnection } = await getIntegrationConnection(clinicId, "Google Forms");
+
       const { data: savedSheets, error: savedError } = await supabase
         .from("google_form_sheets")
         .select("spreadsheet_id, sheet_id")
-        .eq("connection_id", connection?.id);
+        .eq("connection_id", integrationConnection?.id);
 
       if (savedError) throw savedError;
 
@@ -566,7 +579,7 @@ export default function IntegrationsPage() {
             await supabase
               .from("google_form_sheets")
               .delete()
-              .eq("connection_id", connection?.id)
+              .eq("connection_id", integrationConnection?.id)
               .eq("spreadsheet_id", spreadsheet_id)
               .eq("sheet_id", sheet_id);
           }),
@@ -592,22 +605,15 @@ export default function IntegrationsPage() {
         };
       });
 
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          connection_id: connection?.id,
+      const result = await callSupabaseFunction(
+        "google-form-integration/save-selected-sheets",
+        {
+          connection_id: integrationConnection?.id,
           selected_sheets: newSheetsPayload,
-        }),
-      });
-
-      if (!response.ok) throw new Error(await response.text());
-
-      const result = await response.json();
+        },
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+      );
       SuccessToast(`Successfully synced ${result.sync_result.leads_created} leads from Google Lead Form!`);
       toggleModal("Google Forms", false);
     } catch (error) {
@@ -824,21 +830,15 @@ export default function IntegrationsPage() {
           onSetCustomerId={async (customerId: string) => {
             setButtonLoading(true);
             try {
-              const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/set-customer-id`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-                  apikey: SUPABASE_ANON_KEY,
-                },
-                body: JSON.stringify({
+              await callSupabaseFunction(
+                "google-leads/set-customer-id",
+                {
                   connection_id: googleLeadFormData.connectionId,
                   google_customer_id: customerId,
-                }),
-              });
-
-              if (!response.ok) throw new Error(await response.text());
-              await response.json();
+                },
+                SUPABASE_URL,
+                SUPABASE_ANON_KEY,
+              );
 
               // Refresh the modal data
               const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
@@ -853,40 +853,23 @@ export default function IntegrationsPage() {
           onSelectCustomerId={async (selectedCustomerId: string) => {
             setButtonLoading(true);
             try {
-              const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/select-customer`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-                  apikey: SUPABASE_ANON_KEY,
-                },
-                body: JSON.stringify({
+              await callSupabaseFunction(
+                "google-leads/select-customer",
+                {
                   connection_id: googleLeadFormData.connectionId,
                   selected_customer_id: selectedCustomerId,
-                }),
-              });
-
-              if (!response.ok) throw new Error(await response.text());
-
-              await response.json();
-              const formsResponse = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/fetch-lead-forms`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-                  apikey: SUPABASE_ANON_KEY,
                 },
-                body: JSON.stringify({
+                SUPABASE_URL,
+                SUPABASE_ANON_KEY,
+              );
+              await callSupabaseFunction(
+                "google-leads/fetch-lead-forms",
+                {
                   connection_id: googleLeadFormData.connectionId,
-                }),
-              });
-
-              if (!formsResponse.ok) {
-                console.error("Failed to fetch lead forms:", await formsResponse.text());
-                throw new Error("Failed to fetch available lead forms");
-              }
-
-              await formsResponse.json();
+                },
+                SUPABASE_URL,
+                SUPABASE_ANON_KEY,
+              );
 
               // Refresh the modal data to show the next step
               const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");
@@ -916,22 +899,15 @@ export default function IntegrationsPage() {
           onSaveSelectedForms={async (selectedForms: any[]) => {
             setButtonLoading(true);
             try {
-              const response = await fetch(`${SUPABASE_URL}/functions/v1/google-leads/save-selected-forms`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-                  apikey: SUPABASE_ANON_KEY,
-                },
-                body: JSON.stringify({
+              await callSupabaseFunction(
+                "google-leads/save-selected-forms",
+                {
                   connection_id: googleLeadFormData.connectionId,
                   selected_forms: selectedForms,
-                }),
-              });
-
-              if (!response.ok) throw new Error(await response.text());
-
-              await response.json();
+                },
+                SUPABASE_URL,
+                SUPABASE_ANON_KEY,
+              );
 
               // Refresh the modal data but keep modal open
               const realStatus = await updateIntegrationConnectionStatus(clinicId, "Google Lead Forms");

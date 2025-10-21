@@ -1,7 +1,8 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { corsHeaders } from "../_shared/cors.ts";
+// supabase/functions/_shared/gpt-extractor-service.ts
+
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-async function callOpenAI(prompt, retries = 2) {
+
+async function callOpenAI(prompt: string, retries = 2): Promise<any[]> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -25,16 +26,20 @@ async function callOpenAI(prompt, retries = 2) {
         max_tokens: 1500,
       }),
     });
+
     if (!openaiResponse.ok) {
       const error = await openaiResponse.text();
       console.error("OpenAI API error:", error);
       throw new Error("Failed to process data with AI service");
     }
+
     const openaiData = await openaiResponse.json();
     const extractedText = openaiData.choices[0]?.message?.content?.trim();
+
     if (!extractedText) {
       throw new Error("No response from AI service");
     }
+
     try {
       // Clean markdown fences
       let cleaned = extractedText.trim();
@@ -44,13 +49,16 @@ async function callOpenAI(prompt, retries = 2) {
           .replace(/```$/, "")
           .trim();
       }
+
       // Repair incomplete arrays
       if (cleaned.startsWith("[") && !cleaned.endsWith("]")) {
         cleaned = cleaned.replace(/,\s*$/, "");
         cleaned += "]";
       }
+
       const parsed = JSON.parse(cleaned);
       if (!Array.isArray(parsed)) throw new Error("Response not an array");
+
       return parsed.map(c => ({
         email: c.email || null,
         firstName: c.firstName || null,
@@ -61,64 +69,40 @@ async function callOpenAI(prompt, retries = 2) {
     } catch (err) {
       console.error(`Parse failed on attempt ${attempt + 1}:`, err);
       console.error("Raw response:", extractedText);
+
       // retry if we still have attempts left
       if (attempt < retries) {
         console.log("Retrying OpenAI call...");
         continue;
       }
+
       // If retries exhausted, rethrow
       throw err;
     }
   }
   return [];
 }
-serve(async req => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: corsHeaders,
-    });
+
+export async function extractAndCleanContacts(inputData: any, requestId?: string): Promise<any[]> {
+  if (!OPENAI_API_KEY) {
+    console.warn(`[${requestId}] OpenAI API key not configured, skipping data cleaning`);
+    return inputData;
   }
-  try {
-    const inputData = await req.json();
-    if (!inputData) {
-      return new Response(
-        JSON.stringify({
-          error: "No datacr provided",
-        }),
-        {
-          status: 400,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-    }
-    if (!OPENAI_API_KEY) {
-      return new Response(
-        JSON.stringify({
-          error: "OpenAI API key not configured",
-        }),
-        {
-          status: 500,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-    }
-    const prompt = `
+
+  if (!inputData) {
+    throw new Error("No data provided");
+  }
+
+  const prompt = `
 You are a data extraction specialist. I will provide you with JSON data of any structure, and you need to extract contact information from it.
 There can be multiple contacts in the data.
 
 Extract the following information and return it as a valid JSON array of objects:
 - email: Extract email address (skip if no or duplicate email)
 - firstName: Extract first name (null if not found)
-- lastName: Extract last name (null if not found)
+- lastName: Extract last name (null if not found)  
 - phone: Extract primary phone number (null if not found) e.g. (+54122222222/with country code)
 - createdDate: Extract the date when the contact was created (null if not found)
-- source_id: Extract the original source_id (preserve exactly as found, null if not found)
 
 Important rules:
 1. Only return valid JSON format
@@ -134,63 +118,43 @@ Important rules:
 11. skip if duplicate email
 
 Here's the data to extract from:
-${JSON.stringify(inputData.data, null, 2)}
+${JSON.stringify(inputData, null, 2)}
 
 Return only the JSON array of extracted contacts.`;
-    let extractedContacts = [];
-    try {
-      extractedContacts = await callOpenAI(prompt, 2);
 
-      // Deduplicate by email
-      const seen = new Set<string>();
-      extractedContacts = extractedContacts.filter(contact => {
-        if (seen.has(contact.email)) return false;
-        seen.add(contact.email);
-        return true;
-      });
-    } catch (err) {
-      return new Response(
-        JSON.stringify({
-          error: "Failed to parse extracted data",
-          message: err.message,
-          fallback: [],
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-    }
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: extractedContacts,
-      }),
-      {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-  } catch (error) {
-    console.error("Edge function error:", error);
-    return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-        message: error.message,
-      }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      },
-    );
+  try {
+    console.log(`[${requestId}] Starting GPT extraction for data cleaning`);
+    let extractedContacts = await callOpenAI(prompt, 2);
+
+    // Deduplicate by email
+    const seen = new Set<string>();
+    extractedContacts = extractedContacts.filter(contact => {
+      if (!contact.email || seen.has(contact.email)) return false;
+      seen.add(contact.email);
+      return true;
+    });
+
+    console.log(`[${requestId}] GPT extraction completed: ${extractedContacts.length} clean contacts`);
+    return extractedContacts;
+  } catch (err) {
+    console.error(`[${requestId}] GPT extraction failed:`, err.message);
+    // Return original data if extraction fails
+    return inputData;
   }
-});
+}
+
+export async function cleanHubSpotContacts(contacts: any[], requestId?: string): Promise<any[]> {
+  try {
+    console.log(`[${requestId}] Cleaning ${contacts.length} HubSpot contacts with GPT`);
+
+    // Extract clean data using GPT
+    const cleanedContacts = await extractAndCleanContacts(contacts, requestId);
+
+    console.log(`[${requestId}] Cleaned ${cleanedContacts.length} contacts from ${contacts.length} raw contacts`);
+    return cleanedContacts;
+  } catch (error) {
+    console.error(`[${requestId}] Error cleaning HubSpot contacts:`, error);
+    // Return original contacts if cleaning fails
+    return contacts;
+  }
+}
