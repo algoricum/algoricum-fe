@@ -103,19 +103,8 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
       }
 
       case "Pipedrive": {
-        const { data, error } = await supabase
-          .from("pipedrive_integration")
-          .select("*")
-          .eq("clinic_id", clinicId)
-          .neq("access_token", "")
-          .neq("refresh_token", "")
-          .eq("is_active", true)
-          .maybeSingle();
-        if (error) {
-          console.error(`Error checking Pipedrive status:`, error);
-          return "disconnected";
-        }
-        connection = data;
+        connection = await queryIntegrationConnection(clinicId, "Pipedrive");
+        if (!connection) return "disconnected";
         break;
       }
 
@@ -132,44 +121,36 @@ export const updateIntegrationConnectionStatus = async (clinicId: string, integr
       }
 
       case "Facebook Lead Forms": {
-        // Check for actual active form connections first
-        const { data: activeConnection, error: activeError } = await supabase
-          .from("facebook_lead_form_connections")
-          .select("*")
-          .eq("clinic_id", clinicId)
-          .eq("sync_status", "active")
-          .neq("lead_form_id", "pending_selection")
-          .limit(1)
-          .maybeSingle();
+        // Use the standard integration_connections table for Facebook Lead Forms
+        connection = await queryIntegrationConnection(clinicId, "Facebook Lead Forms", false);
 
-        if (activeError) {
-          console.error(`Error checking Facebook Lead Forms active status:`, activeError);
-          return "disconnected";
+        if (connection) {
+          // Check if there are active form connections
+          const authData = connection.auth_data;
+
+          // Check if we have selected forms in the new structure
+          if (authData?.selected_forms && Array.isArray(authData.selected_forms)) {
+            const hasActiveForms = authData.selected_forms.some((form: any) => form.status === "active");
+            if (hasActiveForms) {
+              return "connected";
+            }
+          }
+
+          // Check for legacy single form structure (backward compatibility)
+          if (authData?.sync_status === "active" && authData?.lead_form_id && authData.lead_form_id !== "pending_selection") {
+            return "connected";
+          }
+
+          // If we have auth_data with pending selection, still consider connected (user can select forms)
+          if (authData?.lead_form_id === "pending_selection") {
+            return "connected";
+          }
+
+          // If there's a connection but no proper auth_data, consider connected for backward compatibility
+          return "connected";
         }
 
-        // If there are active connections, return connected
-        if (activeConnection) {
-          connection = activeConnection;
-          break;
-        }
-
-        // Check for pending setup (OAuth completed but forms not selected)
-        const { data: pendingConnection, error: pendingError } = await supabase
-          .from("facebook_lead_form_connections")
-          .select("*")
-          .eq("clinic_id", clinicId)
-          .eq("lead_form_id", "pending_selection")
-          .limit(1)
-          .maybeSingle();
-
-        if (pendingError) {
-          console.error(`Error checking Facebook Lead Forms pending status:`, pendingError);
-          return "disconnected";
-        }
-
-        // If there's a pending connection, consider it "connected" so user can select forms
-        connection = pendingConnection;
-        break;
+        return "disconnected";
       }
 
       default: {
@@ -230,8 +211,7 @@ export const deleteIntegrationConnections = async (clinicId: string, integration
       }
 
       case "Pipedrive": {
-        const { error: deleteError } = await supabase.from("pipedrive_integration").delete().eq("clinic_id", clinicId);
-        error = deleteError;
+        error = await deleteIntegrationConnectionByName(clinicId, "Pipedrive");
         break;
       }
 
@@ -272,8 +252,8 @@ export const deleteIntegrationConnections = async (clinicId: string, integration
       }
 
       case "Facebook Lead Forms": {
-        const { error: deleteError } = await supabase.from("facebook_lead_form_connections").delete().eq("clinic_id", clinicId);
-        error = deleteError;
+        // Use the standard deletion method for Facebook Lead Forms
+        error = await deleteIntegrationConnectionByName(clinicId, "Facebook Lead Forms");
         break;
       }
 
@@ -294,5 +274,83 @@ export const deleteIntegrationConnections = async (clinicId: string, integration
     console.error(`Unexpected error deleting ${integrationName} connections:`, err);
     ErrorToast(`Unexpected error deleting ${integrationName} connections`);
     return false;
+  }
+};
+
+// Fetch all integration statuses for a clinic in a single call
+export const getAllIntegrationStatuses = async (clinicId: string): Promise<Record<string, ConnectionStatus>> => {
+  try {
+    const statusMap: Record<string, ConnectionStatus> = {};
+
+    // Get all integration connections for this clinic
+    const { data: integrationConnections, error: connectionsError } = await supabase
+      .from("integration_connections")
+      .select(
+        `
+        *,
+        integrations!inner(name, type, auth_type)
+      `,
+      )
+      .eq("clinic_id", clinicId)
+      .eq("status", "active");
+
+    if (connectionsError) {
+      console.error("Error fetching integration connections:", connectionsError);
+    }
+
+    // Set connected status for active integrations
+    integrationConnections?.forEach(connection => {
+      statusMap[connection.integrations.name] = "connected";
+    });
+
+    // Check special cases for integrations with custom tables
+
+    // Pipedrive is already handled by the main integration_connections query above
+    // No special handling needed since it now uses the standard table
+
+    // Facebook Lead Forms is now handled by the main integration_connections query
+    // No special handling needed since it now uses the standard table
+
+    // Default to disconnected for any integration not found
+    const allIntegrationNames = [
+      "Hubspot",
+      "Pipedrive",
+      "Google Lead Forms",
+      "Google Forms",
+      "Facebook Lead Forms",
+      "Jotform",
+      "Typeform",
+      "Gravity Form",
+      "GoHighLevel",
+      "NexHealth",
+      "Custom CRM",
+      "CSV Upload",
+    ];
+
+    allIntegrationNames.forEach(name => {
+      if (!statusMap[name]) {
+        statusMap[name] = "disconnected";
+      }
+    });
+
+    console.log("[BULK_STATUS_CHECK] Retrieved statuses for all integrations:", statusMap);
+    return statusMap;
+  } catch (error) {
+    console.error("Error getting all integration statuses:", error);
+    // Return disconnected status for all integrations on error
+    return {
+      Hubspot: "disconnected",
+      Pipedrive: "disconnected",
+      "Google Lead Forms": "disconnected",
+      "Google Forms": "disconnected",
+      "Facebook Lead Forms": "disconnected",
+      Jotform: "disconnected",
+      Typeform: "disconnected",
+      "Gravity Form": "disconnected",
+      GoHighLevel: "disconnected",
+      NexHealth: "disconnected",
+      "Custom CRM": "disconnected",
+      "CSV Upload": "disconnected",
+    };
   }
 };

@@ -10,18 +10,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const PIPEDRIVE_CLIENT_ID = Deno.env.get("PIPEDRIVE_CLIENT_ID");
 const PIPEDRIVE_CLIENT_SECRET = Deno.env.get("PIPEDRIVE_CLIENT_SECRET");
 
-// Types
-interface PipedriveIntegration {
-  id: string;
-  clinic_id: string;
-  access_token: string;
-  refresh_token?: string;
-  api_domain: string;
-  company_id: string;
-  user_id: string;
-  expires_at?: string;
-  is_active: boolean;
-}
+// Initialize Supabase client
+const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
 interface PipedriveLead {
   id: string;
@@ -70,6 +60,34 @@ interface SyncResult {
   total_fetched: number;
   total_persons?: number;
   token_refreshed?: boolean;
+}
+
+interface PipedriveIntegration {
+  id: string;
+  clinic_id: string;
+  integration_id: string;
+  status: string;
+  expires_at: string | null;
+  auth_data: {
+    access_token: string;
+    refresh_token?: string;
+    api_domain: string;
+    company_id: string;
+    user_id: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+// Helper function to get Pipedrive integration ID
+async function getPipedriveIntegrationId(): Promise<string> {
+  const { data: integration, error } = await supabase.from("integrations").select("id").eq("name", "Pipedrive").single();
+
+  if (error || !integration) {
+    throw new Error("Pipedrive integration not found in integrations table");
+  }
+
+  return integration.id;
 }
 
 // Helper function to construct proper Pipedrive API URLs
@@ -400,17 +418,21 @@ export async function initializeOAuth(
     oauthUrl.searchParams.set("scope", "deals:read leads:read persons:read");
 
     // Store pending integration
-    await supabase.from("pipedrive_integration").upsert(
+    const integrationId = await getPipedriveIntegrationId();
+    await supabase.from("integration_connections").upsert(
       {
         clinic_id: clinic_id,
-        access_token: "PENDING",
-        api_domain: "pending.pipedrive.com",
-        company_id: "pending",
-        user_id: "pending",
-        is_active: false,
+        integration_id: integrationId,
+        status: "pending",
+        auth_data: {
+          access_token: "PENDING",
+          api_domain: "pending.pipedrive.com",
+          company_id: "pending",
+          user_id: "pending",
+        },
       },
       {
-        onConflict: "clinic_id",
+        onConflict: "clinic_id,integration_id",
         ignoreDuplicates: false,
       },
     );
@@ -504,11 +526,12 @@ export async function handleOAuthCallback(
 
     // If no clinicId from state, find pending integration
     if (!clinicId) {
+      const integrationId = await getPipedriveIntegrationId();
       const { data: pendingIntegrations } = await supabase
-        .from("pipedrive_integration")
-        .select("clinic_id, user_id")
-        .eq("access_token", "PENDING")
-        .eq("is_active", false)
+        .from("integration_connections")
+        .select("clinic_id, auth_data")
+        .eq("integration_id", integrationId)
+        .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(5);
 
@@ -531,34 +554,26 @@ export async function handleOAuthCallback(
     }
 
     // Save integration to database
+    const integrationId = await getPipedriveIntegrationId();
     const integrationData = {
       clinic_id: clinicId,
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token || null,
-      api_domain: tokenData.api_domain,
-      company_id: tokenData.company_id ? tokenData.company_id.toString() : "unknown",
-      user_id: tokenData.user_id ? tokenData.user_id.toString() : "unknown",
+      integration_id: integrationId,
+      status: "active" as const,
       expires_at: expiresAt?.toISOString() || null,
-      is_active: true,
+      auth_data: {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token || null,
+        api_domain: tokenData.api_domain,
+        company_id: tokenData.company_id ? tokenData.company_id.toString() : "unknown",
+        user_id: tokenData.user_id ? tokenData.user_id.toString() : "unknown",
+      },
     };
 
-    // Try update first, then insert
-    const { data: updateData, error: updateError } = await supabase
-      .from("pipedrive_integration")
-      .update(integrationData)
-      .eq("clinic_id", clinicId)
-      .select();
-
-    let error;
-    if (updateError || !updateData || updateData.length === 0) {
-      // Update failed or no rows updated, try insert
-      const { error: insertError } = await supabase.from("pipedrive_integration").insert(integrationData).select();
-
-      error = insertError;
-    } else {
-      // Update succeeded
-      error = updateError;
-    }
+    // Upsert the integration connection
+    const { error } = await supabase.from("integration_connections").upsert(integrationData, {
+      onConflict: "clinic_id,integration_id",
+      ignoreDuplicates: false,
+    });
 
     if (error) {
       console.error(`[${requestId}] Database save error:`, error);
@@ -567,6 +582,16 @@ export async function handleOAuthCallback(
 
     // Get account info
     const accountInfo = await getAccountInfo(tokenData.access_token, tokenData.api_domain);
+
+    // Sync existing leads after successful OAuth (similar to Facebook integration)
+    console.log(`[${requestId}] Starting initial lead sync after OAuth completion...`);
+    try {
+      const syncResult = await syncLeadsForClinic(clinicId);
+      console.log(`[${requestId}] Initial sync completed:`, syncResult);
+    } catch (syncError) {
+      console.error(`[${requestId}] Initial sync failed (non-blocking):`, syncError);
+      // Don't fail the OAuth callback if sync fails - just log it
+    }
 
     const successUrl = `${redirectUrl || "http://localhost:3000"}?pipedrive_status=success&account_name=${encodeURIComponent(accountInfo.accountName)}&contact_count=${accountInfo.contactCount}&deal_count=${accountInfo.dealCount}`;
 
@@ -592,11 +617,13 @@ export async function syncLeadsForClinic(clinic_id: string): Promise<SyncResult 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     // Get Pipedrive integration
+    const integrationId = await getPipedriveIntegrationId();
     const { data: integration, error: integrationError } = await supabase
-      .from("pipedrive_integration")
+      .from("integration_connections")
       .select("*")
       .eq("clinic_id", clinic_id)
-      .eq("is_active", true)
+      .eq("integration_id", integrationId)
+      .eq("status", "active")
       .single();
 
     if (integrationError || !integration) {
@@ -608,7 +635,7 @@ export async function syncLeadsForClinic(clinic_id: string): Promise<SyncResult 
 
     // Update last sync timestamp
     await supabase
-      .from("pipedrive_integration")
+      .from("integration_connections")
       .update({
         updated_at: new Date().toISOString(),
       })
@@ -641,7 +668,12 @@ export async function syncAllLeads(
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     // Get all active Pipedrive integrations
-    const { data: integrations, error: integrationsError } = await supabase.from("pipedrive_integration").select("*").eq("is_active", true);
+    const integrationId = await getPipedriveIntegrationId();
+    const { data: integrations, error: integrationsError } = await supabase
+      .from("integration_connections")
+      .select("*")
+      .eq("integration_id", integrationId)
+      .eq("status", "active");
 
     if (integrationsError || !integrations) {
       throw new Error("Failed to fetch integrations");
@@ -669,7 +701,7 @@ export async function syncAllLeads(
 
         // Update last sync timestamp
         await supabase
-          .from("pipedrive_integration")
+          .from("integration_connections")
           .update({
             updated_at: new Date().toISOString(),
           })
@@ -709,11 +741,11 @@ export async function syncPipedriveIntegration(
   const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
   // Check if token is expired and refresh if needed
-  let accessToken = integration.access_token;
+  let accessToken = integration.auth_data.access_token;
   let tokenRefreshed = false;
   const tokenExpired = integration.expires_at && new Date(integration.expires_at) <= new Date();
 
-  if (tokenExpired && integration.refresh_token) {
+  if (tokenExpired && integration.auth_data.refresh_token) {
     console.log(`[${requestId}] Token expired for clinic ${integration.clinic_id}, refreshing...`);
 
     const refreshResponse = await fetch("https://oauth.pipedrive.com/oauth/token", {
@@ -721,7 +753,7 @@ export async function syncPipedriveIntegration(
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: integration.refresh_token,
+        refresh_token: integration.auth_data.refresh_token,
         client_id: PIPEDRIVE_CLIENT_ID!,
         client_secret: PIPEDRIVE_CLIENT_SECRET!,
       }),
@@ -736,10 +768,13 @@ export async function syncPipedriveIntegration(
 
       // Update token in database
       await supabase
-        .from("pipedrive_integration")
+        .from("integration_connections")
         .update({
-          access_token: refreshData.access_token,
-          refresh_token: refreshData.refresh_token || integration.refresh_token,
+          auth_data: {
+            ...integration.auth_data,
+            access_token: refreshData.access_token,
+            refresh_token: refreshData.refresh_token || integration.auth_data.refresh_token,
+          },
           expires_at: refreshData.expires_in ? new Date(Date.now() + refreshData.expires_in * 1000).toISOString() : null,
           updated_at: new Date().toISOString(),
         })
@@ -749,14 +784,14 @@ export async function syncPipedriveIntegration(
       console.error(`[${requestId}] Token refresh failed for clinic ${integration.clinic_id}:`, refreshError);
       throw new Error("Failed to refresh access token. Please re-authenticate with Pipedrive.");
     }
-  } else if (tokenExpired && !integration.refresh_token) {
+  } else if (tokenExpired && !integration.auth_data.refresh_token) {
     console.error(`[${requestId}] Token expired and no refresh token for clinic ${integration.clinic_id}`);
     throw new Error("Access token expired and no refresh token available. Please re-authenticate with Pipedrive.");
   }
 
   // Test the token
   console.log(`[${requestId}] Testing API connection for clinic ${integration.clinic_id}...`);
-  const testResponse = await fetch(buildPipedriveUrl(integration.api_domain, "users/me"), {
+  const testResponse = await fetch(buildPipedriveUrl(integration.auth_data.api_domain, "users/me"), {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
@@ -767,8 +802,8 @@ export async function syncPipedriveIntegration(
     if (testResponse.status === 401) {
       // Mark integration as inactive if token is completely invalid
       await supabase
-        .from("pipedrive_integration")
-        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .from("integration_connections")
+        .update({ status: "inactive", updated_at: new Date().toISOString() })
         .eq("id", integration.id);
 
       throw new Error("Access token is invalid. Please re-authenticate with Pipedrive.");
@@ -803,7 +838,7 @@ export async function syncPipedriveIntegration(
   const fourMonthsAgoStr = fourMonthsAgo.toISOString().slice(0, 19).replace("T", " ");
 
   // Fetch leads from Pipedrive with date filtering
-  let leadsUrl = buildPipedriveUrl(integration.api_domain, "leads?limit=500");
+  let leadsUrl = buildPipedriveUrl(integration.auth_data.api_domain, "leads?limit=500");
 
   // Always filter records older than 4 months
   leadsUrl += `&start_date=${encodeURIComponent(fourMonthsAgoStr)}`;
@@ -815,7 +850,7 @@ export async function syncPipedriveIntegration(
     const recentDate = new Date(modifiedSince).toISOString().slice(0, 19).replace("T", " ");
     // Use the more recent of the two dates
     const finalStartDate = new Date(modifiedSince) > fourMonthsAgo ? recentDate : fourMonthsAgoStr;
-    leadsUrl = buildPipedriveUrl(integration.api_domain, "leads?limit=500");
+    leadsUrl = buildPipedriveUrl(integration.auth_data.api_domain, "leads?limit=500");
     leadsUrl += `&start_date=${encodeURIComponent(finalStartDate)}`;
     console.log(`[${requestId}] Using final start date: ${finalStartDate}`);
   }
@@ -838,7 +873,7 @@ export async function syncPipedriveIntegration(
   console.log(`[${requestId}] Found ${pipedriveLeads.length} leads in Pipedrive for clinic ${integration.clinic_id}`);
 
   // Fetch persons for additional contact info
-  const personsUrl = buildPipedriveUrl(integration.api_domain, "persons?limit=500");
+  const personsUrl = buildPipedriveUrl(integration.auth_data.api_domain, "persons?limit=500");
   console.log(`[${requestId}] Fetching persons from: ${personsUrl}`);
 
   const personsResponse = await fetch(personsUrl, {

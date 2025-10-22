@@ -48,6 +48,7 @@ import {
   updateIntegrationConnectionStatus,
   createOAuthCallbackHandler,
   callSupabaseFunction,
+  getAllIntegrationStatuses,
 } from "./integrationUtils";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -99,21 +100,15 @@ export default function IntegrationsPage() {
     },
   });
 
-  // hubspot
-  const [hubspotAccountInfo] = useState<any>(null);
-
   // TypeForm
   const [TypeformTreeData, setTypeFormTreeData] = useState([]);
   const [selectedTypeformForms, setSelectedTypeformForms] = useState<any[]>([]);
-  const [, setTypeformLeadsSynced] = useState(false);
 
   //jotform
   const [jotformTreeData, setJotformTreeData] = useState([]);
   const [selectedJotformForms, setSelectedJotformForms] = useState<any[]>([]);
-  const [, setJotformLeadsSynced] = useState(false);
 
   // Google Form
-  const [, setGoogleFormLeadsSynced] = useState(false);
 
   //  pipedrive
   const [pipedriveAccountInfo, setPipedriveAccountInfo] = useState<any>(null);
@@ -451,32 +446,23 @@ export default function IntegrationsPage() {
           return;
         }
 
-        // 2. Check connection status for each integration
-        const statusChecks = await Promise.allSettled(
-          allIntegrations.map(int => updateIntegrationConnectionStatus(clinicData.id, int.name)),
-        );
+        // 2. Check connection status for all integrations in one call
+        const allStatuses = await getAllIntegrationStatuses(clinicData.id);
 
         // 3. Merge statuses with integrations
-        const integrationsWithStatus = allIntegrations.map((int, idx) => {
-          const check = statusChecks[idx];
+        const integrationsWithStatus = allIntegrations.map(int => {
           return {
             ...int,
-            connected: check.status === "fulfilled" ? check.value === "connected" : false,
+            connected: allStatuses[int.name] === "connected",
           };
         });
 
         setIntegrations(integrationsWithStatus);
 
-        // 4. Update individual integration states
-        const statusUpdates: Partial<Record<IntegrationName, ConnectionStatus>> = {};
-        integrationsWithStatus.forEach(integration => {
-          const name = integration.name as IntegrationName;
-          statusUpdates[name] = integration.connected ? "connected" : "disconnected";
-        });
-
+        // 4. Update individual integration states using bulk status data
         setIntegrationStates(prev => ({
           ...prev,
-          statuses: { ...prev.statuses, ...statusUpdates },
+          statuses: { ...prev.statuses, ...allStatuses },
         }));
       } catch (error) {
         console.error("Failed to initialize integration statuses:", error);
@@ -805,7 +791,6 @@ export default function IntegrationsPage() {
           onSelectForms={setSelectedJotformForms}
           onSyncLeads={() => {
             syncJotformLeads(selectedJotformForms);
-            setJotformLeadsSynced(true);
             toggleModal("Jotform", false);
           }}
           onDisconnect={() => handleDisconnect("Jotform", { closeModal: true })}
@@ -952,9 +937,7 @@ export default function IntegrationsPage() {
           selectedWorksheets={selectedSheets}
           onSelectWorksheets={setSelectedSheets}
           onSyncLeads={async () => {
-            // const selectedSheetsObjects = await selectedSheets.map(value => findSheetDetails(googleFormTreeData, value)).filter(Boolean);
             syncGoogleFormLeads();
-            setGoogleFormLeadsSynced(true);
             toggleModal("Google Forms", false);
           }}
           onDisconnect={() => handleDisconnect("Google Forms", { closeModal: true })}
@@ -964,7 +947,7 @@ export default function IntegrationsPage() {
         <HubspotModal
           open={isModalOpen("Hubspot")}
           status={getIntegrationStatus("Hubspot")}
-          accountInfo={hubspotAccountInfo}
+          accountInfo={null}
           onCancel={() => handleModalClose("Hubspot")}
           onOk={() => handleModalOk("Hubspot")}
           onConnect={() => connectToHubSpot(setButtonLoading)}
@@ -998,7 +981,6 @@ export default function IntegrationsPage() {
           accountInfo={{ accountName: "your typeform account successfully" }}
           onSyncLeads={() => {
             syncTypeformLeads(selectedTypeformForms);
-            setTypeformLeadsSynced(true);
             setButtonLoading(false);
             toggleModal("Typeform", false);
           }}
