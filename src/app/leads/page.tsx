@@ -7,20 +7,13 @@ import { EditLeadModal } from "@/components/Leads/EditLeadModal";
 import LeadGenerationForm from "@/components/Leads/LeadGenerationForm";
 import { StatCard } from "@/components/Leads/StatCard";
 import { useDropdown } from "@/hooks/useDropdown";
-import { usePagination } from "@/hooks/usePagination"; // Adjust path as needed
+import { usePagination } from "@/hooks/usePagination";
+import { useCurrentUserClinic, useLeadsList, useLeadStats } from "@/hooks/useLeads";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import {
-  fetchLeadsForClinic,
-  formatStatus,
-  getCurrentUserClinic,
-  getStatusColor,
-  getStatusStats,
-  LEAD_STATUSES,
-  type StatusStats,
-} from "@/utils/supabase/leads-helper";
+import { formatStatus, getStatusColor, LEAD_STATUSES } from "@/utils/supabase/leads-helper";
 import { Modal, Pagination, Select } from "antd";
 import { Edit, MoreVertical, SearchIcon, Trash2, MessageCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import React, { useState, useMemo } from "react";
 import { leadsStatsConfig } from "./statsUtil";
 import LeadPage from "@/components/screens/Leads/LeadPage";
 
@@ -40,15 +33,10 @@ interface Lead {
 }
 
 export default function LeadsPage() {
-  const [leadsData, setLeadsData] = useState<Lead[]>([]);
-  const [statusStats, setStatusStats] = useState<StatusStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Modal and form state management
   const [selectedLeadStatus, setSelectedLeadStatus] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showLeadForm, setShowLeadForm] = useState(false);
-  const [clinicId, setClinicId] = useState<string | null>(null);
 
   const { activeDropdown, dropdownPosition, dropdownRef, toggleDropdown, closeDropdown } = useDropdown({
     dropdownWidth: 192,
@@ -60,93 +48,41 @@ export default function LeadsPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [conversationHistoryModalOpen, setConversationHistoryModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const { currentPage, pageSize, totalItems, offset, paginationConfig, setTotal } = usePagination(10);
+  const { currentPage, pageSize, totalItems, paginationConfig, setTotal } = usePagination(10);
 
-  useEffect(() => {
-    const initializeClinic = async () => {
-      try {
-        setLoading(true);
-        setStatsLoading(true);
-        const currentClinicId = await getCurrentUserClinic();
-        setClinicId(currentClinicId);
-      } catch (err) {
-        console.error("Error getting clinic:", err);
-        setError(err instanceof Error ? err.message : "Failed to get clinic");
-        setLoading(false);
-        setStatsLoading(false);
-      }
-    };
+  // React Query hooks
+  const { data: clinic, isLoading: clinicLoading, error: clinicError } = useCurrentUserClinic();
+  const clinicId = clinic?.id || "";
+  const { data: leadsResponse, isLoading: leadsLoading, error: leadsError } = useLeadsList(clinicId, currentPage, pageSize);
+  const { data: statusStats = [], isLoading: statsLoading } = useLeadStats(clinicId);
 
-    initializeClinic();
-  }, []);
+  // Extract leads data and pagination info
+  const leadsData = leadsResponse?.leads || [];
+  const totalLeads = leadsResponse?.total || 0;
 
-  useEffect(() => {
-    if (clinicId) {
-      loadData();
-      loadStatusStats();
+  // Combined loading states
+  const loading = clinicLoading || leadsLoading;
+  const error = clinicError || leadsError;
+
+  // Handle React Query errors
+  React.useEffect(() => {
+    if (clinicError) {
+      console.error("Error getting clinic:", clinicError);
     }
-  }, [clinicId, currentPage, pageSize]);
-
-  const loadStatusStats = async () => {
-    if (!clinicId) return;
-    try {
-      setStatsLoading(true);
-      const stats = await getStatusStats(clinicId);
-      setStatusStats(stats);
-    } catch (err) {
-      console.error("Error loading status stats:", err);
-      setError(err instanceof Error ? err.message : "Failed to load status stats");
-    } finally {
-      setStatsLoading(false);
+    if (leadsError) {
+      console.error("Error loading leads:", leadsError);
     }
-  };
+  }, [clinicError, leadsError]);
 
-  const handleClose = (newLead?: any) => {
+  // Update pagination total when leads data changes
+  React.useEffect(() => {
+    setTotal(totalLeads);
+  }, [totalLeads, setTotal]);
+
+  const handleClose = () => {
     setShowLeadForm(false);
-    if (newLead) {
-      const formattedLead = {
-        id: newLead.id,
-        first_name: newLead.first_name,
-        last_name: newLead.last_name,
-        name: newLead.first_name || "Unknown",
-        email: newLead.email,
-        phone: newLead.phone,
-        status: newLead.status,
-        interest_level: newLead.interest_level,
-        urgency: newLead.urgency,
-        notes: newLead.notes,
-        created_at: newLead.created_at,
-        updated_at: newLead.updated_at,
-      };
-      setLeadsData(prev => [formattedLead, ...prev]);
-      loadStatusStats();
-    }
-  };
-
-  const loadData = async () => {
-    if (!clinicId) {
-      console.error("No clinic ID available");
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await fetchLeadsForClinic(clinicId, {
-        page: currentPage,
-        pageSize: pageSize,
-        offset: offset,
-      });
-
-      setLeadsData(response.leads);
-      setTotal(response.total);
-    } catch (err) {
-      console.error("Error loading data:", err);
-      setError(err instanceof Error ? err.message : "Failed to load leads");
-    } finally {
-      setLoading(false);
-    }
+    // React Query will automatically refresh the leads list when a new lead is created
+    // No need to manually update local state
   };
 
   const handleEditLead = (lead: Lead) => {
@@ -167,28 +103,20 @@ export default function LeadsPage() {
     closeDropdown();
   };
 
-  const handleUpdateLead = (updatedLead: Lead) => {
-    setLeadsData(prev => prev.map(lead => (lead.id === updatedLead.id ? updatedLead : lead)));
-    loadStatusStats();
-  };
-
-  const handleConfirmDelete = (leadId: string) => {
-    setLeadsData(prev => prev.filter(lead => lead.id !== leadId));
-    loadStatusStats();
-  };
-
-  const filteredLeads = leadsData.filter(lead => {
-    if (selectedLeadStatus !== "all" && lead.status !== selectedLeadStatus) return false;
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        lead.name.toLowerCase().includes(query) ||
-        (lead.email && lead.email.toLowerCase().includes(query)) ||
-        (lead.phone && lead.phone.toLowerCase().includes(query))
-      );
-    }
-    return true;
-  });
+  const filteredLeads = useMemo(() => {
+    return leadsData.filter(lead => {
+      if (selectedLeadStatus !== "all" && lead.status !== selectedLeadStatus) return false;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return (
+          lead.name.toLowerCase().includes(query) ||
+          (lead.email && lead.email.toLowerCase().includes(query)) ||
+          (lead.phone && lead.phone.toLowerCase().includes(query))
+        );
+      }
+      return true;
+    });
+  }, [leadsData, selectedLeadStatus, searchQuery]);
 
   const ErrorBlock = () => (
     <div className="flex h-64 flex-col items-center justify-center">
@@ -199,9 +127,9 @@ export default function LeadsPage() {
           </svg>
         </div>
         <h3 className="mb-2 text-lg font-semibold text-red-800">Something went wrong</h3>
-        <p className="mb-4 text-red-600">{error}</p>
+        <p className="mb-4 text-red-600">{error?.message || "An error occurred"}</p>
         <button
-          onClick={loadData}
+          onClick={() => window.location.reload()}
           className="mx-auto flex items-center rounded-lg bg-red-600 px-6 py-2 text-white transition-colors duration-200 hover:bg-red-700"
         >
           <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -337,7 +265,7 @@ export default function LeadsPage() {
                           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-purple-100 to-blue-100 font-semibold text-purple-600 shadow-sm ring-2 ring-white">
                             {lead.name
                               .split(" ")
-                              .map(n => n[0])
+                              .map((n: string) => n[0])
                               .join("")
                               .toUpperCase()}
                           </div>
@@ -448,7 +376,6 @@ export default function LeadsPage() {
             setEditModalOpen(false);
             setSelectedLead(null);
           }}
-          onUpdate={handleUpdateLead}
         />
 
         {/* Delete Lead Modal */}
@@ -459,7 +386,7 @@ export default function LeadsPage() {
             setDeleteModalOpen(false);
             setSelectedLead(null);
           }}
-          onDelete={handleConfirmDelete}
+          clinicId={clinicId}
         />
 
         {/* Conversation History Modal */}

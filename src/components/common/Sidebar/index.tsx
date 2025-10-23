@@ -1,16 +1,15 @@
 "use client";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"; // Import your LoadingSpinner
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import footerItems from "@/constants/footerItems";
 import menuItems from "@/constants/menuItems";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { useCurrentUser } from "@/hooks/useUser";
 import { signOut } from "@/utils/supabase/auth-helper";
-import { createClient } from "@/utils/supabase/config/client";
-import type { User } from "@supabase/supabase-js";
 import { X } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 interface SidebarProps {
   sidebarOpen: boolean;
 
@@ -18,29 +17,12 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
-  const supabase = createClient();
   const { push } = useRouter();
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [isUserLoading, setIsUserLoading] = useState(true); // Add loading state
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const { data, error } = await supabase.auth.getUser();
-        if (!error && data?.user) {
-          setUser(data.user);
-        }
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      } finally {
-        setIsUserLoading(false); // Set loading to false after fetch completes
-      }
-    };
-
-    fetchUser();
-  }, [supabase.auth]);
+  // React Query hooks
+  const { data: user, isLoading: isUserLoading } = useCurrentUser();
 
   const menuHandler = async (key: string) => {
     switch (key) {

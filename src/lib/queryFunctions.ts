@@ -1,23 +1,30 @@
-import { createClient } from "@/utils/supabase/config/client";
-import { getClinicData, updateClinic, updateMailgunDomainSettings, getClincApiKey } from "@/utils/supabase/clinic-helper";
+import { LeadMetrics, LeadRow } from "@/app/dashboard/types";
 import { getAllIntegrationStatuses } from "@/app/integrations/integrationUtils";
-import { LeadRow, LeadMetrics } from "@/app/dashboard/types";
-import { getUserData } from "@/utils/supabase/user-helper";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
-import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
+import { getRoleId } from "@/redux/slices/clinic.slice";
 import apiKeyService from "@/services/apiKey";
+import { appointmentHelper, type UpdateMeetingRequest } from "@/utils/appointment-helper";
 import { checkClinicSubscription, shouldAllowTwilioSetup } from "@/utils/subscription-utils";
+import { getSupabaseSession } from "@/utils/supabase/auth-helper";
+import { getClincApiKey, getClinicData, updateClinic, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
 import {
+  deleteStaffMember,
   getClinicStaff,
   getStatusStats,
   updateStaffMember,
-  deleteStaffMember,
   type UpdateStaffData,
 } from "@/utils/supabase/clinic-staff-helper";
+import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
+import { createClient } from "@/utils/supabase/config/client";
 import { createStaffUser } from "@/utils/supabase/config/staff";
-import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
-import { getRoleId } from "@/redux/slices/clinic.slice";
-import { appointmentHelper, type UpdateMeetingRequest } from "@/utils/appointment-helper";
+import {
+  fetchLeadsForClinic,
+  fetchMessagesForLead,
+  getCurrentUserClinic,
+  getStatusStats as getLeadStatusStats,
+  sendMessageToLead,
+  updateLeadStatus,
+} from "@/utils/supabase/leads-helper";
+import { getUserData } from "@/utils/supabase/user-helper";
 import dayjs from "dayjs";
 
 const supabase = createClient();
@@ -561,5 +568,232 @@ export const appointmentsMutations = {
   // Delete appointment
   deleteAppointment: async (appointmentId: string) => {
     return await appointmentHelper.deleteMeeting(appointmentId);
+  },
+};
+
+// Leads query functions
+export const leadsQueries = {
+  // Fetch leads list with pagination
+  fetchLeadsList: async (params: { clinicId: string; page: number; pageSize: number }) => {
+    const { clinicId, page, pageSize } = params;
+    if (!clinicId) throw new Error("Clinic ID is required");
+
+    return await fetchLeadsForClinic(clinicId, {
+      page,
+      pageSize,
+      offset: (page - 1) * pageSize,
+    });
+  },
+
+  // Fetch lead statistics
+  fetchLeadStats: async (clinicId: string) => {
+    if (!clinicId) throw new Error("Clinic ID is required");
+
+    return await getLeadStatusStats(clinicId);
+  },
+
+  // Fetch messages for a specific lead
+  fetchLeadMessages: async (params: { leadId: string; clinicId: string; threadId?: string }) => {
+    const { leadId, clinicId, threadId } = params;
+    if (!leadId || !clinicId) throw new Error("Lead ID and Clinic ID are required");
+
+    return await fetchMessagesForLead(leadId, clinicId, threadId);
+  },
+
+  // Get current user's clinic data (to match billing pattern)
+  fetchCurrentUserClinic: async () => {
+    const data = await getClinicData();
+    if (!data?.id) throw new Error("Clinic data not found");
+    return data;
+  },
+};
+
+// Leads mutation functions
+export const leadsMutations = {
+  // Create new lead
+  createLead: async (leadData: {
+    clinic_id: string;
+    source_id: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+    form_data?: any;
+    interest_level?: string;
+    urgency?: string;
+    status?: string;
+  }) => {
+    const { error, data } = await supabase.from("lead").insert([leadData]).select().single();
+
+    if (error?.code === "23505") {
+      throw new Error("Lead with this email already registered in this clinic");
+    }
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Update lead (comprehensive)
+  updateLead: async (params: {
+    leadId: string;
+    updates: {
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+      phone?: string;
+      status?: string;
+      interest_level?: string;
+      urgency?: string;
+      notes?: string;
+    };
+  }) => {
+    const { leadId, updates } = params;
+
+    const { error, data } = await supabase
+      .from("lead")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", leadId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Update lead status
+  updateLeadStatus: async (params: {
+    leadId: string;
+    updates: {
+      status?: string;
+      interest_level?: string;
+      urgency?: string;
+      notes?: string;
+    };
+  }) => {
+    const { leadId, updates } = params;
+    return await updateLeadStatus(leadId, updates);
+  },
+
+  // Send message to lead
+  sendMessageToLead: async (params: { leadId: string; clinicId: string; content: string; isFromUser?: boolean }) => {
+    const { leadId, clinicId, content, isFromUser = false } = params;
+    return await sendMessageToLead(leadId, clinicId, content, isFromUser);
+  },
+
+  // Delete lead
+  deleteLead: async (params: { leadId: string; clinicId: string }) => {
+    const { leadId, clinicId } = params;
+
+    // Use Supabase directly to delete the lead
+    const { error } = await supabase.from("lead").delete().eq("id", leadId).eq("clinic_id", clinicId);
+
+    if (error) throw error;
+
+    return { success: true };
+  },
+};
+
+// Billing query functions
+export const billingQueries = {
+  // Fetch subscription data for a clinic
+  fetchSubscription: async (clinicId: string) => {
+    if (!clinicId) throw new Error("Clinic ID is required");
+
+    const { data: subscription } = await supabase
+      .from("stripe_subscriptions")
+      .select("id, status, trial_end, stripe_price_id, current_period_end, stripe_subscription_id, last4, exp_month, exp_year, brand")
+      .eq("clinic_id", clinicId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return subscription;
+  },
+
+  // Fetch subscription events
+  fetchSubscriptionEvents: async (subscriptionId: string) => {
+    if (!subscriptionId) throw new Error("Subscription ID is required");
+
+    const { data: events } = await supabase
+      .from("stripe_events")
+      .select("*")
+      .eq("subscription_id", subscriptionId)
+      .order("received_at", { ascending: false });
+
+    return events || [];
+  },
+
+  // Fetch available plans
+  fetchPlans: async () => {
+    const { data: planData } = await supabase.from("plans").select("*").eq("active", true).order("amount", { ascending: true });
+
+    return planData || [];
+  },
+
+  // Fetch invoices for a clinic
+  fetchInvoices: async (clinicId: string) => {
+    if (!clinicId) throw new Error("Clinic ID is required");
+
+    const session = await getSupabaseSession();
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-invoices`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ clinic_id: clinicId }),
+    });
+
+    if (!response.ok) throw new Error("Failed to fetch invoices");
+
+    const { invoices } = await response.json();
+    return invoices || [];
+  },
+
+  // Get current user's clinic data
+  fetchCurrentUserClinic: async () => {
+    const data = await getClinicData();
+    if (!data?.id) throw new Error("Clinic data not found");
+    return data;
+  },
+};
+
+// User query functions
+export const userQueries = {
+  // Get current authenticated user
+  fetchCurrentUser: async () => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    return data.user;
+  },
+};
+
+// Billing mutation functions
+export const billingMutations = {
+  // Create checkout session for subscription
+  createCheckoutSession: async (params: { clinicId: string; priceId: string }) => {
+    const { clinicId, priceId } = params;
+    const session = await getSupabaseSession();
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout-session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        clinic_id: clinicId,
+        price_id: priceId,
+      }),
+    });
+
+    if (!response.ok) throw new Error("Checkout session creation failed");
+
+    const { url } = await response.json();
+    return { url };
   },
 };

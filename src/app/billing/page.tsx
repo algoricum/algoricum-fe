@@ -1,150 +1,64 @@
 "use client";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
+import { PaymentCard } from "@/components/common/PaymentCard/payment-card";
+import {
+  useCreateCheckoutSession,
+  useCurrentUserClinic,
+  useInvoices,
+  usePlans,
+  useSubscription,
+  useSubscriptionEvents,
+} from "@/hooks/useBilling";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
-import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { createClient } from "@/utils/supabase/config/client";
 import { Alert, Button, Col, Flex, Row } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";
 import { AlertTriangle, CheckCircle, Download, ExternalLink, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
-import { PaymentCard } from "@/components/common/PaymentCard/payment-card";
+import { useState } from "react";
 dayjs.extend(utc);
 dayjs.extend(relativeTime);
-const supabase = createClient();
 
 const BillingPage = () => {
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>("active");
-  const [subscriptionEvents, setSubscriptionEvents] = useState<any[]>([]);
-  const [trialEnd, setTrialEnd] = useState<string | null>(null);
-  const [clinicId, setClinicId] = useState<string | null>("demo-clinic");
-  const [loading, setLoading] = useState(true);
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
-  const [currentPriceId, setCurrentPriceId] = useState<string | null>("price_demo");
-  const [currentPlan, setCurrentPlan] = useState<any | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [last4, setLast4] = useState<string | null>("4242");
-  const [expMonth, setExpMonth] = useState<number | null>(12);
-  const [expYear, setExpYear] = useState<number | null>(2028);
-  const [brand, setBrand] = useState<string | null>("visa");
-  const [invoices, setInvoices] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
 
-  const hasActiveSubscription = subscriptionStatus === "active" || subscriptionStatus === "trialing";
+  // React Query hooks
+  const { data: clinic, isLoading: clinicLoading } = useCurrentUserClinic();
+  const { data: subscription, isLoading: subscriptionLoading } = useSubscription(clinic?.id || "");
+  const { data: subscriptionEvents = [] } = useSubscriptionEvents(subscription?.id || "");
+  const { data: plans = [] } = usePlans();
+  const { data: invoices = [] } = useInvoices(clinic?.id || "");
+  const createCheckoutSession = useCreateCheckoutSession();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const clinic = await getClinicData();
-        if (!clinic) return;
+  const loading = clinicLoading || subscriptionLoading;
+  const hasActiveSubscription = subscription?.status === "active" || subscription?.status === "trialing";
 
-        setClinicId(clinic.id);
-
-        const { data: subscription } = await supabase
-          .from("stripe_subscriptions")
-          .select("id,status, trial_end, stripe_price_id, current_period_end, stripe_subscription_id, last4, exp_month, exp_year, brand")
-          .eq("clinic_id", clinic.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const { data: planData } = await supabase.from("plans").select("*").eq("active", true).order("amount", { ascending: true });
-
-        if (subscription) {
-          setSubscriptionStatus(subscription.status);
-          setTrialEnd(subscription.trial_end);
-          setCurrentPriceId(subscription.stripe_price_id);
-          setLast4(subscription.last4);
-          setExpMonth(subscription.exp_month);
-          setExpYear(subscription.exp_year);
-          setBrand(subscription.brand);
-
-          const matchedPlan = planData?.find(plan => plan.price_id === subscription.stripe_price_id);
-          setCurrentPlan({
-            ...matchedPlan,
-            current_period_end: subscription.current_period_end,
-          });
-
-          if (subscription.stripe_subscription_id) {
-            const { data: events } = await supabase
-              .from("stripe_events")
-              .select("*")
-              .eq("subscription_id", subscription.id)
-              .order("received_at", { ascending: false });
-
-            setSubscriptionEvents(events || []);
-          }
+  // Computed values from subscription data
+  const currentPlan =
+    subscription && plans.length > 0
+      ? {
+          ...plans.find(plan => plan.price_id === subscription.stripe_price_id),
+          current_period_end: subscription.current_period_end,
         }
-      } catch (error) {
-        console.error("Billing fetch error:", error);
-        setErrorMessage("Failed to load billing data.");
-      } finally {
-        setLoading(false);
-      }
-    };
+      : null;
 
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const fetchInvoices = async () => {
-      if (!clinicId) return;
-      const session = await getSupabaseSession();
-
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-invoices`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ clinic_id: clinicId }),
-        });
-        const { invoices } = await response.json();
-        setInvoices(invoices || []);
-      } catch (err) {
-        console.error("Invoice fetch error:", err);
-      }
-    };
-    fetchInvoices();
-  }, [clinicId]);
-
-  const handleSubscribe = async (priceId: string) => {
-    if (!clinicId) return;
+  const handleSubscribe = (priceId: string) => {
+    if (!clinic?.id) return;
 
     setSubscribingPlanId(priceId);
-    setErrorMessage(null);
-    const session = await getSupabaseSession();
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout-session`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          clinic_id: clinicId,
-          price_id: priceId,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Checkout session creation failed");
-
-      const { url } = await response.json();
-      window.location.href = url;
-    } catch (err) {
-      console.error("Subscribe error:", err);
-      setErrorMessage("Something went wrong while starting the subscription.");
-    } finally {
-      setSubscribingPlanId(null);
-    }
+    createCheckoutSession.mutate(
+      { clinicId: clinic.id, priceId: priceId },
+      {
+        onSettled: () => setSubscribingPlanId(null),
+      },
+    );
   };
 
-  const trialDaysLeft = trialEnd ? Math.ceil((new Date(trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+  const trialDaysLeft = subscription?.trial_end
+    ? Math.ceil((new Date(subscription.trial_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
   const billingDate = currentPlan?.current_period_end ? new Date(currentPlan.current_period_end).toLocaleDateString() : null;
 
   const tabItems = [
@@ -153,14 +67,14 @@ const BillingPage = () => {
       label: "Overview",
       children: (
         <div className="space-y-6">
-          {errorMessage && (
+          {createCheckoutSession.isError && (
             <Alert
               message="Subscription Error"
-              description={errorMessage}
+              description={createCheckoutSession.error?.message || "Something went wrong while starting the subscription."}
               type="error"
               showIcon
               closable
-              onClose={() => setErrorMessage(null)}
+              onClose={() => createCheckoutSession.reset()}
               className="mx-4 md:mx-0"
             />
           )}
@@ -171,19 +85,21 @@ const BillingPage = () => {
                 <Col xs={24} lg={14}>
                   <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-8">
                     <div className="flex items-center mb-6">
-                      {subscriptionStatus === "active" || subscriptionStatus === "trialing" ? (
+                      {subscription?.status === "active" || subscription?.status === "trialing" ? (
                         <CheckCircle className="w-6 h-6 text-green-600 mr-3" />
                       ) : (
                         <XCircle className="w-6 h-6 text-red-600 mr-3" />
                       )}
                       <p className="text-lg font-semibold text-gray-800">
-                        Subscription Status: <span className="capitalize text-blue-600">{subscriptionStatus}</span>
+                        Subscription Status: <span className="capitalize text-blue-600">{subscription?.status}</span>
                       </p>
                     </div>
 
-                    {subscriptionStatus === "trialing" && trialEnd && (
+                    {subscription?.status === "trialing" && subscription?.trial_end && (
                       <div className="bg-blue-50 rounded-lg p-4 mb-6 shadow-sm">
-                        <p className="text-sm text-blue-700 mb-1 font-medium">Trial ends on: {new Date(trialEnd).toLocaleDateString()}</p>
+                        <p className="text-sm text-blue-700 mb-1 font-medium">
+                          Trial ends on: {new Date(subscription.trial_end).toLocaleDateString()}
+                        </p>
                         {trialDaysLeft !== null && trialDaysLeft >= 0 && (
                           <p className="text-sm text-blue-600">
                             {trialDaysLeft} day{trialDaysLeft !== 1 ? "s" : ""} remaining
@@ -192,14 +108,14 @@ const BillingPage = () => {
                       </div>
                     )}
 
-                    {subscriptionStatus === "trialing" && trialDaysLeft !== null && trialDaysLeft <= 3 && (
+                    {subscription?.status === "trialing" && trialDaysLeft !== null && trialDaysLeft <= 3 && (
                       <div className="flex items-center bg-yellow-50 text-yellow-800 p-4 rounded-lg mb-6 shadow-sm">
                         <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0" />
                         <span className="text-sm font-medium">Your trial is ending soon. Don't forget to add payment.</span>
                       </div>
                     )}
 
-                    {subscriptionStatus === "active" && billingDate && (
+                    {subscription?.status === "active" && billingDate && (
                       <div className="bg-green-50 rounded-lg p-4 mb-6 shadow-sm">
                         <p className="text-sm text-green-700 font-medium">Next billing date: {billingDate}</p>
                       </div>
@@ -209,7 +125,7 @@ const BillingPage = () => {
                       <div className="border-t border-gray-100 pt-6 mb-6">
                         <h3 className="text-lg font-semibold text-gray-800 mb-2">Current Plan: {currentPlan.name}</h3>
                         <p className="text-gray-600 text-base">
-                          ${currentPlan.amount} {currentPlan.currency.toUpperCase()} / {currentPlan.interval}
+                          ${currentPlan.amount} {currentPlan.currency?.toUpperCase()} / {currentPlan.interval}
                         </p>
                       </div>
                     )}
@@ -217,13 +133,13 @@ const BillingPage = () => {
                     <Button
                       type="primary"
                       size="large"
-                      loading={subscribingPlanId === currentPriceId}
-                      onClick={() => currentPriceId && handleSubscribe(currentPriceId)}
-                      disabled={!currentPriceId}
+                      loading={subscribingPlanId === subscription?.stripe_price_id}
+                      onClick={() => subscription?.stripe_price_id && handleSubscribe(subscription.stripe_price_id)}
+                      disabled={!subscription?.stripe_price_id}
                       className="w-full md:w-auto px-8"
                       style={{ backgroundColor: "#A200E6" }}
                     >
-                      {subscribingPlanId === currentPriceId ? "Redirecting..." : "Manage Subscription"}
+                      {subscribingPlanId === subscription?.stripe_price_id ? "Redirecting..." : "Manage Subscription"}
                     </Button>
                   </div>
                 </Col>
@@ -234,10 +150,10 @@ const BillingPage = () => {
                       <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">Payment Method</h3>
                       <div className="flex justify-end">
                         <PaymentCard
-                          last4={last4 || "0000"}
-                          expMonth={expMonth || 12}
-                          expYear={expYear || 2025}
-                          brand={brand || "default"}
+                          last4={subscription?.last4 || "0000"}
+                          expMonth={subscription?.exp_month || 12}
+                          expYear={subscription?.exp_year || 2025}
+                          brand={subscription?.brand || "default"}
                           cardholderName="***************"
                           variant="gradient"
                           className="w-full sm:w-auto"
@@ -317,7 +233,7 @@ const BillingPage = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {invoices.map(inv => (
+              {invoices.map((inv: any) => (
                 <div
                   key={inv.id}
                   className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-md hover:shadow-lg transition-all duration-200"
@@ -329,25 +245,25 @@ const BillingPage = () => {
                     <p className="text-sm text-gray-500">{dayjs.unix(inv.created).format("MMMM DD, YYYY • hh:mm A")}</p>
                   </div>
                   <div className="flex gap-3 w-full sm:w-auto">
-                    <Button
-                      icon={<ExternalLink size={16} />}
-                      href={inv.hosted_invoice_url}
-                      target="_blank"
-                      type="default"
-                      className="flex-1 sm:flex-none bg-[#A200E6] text-white rounded-xl shadow-md hover:bg-[#7a00b3]"
-                    >
-                      View
-                    </Button>
+                    <a href={inv.hosted_invoice_url} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none">
+                      <Button
+                        icon={<ExternalLink size={16} />}
+                        type="default"
+                        className="w-full bg-[#A200E6] text-white rounded-xl shadow-md hover:bg-[#7a00b3]"
+                      >
+                        View
+                      </Button>
+                    </a>
 
-                    <Button
-                      icon={<Download size={16} />}
-                      href={inv.invoice_pdf}
-                      target="_blank"
-                      type="default"
-                      className="flex-1 sm:flex-none bg-[#A200E6] text-white rounded-xl shadow-md hover:bg-[#7a00b3]"
-                    >
-                      Download
-                    </Button>
+                    <a href={inv.invoice_pdf} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none">
+                      <Button
+                        icon={<Download size={16} />}
+                        type="default"
+                        className="w-full bg-[#A200E6] text-white rounded-xl shadow-md hover:bg-[#7a00b3]"
+                      >
+                        Download
+                      </Button>
+                    </a>
                   </div>
                 </div>
               ))}

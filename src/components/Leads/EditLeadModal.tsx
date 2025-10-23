@@ -7,9 +7,8 @@ import { User, Mail, Phone } from "lucide-react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { usePhoneValidation } from "@/hooks/usePhoneValidation";
+import { useUpdateLead } from "@/hooks/useLeads";
 import { LEAD_STATUSES } from "@/utils/supabase/leads-helper";
-import { createClient } from "@/utils/supabase/config/client";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
 
 interface Lead {
   id: string;
@@ -30,10 +29,9 @@ interface EditLeadModalProps {
   lead: Lead | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate: (updatedLead: Lead) => void;
 }
 
-export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModalProps) {
+export function EditLeadModal({ lead, isOpen, onClose }: EditLeadModalProps) {
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -44,11 +42,11 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
     notes: "",
   });
 
-  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const supabase = createClient();
-
   const { phoneNumber, setPhoneNumber, phoneError, handlePhoneChange, handlePhoneBlur, validatePhoneNumber } = usePhoneValidation();
+
+  // React Query hook
+  const updateLeadMutation = useUpdateLead();
 
   useEffect(() => {
     if (lead && isOpen) {
@@ -102,45 +100,26 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
     e.preventDefault();
     if (!lead || !validateForm()) return;
 
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from("lead")
-        .update({
+    updateLeadMutation.mutate(
+      {
+        leadId: lead.id,
+        updates: {
           first_name: formData.first_name,
           last_name: formData.last_name,
           email: formData.email,
           phone: phoneNumber,
           status: formData.status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", lead.id);
-
-      if (error) throw error;
-
-      const updatedLead: Lead = {
-        ...lead,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        name: `${formData.first_name} ${formData.last_name}`.trim(),
-        email: formData.email,
-        phone: phoneNumber,
-        status: formData.status,
-        interest_level: formData.interest_level,
-        urgency: formData.urgency,
-        notes: formData.notes,
-        updated_at: new Date().toISOString(),
-      };
-
-      onUpdate(updatedLead);
-      SuccessToast("Lead updated successfully");
-      onClose();
-    } catch (err) {
-      console.error("Error updating lead:", err);
-      ErrorToast("Failed to update lead");
-    } finally {
-      setLoading(false);
-    }
+          interest_level: formData.interest_level,
+          urgency: formData.urgency,
+          notes: formData.notes,
+        },
+      },
+      {
+        onSuccess: () => {
+          onClose();
+        },
+      },
+    );
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -295,10 +274,10 @@ export function EditLeadModal({ lead, isOpen, onClose, onUpdate }: EditLeadModal
           </button>
           <button
             type="submit"
-            disabled={loading}
+            disabled={updateLeadMutation.isPending}
             className="px-6 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors duration-200"
           >
-            {loading ? "Updating..." : "Update Lead"}
+            {updateLeadMutation.isPending ? "Updating..." : "Update Lead"}
           </button>
         </div>
       </form>

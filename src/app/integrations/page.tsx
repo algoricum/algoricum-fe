@@ -17,7 +17,8 @@ import {
   TypeformModal,
 } from "@/components/modals/Modals";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { useClinicData, useIntegrationsWithStatus } from "@/hooks/useDashboard";
+import { useIntegrationsWithStatus } from "@/hooks/useDashboard";
+import { useCurrentUserClinic } from "@/hooks/useBilling";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { IntegrationName, IntegrationStates, IntegrationWithStatus } from "@/types/integrations";
 import {
@@ -65,7 +66,7 @@ export default function IntegrationsPage() {
   const [googleFormTreeData, setGoogleFormTreeData] = useState<any[]>([]);
   const [buttonLoading, setButtonLoading] = useState(false);
   // React Query hooks
-  const { data: clinicData, isLoading: clinicLoading } = useClinicData();
+  const { data: clinicData, isLoading: clinicLoading } = useCurrentUserClinic();
   const clinicId = clinicData?.id || "";
   const { data: integrationsData, isLoading: integrationsLoading } = useIntegrationsWithStatus(clinicId);
 

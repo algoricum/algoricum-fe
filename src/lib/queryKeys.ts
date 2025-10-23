@@ -62,4 +62,22 @@ export const queryKeys = {
     stats: (clinicId: string) => ["appointments", "stats", clinicId] as const,
     byId: (appointmentId: string) => ["appointments", "byId", appointmentId] as const,
   },
+
+  // Leads related queries
+  leads: {
+    all: ["leads"] as const,
+    list: (clinicId: string, page: number, pageSize: number) => ["leads", "list", clinicId, page, pageSize] as const,
+    stats: (clinicId: string) => ["leads", "stats", clinicId] as const,
+    byId: (leadId: string) => ["leads", "byId", leadId] as const,
+    messages: (leadId: string, clinicId: string) => ["leads", "messages", leadId, clinicId] as const,
+  },
+
+  // Billing related queries
+  billing: {
+    all: ["billing"] as const,
+    subscription: (clinicId: string) => ["billing", "subscription", clinicId] as const,
+    events: (subscriptionId: string) => ["billing", "events", subscriptionId] as const,
+    invoices: (clinicId: string) => ["billing", "invoices", clinicId] as const,
+    plans: () => ["billing", "plans"] as const,
+  },
 } as const;

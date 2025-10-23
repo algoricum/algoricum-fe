@@ -70,7 +70,8 @@ export default function StaffPage(): JSX.Element {
   const { currentPage, pageSize, paginationConfig, setTotal } = usePagination(10);
 
   // React Query hooks
-  const { data: clinicId = "", isLoading: clinicLoading, error: clinicError } = useCurrentUserClinic();
+  const { data: clinic, isLoading: clinicLoading, error: clinicError } = useCurrentUserClinic();
+  const clinicId = clinic?.id || "";
   const { data: staffResponse, isLoading: staffLoading, error: staffError } = useStaffList(clinicId, currentPage, pageSize);
   const { data: statusStats = [], isLoading: statsLoading } = useStaffStats(clinicId);
 

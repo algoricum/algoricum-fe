@@ -47,7 +47,8 @@ export default function AppointmentsPage() {
   const { currentPage, pageSize, paginationConfig, setTotal, setCurrentPage } = usePagination(10);
 
   // React Query hooks
-  const { data: clinicId = "", isLoading: clinicLoading, error: clinicError } = useCurrentUserClinic();
+  const { data: clinic, isLoading: clinicLoading, error: clinicError } = useCurrentUserClinic();
+  const clinicId = clinic?.id || "";
   const {
     data: appointmentsResponse,
     isLoading: appointmentsLoading,

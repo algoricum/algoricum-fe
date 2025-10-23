@@ -1,9 +1,7 @@
 "use client";
-import { useState } from "react";
 import { Modal } from "antd";
 import { Trash2, AlertTriangle } from "lucide-react";
-import { createClient } from "@/utils/supabase/config/client";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { useDeleteLead } from "@/hooks/useLeads";
 
 interface Lead {
   id: string;
@@ -20,32 +18,23 @@ interface DeleteLeadModalProps {
   lead: Lead | null;
   isOpen: boolean;
   onClose: () => void;
-   
-  onDelete: (leadId: string) => void;
+  clinicId: string;
 }
 
-export function DeleteLeadModal({ lead, isOpen, onClose, onDelete }: DeleteLeadModalProps) {
-  const [loading, setLoading] = useState(false);
-  const supabase = createClient();
+export function DeleteLeadModal({ lead, isOpen, onClose, clinicId }: DeleteLeadModalProps) {
+  const deleteLeadMutation = useDeleteLead();
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!lead) return;
 
-    setLoading(true);
-    try {
-      const { error } = await supabase.from("lead").delete().eq("id", lead.id);
-
-      if (error) throw error;
-
-      onDelete(lead.id);
-      SuccessToast("Lead deleted successfully");
-      onClose();
-    } catch (err) {
-      console.error("Error deleting lead:", err);
-      ErrorToast("Failed to delete lead");
-    } finally {
-      setLoading(false);
-    }
+    deleteLeadMutation.mutate(
+      { leadId: lead.id, clinicId },
+      {
+        onSuccess: () => {
+          onClose();
+        },
+      },
+    );
   };
 
   if (!lead) return null;
@@ -110,7 +99,7 @@ export function DeleteLeadModal({ lead, isOpen, onClose, onDelete }: DeleteLeadM
           <button
             type="button"
             onClick={onClose}
-            disabled={loading}
+            disabled={deleteLeadMutation.isPending}
             className="px-6 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors duration-200"
           >
             Cancel
@@ -118,10 +107,10 @@ export function DeleteLeadModal({ lead, isOpen, onClose, onDelete }: DeleteLeadM
           <button
             type="button"
             onClick={handleDelete}
-            disabled={loading}
+            disabled={deleteLeadMutation.isPending}
             className="px-6 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors duration-200 flex items-center gap-2"
           >
-            {loading ? (
+            {deleteLeadMutation.isPending ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Deleting...
