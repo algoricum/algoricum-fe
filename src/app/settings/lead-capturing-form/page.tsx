@@ -1,14 +1,14 @@
-"use client";
-import { Header } from "@/components/common";
-import SettingsTabs from "@/components/screens/Settings/SettingsTabs";
-import DashboardLayout from "@/layouts/DashboardLayout";
+import dynamic from "next/dynamic";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 
-const Page = () => {
-  return (
-    <DashboardLayout header={<Header title="Profile Settings" description="Manage your profile and application settings." />}>
-      <SettingsTabs />
-    </DashboardLayout>
-  );
-};
+const LeadFormSettingsContent = dynamic(() => import("../SettingsContent"), {
+  loading: () => (
+    <div className="flex min-h-screen items-center justify-center">
+      <LoadingSpinner message="Loading form settings..." size="lg" />
+    </div>
+  ),
+});
 
-export default Page;
+export default function LeadFormSettingsPage() {
+  return <LeadFormSettingsContent />;
+}

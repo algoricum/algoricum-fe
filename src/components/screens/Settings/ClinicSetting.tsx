@@ -265,7 +265,14 @@ const ClinicSetting = () => {
             <div className="flex flex-col items-center justify-center w-full h-full">
               <div className="relative w-full max-w-xs">
                 <div className="relative w-full h-[200px] mb-4">
-                  <Image src={formData.logo || "/placeholder.svg"} alt="Clinic Logo" fill className="object-contain rounded-lg shadow-sm" />
+                  <Image
+                    src={formData.logo || "/placeholder.svg"}
+                    alt="Clinic Logo"
+                    fill
+                    className="object-contain rounded-lg shadow-sm"
+                    sizes="(max-width: 768px) 100vw, 320px"
+                    loading="lazy" // Settings page loads after navigation
+                  />
                 </div>
 
                 <div className="text-center space-y-4">

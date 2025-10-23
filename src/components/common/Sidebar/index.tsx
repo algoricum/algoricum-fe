@@ -102,7 +102,13 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
         <div className="flex items-center">
           <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
-            <Image src="/logo.svg" alt="Logo" width={48} height={48} />
+            <Image
+              src="/logo.svg"
+              alt="Algoricum Logo"
+              width={48}
+              height={48}
+              priority // Sidebar is above the fold
+            />
           </div>
           <div className="ml-3">
             <div className="text-lg font-semibold text-gray-900">Algoricum</div>

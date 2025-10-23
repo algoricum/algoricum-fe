@@ -1,21 +1,14 @@
-"use client";
-import { Header } from "@/components/common";
-import ClinicSettingsPage from "@/components/screens/Settings/Clinic/clinicSettingsPage";
-import DashboardLayout from "@/layouts/DashboardLayout";
+import dynamic from "next/dynamic";
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 
-const Page = () => {
-  return (
-    <DashboardLayout
-      header={
-        <Header
-          title="Clinic Settings"
-          description="Customize the design and settings of your clinic to match your brand’s look and feel."
-        />
-      }
-    >
-      <ClinicSettingsPage />
-    </DashboardLayout>
-  );
-};
+const WorkspaceSettingsContent = dynamic(() => import("./WorkspaceSettingsContent"), {
+  loading: () => (
+    <div className="flex min-h-screen items-center justify-center">
+      <LoadingSpinner message="Loading workspace settings..." size="lg" />
+    </div>
+  ),
+});
 
-export default Page;
+export default function WorkspaceSettingsPage() {
+  return <WorkspaceSettingsContent />;
+}

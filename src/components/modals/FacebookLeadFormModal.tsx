@@ -365,7 +365,14 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
                           <div className="flex items-center">
                             <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
                               {page.picture?.data?.url ? (
-                                <img src={page.picture.data.url} alt={page.name} className="w-8 h-8 rounded-full" />
+                                <Image
+                                  src={page.picture.data.url}
+                                  alt={page.name}
+                                  width={32}
+                                  height={32}
+                                  className="w-8 h-8 rounded-full"
+                                  unoptimized // External URLs need this
+                                />
                               ) : (
                                 <span className="text-gray-500 text-sm">📄</span>
                               )}

@@ -45,7 +45,13 @@ const Footer = () => {
       <Flex justify="space-between" className="w-auto flex flex-wrap gap-5 md:gap-0  max-w-[1312px]">
         <Flex className="" vertical gap={12}>
           <Flex align="center" gap={12}>
-            <Image width={40} height={40} src={"/logo.svg"} alt="logo" />
+            <Image
+              width={40}
+              height={40}
+              src={"/logo.svg"}
+              alt="Algoricum Logo"
+              loading="lazy" // Footer loads later
+            />
             <h1 className="font-helvetica-700 text-[20px] leading-[27px] text-white">Algoricum</h1>
           </Flex>
           <SocialButtons />
@@ -55,7 +61,14 @@ const Footer = () => {
         <FooterMenuItems heading="Resources" menus={Footermenus?.resources} />
         <FooterMenuItems heading="Legal" menus={Footermenus?.legal} />
       </Flex>
-      <Image alt="logo-2" layout="responsive" width={1400} height={402} src={"/logo-2.svg"} />
+      <Image
+        alt="Algoricum Brand Background"
+        width={1400}
+        height={402}
+        src={"/logo-2.svg"}
+        style={{ width: "100%", height: "auto" }}
+        loading="lazy" // Background image can load later
+      />
     </Flex>
   );
 };
