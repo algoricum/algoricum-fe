@@ -5,26 +5,27 @@ import { EditAppointmentModal } from "@/components/appointments/edit-appointment
 import { StatCard } from "@/components/appointments/stat-card";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { ErrorToast } from "@/helpers/toast";
 import { useDropdown } from "@/hooks/useDropdown";
 import { usePagination } from "@/hooks/usePagination";
+import {
+  useCurrentUserClinic,
+  useAppointmentsList,
+  useAppointmentStats,
+  useCreateAppointment,
+  useUpdateAppointment,
+  useDeleteAppointment,
+} from "@/hooks/useAppointments";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { appointmentHelper, type AppointmentStatus, type MeetingSchedule } from "@/utils/appointment-helper";
-import { createClient } from "@/utils/supabase/config/client";
-import { getCurrentUserClinic } from "@/utils/supabase/leads-helper";
+import { type MeetingSchedule } from "@/utils/appointment-helper";
 import { Form, Pagination, Select } from "antd";
-import dayjs from "dayjs";
 import { Calendar, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import "react-phone-number-input/style.css";
 import { appointmentStatsConfig } from "./statsUtil";
 
 export default function AppointmentsPage() {
-  const [appointmentsData, setAppointmentsData] = useState<MeetingSchedule[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [statusStats, setStatusStats] = useState<AppointmentStatus[]>([]);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Modal and form state management
   const [showAddAppointmentModal, setShowAddAppointmentModal] = useState(false);
   const [showEditAppointmentModal, setShowEditAppointmentModal] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
@@ -32,7 +33,6 @@ export default function AppointmentsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [clinicId, setClinicId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [, setPhoneError] = useState<string>("");
@@ -46,66 +46,42 @@ export default function AppointmentsPage() {
   // Initialize pagination with default page size of 10
   const { currentPage, pageSize, paginationConfig, setTotal, setCurrentPage } = usePagination(10);
 
-  const supabase = createClient();
+  // React Query hooks
+  const { data: clinicId = "", isLoading: clinicLoading, error: clinicError } = useCurrentUserClinic();
+  const {
+    data: appointmentsResponse,
+    isLoading: appointmentsLoading,
+    error: appointmentsError,
+  } = useAppointmentsList(clinicId, currentPage, pageSize);
+  const { data: statusStats = [], isLoading: statsLoading } = useAppointmentStats(clinicId);
 
-  // Load appointments data from Supabase with pagination
-  const loadAppointments = async () => {
-    if (!clinicId) return;
-    setIsLoading(true);
-    setStatsLoading(true);
-    try {
-      const {
-        data: meetings,
-        error,
-        count,
-      } = await supabase
-        .from("meeting_schedule")
-        .select("*", { count: "exact" })
-        .eq("clinic_id", clinicId)
-        .order("created_at", { ascending: false })
-        .range((currentPage - 1) * pageSize, currentPage * pageSize - 1);
+  // Extract appointments data and pagination info
+  const appointmentsData = appointmentsResponse?.data || [];
+  const totalAppointments = appointmentsResponse?.total || 0;
 
-      if (error) throw error;
+  // React Query mutations
+  const createAppointmentMutation = useCreateAppointment();
+  const updateAppointmentMutation = useUpdateAppointment();
+  const deleteAppointmentMutation = useDeleteAppointment();
 
-      // Set both data and total count from single query
-      setAppointmentsData(meetings || []);
-      setTotal(count || 0);
-    } catch (error) {
-      console.error("Error loading appointments:", error);
+  // Combined loading states
+  const isLoading = clinicLoading || appointmentsLoading;
+  const isSubmitting = createAppointmentMutation.isPending || updateAppointmentMutation.isPending || deleteAppointmentMutation.isPending;
+
+  // Handle React Query errors
+  React.useEffect(() => {
+    if (clinicError) {
+      ErrorToast("Failed to load clinic data. Please try again.");
+    }
+    if (appointmentsError) {
       ErrorToast("Failed to load appointments. Please try again.");
-    } finally {
-      setIsLoading(false);
-      setStatsLoading(false);
     }
-  };
+  }, [clinicError, appointmentsError]);
 
-  useEffect(() => {
-    loadAppointments();
-  }, [clinicId, currentPage, pageSize, setTotal]);
-
-  // Get clinic ID when component mounts
-  useEffect(() => {
-    const fetchClinicId = async () => {
-      try {
-        const clinic_id = await getCurrentUserClinic();
-        if (!clinic_id) {
-          ErrorToast("No clinic found. Please make sure you have a clinic set up.");
-          return;
-        }
-        setClinicId(clinic_id);
-      } catch (error) {
-        console.error("Error fetching clinic ID:", error);
-        ErrorToast("Failed to fetch clinic information.");
-      }
-    };
-    fetchClinicId();
-  }, []);
-
-  useEffect(() => {
-    if (clinicId) {
-      loadStatusStats();
-    }
-  }, [clinicId, appointmentsData]);
+  // Update pagination total when appointments data changes
+  React.useEffect(() => {
+    setTotal(totalAppointments);
+  }, [totalAppointments, setTotal]);
 
   // Clear copied link indicator after 2 seconds
   useEffect(() => {
@@ -117,19 +93,6 @@ export default function AppointmentsPage() {
     }
   }, [copiedLink]);
 
-  const loadStatusStats = async () => {
-    if (!clinicId) return;
-    try {
-      setStatsLoading(true);
-      const stats = await appointmentHelper.getStatusStats(clinicId);
-      setStatusStats(stats);
-    } catch (err) {
-      console.error("Error loading status stats:", err);
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
   const handleAddAppointment = async () => {
     if (!clinicId) {
       ErrorToast("No clinic found. Please make sure you have a clinic set up.");
@@ -139,72 +102,28 @@ export default function AppointmentsPage() {
   };
 
   const handleSubmitMeeting = async (values: any) => {
+    if (!clinicId) {
+      ErrorToast("No clinic found. Please make sure you have a clinic set up.");
+      return;
+    }
+
     try {
-      setIsSubmitting(true);
-      let fullDateTime = null;
-      if (values.preferred_meeting_date && values.preferred_meeting_time) {
-        const date = dayjs(values.preferred_meeting_date).format("YYYY-MM-DD");
-        const time = dayjs(values.preferred_meeting_time).format("HH:mm:ss");
-        fullDateTime = `${date} ${time}`;
-      }
+      await createAppointmentMutation.mutateAsync({
+        appointmentData: {
+          ...values,
+          phone_number: values.phone_number || phoneNumber,
+        },
+        clinicId,
+      });
 
-      const { error } = await supabase.from("meeting_schedule").upsert(
-        [
-          {
-            username: `${values.first_name} ${values.last_name}`.trim(),
-            email: values.email,
-            phone_number: values.phone_number || phoneNumber,
-            preferred_meeting_time: fullDateTime,
-            meeting_notes: values.meeting_notes || null,
-            clinic_id: clinicId,
-          },
-        ],
-        { onConflict: "email" },
-      );
-
-      const { data: leadSourceData, error: leadSourceError } = await supabase
-        .from("lead_source")
-        .select("id")
-        .eq("name", "Others")
-        .single();
-
-      const { error: leadError } = await supabase.from("lead").upsert(
-        [
-          {
-            first_name: values.first_name.trim(),
-            last_name: values.last_name.trim(),
-            email: values.email,
-            phone: values.phone_number || phoneNumber,
-            status: "Booked",
-            interest_level: "medium",
-            clinic_id: clinicId,
-            source_id: leadSourceData?.id,
-          },
-        ],
-        { onConflict: "email,clinic_id" },
-      );
-
-      if (error || leadError || leadSourceError) {
-        if (error?.code === "23505") {
-          ErrorToast("This email is already registered for a meeting");
-        } else {
-          throw error;
-        }
-        return;
-      }
-
-      await loadAppointments();
-
-      SuccessToast("Meeting schedule saved successfully!");
+      // Reset form and close modal on success
       form.resetFields();
       setPhoneNumber("");
       setPhoneError("");
       setShowAddAppointmentModal(false);
-    } catch (error: any) {
-      console.error("Error saving meeting schedule:", error);
-      ErrorToast(error.message || "Failed to save meeting schedule");
-    } finally {
-      setIsSubmitting(false);
+    } catch (error) {
+      // Error handling is done by the mutation
+      console.error("Create appointment error:", error);
     }
   };
 
@@ -213,31 +132,26 @@ export default function AppointmentsPage() {
       return;
     }
 
-    setIsSubmitting(true);
     try {
-      const updatedMeeting = await appointmentHelper.updateMeeting(selectedAppointment.id, formData);
+      await updateAppointmentMutation.mutateAsync({
+        appointmentId: selectedAppointment.id,
+        updateData: formData,
+      });
 
-      // Update local state
-      setAppointmentsData(prev => prev.map(apt => (apt.id === selectedAppointment.id ? updatedMeeting : apt)));
+      // Reset modal state on success
       setShowEditAppointmentModal(false);
       setSelectedAppointment(null);
-      SuccessToast("Appointment updated successfully!");
-    } catch (error: any) {
-      console.error("Error updating appointment:", error);
-      ErrorToast(error.message || "Failed to update appointment. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+    } catch (error) {
+      // Error handling is done by the mutation
+      console.error("Update appointment error:", error);
     }
   };
 
   const handleDeleteAppointment = async () => {
     if (!selectedAppointment) return;
 
-    setIsSubmitting(true);
     try {
-      await appointmentHelper.deleteMeeting(selectedAppointment.id);
-
-      setAppointmentsData(prev => prev.filter(apt => apt.id !== selectedAppointment.id));
+      await deleteAppointmentMutation.mutateAsync(selectedAppointment.id);
 
       // Calculate if current page will be empty after deletion
       const newTotalItems = appointmentsData.length - 1;
@@ -250,14 +164,12 @@ export default function AppointmentsPage() {
         setCurrentPage(1);
       }
 
+      // Reset modal state on success
       setShowDeleteConfirmation(false);
       setSelectedAppointment(null);
-      SuccessToast("Appointment deleted successfully!");
-    } catch (error: any) {
-      console.error("Error deleting appointment:", error);
-      ErrorToast(error.message || "Failed to delete appointment. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+    } catch (error) {
+      // Error handling is done by the mutation
+      console.error("Delete appointment error:", error);
     }
   };
 
@@ -274,15 +186,17 @@ export default function AppointmentsPage() {
   };
 
   // Filter appointments based on search and status
-  const filteredAppointments = appointmentsData.filter(appointment => {
-    const matchesSearch =
-      searchQuery === "" ||
-      appointment.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      appointment.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (appointment.meeting_notes && appointment.meeting_notes.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === "all" || appointment.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredAppointments = useMemo(() => {
+    return appointmentsData.filter(appointment => {
+      const matchesSearch =
+        searchQuery === "" ||
+        appointment.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        appointment.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (appointment.meeting_notes && appointment.meeting_notes.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesStatus = statusFilter === "all" || appointment.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [appointmentsData, searchQuery, statusFilter]);
 
   // Format date and time for display
   const formatAppointmentDateTime = (dateTimeString: string | null) => {
@@ -427,7 +341,7 @@ export default function AppointmentsPage() {
                             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-blue-100 to-purple-100 font-semibold text-blue-700 shadow-sm ring-2 ring-white">
                               {appointment.username
                                 .split(" ")
-                                .map(n => n[0])
+                                .map((n: string) => n[0])
                                 .join("")
                                 .toUpperCase()}
                             </div>

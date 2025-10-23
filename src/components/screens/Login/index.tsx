@@ -13,7 +13,7 @@ import { setUserData } from "@/utils/supabase/user-helper";
 import { Flex, Form, Typography } from "antd";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMutation } from "react-query";
+import { useMutation } from "@tanstack/react-query";
 
 const { Text } = Typography;
 const LoginPage = () => {
@@ -32,7 +32,8 @@ const LoginPage = () => {
     ]);
   };
 
-  const { mutate, isLoading } = useMutation((data: LoginProps) => signInWithPassword(data.email, data.password), {
+  const { mutate, isPending } = useMutation({
+    mutationFn: (data: LoginProps) => signInWithPassword(data.email, data.password),
     onSuccess: async (data: any) => {
       console.log("Login success data:", data); // Debug log
       setUserData(data?.user);
@@ -192,7 +193,7 @@ const LoginPage = () => {
           </div>
           <Form.Item className="mt-2">
             <Button
-              loading={isLoading}
+              loading={isPending}
               className="w-full bg-brand-primary hover:!bg-brand-secondary text-white py-2 rounded-md"
               type="primary"
               htmlType="submit"

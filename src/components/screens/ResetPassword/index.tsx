@@ -7,7 +7,7 @@ import { createClient } from "@/utils/supabase/config/client";
 import { Flex, Form, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useMutation } from "react-query";
+import { useMutation } from "@tanstack/react-query";
 
 const { Title, Text } = Typography;
 
@@ -63,22 +63,20 @@ const PasswordSetupPage = () => {
     }
   }, [searchParams, supabase.auth]);
 
-  const { mutate, isLoading } = useMutation(
-    async (password: string) => {
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (password: string) => {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       return true;
     },
-    {
-      onSuccess: () => {
-        SuccessToast("Password updated successfully");
-        push("/login");
-      },
-      onError: (error: any) => {
-        ErrorToast(error?.message || "Failed to update password");
-      },
+    onSuccess: () => {
+      SuccessToast("Password updated successfully");
+      push("/login");
     },
-  );
+    onError: (error: any) => {
+      ErrorToast(error?.message || "Failed to update password");
+    },
+  });
 
   const onFinish = (values: any) => {
     mutate(values.password);
@@ -125,7 +123,7 @@ const PasswordSetupPage = () => {
           </Form.Item>
 
           <Form.Item>
-            <Button loading={isLoading} className="w-full" type="primary" htmlType="submit">
+            <Button loading={isPending} className="w-full" type="primary" htmlType="submit">
               Save Password
             </Button>
           </Form.Item>

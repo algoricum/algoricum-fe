@@ -1,15 +1,11 @@
 "use client";
 import { ErrorToast } from "@/helpers/toast";
-import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { createClient } from "@/utils/supabase/config/client";
 import { Modal } from "antd";
 import dayjs from "dayjs";
 import { Calendar, CheckCircle, Clock, Info, Plus } from "lucide-react";
-import React, { useEffect, useState } from "react";
-import { getAllIntegrationStatuses } from "../integrations/integrationUtils";
+import React, { useState, useMemo } from "react";
+import { useTasks, useIntegrationStatuses, useAddTask, useToggleTask } from "@/hooks/useDashboard";
 import { Task, SPECIAL_TASK_IDS, TASK_STYLES } from "./types";
-
-const supabase = createClient();
 
 // Helper functions
 const getTaskStyle = (task: Task) => {
@@ -31,9 +27,6 @@ const getTaskIcon = (task: Task) => {
 const isSpecialTask = (taskId: string) => taskId === SPECIAL_TASK_IDS.ADD_INTEGRATIONS;
 
 export default function TodayTasks({ clinicId }: { clinicId: string }) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [newTask, setNewTask] = useState({
     task: "",
@@ -41,99 +34,44 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
     time: "",
   });
 
-  useEffect(() => {
-    const initializeData = async () => {
-      setIsLoading(true);
-      try {
-        const clinicData = await getClinicData();
-        if (!clinicData?.id) {
-          ErrorToast("Clinic ID is not found.");
-          return;
-        }
+  // React Query hooks
+  const { data: tasksData = [], isLoading: tasksLoading } = useTasks(clinicId);
+  const { data: integrationStatuses = {} } = useIntegrationStatuses(clinicId);
+  const addTaskMutation = useAddTask();
+  const toggleTaskMutation = useToggleTask();
 
-        // 1. Get integration statuses efficiently
-        const integrationStatuses = await getAllIntegrationStatuses(clinicData.id);
+  // Memoized tasks array combining database tasks and integration task
+  const tasks = useMemo(() => {
+    const connectedCount = Object.values(integrationStatuses).filter(status => status === "connected").length;
+    const totalCount = Object.keys(integrationStatuses).length;
+    const hasDisconnectedIntegrations = connectedCount < totalCount;
 
-        // 2. Create a simple structure for task fetching (we only need connection status)
-        const connectedIntegrationCount = Object.values(integrationStatuses).filter(status => status === "connected").length;
-        const totalAvailableIntegrations = Object.keys(integrationStatuses).length;
-        const hasDisconnectedIntegrations = connectedIntegrationCount < totalAvailableIntegrations;
-
-        // 3. Fetch tasks with integration availability info
-        await fetchTasks(hasDisconnectedIntegrations);
-      } catch (error) {
-        console.error("Failed to initialize data:", error);
-        ErrorToast("Failed to initialize data");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeData();
-  }, [clinicId, supabase]);
-
-  const fetchTasks = async (hasDisconnectedIntegrations: boolean) => {
-    try {
-      const start = dayjs().startOf("day").toISOString();
-      const end = dayjs().endOf("day").toISOString();
-
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("clinic_id", clinicId)
-        .gte("due_at", start)
-        .lte("due_at", end)
-        .order("due_at", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching tasks:", error);
-        return;
-      }
-
-      // ✅ Only one "Add more integrations" task if any are available
-      let integrationTask: Task[] = [];
-      if (hasDisconnectedIntegrations) {
-        integrationTask = [
-          {
-            id: SPECIAL_TASK_IDS.ADD_INTEGRATIONS,
-            clinic_id: clinicId,
-            task: "More CRM & Tools are available. Connect now!",
-            priority: "low",
-            completed: false,
-          },
-        ];
-      }
-
-      const taskList = [...data, ...integrationTask];
-      setTasks(taskList);
-    } catch (error) {
-      console.error("Error fetching tasks:", error);
+    if (hasDisconnectedIntegrations) {
+      const integrationTask: Task = {
+        id: SPECIAL_TASK_IDS.ADD_INTEGRATIONS,
+        clinic_id: clinicId,
+        task: "More CRM & Tools are available. Connect now!",
+        priority: "low",
+        completed: false,
+      };
+      return [...tasksData, integrationTask];
     }
-  };
+
+    return tasksData;
+  }, [tasksData, integrationStatuses, clinicId]);
 
   const toggleTask = async (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t: Task) => t.id === taskId);
     if (!task) return;
 
-    const originalCompleted = task.completed;
-    const revertOptimisticUpdate = () => {
-      setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, completed: originalCompleted } : t)));
-    };
-
-    // Optimistically update UI immediately
-    setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, completed: !t.completed } : t)));
-
     try {
-      const { error } = await supabase.from("tasks").update({ completed: !originalCompleted }).eq("id", taskId);
-
-      if (error) {
-        console.error("Error updating task:", error);
-        revertOptimisticUpdate();
-        ErrorToast("Failed to update task. Please try again.");
-      }
-    } catch (err) {
-      console.error("Unexpected error updating task:", err);
-      revertOptimisticUpdate();
+      await toggleTaskMutation.mutateAsync({
+        taskId,
+        completed: !task.completed,
+        clinicId,
+      });
+    } catch (error) {
+      console.error("Error updating task:", error);
       ErrorToast("Failed to update task. Please try again.");
     }
   };
@@ -145,7 +83,7 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
       const today = dayjs().format("YYYY-MM-DD");
       const dueAt = dayjs(`${today}T${newTask.time}`).toISOString();
 
-      const { error } = await supabase.from("tasks").insert({
+      await addTaskMutation.mutateAsync({
         clinic_id: clinicId,
         task: newTask.task,
         priority: newTask.priority,
@@ -155,25 +93,11 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
         is_automated: false,
       });
 
-      if (error) {
-        console.error("Error adding task:", error);
-        ErrorToast("Failed to add task. Please try again.");
-        return;
-      }
-
       // Success - clear form and close modal
       setNewTask({ task: "", priority: "low", time: "" });
       setShowAddTaskModal(false);
-
-      // Refresh tasks - check integration status again
-      const integrationStatuses = await getAllIntegrationStatuses(clinicId);
-      const connectedCount = Object.values(integrationStatuses).filter(status => status === "connected").length;
-      const totalCount = Object.keys(integrationStatuses).length;
-      const hasDisconnected = connectedCount < totalCount;
-
-      await fetchTasks(hasDisconnected);
-    } catch (err) {
-      console.error("Unexpected error adding task:", err);
+    } catch (error) {
+      console.error("Error adding task:", error);
       ErrorToast("Failed to add task. Please try again.");
     }
   };
@@ -191,7 +115,7 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
         </button>
       </div>
       <div className="space-y-4">
-        {isLoading ? (
+        {tasksLoading ? (
           <div className="text-center text-gray-500 py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
             <p>Loading tasks...</p>
@@ -203,7 +127,7 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
             <p className="text-sm">Add some tasks to get started</p>
           </div>
         ) : (
-          tasks.map(task => {
+          tasks.map((task: Task) => {
             const taskStyle = getTaskStyle(task);
             return (
               <div

@@ -7,17 +7,17 @@ import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import ChatbotTrainingModal from "@/components/common/TrainingChatbotModal/chatbot-training-modal";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { handleCsvUpload } from "@/utils/csvUtils";
-import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { Button, Select } from "antd";
 import { Bot, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useLeads, useClinicData, useTwilioConfig } from "@/hooks/useDashboard";
 import AiActivityLog from "./AiActivityLogs";
 import StatsGrid from "./StatsGrid";
 import TodayTasks from "./TodayTasks";
 
-import { LeadRow, AppointmentFilter, LOADING_DELAY, IntegrationBannersProps } from "./types";
+import { AppointmentFilter, LOADING_DELAY, IntegrationBannersProps } from "./types";
 
 // Helper functions
 const formatTwilioNumber = (phoneNumber: string | undefined): string => {
@@ -44,88 +44,15 @@ export default function DashboardPage() {
   // Modal state
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
 
-  // Data
-  const [leadsData, setLeadsData] = useState<LeadRow[]>([]);
-  const [clinicId, setClinicId] = useState<string>("");
-  const [clinicData, setClinicData] = useState<any>(null);
-  const [twilioPhoneNumber, setTwilioPhoneNumber] = useState<string>("");
+  // React Query hooks
+  const { data: clinicData, isLoading: clinicLoading } = useClinicData();
+  const clinicId = clinicData?.id || "";
 
-  // Fetch clinic info
-  useEffect(() => {
-    const fetchClinicData = async () => {
-      try {
-        const data = await getClinicData();
-        if (data?.id) {
-          setClinicId(data.id);
-          setClinicData(data);
+  const { data: leadsData = [], isLoading: leadsLoading, refetch: refetchLeads } = useLeads(clinicId);
+  const { data: twilioPhoneNumber = "", isLoading: twilioLoading } = useTwilioConfig(clinicId);
 
-          // Fetch Twilio phone number separately
-          const { data: twilioData, error } = await supabase
-            .from("twilio_config")
-            .select("twilio_phone_number")
-            .eq("clinic_id", data.id)
-            .single();
-
-          if (twilioData && !error) {
-            setTwilioPhoneNumber(twilioData.twilio_phone_number || "");
-          }
-        }
-      } catch (e) {
-        console.error("Error fetching clinic data:", e);
-      }
-    };
-    fetchClinicData();
-  }, []);
-
-  // Centralized function to fetch leads data
-  const fetchLeads = useCallback(async () => {
-    if (!clinicId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("lead")
-        .select(
-          `
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          status,
-          created_at,
-          source_id:source_id(id),
-          source:source_id(name)
-        `,
-        )
-        .eq("clinic_id", clinicId);
-
-      if (error) {
-        console.error("Leads fetch error:", error);
-        return;
-      }
-
-      const formatted: LeadRow[] =
-        data?.map((lead: any) => ({
-          id: lead.id,
-          name: `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim(),
-          email: lead.email,
-          phone: lead.phone,
-          status: lead.status,
-          date: lead.created_at,
-          source_id: lead.source_id ?? "Unknown",
-          sourceName: lead.source ?? "Unknown",
-        })) ?? [];
-
-      setLeadsData(formatted);
-    } catch (e) {
-      console.error("Unexpected error fetching leads:", e);
-    }
-  }, [clinicId, supabase]);
-
-  // Fetch leads when clinic ID is available
-  useEffect(() => {
-    fetchLeads();
-  }, [fetchLeads]);
+  // Calculate overall loading state
+  const isDataLoading = clinicLoading || leadsLoading || twilioLoading;
 
   // Gate unauthenticated or first-time staff to reset-password
   useEffect(() => {
@@ -155,7 +82,7 @@ export default function DashboardPage() {
     checkUser();
   }, [router, supabase.auth]);
 
-  if (loading) {
+  if (loading || isDataLoading) {
     return (
       <DashboardLayout
         header={
@@ -271,7 +198,7 @@ export default function DashboardPage() {
           try {
             await handleCsvUpload(leads, true); // The second parameter triggers the upload
             setShowManualLeadsModal(false); // Close modal after successful upload
-            await fetchLeads(); // Refresh the leads data
+            refetchLeads(); // Refresh the leads data using React Query
           } catch (error) {
             console.error("Upload failed:", error);
           }

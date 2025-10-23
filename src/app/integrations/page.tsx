@@ -17,6 +17,7 @@ import {
   TypeformModal,
 } from "@/components/modals/Modals";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { useClinicData, useIntegrationsWithStatus } from "@/hooks/useDashboard";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { IntegrationName, IntegrationStates, IntegrationWithStatus } from "@/types/integrations";
 import {
@@ -42,13 +43,12 @@ import { createClient } from "@/utils/supabase/config/client";
 import { Button, Card, Col, Divider, Row } from "antd";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { JSX, useEffect, useState } from "react";
+import { JSX, useEffect, useMemo, useState } from "react";
 import {
+  callSupabaseFunction,
+  createOAuthCallbackHandler,
   deleteIntegrationConnections,
   updateIntegrationConnectionStatus,
-  createOAuthCallbackHandler,
-  callSupabaseFunction,
-  getAllIntegrationStatuses,
 } from "./integrationUtils";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -56,20 +56,25 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Icon mapping for different integrations
 const getIntegrationIcon = (logo: string): JSX.Element => {
-  return <Image src={logo} alt={`${name} logo`} width={24} height={24} className="object-contain" />;
+  return <Image src={logo} alt="integration logo" width={24} height={24} className="object-contain" />;
 };
 
 export default function IntegrationsPage() {
   const supabase = createClient();
-  const [loading, setLoading] = useState(true);
-  const [integrations, setIntegrations] = useState<IntegrationWithStatus[]>([]);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const [googleFormTreeData, setGoogleFormTreeData] = useState<any[]>([]);
   const [buttonLoading, setButtonLoading] = useState(false);
-  const [clinicId, setClinicId] = useState<string>("");
+  // React Query hooks
+  const { data: clinicData, isLoading: clinicLoading } = useClinicData();
+  const clinicId = clinicData?.id || "";
+  const { data: integrationsData, isLoading: integrationsLoading } = useIntegrationsWithStatus(clinicId);
 
-  // Refactored state management
-  const [integrationStates, setIntegrationStates] = useState<IntegrationStates>({
+  // Extract integrations and initial statuses from React Query data
+  const integrations = integrationsData?.integrations || [];
+  const initialStatuses = integrationsData?.statuses || {};
+
+  // Memoized integration states using React Query data
+  const [integrationStates, setIntegrationStates] = useState<IntegrationStates>(() => ({
     statuses: {
       "Facebook Lead Forms": "disconnected",
       Jotform: "disconnected",
@@ -98,7 +103,17 @@ export default function IntegrationsPage() {
       "CSV Upload": false,
       "Custom CRM": false,
     },
-  });
+  }));
+
+  // Update integration statuses when React Query data changes
+  useEffect(() => {
+    if (initialStatuses && Object.keys(initialStatuses).length > 0) {
+      setIntegrationStates(prev => ({
+        ...prev,
+        statuses: { ...prev.statuses, ...initialStatuses },
+      }));
+    }
+  }, [initialStatuses]);
 
   // TypeForm
   const [TypeformTreeData, setTypeFormTreeData] = useState([]);
@@ -132,11 +147,6 @@ export default function IntegrationsPage() {
       ...prev,
       statuses: { ...prev.statuses, [name]: status },
     }));
-
-    // Also update the integrations array to reflect the connection status
-    setIntegrations(prev =>
-      prev.map(integration => (integration.name === name ? { ...integration, connected: status === "connected" } : integration)),
-    );
   };
 
   const toggleModal = (name: IntegrationName, isOpen?: boolean) => {
@@ -416,64 +426,15 @@ export default function IntegrationsPage() {
     }
   }, [isModalOpen("Google Forms"), clinicId]);
 
-  useEffect(() => {
-    const initializeAllIntegrationStatuses = async () => {
-      setLoading(true);
-      try {
-        const clinicData = await getClinicData();
-        if (!clinicData?.id) {
-          ErrorToast("Clinic ID is not found.");
-          setLoading(false);
-          return;
-        }
+  // Combined loading state
+  const loading = clinicLoading || integrationsLoading;
 
-        // Set the clinic ID for Facebook modal
-        setClinicId(clinicData.id);
-
-        // Check for pending Facebook setup after clinicId is set
-        setTimeout(() => {
-          const currentStatus = getIntegrationStatus("Facebook Lead Forms");
-          console.log("Current Facebook status after clinic ID set:", currentStatus);
-        }, 100);
-
-        // 1. Fetch all integrations from master table
-        const { data: allIntegrations, error } = await supabase.from("integrations").select("*");
-
-        if (error) {
-          console.error("Error fetching integrations:", error);
-          ErrorToast("Failed to fetch integrations");
-          setLoading(false);
-          return;
-        }
-
-        // 2. Check connection status for all integrations in one call
-        const allStatuses = await getAllIntegrationStatuses(clinicData.id);
-
-        // 3. Merge statuses with integrations
-        const integrationsWithStatus = allIntegrations.map(int => {
-          return {
-            ...int,
-            connected: allStatuses[int.name] === "connected",
-          };
-        });
-
-        setIntegrations(integrationsWithStatus);
-
-        // 4. Update individual integration states using bulk status data
-        setIntegrationStates(prev => ({
-          ...prev,
-          statuses: { ...prev.statuses, ...allStatuses },
-        }));
-      } catch (error) {
-        console.error("Failed to initialize integration statuses:", error);
-        ErrorToast("Failed to initialize integrations");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAllIntegrationStatuses();
-  }, []); // Empty dependency array - this should only run once on mount
+  // Memoized filtered integrations
+  const { connectedIntegrations, availableIntegrations } = useMemo(() => {
+    const connected = integrations.filter(i => i.connected);
+    const available = integrations.filter(i => !i.connected);
+    return { connectedIntegrations: connected, availableIntegrations: available };
+  }, [integrations]);
 
   const handleIntegrationClick = async (integration: IntegrationWithStatus) => {
     if (!integration.connected) {
@@ -499,7 +460,6 @@ export default function IntegrationsPage() {
       const clinicData = await getClinicData();
       if (!clinicData?.id) {
         ErrorToast("Clinic ID is not found.");
-        setLoading(false);
         return;
       }
 
@@ -613,8 +573,6 @@ export default function IntegrationsPage() {
     toggleModal(name, true);
   };
 
-  const connectedIntegrations = integrations.filter(i => i.connected);
-  const availableIntegrations = integrations.filter(i => !i.connected);
   return (
     <DashboardLayout
       header={

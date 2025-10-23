@@ -1,9 +1,9 @@
 "use client";
-import React, { useState } from "react";
-import { BookingLinkComponentProps } from "./types";
-import { Button, Typography } from "antd";
 import { CalendarOutlined } from "@ant-design/icons";
-import { BOOKING_LINK, TARGET_VALUE} from "./constants";
+import { Button, Typography } from "antd";
+import React, { useState } from "react";
+import { BOOKING_LINK, TARGET_VALUE } from "./constants";
+import { BookingLinkComponentProps } from "./types";
 import { colorMapForBookingLinkComponent } from "./utils";
 
 const { Text } = Typography;
@@ -15,9 +15,9 @@ export const BookingLinkComponent: React.FC<BookingLinkComponentProps> = ({
   hoverBgColor,
   buttonBgColor,
 }) => {
-
   const [isHovered, setIsHovered] = useState(false);
-  const getColor = (colorName: string) => colorMapForBookingLinkComponent[colorName as keyof typeof colorMapForBookingLinkComponent] || "#16a34a";
+  const getColor = (colorName: string) =>
+    colorMapForBookingLinkComponent[colorName as keyof typeof colorMapForBookingLinkComponent] || "#16a34a";
   const buttonStyle = {
     backgroundColor: isHovered ? getColor(hoverBgColor) : getColor(buttonBgColor || textColor),
     borderColor: isHovered ? getColor(hoverBgColor) : getColor(buttonBgColor || textColor),

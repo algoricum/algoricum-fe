@@ -10,15 +10,16 @@ import {
 } from "@/constants/localStorageKeys";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { useAuth } from "@/hooks/useAuth";
-import apiKeyService from "@/services/apiKey";
+import {
+  useOnboardingUser,
+  useOnboardingClinic,
+  useCalendlyLink,
+  useSubscriptionStatus,
+  useCompleteOnboarding,
+} from "@/hooks/useOnboarding";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
-import { checkClinicSubscription, shouldAllowTwilioSetup } from "@/utils/subscription-utils";
-// import { handleSubscribe } from "@/utils/stripe";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
-import { getClinicData, updateClinic, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
-import { getUserData } from "@/utils/supabase/user-helper";
 import { Button, Typography } from "antd";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -48,12 +49,32 @@ export default function MainOnboarding() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [allData, setAllData] = useState<Record<string, any>>({});
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
+
+  // React Query hooks
+  const { data: userData, isLoading: userLoading, error: userError } = useOnboardingUser();
+  const { data: clinicData, isLoading: clinicLoading, error: clinicError } = useOnboardingClinic();
+  const { data: calendlyLink, isLoading: calendlyLoading } = useCalendlyLink(clinicData?.id || "");
+  const { data: subscriptionData, isLoading: subscriptionLoading } = useSubscriptionStatus(clinicData?.id || "");
+  const completeOnboardingMutation = useCompleteOnboarding();
 
   // Only use BASE_STEPS for sidebar and navigation
   const STEPS = BASE_STEPS;
   const currentStep = STEPS[currentStepIndex];
+
+  // Combined loading state for all React Query operations
+  const isLoading = userLoading || clinicLoading || calendlyLoading || subscriptionLoading || completeOnboardingMutation.isPending;
+
+  // Handle errors from React Query
+  useEffect(() => {
+    if (userError) {
+      ErrorToast("Failed to load user data. Please refresh and try again.");
+    }
+    if (clinicError) {
+      ErrorToast("Failed to load clinic data. Please refresh and try again.");
+    }
+  }, [userError, clinicError]);
+
   // Helper functions for localStorage (same as old flow)
   const isBrowser = typeof window !== "undefined";
 
@@ -105,51 +126,6 @@ export default function MainOnboarding() {
     } catch (error) {
       console.error("Error clearing localStorage:", error);
       ErrorToast("Error clearing localStorage");
-    }
-  };
-
-  // Mailgun setup function
-  const setupMailgunDomain = async (clinicData: any, formData: any, slug: string) => {
-    console.log("🚀 Starting Mailgun domain setup...");
-
-    if (!clinicData?.id) {
-      console.error("Clinic ID not available. Cannot proceed with mailgun setup.");
-      return;
-    }
-
-    if (!slug) {
-      console.error("Slug not available. Cannot proceed with mailgun setup.");
-      return;
-    }
-
-    try {
-      const requestPayload = {
-        ...formData,
-        clinicId: clinicData.id,
-        slug: slug, // Pass the generated slug
-      };
-
-      console.log("📡 Mailgun setup request payload:", requestPayload);
-
-      const response = await fetch("/api/mailgun-setup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestPayload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Mailgun setup failed:", data.error || `HTTP ${response.status}: ${response.statusText}`);
-        return;
-      }
-
-      console.log("✅ Mailgun setup completed:", data);
-      return data;
-    } catch (error) {
-      console.error("❌ Mailgun setup failed:", error);
     }
   };
 
@@ -229,71 +205,41 @@ export default function MainOnboarding() {
     }
   }
 
-  // Main submission function (updated to handle three document types)
+  // Streamlined onboarding completion using React Query
   const handleCompleteOnboarding = async (dataToUse?: Record<string, any>) => {
+    if (!userData || !clinicData || !subscriptionData) {
+      ErrorToast("Required data not loaded. Please refresh and try again.");
+      return;
+    }
+
     try {
-      setIsSubmitting(true);
-
       const finalData = dataToUse || allData;
-
-      // Map the new flow data to the old structure
       const mappedData = mapDataForSubmission(finalData);
 
-      // Get current user
-      const user = await getUserData();
-      if (!user) {
-        ErrorToast("User not found. Please logout and log in again.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Get existing clinic
-      const clinic = await getClinicData();
-      if (!clinic || !clinic.id) {
-        ErrorToast("No clinic found for user. Please try logging in again.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Fetch Calendly booking link if available
-      let calendlyBookingLink = mappedData.calendlyLink || "https://tinyurl.com/35c3wr42";
-      try {
-        const { data: calendlyIntegration } = await supabase
-          .from("calendly_integrations")
-          .select("clinic_booking_link")
-          .eq("clinic_id", clinic.id)
-          .eq("status", "active")
-          .single();
-
-        if (calendlyIntegration?.clinic_booking_link) {
-          calendlyBookingLink = calendlyIntegration.clinic_booking_link;
-          console.log("📅 Using Calendly booking link:", calendlyBookingLink);
-        }
-      } catch (error) {
-        console.log("📅 No Calendly integration found, using default/provided link", error);
-      }
+      // Use Calendly link from React Query or fallback
+      const calendlyBookingLink = calendlyLink || mappedData.calendlyLink || BOOKING_LINK;
 
       // Generate slug from clinic name
-      const clinicSlug = generateSlug(mappedData.legalBusinessName || clinic.name || "clinic");
+      const clinicSlug = generateSlug(mappedData.legalBusinessName || clinicData.name || "clinic");
 
-      // Ensure slug is valid
       if (!clinicSlug || clinicSlug.trim() === "") {
         throw new Error("Failed to generate valid clinic slug");
       }
 
-      const clinicData = {
-        id: clinic.id, // Include clinic ID for update
-        owner_id: user.id,
-        name: mappedData.legalBusinessName || `${user.email?.split("@")[0] || "User"}'s Clinic`,
-        legal_business_name: mappedData.legalBusinessName || `${user.email?.split("@")[0] || "User"}'s Clinic`,
+      // Prepare clinic update data
+      const clinicUpdateData = {
+        id: clinicData.id,
+        owner_id: userData.id,
+        name: mappedData.legalBusinessName || `${userData.email?.split("@")[0] || "User"}'s Clinic`,
+        legal_business_name: mappedData.legalBusinessName || `${userData.email?.split("@")[0] || "User"}'s Clinic`,
         dba_name: mappedData.dbaName,
-        slug: clinicSlug, // Add the generated slug
+        slug: clinicSlug,
         address: mappedData.clinicAddress,
         phone: mappedData.phoneNumber,
-        email: mappedData.emailAddress || user.email,
+        email: mappedData.emailAddress || userData.email,
         language: "en",
         business_hours: mappedData.businessHours,
-        calendly_link: mappedData.calendlyLink || calendlyBookingLink || BOOKING_LINK,
+        calendly_link: calendlyBookingLink,
         tone_selector: mappedData.toneSelector,
         sentence_length: mappedData.sentenceLength,
         formality_level: mappedData.formalityLevel,
@@ -312,14 +258,8 @@ export default function MainOnboarding() {
         },
       };
 
-      console.log("MainOnboarding clinicData:", clinicData);
-
-      // Update clinic
-      const updatedClinic = await updateClinic(clinicData);
-
-      // Setup Mailgun domain after clinic update
+      // Prepare Mailgun setup data
       const clinicInfoData = allData["clinic-info"] || {};
-      // Ensure all required fields are included
       const mailgunSetupData = {
         ...clinicInfoData,
         clinicName: mappedData.legalBusinessName,
@@ -329,158 +269,71 @@ export default function MainOnboarding() {
         businessAddress: mappedData.clinicAddress,
       };
 
-      const mailgunResponse = await setupMailgunDomain(updatedClinic, mailgunSetupData, clinicSlug);
-
-      if (mailgunResponse?.success && mailgunResponse.data) {
-        await updateMailgunDomainSettings(updatedClinic.id, {
-          domain: mailgunResponse?.data.domain,
-          email: mailgunResponse.data.email,
-        });
-      } else {
-        console.warn("Mailgun setup response missing or unsuccessful, skipping email settings save");
-      }
-
-      // Handle multiple document uploads to enhanced edge function
+      // Prepare assistant FormData if documents exist
+      let assistantFormData: FormData | undefined;
       const hasDocuments = mappedData.servicesDocumentPath || mappedData.pricingDocumentPath || mappedData.testimonialsDocumentPath;
 
       if (hasDocuments) {
-        try {
-          const formDataToSend = new FormData();
-          const session = await getSupabaseSession();
+        assistantFormData = new FormData();
+        assistantFormData.append("clinic_id", clinicData.id);
+        assistantFormData.append("name", mappedData.legalBusinessName || "Assistant");
 
-          // Add basic fields
-          formDataToSend.append("clinic_id", updatedClinic.id);
-          formDataToSend.append("name", mappedData.legalBusinessName || "Assistant");
+        const clinicInstructions = generateClinicInstructions({
+          name: mappedData.legalBusinessName || "",
+          address: mappedData.clinicAddress || "",
+          phone: mappedData.phoneNumber || "",
+          email: mappedData.emailAddress || userData.email || "",
+          business_hours: mappedData.businessHoursText || "",
+          calendly_link: mappedData.calendlyLink || "",
+          tone_selector: mappedData.toneSelector || "professional",
+          sentence_length: mappedData.sentenceLength || "medium",
+          formality_level: mappedData.formalityLevel || "formal",
+          has_uploaded_document: true,
+        });
 
-          // Generate clinic instructions with all collected data
-          const clinicInstructions = generateClinicInstructions({
-            name: mappedData.legalBusinessName || "",
-            address: mappedData.clinicAddress || "",
-            phone: mappedData.phoneNumber || "",
-            email: mappedData.emailAddress || user.email || "",
-            business_hours: mappedData.businessHoursText || "",
-            calendly_link: mappedData.calendlyLink || "",
-            tone_selector: mappedData.toneSelector || "professional",
-            sentence_length: mappedData.sentenceLength || "medium",
-            formality_level: mappedData.formalityLevel || "formal",
-            has_uploaded_document: true,
-          });
+        assistantFormData.append("instructions", clinicInstructions);
 
-          formDataToSend.append("instructions", clinicInstructions);
+        // Download and append files
+        if (mappedData.servicesDocumentPath) {
+          const serviceFile = await getFileAsFile("Assistant-File", mappedData.servicesDocumentPath);
+          if (serviceFile) assistantFormData.append("service_document", serviceFile);
+        }
 
-          // Download and append files based on their document type
-          if (mappedData.servicesDocumentPath) {
-            const serviceFile = await getFileAsFile("Assistant-File", mappedData.servicesDocumentPath);
-            if (serviceFile) {
-              formDataToSend.append("service_document", serviceFile);
-            }
-          }
+        if (mappedData.pricingDocumentPath) {
+          const pricingFile = await getFileAsFile("Assistant-File", mappedData.pricingDocumentPath);
+          if (pricingFile) assistantFormData.append("pricing_document", pricingFile);
+        }
 
-          if (mappedData.pricingDocumentPath) {
-            const pricingFile = await getFileAsFile("Assistant-File", mappedData.pricingDocumentPath);
-            if (pricingFile) {
-              formDataToSend.append("pricing_document", pricingFile);
-            }
-          }
-
-          if (mappedData.testimonialsDocumentPath) {
-            const testimonialsFile = await getFileAsFile("Assistant-File", mappedData.testimonialsDocumentPath);
-            if (testimonialsFile) {
-              formDataToSend.append("testimonials_document", testimonialsFile);
-            }
-          }
-
-          // Call the enhanced edge function
-          const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: formDataToSend,
-          });
-
-          const result = await response.json();
-
-          if (!response.ok) {
-            console.error("Assistant creation failed:", result.error);
-            // Continue onboarding even if assistant creation fails
-          } else {
-            console.log("Assistant created successfully:", result);
-            console.log(`✅ Assistant created with ${result.filesUploaded} documents: ${result.updatedDocumentTypes?.join(", ")}`);
-          }
-        } catch (error) {
-          console.error("Failed to create assistant with documents:", error);
-          // Continue onboarding even if assistant creation fails
+        if (mappedData.testimonialsDocumentPath) {
+          const testimonialsFile = await getFileAsFile("Assistant-File", mappedData.testimonialsDocumentPath);
+          if (testimonialsFile) assistantFormData.append("testimonials_document", testimonialsFile);
         }
       }
 
-      // Generate API key for the clinic
-      const apiKeyName = `${mappedData.legalBusinessName} Primary Key`;
-      await apiKeyService.create({
-        name: apiKeyName,
-        clinicId: updatedClinic.id,
+      // Execute complete onboarding mutation
+      await completeOnboardingMutation.mutateAsync({
+        clinicData: clinicUpdateData,
+        mailgunSetupData,
+        slug: clinicSlug,
+        apiKeyName: `${mappedData.legalBusinessName} Primary Key`,
+        assistantFormData,
+        subscriptionData,
+        confirmationEmailData: {
+          name: clinicUpdateData.legal_business_name,
+          email: clinicUpdateData.email || userData.email || "",
+        },
       });
 
-      // Setup Twilio phone number for clinic (only for paid plans)
-      try {
-        // Check clinic subscription before attempting Twilio setup
-        const subscriptionInfo = await checkClinicSubscription(updatedClinic.id);
+      // Handle CSV leads upload
+      await handleCsvLeadsUpload(clinicData.id);
 
-        if (shouldAllowTwilioSetup(subscriptionInfo)) {
-          console.log("✅ Clinic has paid subscription - proceeding with Twilio setup");
-
-          const session = await getSupabaseSession();
-          if (!session.access_token) {
-            throw new Error("Not authenticated");
-          }
-
-          const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              clinic_id: updatedClinic.id,
-              phone_number: mappedData.phoneNumber,
-              name: mappedData.legalBusinessName,
-            }),
-          });
-
-          const twilioResult = await twilioResponse.json();
-
-          if (!twilioResponse.ok) {
-            console.error("Twilio setup error:", twilioResult.error);
-          } else {
-            console.log("✅ Twilio setup completed successfully");
-          }
-        } else {
-          console.log("❌ Clinic has free subscription - skipping Twilio setup");
-          console.log(`Subscription details: ${subscriptionInfo.isDemo ? "demo" : "production"} + ${subscriptionInfo.planType} plan`);
-        }
-      } catch (twilioError) {
-        console.error("Failed to set up Twilio:", twilioError);
-      }
-
-      await handleCsvLeadsUpload(clinic.id);
+      // Clear stored progress
       clearStoredProgress();
 
-      SuccessToast("You're all set!");
-      await fetch("/api/sendConfiramtionMail", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: clinicData.legal_business_name,
-          email: clinicData.email || user.email || "",
-        }),
-      });
       setIsOnboardingComplete(true);
     } catch (error: any) {
-      ErrorToast(error.message || "Failed to update clinic");
-    } finally {
-      setIsSubmitting(false);
+      console.error("Onboarding completion error:", error);
+      ErrorToast(error.message || "Failed to complete onboarding");
     }
   };
 
@@ -634,7 +487,7 @@ export default function MainOnboarding() {
           <button
             onClick={handleLogout}
             className="w-auto bg-white bg-opacity-20 border border-white border-opacity-30 text-white rounded-lg px-4 py-2 h-auto text-sm hover:bg-white hover:bg-opacity-30 transition-all flex items-center"
-            disabled={isSubmitting}
+            disabled={isLoading}
           >
             <span className="mr-2">→</span>
             Logout
@@ -644,10 +497,10 @@ export default function MainOnboarding() {
 
       {/* Main Content */}
       <div className="flex-1 h-screen overflow-hidden relative">
-        {/* Loading overlay when submitting */}
-        {isSubmitting && (
+        {/* Loading overlay when processing */}
+        {isLoading && (
           <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50">
-            <LoadingSpinner message="Setting up your clinic..." size="lg" />
+            <LoadingSpinner message={completeOnboardingMutation.isPending ? "Setting up your clinic..." : "Loading..."} size="lg" />
           </div>
         )}
 

@@ -1,27 +1,16 @@
 "use client";
 import { Header } from "@/components/common";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { ErrorToast } from "@/helpers/toast";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { getRoleId } from "@/redux/slices/clinic.slice";
-import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { JSX } from "react/jsx-runtime";
-import {
-  deleteStaffMember,
-  getClinicStaff,
-  getStatusStats,
-  updateStaffMember,
-  type StaffStatus,
-  type TransformedStaffMember,
-} from "../../utils/supabase/clinic-staff-helper";
+import { type TransformedStaffMember } from "../../utils/supabase/clinic-staff-helper";
 // Component imports
 
 import { StaffFilters } from "@/components/staff/staff-filters";
 import { StatCard } from "@/components/staff/staff-stats";
 import { StaffTable } from "@/components/staff/staff-table";
-import { createStaffUser } from "../../utils/supabase/config/staff";
-import { getCurrentUserClinic } from "../../utils/supabase/leads-helper";
 
 // Component imports
 import { AddStaffModal } from "@/components/staff/add-staff-modal";
@@ -30,6 +19,7 @@ import { EditStaffModal } from "@/components/staff/edit-staff-modal";
 import { getInitials, mapDatabaseStatusToFrontend, mapFrontendStatusToDatabase } from "@/components/staff/staffUtilFunctions";
 import { staffStatsConfig } from "@/components/staff/statCardUtils";
 import { usePagination } from "@/hooks/usePagination";
+import { useCurrentUserClinic, useStaffList, useStaffStats, useCreateStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useStaff";
 import { Pagination } from "antd";
 
 interface Staff {
@@ -55,24 +45,12 @@ interface EditStaff {
   status: string;
 }
 
-interface CreateStaffResponse {
-  data?: { emailSent?: boolean; tempPassword?: string };
-  error?: { message?: string };
-}
-
 export default function StaffPage(): JSX.Element {
-  // State management
+  // Modal and form state management
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
-  const [staffData, setStaffData] = useState<Staff[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [statusStats, setStatusStats] = useState<StaffStatus[]>([]);
-  const [statsLoading, setStatsLoading] = useState(true);
   const [showAddStaffModal, setShowAddStaffModal] = useState<boolean>(false);
   const [showEditStaffModal, setShowEditStaffModal] = useState<boolean>(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isDeleting, setIsDeleting] = useState<boolean>(false);
-  const [clinicId, setClinicId] = useState<string>("");
   const [selectedStaffForEdit, setSelectedStaffForEdit] = useState<Staff | null>(null);
   const [selectedStaffForDelete, setSelectedStaffForDelete] = useState<Staff | null>(null);
   const [newStaff, setNewStaff] = useState<NewStaff>({
@@ -91,85 +69,60 @@ export default function StaffPage(): JSX.Element {
   // Initialize pagination with default page size of 10
   const { currentPage, pageSize, paginationConfig, setTotal } = usePagination(10);
 
-  // Effects
-  useEffect(() => {
-    const initializeClinic = async () => {
-      try {
-        const currentClinicId = await getCurrentUserClinic();
-        if (!currentClinicId) {
-          ErrorToast("No clinic found. Please make sure you have a clinic set up.");
-          return;
-        }
-        setClinicId(currentClinicId);
-      } catch (error: any) {
-        console.error("Error getting clinic:", error);
-        ErrorToast("Failed to load clinic data. Please try again.");
-      }
-    };
-    initializeClinic();
-  }, []);
+  // React Query hooks
+  const { data: clinicId = "", isLoading: clinicLoading, error: clinicError } = useCurrentUserClinic();
+  const { data: staffResponse, isLoading: staffLoading, error: staffError } = useStaffList(clinicId, currentPage, pageSize);
+  const { data: statusStats = [], isLoading: statsLoading } = useStaffStats(clinicId);
 
-  const loadStaffData = async (): Promise<void> => {
-    try {
-      setIsLoading(true);
+  // Extract staff data and pagination info
+  const staffData = staffResponse?.data || [];
+  const totalStaff = staffResponse?.total || 0;
 
-      // Get clinic ID if not already set
-      if (!clinicId) {
-        const currentClinicId = await getCurrentUserClinic();
-        if (!currentClinicId) {
-          ErrorToast("No clinic found. Please make sure you have a clinic set up.");
-          return;
-        }
-        setClinicId(currentClinicId);
-      }
+  // React Query mutations
+  const createStaffMutation = useCreateStaff();
+  const updateStaffMutation = useUpdateStaff();
+  const deleteStaffMutation = useDeleteStaff();
 
-      const { data: staffMembers, total, error } = await getClinicStaff(currentPage, pageSize, clinicId);
+  // Combined loading states
+  const isLoading = clinicLoading || staffLoading;
+  const isSubmitting = createStaffMutation.isPending || updateStaffMutation.isPending;
+  const isDeleting = deleteStaffMutation.isPending;
 
-      if (error) {
-        ErrorToast(error);
-        return;
-      }
-
-      // Set total for pagination
-      setTotal(total);
-
-      const transformedStaff: Staff[] =
-        staffMembers?.map((member: TransformedStaffMember) => ({
-          id: member.user_id,
-          name: member.staff_member,
-          email: member.email,
-          role: member.role,
-          createdBy: member.created_by,
-          password: "••••••••",
-          avatar: getInitials(member.staff_member),
-          joinedDate: member.joined_date,
-          status: mapDatabaseStatusToFrontend(member.status),
-        })) || [];
-
-      setStaffData(transformedStaff);
-    } catch (error: any) {
-      console.error("Error loading staff data:", error);
+  // Handle React Query errors
+  React.useEffect(() => {
+    if (clinicError) {
+      ErrorToast("Failed to load clinic data. Please try again.");
+    }
+    if (staffError) {
       ErrorToast("Failed to load staff data. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }, [clinicError, staffError]);
 
-  useEffect(() => {
-    if (clinicId) {
-      loadStaffData();
-    }
-  }, [clinicId, currentPage, pageSize]);
+  // Transform staff data from API response to component format
+  const transformedStaffData: Staff[] = useMemo(() => {
+    return (
+      staffData?.map((member: TransformedStaffMember) => ({
+        id: member.user_id,
+        name: member.staff_member,
+        email: member.email,
+        role: member.role,
+        createdBy: member.created_by,
+        password: "••••••••",
+        avatar: getInitials(member.staff_member),
+        joinedDate: member.joined_date,
+        status: mapDatabaseStatusToFrontend(member.status),
+      })) || []
+    );
+  }, [staffData]);
 
-  useEffect(() => {
-    if (clinicId) {
-      loadStatusStats();
-    }
-  }, [clinicId, staffData]);
+  // Update pagination total when staff data changes
+  React.useEffect(() => {
+    setTotal(totalStaff);
+  }, [totalStaff, setTotal]);
 
   // Computed values
   const filteredStaffData = useMemo(() => {
-    return staffData.filter(staff => {
+    return transformedStaffData.filter(staff => {
       const q = searchTerm.toLowerCase();
       const matchesSearch =
         staff.name.toLowerCase().includes(q) ||
@@ -185,28 +138,15 @@ export default function StaffPage(): JSX.Element {
 
       return matchesSearch && matchesRole && matchesStatus;
     });
-  }, [staffData, searchTerm, selectedRole, selectedStatus]);
+  }, [transformedStaffData, searchTerm, selectedRole, selectedStatus]);
 
   const availableRoles = useMemo(() => {
-    const roles = [...new Set(staffData.map(s => s.role))];
+    const roles = [...new Set(transformedStaffData.map(s => s.role))];
     return roles.map(role => ({
       value: role.toLowerCase(),
       label: role.charAt(0).toUpperCase() + role.slice(1),
     }));
-  }, [staffData]);
-
-  const loadStatusStats = async () => {
-    if (!clinicId) return;
-    try {
-      setStatsLoading(true);
-      const stats = await getStatusStats(clinicId);
-      setStatusStats(stats);
-    } catch (err) {
-      console.error("Error loading status stats:", err);
-    } finally {
-      setStatsLoading(false);
-    }
-  };
+  }, [transformedStaffData]);
 
   // Event handlers
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value);
@@ -223,11 +163,6 @@ export default function StaffPage(): JSX.Element {
   const handleInputChange = (field: keyof NewStaff, value: string) => setNewStaff(p => ({ ...p, [field]: value }));
   const handleEditInputChange = (field: keyof EditStaff, value: string) => setEditStaff(p => ({ ...p, [field]: value }));
 
-  const refreshStaffData = async () => {
-    if (!clinicId) return;
-    await loadStaffData();
-  };
-
   const handleAddStaff = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newStaff.email.trim()) {
@@ -238,47 +173,24 @@ export default function StaffPage(): JSX.Element {
       ErrorToast("Please enter staff name");
       return;
     }
-    setIsSubmitting(true);
+    if (!clinicId) {
+      ErrorToast("No clinic found. Please make sure you have a clinic set up.");
+      return;
+    }
+
     try {
-      const clinic_id: string | null = await getCurrentUserClinic();
-      if (!clinic_id) {
-        ErrorToast("No clinic found. Please make sure you have a clinic set up.");
-        return;
-      }
-
-      const roleId = await getRoleId("receptionist"); // Fetch role ID from Redux store or other source
-
-      if (!roleId) {
-        ErrorToast("No role found. Please make sure roles are set up correctly.");
-        return;
-      }
-
-      const response: CreateStaffResponse = await createStaffUser({
+      await createStaffMutation.mutateAsync({
         email: newStaff.email,
         name: newStaff.name,
-        clinicId: clinic_id,
-        roleId,
+        clinicId,
       });
-      if (response.error) {
-        ErrorToast(response.error.message || "Failed to create staff member");
-        return;
-      }
-      if (response.data) {
-        const successMessage = `Staff member created successfully! ${
-          response.data.emailSent
-            ? `Login credentials have been sent to ${newStaff.email}`
-            : `Please share the credentials manually: ${response.data.tempPassword}`
-        }`;
-        SuccessToast(successMessage);
-        setNewStaff({ email: "", name: "" });
-        setShowAddStaffModal(false);
-        await refreshStaffData();
-      }
-    } catch (error: any) {
-      console.error("Unexpected error:", error);
-      ErrorToast("An unexpected error occurred. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+
+      // Reset form and close modal on success
+      setNewStaff({ email: "", name: "" });
+      setShowAddStaffModal(false);
+    } catch (error) {
+      // Error handling is done by the mutation
+      console.error("Create staff error:", error);
     }
   };
 
@@ -298,30 +210,23 @@ export default function StaffPage(): JSX.Element {
       ErrorToast("No clinic found. Please try again.");
       return;
     }
-    setIsSubmitting(true);
+
     try {
-      const result = await updateStaffMember(editStaff.id, clinicId, {
-        name: editStaff.name,
-        is_active: mapFrontendStatusToDatabase(editStaff.status),
+      await updateStaffMutation.mutateAsync({
+        userId: editStaff.id,
+        clinicId,
+        updateData: {
+          name: editStaff.name,
+          is_active: mapFrontendStatusToDatabase(editStaff.status),
+        },
       });
-      if (result.error) {
-        ErrorToast(result.error);
-        return;
-      }
-      setStaffData(prev =>
-        prev.map(s =>
-          s.id === editStaff.id ? { ...s, name: editStaff.name, status: editStaff.status, avatar: getInitials(editStaff.name) } : s,
-        ),
-      );
-      SuccessToast(`Staff member "${editStaff.name}" has been updated successfully.`);
+
+      // Reset form and close modal on success
       setShowEditStaffModal(false);
       setSelectedStaffForEdit(null);
-      await refreshStaffData();
-    } catch (error: any) {
-      console.error("Error updating staff:", error);
-      ErrorToast("Failed to update staff member. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+    } catch (error) {
+      // Error handling is done by the mutation
+      console.error("Update staff error:", error);
     }
   };
 
@@ -335,24 +240,19 @@ export default function StaffPage(): JSX.Element {
       ErrorToast("Missing required information. Please try again.");
       return;
     }
-    setIsDeleting(true);
+
     try {
-      const result = await deleteStaffMember(selectedStaffForDelete.id, clinicId);
-      if (result.error) {
-        ErrorToast(result.error);
-        return;
-      }
-      setStaffData(prev => prev.filter(s => s.id !== selectedStaffForDelete.id));
-      SuccessToast(`Staff member "${selectedStaffForDelete.name}" has been removed successfully.`);
+      await deleteStaffMutation.mutateAsync({
+        userId: selectedStaffForDelete.id,
+        clinicId,
+      });
+
+      // Reset modal state on success
       setShowDeleteConfirmModal(false);
       setSelectedStaffForDelete(null);
-      await loadStatusStats();
-      await refreshStaffData();
-    } catch (error: any) {
-      console.error("Error deleting staff:", error);
-      ErrorToast("Failed to remove staff member. Please try again.");
-    } finally {
-      setIsDeleting(false);
+    } catch (error) {
+      // Error handling is done by the mutation
+      console.error("Delete staff error:", error);
     }
   };
 
@@ -387,7 +287,7 @@ export default function StaffPage(): JSX.Element {
             selectedRole={selectedRole}
             selectedStatus={selectedStatus}
             availableRoles={availableRoles}
-            totalStaff={staffData.length}
+            totalStaff={transformedStaffData.length}
             filteredStaff={filteredStaffData.length}
             onSearchChange={handleSearchChange}
             onRoleChange={handleRoleChange}
