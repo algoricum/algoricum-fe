@@ -1,5 +1,5 @@
 "use client";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import ChatbotSettings from "./ChatbotSettings";

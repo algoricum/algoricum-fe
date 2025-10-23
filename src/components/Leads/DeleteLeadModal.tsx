@@ -1,5 +1,5 @@
 "use client";
-import { Modal } from "antd";
+import Modal from "antd/es/modal";
 import { Trash2, AlertTriangle } from "lucide-react";
 import { useDeleteLead } from "@/hooks/useLeads";
 

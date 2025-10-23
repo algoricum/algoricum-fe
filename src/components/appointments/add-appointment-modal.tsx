@@ -1,7 +1,11 @@
 "use client";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { CalendarOutlined, ClockCircleOutlined, MailOutlined, PhoneOutlined, UserOutlined } from "@ant-design/icons";
-import { DatePicker, Form, Input, TimePicker, Modal } from "antd";
+import DatePicker from "antd/es/date-picker";
+import Form from "antd/es/form";
+import Input from "antd/es/input";
+import TimePicker from "antd/es/time-picker";
+import Modal from "antd/es/modal";
 import dayjs from "dayjs";
 import { usePhoneValidation } from "@/hooks/usePhoneValidation";
 import PhoneInput from "react-phone-number-input";

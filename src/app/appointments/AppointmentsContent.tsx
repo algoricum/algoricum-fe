@@ -18,7 +18,9 @@ import {
 } from "@/hooks/useAppointments";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { type MeetingSchedule } from "@/utils/appointment-helper";
-import { Form, Pagination, Select } from "antd";
+import Form from "antd/es/form";
+import Pagination from "antd/es/pagination";
+import Select from "antd/es/select";
 import { Calendar, Edit, Mail, MoreVertical, PhoneIcon, Plus, SearchIcon, Trash2 } from "lucide-react";
 import React, { useEffect, useState, useMemo } from "react";
 import "react-phone-number-input/style.css";

@@ -1,6 +1,7 @@
 "use client";
 import { CalendarOutlined } from "@ant-design/icons";
-import { Button, Typography } from "antd";
+import Button from "antd/es/button";
+import Typography from "antd/es/typography";
 import React, { useState } from "react";
 import { BOOKING_LINK, TARGET_VALUE } from "./constants";
 import { BookingLinkComponentProps } from "./types";

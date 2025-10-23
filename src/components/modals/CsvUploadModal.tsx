@@ -1,5 +1,9 @@
 "use client";
-import { Alert, Button, Modal, Typography, Upload } from "antd";
+import Alert from "antd/es/alert";
+import Button from "antd/es/button";
+import Modal from "antd/es/modal";
+import Typography from "antd/es/typography";
+import Upload from "antd/es/upload";
 import Image from "next/image";
 import type React from "react";
 import { CsvUploadModalProps } from "./types";

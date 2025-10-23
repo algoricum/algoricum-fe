@@ -1,7 +1,8 @@
 "use client";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { ErrorToast } from "@/helpers/toast";
-import { Button, Select } from "antd";
+import Button from "antd/es/button";
+import Select from "antd/es/select";
 import { X } from "lucide-react";
 import type React from "react";
 

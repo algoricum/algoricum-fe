@@ -1,6 +1,7 @@
 import Footermenus from "@/constants/FooterMenus";
 import { EmailIcon, FacebookIcon, LinkedinIcon, TwitterIcon } from "@/icons";
-import { Button, Flex } from "antd";
+import Button from "antd/es/button";
+import Flex from "antd/es/flex";
 import Image from "next/image";
 import Link from "next/link";
 import React from "react";

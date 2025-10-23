@@ -19,7 +19,7 @@ export function Providers({ children }: { children: ReactNode }) {
         </PersistGate>
       </Provider>
       {/* React Query Devtools - only shows in development */}
-      <ReactQueryDevtools initialIsOpen={false} />
+      {process.env.NODE_ENV === "development" && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   );
 }

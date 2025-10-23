@@ -2,7 +2,12 @@
 import { CalendlyModal } from "@/components/modals/CalendlyModal";
 import { ONBOARDING_COMPLETED_STEPS_KEY } from "@/constants/localStorageKeys";
 import { connectToCalendly, fetchCalendlyEventTypes, saveCalendlyEventType } from "@/utils/integration-utils";
-import { Button, Card, Input, Radio, Space, Typography } from "antd";
+import Button from "antd/es/button";
+import Card from "antd/es/card";
+import Input from "antd/es/input";
+import Radio from "antd/es/radio";
+import Space from "antd/es/space";
+import Typography from "antd/es/typography";
 import { useEffect, useState } from "react";
 
 const { Title, Text } = Typography;

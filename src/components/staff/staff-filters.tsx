@@ -1,5 +1,6 @@
 "use client";
-import { Button, Select } from "antd";
+import Button from "antd/es/button";
+import Select from "antd/es/select";
 import { Plus, Search, X } from "lucide-react";
 import type React from "react";
 

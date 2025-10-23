@@ -7,7 +7,10 @@ import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
 import { createClient } from "@/utils/supabase/config/client";
 import { getUserData } from "@/utils/supabase/user-helper";
-import { Flex, Form, Upload, UploadFile } from "antd";
+import Flex from "antd/es/flex";
+import Form from "antd/es/form";
+import Upload from "antd/es/upload";
+import { UploadFile } from "antd";
 import { useEffect, useRef, useState } from "react";
 import SettingsCard from "../SettingsCard";
 

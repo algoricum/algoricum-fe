@@ -1,6 +1,8 @@
 "use client";
 import { Sidebar } from "@/components/common";
-import { Flex, Layout, type LayoutProps } from "antd";
+import Flex from "antd/es/flex";
+import Layout from "antd/es/layout";
+import type { LayoutProps } from "antd/es/layout";
 import { useState, type ReactNode } from "react";
 
 const { Content } = Layout;

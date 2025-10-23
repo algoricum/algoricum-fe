@@ -1,6 +1,6 @@
 "use client";
 import { ErrorToast } from "@/helpers/toast";
-import { Modal } from "antd";
+import Modal from "antd/es/modal";
 import dayjs from "dayjs";
 import { Calendar, CheckCircle, Clock, Info, Plus } from "lucide-react";
 import React, { useState, useMemo } from "react";

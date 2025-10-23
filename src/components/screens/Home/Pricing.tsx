@@ -1,6 +1,8 @@
 import PricingCard from "@/components/common/PricingCard";
 import { pricingPlanData } from "@/constants/pricingPlanData";
-import { Col, Flex, Row } from "antd";
+import Col from "antd/es/col";
+import Flex from "antd/es/flex";
+import Row from "antd/es/row";
 
 const Pricing = () => {
   return (

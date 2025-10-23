@@ -10,7 +10,9 @@ import { checkUserStatus, signInWithPassword } from "@/utils/supabase/auth-helpe
 import { setClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { setUserData } from "@/utils/supabase/user-helper";
-import { Flex, Form, Typography } from "antd";
+import Flex from "antd/es/flex";
+import Form from "antd/es/form";
+import Typography from "antd/es/typography";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";

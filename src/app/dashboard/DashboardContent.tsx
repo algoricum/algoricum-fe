@@ -8,7 +8,8 @@ import ChatbotTrainingModal from "@/components/common/TrainingChatbotModal/chatb
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { handleCsvUpload } from "@/utils/csvUtils";
 import { createClient } from "@/utils/supabase/config/client";
-import { Button, Select } from "antd";
+import Button from "antd/es/button";
+import Select from "antd/es/select";
 import { Bot, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";

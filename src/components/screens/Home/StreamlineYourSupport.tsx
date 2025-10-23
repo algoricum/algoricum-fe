@@ -1,4 +1,4 @@
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 
 const StreamlineYourSupport = () => {
   return (

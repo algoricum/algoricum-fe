@@ -1,4 +1,4 @@
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 import React from "react";
 interface BackgroundWrapperProps {
   children: React.ReactNode | React.ReactNode[]; // The content to render inside the background wrapper.

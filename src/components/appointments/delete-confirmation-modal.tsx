@@ -2,7 +2,7 @@
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { type MeetingSchedule, formatMeetingDate } from "@/utils/appointment-helper";
 import { AlertTriangle } from "lucide-react";
-import { Modal } from "antd";
+import Modal from "antd/es/modal";
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;

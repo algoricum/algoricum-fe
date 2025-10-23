@@ -1,5 +1,5 @@
 "use client";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 import { usePathname } from "next/navigation";
 
 const loginHeader = {

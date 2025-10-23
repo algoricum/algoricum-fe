@@ -11,7 +11,11 @@ import {
   useSubscriptionEvents,
 } from "@/hooks/useBilling";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { Alert, Button, Col, Flex, Row } from "antd";
+import Alert from "antd/es/alert";
+import Button from "antd/es/button";
+import Col from "antd/es/col";
+import Flex from "antd/es/flex";
+import Row from "antd/es/row";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";

@@ -2,13 +2,17 @@
 
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { LinkOutlined } from "@ant-design/icons";
-import { Alert, Button, Input, Modal, Spin, Typography } from "antd";
+import Alert from "antd/es/alert";
+import Button from "antd/es/button";
+import Input from "antd/es/input";
+import Modal from "antd/es/modal";
+import Spin from "antd/es/spin";
+import Typography from "antd/es/typography";
 import Image from "next/image";
 import type React from "react";
 import { useState } from "react";
 import { ModalProps } from "./types";
 import { commonAlertStyles } from "./utils";
-
 
 const { Text } = Typography;
 

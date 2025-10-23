@@ -1,5 +1,9 @@
 "use client";
-import { Alert, Button, Modal, Spin, Typography } from "antd";
+import Alert from "antd/es/alert";
+import Button from "antd/es/button";
+import Modal from "antd/es/modal";
+import Spin from "antd/es/spin";
+import Typography from "antd/es/typography";
 import Image from "next/image";
 import type React from "react";
 import { ModalProps } from "./types";

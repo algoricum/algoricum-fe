@@ -1,7 +1,9 @@
 import HashbotWorkCard from "@/components/common/HashbotWorkCard";
 import { Button } from "@/components/elements";
 import { howHashbotWorksData } from "@/constants/home";
-import { Col, Flex, Row } from "antd";
+import Col from "antd/es/col";
+import Flex from "antd/es/flex";
+import Row from "antd/es/row";
 
 const HowHashbotWorks = () => {
   return (

@@ -20,7 +20,7 @@ import { getInitials, mapDatabaseStatusToFrontend, mapFrontendStatusToDatabase }
 import { staffStatsConfig } from "@/components/staff/statCardUtils";
 import { usePagination } from "@/hooks/usePagination";
 import { useCurrentUserClinic, useStaffList, useStaffStats, useCreateStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useStaff";
-import { Pagination } from "antd";
+import Pagination from "antd/es/pagination";
 
 interface Staff {
   id: string;

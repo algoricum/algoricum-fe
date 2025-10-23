@@ -1,5 +1,7 @@
 import menuItems from "@/constants/menuItems";
-import { Col, Flex, Row } from "antd";
+import Col from "antd/es/col";
+import Flex from "antd/es/flex";
+import Row from "antd/es/row";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 

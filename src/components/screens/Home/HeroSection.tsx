@@ -1,7 +1,7 @@
 import { Button } from "@/components/elements";
 import { heroSectionTabs } from "@/constants/heroSectionTabs";
 import { CheckIcon } from "@/icons";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 
 const HeroSection = () => {
   return (

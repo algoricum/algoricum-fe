@@ -20,7 +20,8 @@ import {
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { createClient } from "@/utils/supabase/config/client";
-import { Button, Typography } from "antd";
+import Button from "antd/es/button";
+import Typography from "antd/es/typography";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";

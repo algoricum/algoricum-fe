@@ -3,7 +3,14 @@
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
-import { Alert, Badge, Button, Divider, Modal, Select, Spin, Typography } from "antd";
+import Alert from "antd/es/alert";
+import Badge from "antd/es/badge";
+import Button from "antd/es/button";
+import Divider from "antd/es/divider";
+import Modal from "antd/es/modal";
+import Select from "antd/es/select";
+import Spin from "antd/es/spin";
+import Typography from "antd/es/typography";
 import Image from "next/image";
 import type React from "react";
 import { useEffect, useState } from "react";
