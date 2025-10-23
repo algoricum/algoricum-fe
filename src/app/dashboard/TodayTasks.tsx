@@ -6,55 +6,32 @@ import { Modal } from "antd";
 import dayjs from "dayjs";
 import { Calendar, CheckCircle, Clock, Info, Plus } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { updateIntegrationConnectionStatus } from "../integrations/integrationUtils";
-import { ConnectionStatus } from "../types/types";
-// Integration types for better type safety
-type IntegrationName =
-  | "Facebook Lead Forms"
-  | "Jotform"
-  | "Google Lead Forms"
-  | "Google Forms"
-  | "Hubspot"
-  | "GoHighLevel"
-  | "Typeform"
-  | "Pipedrive"
-  | "Gravity Form"
-  | "NextHealth"
-  | "CSV Upload"
-  | "Custom CRM";
-
-interface Task {
-  id: string;
-  task: string;
-  priority: "low" | "medium" | "high";
-  time?: string;
-  completed: boolean;
-  due_at?: string;
-  clinic_id: string;
-}
-
-interface IntegrationWithStatus {
-  id: string;
-  name: string;
-  integration_type: string;
-  auth_type: string;
-  connected: boolean;
-  connection_id?: string;
-  connection_status?: string;
-  auth_data?: any;
-  expires_at?: string;
-  last_sync_at?: string;
-  created_at: string;
-  updated_at: string;
-  integration_logo: string;
-  description: string;
-}
+import { getAllIntegrationStatuses } from "../integrations/integrationUtils";
+import { Task, SPECIAL_TASK_IDS, TASK_STYLES } from "./types";
 
 const supabase = createClient();
 
+// Helper functions
+const getTaskStyle = (task: Task) => {
+  if (task.id === SPECIAL_TASK_IDS.ADD_INTEGRATIONS) return TASK_STYLES.INTEGRATION;
+  if (task.completed) return TASK_STYLES.COMPLETED;
+  return TASK_STYLES.PENDING;
+};
+
+const getTaskIcon = (task: Task) => {
+  if (task.id === SPECIAL_TASK_IDS.ADD_INTEGRATIONS) {
+    return <Info className="w-4 h-4 text-blue-600" />;
+  }
+  if (task.completed) {
+    return <CheckCircle className="w-4 h-4 text-green-600" />;
+  }
+  return <Clock className="w-4 h-4 text-purple-600" />;
+};
+
+const isSpecialTask = (taskId: string) => taskId === SPECIAL_TASK_IDS.ADD_INTEGRATIONS;
+
 export default function TodayTasks({ clinicId }: { clinicId: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [integrations, setIntegrations] = useState<IntegrationWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -74,39 +51,16 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
           return;
         }
 
-        // 1. Fetch all integrations from master table
-        const { data: allIntegrations, error: integrationsError } = await supabase.from("integrations").select("*");
+        // 1. Get integration statuses efficiently
+        const integrationStatuses = await getAllIntegrationStatuses(clinicData.id);
 
-        if (integrationsError) {
-          console.error("Error fetching integrations:", integrationsError);
-          return;
-        }
+        // 2. Create a simple structure for task fetching (we only need connection status)
+        const connectedIntegrationCount = Object.values(integrationStatuses).filter(status => status === "connected").length;
+        const totalAvailableIntegrations = Object.keys(integrationStatuses).length;
+        const hasDisconnectedIntegrations = connectedIntegrationCount < totalAvailableIntegrations;
 
-        // 2. Check connection status for each integration
-        const statusChecks = await Promise.allSettled(
-          allIntegrations.map(int => updateIntegrationConnectionStatus(clinicData.id, int.name)),
-        );
-
-        // 3. Merge statuses with integrations
-        const integrationsWithStatus = allIntegrations.map((int, idx) => {
-          const check = statusChecks[idx];
-          return {
-            ...int,
-            connected: check.status === "fulfilled" ? check.value === "connected" : false,
-          };
-        });
-
-        setIntegrations(integrationsWithStatus);
-
-        // 4. Update individual integration states
-        const statusUpdates: Partial<Record<IntegrationName, ConnectionStatus>> = {};
-        integrationsWithStatus.forEach(integration => {
-          const name = integration.name as IntegrationName;
-          statusUpdates[name] = integration.connected ? "connected" : "disconnected";
-        });
-
-        // 5. Fetch tasks immediately after integrations are ready
-        await fetchTasks(integrationsWithStatus);
+        // 3. Fetch tasks with integration availability info
+        await fetchTasks(hasDisconnectedIntegrations);
       } catch (error) {
         console.error("Failed to initialize data:", error);
         ErrorToast("Failed to initialize data");
@@ -118,12 +72,10 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
     initializeData();
   }, [clinicId, supabase]);
 
-  const fetchTasks = async (integrations: IntegrationWithStatus[]) => {
+  const fetchTasks = async (hasDisconnectedIntegrations: boolean) => {
     try {
       const start = dayjs().startOf("day").toISOString();
       const end = dayjs().endOf("day").toISOString();
-
-      const availableIntegrations = integrations.filter(i => !i.connected);
 
       const { data, error } = await supabase
         .from("tasks")
@@ -140,10 +92,10 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
 
       // ✅ Only one "Add more integrations" task if any are available
       let integrationTask: Task[] = [];
-      if (availableIntegrations.length > 0) {
+      if (hasDisconnectedIntegrations) {
         integrationTask = [
           {
-            id: "add-integrations",
+            id: SPECIAL_TASK_IDS.ADD_INTEGRATIONS,
             clinic_id: clinicId,
             task: "More CRM & Tools are available. Connect now!",
             priority: "low",
@@ -163,33 +115,25 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // Store original state for rollback
     const originalCompleted = task.completed;
+    const revertOptimisticUpdate = () => {
+      setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, completed: originalCompleted } : t)));
+    };
 
     // Optimistically update UI immediately
     setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, completed: !t.completed } : t)));
 
     try {
-      // Update in database
       const { error } = await supabase.from("tasks").update({ completed: !originalCompleted }).eq("id", taskId);
 
-      // If error, revert the optimistic update and show error message
       if (error) {
         console.error("Error updating task:", error);
-
-        // Revert the optimistic update
-        setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, completed: originalCompleted } : t)));
-
-        // Show user-friendly error message
+        revertOptimisticUpdate();
         ErrorToast("Failed to update task. Please try again.");
       }
     } catch (err) {
       console.error("Unexpected error updating task:", err);
-
-      // Revert the optimistic update
-      setTasks(prevTasks => prevTasks.map(t => (t.id === taskId ? { ...t, completed: originalCompleted } : t)));
-
-      // Show user-friendly error message
+      revertOptimisticUpdate();
       ErrorToast("Failed to update task. Please try again.");
     }
   };
@@ -220,7 +164,14 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
       // Success - clear form and close modal
       setNewTask({ task: "", priority: "low", time: "" });
       setShowAddTaskModal(false);
-      fetchTasks(integrations); // Don't show loader when adding task
+
+      // Refresh tasks - check integration status again
+      const integrationStatuses = await getAllIntegrationStatuses(clinicId);
+      const connectedCount = Object.values(integrationStatuses).filter(status => status === "connected").length;
+      const totalCount = Object.keys(integrationStatuses).length;
+      const hasDisconnected = connectedCount < totalCount;
+
+      await fetchTasks(hasDisconnected);
     } catch (err) {
       console.error("Unexpected error adding task:", err);
       ErrorToast("Failed to add task. Please try again.");
@@ -252,46 +203,35 @@ export default function TodayTasks({ clinicId }: { clinicId: string }) {
             <p className="text-sm">Add some tasks to get started</p>
           </div>
         ) : (
-          tasks.map(task => (
-            <div
-              key={task.id}
-              className={`flex items-start space-x-3 rounded-lg p-3 bg-gray-50 ${
-                task.id === "add-integrations" ? "cursor-default" : "hover:bg-gray-100 transition-colors cursor-pointer"
-              }`}
-              onClick={() => task.id !== "add-integrations" && toggleTask(task.id)}
-            >
-              {/* Icon with colored background */}
-              <div className="flex-shrink-0">
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                    task.id === "add-integrations" ? "bg-blue-100" : task.completed ? "bg-green-100" : "bg-purple-100"
-                  }`}
-                >
-                  {task.id === "add-integrations" ? (
-                    <Info className="w-4 h-4 text-blue-600" />
-                  ) : task.completed ? (
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <Clock className="w-4 h-4 text-purple-600" />
-                  )}
+          tasks.map(task => {
+            const taskStyle = getTaskStyle(task);
+            return (
+              <div
+                key={task.id}
+                className={`flex items-start space-x-3 rounded-lg p-3 bg-gray-50 ${taskStyle.cursor}`}
+                onClick={() => !isSpecialTask(task.id) && toggleTask(task.id)}
+              >
+                {/* Icon with colored background */}
+                <div className="flex-shrink-0">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full ${taskStyle.bgColor}`}>{getTaskIcon(task)}</div>
+                </div>
+
+                {/* Task content */}
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-medium ${task.completed ? "line-through text-gray-500" : "text-gray-900"}`}>{task.task}</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {task.due_at && !Number.isNaN(Date.parse(task.due_at))
+                      ? new Date(task.due_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })
+                      : "Today"}
+                  </p>
                 </div>
               </div>
-
-              {/* Task content */}
-              <div className="min-w-0 flex-1">
-                <p className={`text-sm font-medium ${task.completed ? "line-through text-gray-500" : "text-gray-900"}`}>{task.task}</p>
-                <p className="mt-1 text-sm text-gray-500">
-                  {task.due_at && !Number.isNaN(Date.parse(task.due_at))
-                    ? new Date(task.due_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                      })
-                    : "Today"}
-                </p>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

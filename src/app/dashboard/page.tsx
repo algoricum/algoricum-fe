@@ -17,15 +17,15 @@ import AiActivityLog from "./AiActivityLogs";
 import StatsGrid from "./StatsGrid";
 import TodayTasks from "./TodayTasks";
 
-type LeadRow = {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  status: string | null;
-  date: string;
-  source_id: string | null;
-  sourceName: string | null;
+import { LeadRow, AppointmentFilter, LOADING_DELAY, IntegrationBannersProps } from "./types";
+
+// Helper functions
+const formatTwilioNumber = (phoneNumber: string | undefined): string => {
+  return phoneNumber || "";
+};
+
+const formatMailgunEmail = (email: string | undefined): string => {
+  return email || "Not configured";
 };
 
 export default function DashboardPage() {
@@ -34,7 +34,7 @@ export default function DashboardPage() {
 
   // Loading/UI state
   const [loading, setLoading] = useState(true);
-  const [appointmentFilter, setAppointmentFilter] = useState<"today" | "week" | "month" | "year">("month");
+  const [appointmentFilter, setAppointmentFilter] = useState<AppointmentFilter>("month");
 
   // Integrations state
   const [showManualLeadsModal, setShowManualLeadsModal] = useState(false);
@@ -149,7 +149,7 @@ export default function DashboardPage() {
         console.error("Error checking user:", error);
       } finally {
         // simulate small delay for dashboard data readiness
-        setTimeout(() => setLoading(false), 800);
+        setTimeout(() => setLoading(false), LOADING_DELAY);
       }
     };
     checkUser();
@@ -181,118 +181,13 @@ export default function DashboardPage() {
     >
       <div className="space-y-8 p-0 sm:p-4">
         {/* Integration Banners */}
-        <div className="w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* CSV Upload Banner */}
-            {showCsvBanner && (
-              <div className="w-full rounded-xl border-2 p-4 bg-blue-50 border-blue-200 shadow-sm transition-all hover:shadow-md">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="rounded-lg p-3 bg-blue-100 border border-blue-200">
-                      <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-gray-900 block mb-1">Upload CSV Leads</span>
-                      <p className="text-sm text-gray-600 leading-relaxed">
-                        Import your leads data from CSV files to get started quickly with your patient management.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <Button
-                      onClick={() => setShowManualLeadsModal(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                      aria-label="Open CSV upload modal"
-                    >
-                      Upload CSV
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ChatBot Training Banner */}
-            <div className="w-full rounded-xl border-2 p-4 bg-purple-50 border-purple-200 shadow-sm transition-all hover:shadow-md">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-lg p-3 bg-purple-100 border border-purple-200">
-                    <Bot className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-semibold text-gray-900 block mb-1">Train Your Chatbot Now</span>
-                    <p className="text-sm text-gray-600 leading-relaxed">
-                      Upload training documents to enhance your ChatBot&apos;s knowledge and improve patient interactions.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex-shrink-0">
-                  <Button
-                    onClick={() => setShowTrainingModal(true)}
-                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                    aria-label="Open ChatBot training modal"
-                  >
-                    <Bot className="h-4 w-4 mr-2" />
-                    Train Now
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Nurturing Email & SMS Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {/* Nurturing Email Stats */}
-            <div className="w-full rounded-xl border-2 p-4 bg-green-50 border-green-200 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="rounded-lg p-3 bg-green-100 border border-green-200">
-                  <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <span className="font-semibold text-gray-900 block mb-1">Nurturing Email</span>
-                  <div className="text-sm text-gray-600">
-                    <div>{clinicData?.mailgun_email || "Not configured"}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Nurturing SMS Stats */}
-            <div className="w-full rounded-xl border-2 p-4 bg-orange-50 border-orange-200 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="rounded-lg p-3 bg-orange-100 border border-orange-200">
-                  <svg className="h-5 w-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <span className="font-semibold text-gray-900 block mb-1">Nurturing Phone Number</span>
-                  <div className="text-sm text-gray-600">
-                    <div>{twilioPhoneNumber || ""}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <IntegrationBanners
+          showCsvBanner={showCsvBanner}
+          onCsvUpload={() => setShowManualLeadsModal(true)}
+          onTrainChatbot={() => setShowTrainingModal(true)}
+          clinicData={clinicData}
+          twilioPhoneNumber={twilioPhoneNumber}
+        />
 
         {/* Stats Grid - Pass leadsData directly for real-time updates */}
         <div className="mt-8">
@@ -385,5 +280,140 @@ export default function DashboardPage() {
       />
       <ChatbotTrainingModal open={showTrainingModal} onClose={() => setShowTrainingModal(false)} />
     </DashboardLayout>
+  );
+}
+
+// Helper Components
+
+function IntegrationBanners({ showCsvBanner, onCsvUpload, onTrainChatbot, clinicData, twilioPhoneNumber }: IntegrationBannersProps) {
+  return (
+    <div className="w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {showCsvBanner && <CsvUploadBanner onUpload={onCsvUpload} />}
+        <ChatbotTrainingBanner onTrain={onTrainChatbot} />
+      </div>
+
+      {/* Nurturing Email & SMS Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <NurturingEmailCard email={formatMailgunEmail(clinicData?.mailgun_email)} />
+        <NurturingPhoneCard phoneNumber={formatTwilioNumber(twilioPhoneNumber)} />
+      </div>
+    </div>
+  );
+}
+
+function CsvUploadBanner({ onUpload }: { onUpload: () => void }) {
+  return (
+    <div className="w-full rounded-xl border-2 p-4 bg-blue-50 border-blue-200 shadow-sm transition-all hover:shadow-md">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="rounded-lg p-3 bg-blue-100 border border-blue-200">
+            <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="font-semibold text-gray-900 block mb-1">Upload CSV Leads</span>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Import your leads data from CSV files to get started quickly with your patient management.
+            </p>
+          </div>
+        </div>
+        <div className="flex-shrink-0">
+          <Button
+            onClick={onUpload}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+            aria-label="Open CSV upload modal"
+          >
+            Upload CSV
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatbotTrainingBanner({ onTrain }: { onTrain: () => void }) {
+  return (
+    <div className="w-full rounded-xl border-2 p-4 bg-purple-50 border-purple-200 shadow-sm transition-all hover:shadow-md">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="rounded-lg p-3 bg-purple-100 border border-purple-200">
+            <Bot className="h-5 w-5 text-purple-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="font-semibold text-gray-900 block mb-1">Train Your Chatbot Now</span>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Upload training documents to enhance your ChatBot&apos;s knowledge and improve patient interactions.
+            </p>
+          </div>
+        </div>
+        <div className="flex-shrink-0">
+          <Button
+            onClick={onTrain}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+            aria-label="Open ChatBot training modal"
+          >
+            <Bot className="h-4 w-4 mr-2" />
+            Train Now
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NurturingEmailCard({ email }: { email: string }) {
+  return (
+    <div className="w-full rounded-xl border-2 p-4 bg-green-50 border-green-200 shadow-sm">
+      <div className="flex items-center gap-4">
+        <div className="rounded-lg p-3 bg-green-100 border border-green-200">
+          <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+            />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <span className="font-semibold text-gray-900 block mb-1">Nurturing Email</span>
+          <div className="text-sm text-gray-600">
+            <div>{email}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NurturingPhoneCard({ phoneNumber }: { phoneNumber: string }) {
+  return (
+    <div className="w-full rounded-xl border-2 p-4 bg-orange-50 border-orange-200 shadow-sm">
+      <div className="flex items-center gap-4">
+        <div className="rounded-lg p-3 bg-orange-100 border border-orange-200">
+          <svg className="h-5 w-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <span className="font-semibold text-gray-900 block mb-1">Nurturing Phone Number</span>
+          <div className="text-sm text-gray-600">
+            <div>{phoneNumber}</div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
