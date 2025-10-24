@@ -649,21 +649,22 @@ export const leadsMutations = {
   }) => {
     const { leadId, updates } = params;
 
-    const { error, data } = await supabase
-      .from("lead")
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", leadId)
-      .select()
-      .single();
+    // Convert empty strings to null for fields with check constraints
+    const sanitizedUpdates = {
+      ...updates,
+      interest_level: updates.interest_level === "" ? null : updates.interest_level,
+      urgency: updates.urgency === "" ? null : updates.urgency,
+      notes: updates.notes === "" ? null : updates.notes,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error, data } = await supabase.from("lead").update(sanitizedUpdates).eq("id", leadId).select().single();
 
     if (error) throw error;
     return data;
   },
 
-  // Update lead status
+  // Update lead status (uses the sanitized function from leads-helper)
   updateLeadStatus: async (params: {
     leadId: string;
     updates: {
