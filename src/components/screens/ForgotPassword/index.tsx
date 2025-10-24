@@ -6,13 +6,13 @@ import { MailIcon, PasswordIcon } from "@/icons";
 import { ForgotProps } from "@/interfaces/services_type";
 import { resetPasswordRequest } from "@/utils/supabase/auth-helper";
 import { createClient } from "@/utils/supabase/config/client";
+import { useMutation } from "@tanstack/react-query";
 import Flex from "antd/es/flex";
 import Form from "antd/es/form";
 import Typography from "antd/es/typography";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 
 const { Title, Text } = Typography;
 
@@ -38,10 +38,6 @@ const ForgotPasswordPage = () => {
     const tokenFromQuery = searchParams.get("token");
     const typeFromQuery = searchParams.get("type");
     const codeFromQuery = searchParams.get("code");
-
-    // Log parameters for debugging
-    console.log("Hash:", { accessToken: accessTokenFromHash, type: typeFromHash });
-    console.log("Query:", { token: tokenFromQuery, type: typeFromQuery, code: codeFromQuery });
 
     if (
       (typeFromHash === "recovery" && accessTokenFromHash) ||

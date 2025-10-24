@@ -77,8 +77,6 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
       return;
     }
 
-    console.log("Checking pending setup for clinic:", clinicId);
-
     try {
       const { data, error } = await supabase
         .from("facebook_lead_form_connections")
@@ -87,14 +85,14 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
         .eq("lead_form_id", "pending_selection")
         .limit(1);
 
-      console.log("Pending setup query result:", { data, error });
+      if (error) {
+        console.error("Error querying pending setup:", error);
+        return;
+      }
 
       if (data && data.length > 0) {
-        console.log("Found pending setup, showing form selection");
         setShowFormSelection(true);
         await fetchPages();
-      } else {
-        console.log("No pending setup found");
       }
     } catch (error) {
       console.error("Error checking pending setup:", error);

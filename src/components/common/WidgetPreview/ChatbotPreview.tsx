@@ -11,7 +11,6 @@ interface AvatarsProps {
 }
 
 const Avatars = ({ chatbotAvatar }: AvatarsProps) => {
-  console.log("Rendering Avatars with chatbotAvatar:", chatbotAvatar);
   return (
     <div>
       <Avatar.Group>
@@ -159,18 +158,7 @@ const ChatbotPreview = ({ primaryColor = "#2563EB", chatbotName = "Ava", logo = 
   // Force re-render when critical props change
   useEffect(() => {
     setRenderKey(prev => prev + 1);
-    console.log("HomePage props changed:", { primaryColor, chatbotName, logo, chatbotAvatar });
   }, [primaryColor, chatbotName, logo, chatbotAvatar]);
-
-  // Add debugging for image URLs
-  useEffect(() => {
-    if (logo) {
-      console.log("Logo URL received in HomePage:", logo);
-    }
-    if (chatbotAvatar) {
-      console.log("Avatar URL received in HomePage:", chatbotAvatar);
-    }
-  }, [logo, chatbotAvatar]);
 
   return (
     <div className="overflow-x-hidden overflow-y-auto custom-scrollbar h-full p-6 max-w-md mx-auto" key={renderKey}>

@@ -168,7 +168,6 @@ export default function BookingSetupStep({ onNext, onPrev, initialData = {} }: B
       }
       setState(prev => ({ ...prev, currentQuestionIndex: prev.currentQuestionIndex + 1 }));
     } else {
-      console.log("🔍 BookingSetupStep: Final form data being passed:", state.formData);
       onNext(state.formData);
     }
   };

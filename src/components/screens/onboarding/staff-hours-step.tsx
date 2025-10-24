@@ -74,7 +74,6 @@ export default function StaffHoursStep({ onNext, onPrev, initialData = {} }: Sta
   useEffect(() => {
     const fetchInitialData = async () => {
       const clinic = await getClinicData();
-      console.log(".......Clinic data:.....", clinic);
       if (!clinic) {
         ErrorToast("Clinic data not found.");
         return;

@@ -35,9 +35,7 @@ export async function sendWelcomeEmail(email: string, name: string, password: st
       html: emailHtml,
     };
 
-    const data = await mg.messages.create(process.env.MAILGUN_DOMAIN || "", mailData);
-
-    console.log("Email sent successfully:", data);
+    await mg.messages.create(process.env.MAILGUN_DOMAIN || "", mailData);
 
     return {
       success: true,

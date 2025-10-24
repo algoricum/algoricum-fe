@@ -261,7 +261,7 @@ export default function IntegrationsContent() {
         window.history.replaceState({}, document.title, window.location.pathname);
         setTimeout(() => syncPipedriveLeads(), 1000);
       } else if (pipedriveStatus === "error") {
-        console.log("❌ Pipedrive OAuth error detected from URL:", errorMessage);
+        console.error("❌ Pipedrive OAuth error detected from URL:", errorMessage);
         updateIntegrationStatus("Pipedrive", "disconnected");
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -407,8 +407,6 @@ export default function IntegrationsContent() {
             const currentStatus = getIntegrationStatus("Google Lead Forms");
             if (currentStatus !== modalStatus) {
               updateIntegrationStatus("Google Lead Forms", modalStatus);
-            } else {
-              console.log("Status unchanged, staying at:", currentStatus);
             }
 
             setGoogleLeadFormData({

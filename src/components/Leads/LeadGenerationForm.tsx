@@ -110,7 +110,6 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("form validity", validateForm());
     if (!validateForm()) return;
 
     const source_id = await getLeadSourceId("Others");

@@ -6,8 +6,6 @@ const supabase = createClient();
 
 // Helper function for querying integration_connections table
 async function queryIntegrationConnection(clinicId: string, integrationName: string, includeStatus = true) {
-  console.log(`[INTEGRATION_STATUS] Checking ${integrationName} for clinic: ${clinicId}`);
-
   let query = supabase
     .from("integration_connections")
     .select(
@@ -28,8 +26,6 @@ async function queryIntegrationConnection(clinicId: string, integrationName: str
   }
 
   const { data, error } = await query.maybeSingle();
-
-  console.log(`[INTEGRATION_STATUS] ${integrationName} query result:`, { data, error });
 
   if (error) {
     console.error(`Error checking ${integrationName} status:`, error);
@@ -66,7 +62,6 @@ export function createOAuthCallbackHandler(
     const status = urlParams.get(statusParamName);
 
     if (status === "success") {
-      console.log(`✅ ${integrationName} OAuth success detected from URL`);
       updateIntegrationStatus(integrationName, "connected");
 
       // Clean up URL parameters
@@ -78,7 +73,7 @@ export function createOAuthCallbackHandler(
         showSuccessToast(message);
       }
     } else if (status === "error") {
-      console.log(`❌ ${integrationName} OAuth error detected from URL:`, errorMessage);
+      console.error(`❌ ${integrationName} OAuth error detected from URL:`, errorMessage);
       updateIntegrationStatus(integrationName, "disconnected");
       window.history.replaceState({}, document.title, window.location.pathname);
 
@@ -333,7 +328,6 @@ export const getAllIntegrationStatuses = async (clinicId: string): Promise<Recor
       }
     });
 
-    console.log("[BULK_STATUS_CHECK] Retrieved statuses for all integrations:", statusMap);
     return statusMap;
   } catch (error) {
     console.error("Error getting all integration statuses:", error);

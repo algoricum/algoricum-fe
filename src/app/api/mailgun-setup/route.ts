@@ -58,14 +58,6 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("🚀 Starting clinic mailgun setup request:", {
-      clinicId,
-      clinicName,
-      slug, // --- LOGGING THE SLUG ---
-      action,
-      timestamp: new Date().toISOString(),
-    });
-
     // Prepare request to Supabase Edge Function
     const supabaseEdgeFunctionUrl = `${supabaseUrl}/functions/v1/setup-clinic-mailgun`;
 
@@ -87,12 +79,6 @@ export async function POST(req: Request) {
       apikey: supabaseAnonKey,
     };
 
-    console.log("📡 Calling Supabase Edge Function:", {
-      url: supabaseEdgeFunctionUrl,
-      payload: requestPayload,
-      headers: { ...headers, Authorization: "[REDACTED]", apikey: "[REDACTED]" },
-    });
-
     // Setup fetch options
     const fetchOptions: any = {
       method: "POST",
@@ -102,10 +88,6 @@ export async function POST(req: Request) {
 
     // Add proxy if available
     if (proxyUrl) {
-      console.log("🔄 Using proxy for request");
-      // Note: The native fetch doesn't directly support agents like node-fetch.
-      // This part of the code might need a different approach depending on your deployment.
-      // For Vercel Edge functions, you might need a different proxy library or solution.
       const agent = new HttpsProxyAgent(proxyUrl);
       fetchOptions.agent = agent;
     }
@@ -114,13 +96,6 @@ export async function POST(req: Request) {
     const startTime = Date.now();
     const supabaseResponse = await fetch(supabaseEdgeFunctionUrl, fetchOptions);
     const duration = Date.now() - startTime;
-
-    console.log("📊 Supabase Edge Function response:", {
-      status: supabaseResponse.status,
-      statusText: supabaseResponse.statusText,
-      duration: `${duration}ms`,
-      headers: Object.fromEntries(supabaseResponse.headers.entries()),
-    });
 
     // Parse response
     const responseData: any = await supabaseResponse.json();

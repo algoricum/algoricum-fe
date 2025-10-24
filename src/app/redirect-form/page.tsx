@@ -10,7 +10,6 @@ export default function DashboardPage() {
       const params = new URLSearchParams(window.location.search);
 
       if ([...params].length === 0) {
-        console.log("No params found, not redirecting");
         return;
       }
 

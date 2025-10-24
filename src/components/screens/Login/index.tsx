@@ -2,7 +2,7 @@
 import { AuthSeparator } from "@/components/common";
 import { Button, Input } from "@/components/elements";
 import PasswordInput from "@/components/elements/PasswordInput";
-import { ErrorToast, WarningToast, SuccessToast } from "@/helpers/toast";
+import { ErrorToast, SuccessToast, WarningToast } from "@/helpers/toast";
 import { useClinicCheck } from "@/hooks/useClinicCheck";
 import { MailIcon, PasswordIcon } from "@/icons";
 import type { LoginProps } from "@/interfaces/services_type";
@@ -10,12 +10,12 @@ import { checkUserStatus, signInWithPassword } from "@/utils/supabase/auth-helpe
 import { setClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { setUserData } from "@/utils/supabase/user-helper";
+import { useMutation } from "@tanstack/react-query";
 import Flex from "antd/es/flex";
 import Form from "antd/es/form";
 import Typography from "antd/es/typography";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
 
 const { Text } = Typography;
 const LoginPage = () => {
@@ -37,7 +37,6 @@ const LoginPage = () => {
   const { mutate, isPending } = useMutation({
     mutationFn: (data: LoginProps) => signInWithPassword(data.email, data.password),
     onSuccess: async (data: any) => {
-      console.log("Login success data:", data); // Debug log
       setUserData(data?.user);
       // More robust email verification check
       const user = data?.user;
@@ -48,12 +47,7 @@ const LoginPage = () => {
       // Check multiple possible fields for email verification
       const isEmailVerified = user.is_email_verified !== null && user.is_email_verified !== undefined;
 
-      console.log("Email verification status:", {
-        is_email_verified: user.is_email_verified,
-        isEmailVerified,
-      }); // Debug log
       if (!isEmailVerified) {
-        console.log("Email not verified, redirecting to OTP page"); // Debug log
         WarningToast("Please verify your email before continuing.");
         // Auto-resend verification email
         const supabase = createClient();
