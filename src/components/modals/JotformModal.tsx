@@ -50,7 +50,6 @@ export const JotformModal: React.FC<ModalProps> = ({
       () => {
         const token = window.JF.getAPIKey();
         window.JF.getUser(() => {
-          console.log("Jotform auth successful", token);
           onConnect?.(token);
         });
       },

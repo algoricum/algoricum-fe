@@ -17,8 +17,8 @@ import {
   TypeformModal,
 } from "@/components/modals/Modals";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { useIntegrationsWithStatus } from "@/hooks/useDashboard";
 import { useCurrentUserClinic } from "@/hooks/useBilling";
+import { useIntegrationsWithStatus } from "@/hooks/useDashboard";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { IntegrationName, IntegrationStates, IntegrationWithStatus } from "@/types/integrations";
 import {
@@ -363,7 +363,6 @@ export default function IntegrationsContent() {
         try {
           fetchJotformForms(setJotformTreeData);
           const { data: jotformData } = await getIntegrationConnection(clinicId, "Jotform");
-          console.warn("jotformData", jotformData);
           setSelectedJotformForms(jotformData.auth_data?.forms.map((form: any) => form.form_id));
         } catch (error) {
           console.error("Error fetching Jotform data:", error);

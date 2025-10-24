@@ -143,7 +143,7 @@ export const integrationQueries = {
     // Merge statuses with integrations
     const integrationsWithStatus = allIntegrations.map(int => ({
       ...int,
-      connected: allStatuses[int.name] === "connected",
+      connected: allStatuses[int.name] !== "disconnected" && allStatuses[int.name] !== undefined,
     }));
 
     return {
