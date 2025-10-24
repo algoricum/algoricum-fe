@@ -47,7 +47,7 @@ export default function DashboardContent() {
 
   // React Query hooks
   const { data: clinicData, isLoading: clinicLoading } = useClinicData();
-  const clinicId = clinicData?.id || "";
+  const clinicId = typeof clinicData === "string" ? clinicData : clinicData?.id || "";
 
   const { data: leadsData = [], isLoading: leadsLoading, refetch: refetchLeads } = useLeads(clinicId);
   const { data: twilioPhoneNumber = "", isLoading: twilioLoading } = useTwilioConfig(clinicId);

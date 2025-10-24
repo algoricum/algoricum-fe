@@ -78,7 +78,7 @@ export default function IntegrationsContent() {
   const [buttonLoading, setButtonLoading] = useState(false);
   // React Query hooks
   const { data: clinicData, isLoading: clinicLoading } = useCurrentUserClinic();
-  const clinicId = clinicData?.id || "";
+  const clinicId = typeof clinicData === "string" ? clinicData : clinicData?.id || "";
   const { data: integrationsData, isLoading: integrationsLoading } = useIntegrationsWithStatus(clinicId);
 
   // Extract integrations and initial statuses from React Query data

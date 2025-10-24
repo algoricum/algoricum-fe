@@ -50,7 +50,7 @@ export default function AppointmentsContent() {
 
   // React Query hooks
   const { data: clinic, isLoading: clinicLoading, error: clinicError } = useCurrentUserClinic();
-  const clinicId = clinic?.id || "";
+  const clinicId = typeof clinic === "string" ? clinic : clinic?.id || "";
   const {
     data: appointmentsResponse,
     isLoading: appointmentsLoading,

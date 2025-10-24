@@ -30,10 +30,11 @@ export default function BillingContent() {
 
   // React Query hooks
   const { data: clinic, isLoading: clinicLoading } = useCurrentUserClinic();
-  const { data: subscription, isLoading: subscriptionLoading } = useSubscription(clinic?.id || "");
+  const clinicId = typeof clinic === "string" ? clinic : clinic?.id || "";
+  const { data: subscription, isLoading: subscriptionLoading } = useSubscription(clinicId);
   const { data: subscriptionEvents = [] } = useSubscriptionEvents(subscription?.id || "");
   const { data: plans = [] } = usePlans();
-  const { data: invoices = [] } = useInvoices(clinic?.id || "");
+  const { data: invoices = [] } = useInvoices(clinicId);
   const createCheckoutSession = useCreateCheckoutSession();
 
   const loading = clinicLoading || subscriptionLoading;
@@ -49,11 +50,11 @@ export default function BillingContent() {
       : null;
 
   const handleSubscribe = (priceId: string) => {
-    if (!clinic?.id) return;
+    if (!clinicId) return;
 
     setSubscribingPlanId(priceId);
     createCheckoutSession.mutate(
-      { clinicId: clinic.id, priceId: priceId },
+      { clinicId, priceId: priceId },
       {
         onSettled: () => setSubscribingPlanId(null),
       },
