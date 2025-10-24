@@ -959,12 +959,19 @@ export async function saveSelectedForms(req, supabaseAdmin) {
       }
 
       // Find the pending connection for this page
-      const pendingConnection = existingConnections?.find(
+      let pendingConnection = existingConnections?.find(
         conn => conn.auth_data?.facebook_page_id === facebook_page_id && conn.auth_data?.lead_form_id === "pending_selection",
       );
 
+      // If no pending connection exists, look for any active connection for this page that we can update
       if (!pendingConnection) {
-        throw new Error("No pending connection found for this page. Please re-authenticate.");
+        pendingConnection = existingConnections?.find(
+          conn => conn.auth_data?.facebook_page_id === facebook_page_id && conn.status === "active",
+        );
+      }
+
+      if (!pendingConnection) {
+        throw new Error("No connection found for this page. Please re-authenticate.");
       }
 
       // Update the pending connection with the selected forms
@@ -1228,7 +1235,7 @@ export async function fetchFacebookLeadFormResponses(reqOrClinicId, supabaseAdmi
                           updated_at: new Date().toISOString(),
                         };
 
-                        await enqueueLead(enqueuedLead, supabaseAdmin);
+                        await enqueueLead([enqueuedLead], connection.clinic_id);
                         totalCreated++;
                       } catch (leadErr) {
                         console.error("Lead processing error", leadErr);
@@ -1280,7 +1287,7 @@ export async function fetchFacebookLeadFormResponses(reqOrClinicId, supabaseAdmi
                         updated_at: new Date().toISOString(),
                       };
 
-                      await enqueueLead(fallbackLead, supabaseAdmin);
+                      await enqueueLead([fallbackLead], connection.clinic_id);
                       totalCreated++;
                     } catch (leadErr) {
                       console.error("Fallback lead processing error", leadErr);
@@ -1390,7 +1397,7 @@ async function processFacebookLead(leadgenId, connection, supabaseAdmin) {
             updated_at: new Date().toISOString(),
           };
 
-          await enqueueLead(enqueuedLead, supabaseAdmin);
+          await enqueueLead([enqueuedLead], connection.clinic_id);
           console.log(`Processed lead ${leadgenId} successfully via GPT extraction and queue`);
         } else {
           console.log(`No contacts extracted from lead ${leadgenId}`);
@@ -1444,7 +1451,7 @@ async function processFacebookLead(leadgenId, connection, supabaseAdmin) {
           updated_at: new Date().toISOString(),
         };
 
-        await enqueueLead(fallbackLead, supabaseAdmin);
+        await enqueueLead([fallbackLead], connection.clinic_id);
         console.log(`Processed lead ${leadgenId} via fallback processing`);
       }
     } catch (apiError) {
