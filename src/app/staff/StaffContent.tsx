@@ -71,7 +71,7 @@ export default function StaffContent(): JSX.Element {
 
   // React Query hooks
   const { data: clinic, isLoading: clinicLoading, error: clinicError } = useCurrentUserClinic();
-  const clinicId = clinic?.id || "";
+  const clinicId = typeof clinic === "string" ? clinic : clinic?.id || "";
   const { data: staffResponse, isLoading: staffLoading, error: staffError } = useStaffList(clinicId, currentPage, pageSize);
   const { data: statusStats = [], isLoading: statsLoading } = useStaffStats(clinicId);
 
