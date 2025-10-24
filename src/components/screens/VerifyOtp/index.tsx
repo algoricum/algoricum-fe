@@ -6,12 +6,12 @@ import { resendOtp, verifyOtp } from "@/utils/supabase/auth-helper";
 import { createClinic, setClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { getUserData } from "@/utils/supabase/user-helper";
+import { useMutation } from "@tanstack/react-query";
 import Flex from "antd/es/flex";
 import Typography from "antd/es/typography";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import OtpInput from "react-otp-input";
-import { useMutation } from "@tanstack/react-query";
 
 const { Title, Text } = Typography;
 
@@ -139,8 +139,6 @@ const VerifyOTPPage = () => {
           primary_color: "#2563EB",
         },
       };
-
-      console.log("VerifyOTPPage clinicData:", clinicData);
 
       try {
         const clinic = await createClinic(clinicData);

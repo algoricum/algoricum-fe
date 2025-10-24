@@ -11,11 +11,11 @@ import {
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  useOnboardingUser,
-  useOnboardingClinic,
   useCalendlyLink,
-  useSubscriptionStatus,
   useCompleteOnboarding,
+  useOnboardingClinic,
+  useOnboardingUser,
+  useSubscriptionStatus,
 } from "@/hooks/useOnboarding";
 import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
@@ -450,32 +450,34 @@ export default function MainOnboarding() {
             const isAccessible = index <= currentStepIndex || isCompleted;
 
             return (
-              <div key={step.id} className={`relative ${index === STEPS.length - 1 ? "" : "mb-3"}`}>
+              <div key={step.id} className={`relative ${index === STEPS.length - 1 ? "" : "mb-4"}`}>
                 {/* Vertical connecting line */}
-                {index < STEPS.length - 1 && <div className="absolute left-3 top-6 w-px h-6 bg-white bg-opacity-30 z-10" />}
+                {index < STEPS.length - 1 && <div className="absolute left-8 top-20 w-px h-4 bg-white/20 z-10" />}
 
                 <div
-                  className={`flex items-start cursor-pointer opacity-100 ${isAccessible ? "cursor-pointer" : "cursor-default opacity-70"}`}
+                  className={`group flex items-center py-3 px-2 transition-all duration-200 ${
+                    isAccessible ? "cursor-pointer" : "cursor-default opacity-60"
+                  }`}
                   onClick={() => isAccessible && handleStepClick(index)}
                 >
                   {/* Icon Circle */}
                   <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 flex-shrink-0 z-20 relative ${
-                      isCurrent ? "bg-white bg-opacity-90" : "bg-white bg-opacity-20"
+                    className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 flex-shrink-0 z-20 relative transition-all duration-200 ${
+                      isCurrent ? "bg-white" : isCompleted ? "bg-green-400" : "bg-white/20 border-2 border-white/30"
                     }`}
                   >
-                    <Text className={`text-xs ${isCurrent ? "text-purple-500" : "text-white text-opacity-80"}`}>
+                    <Text className={`text-lg ${isCurrent ? "text-purple-600" : isCompleted ? "text-white" : "text-white"}`}>
                       {isCompleted ? "✓" : step.icon}
                     </Text>
                   </div>
 
                   {/* Step Content */}
-                  <div className="flex-1 pt-0">
-                    <Text className="text-white text-opacity-80 text-xs font-normal block mb-0 tracking-wide">
-                      {index + 1}/{STEPS.length}
+                  <div className="flex-1">
+                    <Text className="text-white/60 text-xs font-medium mb-1 block">
+                      Step {index + 1 < 10 ? "0" + (index + 1) : index + 1}
                     </Text>
-                    <Text className="text-white text-sm font-semibold block mb-0 leading-none">{step.title}</Text>
-                    <Text className="text-white text-opacity-70 text-xs leading-tight block">{step.description}</Text>
+                    <Text className="text-white text-base font-semibold mb-1 leading-tight block">{step.title}</Text>
+                    <Text className="text-white/70 text-sm font-normal block">{step.description}</Text>
                   </div>
                 </div>
               </div>
