@@ -1,6 +1,6 @@
 import { keyFeatures } from "@/constants/home";
 import KeyFeatureLayout from "@/layouts/KeyFeatureLayout";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 
 const KeyFeatures = () => {
   return (

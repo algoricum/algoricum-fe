@@ -32,7 +32,6 @@ export default function OAuthRedirectPage() {
       try {
         // Save user to Redux and set user data
         saveUser(user);
-        // await setUserData(user);
 
         // Check if this user exists in the auth.users table by ID (returning user)
         const { data: existingUser } = await supabase.from("user").select("id, is_email_verified").eq("id", user.id).single();

@@ -42,7 +42,7 @@ export default function SystemAccessDenied({
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "#F8F9FA" }}>
-      <Card className="w-full max-w-5xl shadow-2xl border-0 overflow-hidden" bodyStyle={{ padding: 0 }}>
+      <Card className="w-full max-w-5xl shadow-2xl border-0 overflow-hidden" styles={{ body: { padding: 0 } }}>
         <Row className="min-h-[400px]">
           {/* Left Side - Header with purple background */}
           <Col xs={24} md={10} lg={8}>

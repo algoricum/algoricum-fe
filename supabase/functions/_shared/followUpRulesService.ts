@@ -394,6 +394,7 @@ const FOLLOW_UP_RULES_FREE: FollowUpRule[] = [
   {
     name: "email_21day_followup",
     timeFromCreated: 5 * 60 * 1000, // 5 minutes
+    leadStatus: ["New"],
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,
@@ -503,6 +504,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
   {
     name: "email_21day_followup",
     timeFromCreated: 30 * 1000, // 30 seconds
+    leadStatus: ["New"],
     communicationType: "email",
     onlyOnce: true,
     checkLastActivity: true,

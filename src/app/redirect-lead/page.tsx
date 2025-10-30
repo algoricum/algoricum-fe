@@ -15,8 +15,6 @@ export default function DashboardPage() {
     run();
   }, []);
 
-  // Loading/UI state
-
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
       <LoadingSpinner message="Loading ..." size="lg" />

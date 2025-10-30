@@ -1,6 +1,9 @@
 "use client";
 import { CalendarOutlined } from "@ant-design/icons";
-import { Alert, Button, Modal, Typography } from "antd";
+import Alert from "antd/es/alert";
+import Button from "antd/es/button";
+import Modal from "antd/es/modal";
+import Typography from "antd/es/typography";
 import type React from "react";
 import { CustomCrmModalProps } from "./types";
 import { commonAlertStyles } from "./utils";

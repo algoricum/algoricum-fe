@@ -123,8 +123,6 @@ async function getNamecheapDNSRecords(sld: string, tld: string, apiUser: string,
     url.searchParams.set(key, value);
   });
 
-  console.log("Fetching DNS records via proxy", { sld, tld, url: url.toString() });
-
   try {
     const response = await fetchWithProxy(url.toString(), {
       method: "GET",
@@ -141,10 +139,6 @@ async function getNamecheapDNSRecords(sld: string, tld: string, apiUser: string,
     }
 
     const responseText = await response.text();
-    console.log("DNS records response received", {
-      responseLength: responseText.length,
-      preview: responseText.substring(0, 200),
-    });
 
     // Check for API errors in XML response
     if (responseText.includes("<Errors>")) {
@@ -179,7 +173,6 @@ async function getNamecheapDNSRecords(sld: string, tld: string, apiUser: string,
       });
     }
 
-    console.log("Parsed existing DNS records", { count: records.length, records });
     return records;
   } catch (error: any) {
     console.error("Error fetching DNS records:", error);
@@ -224,12 +217,6 @@ async function setNamecheapDNSRecords(
     url.searchParams.set(key, String(value));
   });
 
-  console.log("Setting DNS records via proxy", {
-    recordCount: records.length,
-    url: url.toString().replace(apiKey, "***"), // Hide API key in logs
-    records: records.map(r => ({ name: r.name, type: r.type, address: r.address })),
-  });
-
   try {
     const response = await fetchWithProxy(url.toString(), {
       method: "GET",
@@ -246,10 +233,6 @@ async function setNamecheapDNSRecords(
     }
 
     const responseText = await response.text();
-    console.log("DNS records set response:", {
-      responseLength: responseText.length,
-      preview: responseText.substring(0, 200),
-    });
 
     // Check for API errors in XML response
     if (responseText.includes("<Errors>")) {
@@ -281,11 +264,6 @@ async function getDmarcRecord(domain: string, subdomain: string, mailgunDnsRecor
   const existingDmarc = allRecords.find(record => record.record_type === "TXT" && record.name.includes("_dmarc"));
 
   if (existingDmarc) {
-    console.log("Found existing DMARC record from Mailgun:", {
-      name: existingDmarc.name,
-      value: existingDmarc.value,
-    });
-
     // Clean up the host name (remove domain if present)
     let dmarcHost = existingDmarc.name;
     if (dmarcHost.includes(domain)) {
@@ -301,9 +279,6 @@ async function getDmarcRecord(domain: string, subdomain: string, mailgunDnsRecor
       source: "mailgun",
     };
   }
-
-  // If no DMARC record from Mailgun, create a default one
-  console.log("No DMARC record found in Mailgun DNS, creating default DMARC policy");
 
   // Extract subdomain host for DMARC
   const subdomainHost = subdomain.replace(`.${domain}`, "");
@@ -333,12 +308,10 @@ async function executeWithIpFallback<T>(operation: (_clientIp: string) => Promis
   // Try with first IP
   if (ip1) {
     try {
-      console.log(`${operationName}: Trying with IP1 (${ip1})`);
       return await operation(ip1);
     } catch (error: any) {
       // Check if it's an IP mismatch error
       if (error.message.includes("Invalid request IP") && ip2) {
-        console.log(`${operationName}: IP1 failed (${error.message}), retrying with IP2 (${ip2})`);
         try {
           return await operation(ip2);
         } catch (ip2Error: any) {
@@ -352,7 +325,6 @@ async function executeWithIpFallback<T>(operation: (_clientIp: string) => Promis
     }
   } else if (ip2) {
     // Only IP2 available
-    console.log(`${operationName}: Only IP2 available (${ip2})`);
     return await operation(ip2);
   } else {
     throw new Error("No Namecheap Client IPs configured");
@@ -368,19 +340,6 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
   const NAMECHEAP_USERNAME = process.env.NAMECHEAP_USERNAME;
   const NAMECHEAP_CLIENT_IP1 = process.env.NAMECHEAP_CLIENT_IP1;
   const NAMECHEAP_CLIENT_IP2 = process.env.NAMECHEAP_CLIENT_IP2;
-
-  console.log("Starting DNS setup with IP fallback", {
-    domain,
-    subdomain,
-    hasApiUser: !!NAMECHEAP_API_USER,
-    hasApiKey: !!NAMECHEAP_API_KEY,
-    hasUsername: !!NAMECHEAP_USERNAME,
-    hasClientIp1: !!NAMECHEAP_CLIENT_IP1,
-    hasClientIp2: !!NAMECHEAP_CLIENT_IP2,
-    hasProxy: !!process.env.FIXIE_PROXY_URL,
-    clientIp1: NAMECHEAP_CLIENT_IP1,
-    clientIp2: NAMECHEAP_CLIENT_IP2,
-  });
 
   if (!NAMECHEAP_API_USER || !NAMECHEAP_API_KEY || !NAMECHEAP_USERNAME || (!NAMECHEAP_CLIENT_IP1 && !NAMECHEAP_CLIENT_IP2)) {
     console.warn("Namecheap API credentials incomplete");
@@ -407,22 +366,11 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
     const tld = domainParts[1];
     const subdomainHost = subdomain.replace(`.${domain}`, "");
 
-    console.log("Parsed domain components", { domain, sld, tld, subdomain, subdomainHost });
-
     // Extract DKIM records from Mailgun DNS records (handling ANY selector: mx, pic, mailo, etc.)
     const dkimRecords =
       mailgunDnsRecords.sending_dns_records?.filter(
         (record: MailgunDnsRecord) => record.record_type === "TXT" && record.name.includes("_domainkey"),
       ) || [];
-
-    console.log(
-      "Found DKIM records:",
-      dkimRecords.map((r: MailgunDnsRecord) => ({
-        name: r.name,
-        selector: r.name.split("._domainkey")[0],
-        value_preview: `${r.value.substring(0, 50)}...`,
-      })),
-    );
 
     if (dkimRecords.length === 0) {
       console.warn("No DKIM records found in Mailgun DNS data!");
@@ -432,14 +380,8 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
 
     // Get DMARC record
     const dmarcRecord = await getDmarcRecord(domain, subdomain, mailgunDnsRecords);
-    console.log("DMARC record prepared:", {
-      name: dmarcRecord.name,
-      source: dmarcRecord.source,
-      value_preview: `${dmarcRecord.address.substring(0, 50)}...`,
-    });
 
     // Step 1: Get existing DNS records with IP fallback
-    console.log("Fetching existing DNS records");
     const existingRecords = await executeWithIpFallback(
       clientIp => getNamecheapDNSRecords(sld, tld, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, clientIp),
       "getNamecheapDNSRecords",
@@ -468,14 +410,6 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       }
 
       return true;
-    });
-
-    console.log("DNS records analysis", {
-      totalExisting: existingRecords.length,
-      toPreserve: preservedRecords.length,
-      toReplace: existingRecords.length - preservedRecords.length,
-      dkimRecordsFound: dkimRecords.length,
-      dmarcRecordSource: dmarcRecord.source,
     });
 
     // Step 3: Build new DNS records
@@ -521,7 +455,6 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       let dkimHost = dkimRecord.name;
       // Remove ".msgdesk.co" from the host
       dkimHost = dkimHost.replace(".msgdesk.co", "");
-      console.log(`Adding DKIM record: ${dkimHost} -> ${dkimRecord.value.substring(0, 50)}...`);
 
       newRecords.push({
         name: dkimHost,
@@ -531,16 +464,6 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
         ttl: "300",
       });
     });
-
-    // Log record details for debugging
-    console.log(
-      "Records to be set:",
-      newRecords.map(r => ({
-        name: r.name,
-        type: r.type,
-        address: r.address.length > 50 ? `${r.address.substring(0, 50)}...` : r.address,
-      })),
-    );
 
     // Validate records count (Namecheap has limits)
     if (newRecords.length > 100) {
@@ -566,21 +489,6 @@ async function createNamecheapDNSRecords(domain: string, subdomain: string, mail
       clientIp => setNamecheapDNSRecords(sld, tld, newRecords, NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, clientIp),
       "setNamecheapDNSRecords",
     );
-
-    const totalMailgunRecords = 5 + dkimRecords.length; // 2 MX + 1 SPF + 1 DMARC + 1 CNAME + N DKIM records
-    console.log("DNS records updated successfully", {
-      domain,
-      subdomain,
-      recordsSet: totalMailgunRecords,
-      breakdown: {
-        mx_records: 2,
-        spf_record: 1,
-        dmarc_record: 1,
-        cname_record: 1,
-        dkim_records: dkimRecords.length,
-      },
-      totalDuration: Date.now() - startTime,
-    });
 
     // Build response with all created records
     const recordsCreated = [
@@ -630,8 +538,6 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { action, domain, subdomain, mailgunDnsRecords } = body;
-
-    console.log("Namecheap DNS API called", { action, domain, subdomain, recordsProvided: !!mailgunDnsRecords });
 
     if (action === "setup-dns") {
       if (!mailgunDnsRecords || !mailgunDnsRecords.sending_dns_records) {

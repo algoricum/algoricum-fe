@@ -5,10 +5,12 @@ import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { PasswordIcon } from "@/icons";
 import AuthLayout from "@/layouts/AuthLayout";
 import { createClient } from "@/utils/supabase/config/client";
-import { Flex, Form, Typography } from "antd";
+import Flex from "antd/es/flex";
+import Form from "antd/es/form";
+import Typography from "antd/es/typography";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useMutation } from "react-query";
+import { useMutation } from "@tanstack/react-query";
 const { Title, Text } = Typography;
 
 const PasswordSetupPage = () => {
@@ -39,8 +41,8 @@ const PasswordSetupPage = () => {
     verifySession();
   }, [searchParams, supabase.auth]);
 
-  const { mutate, isLoading } = useMutation(
-    async (password: string) => {
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (password: string) => {
       const { error } = await supabase.auth.updateUser({
         password,
         data: {
@@ -50,20 +52,18 @@ const PasswordSetupPage = () => {
       if (error) throw error;
       return true;
     },
-    {
-      onSuccess: async () => {
-        SuccessToast("Password updated successfully");
-        form.resetFields();
+    onSuccess: async () => {
+      SuccessToast("Password updated successfully");
+      form.resetFields();
 
-        setTimeout(() => {
-          window.location.href = "/dashboard";
-        }, 1500);
-      },
-      onError: (error: any) => {
-        ErrorToast(error?.message || "Failed to update password");
-      },
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 1500);
     },
-  );
+    onError: (error: any) => {
+      ErrorToast(error?.message || "Failed to update password");
+    },
+  });
 
   const onFinish = (values: any) => {
     mutate(values.password);
@@ -135,7 +135,7 @@ const PasswordSetupPage = () => {
             </Form.Item>
 
             <Form.Item>
-              <Button loading={isLoading} className="w-full" type="primary" htmlType="submit">
+              <Button loading={isPending} className="w-full" type="primary" htmlType="submit">
                 Save Password
               </Button>
             </Form.Item>

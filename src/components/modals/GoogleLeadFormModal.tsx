@@ -1,7 +1,11 @@
 "use client";
 
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
-import { Alert, Button, Modal, Select, Typography } from "antd";
+import Alert from "antd/es/alert";
+import Button from "antd/es/button";
+import Modal from "antd/es/modal";
+import Select from "antd/es/select";
+import Typography from "antd/es/typography";
 import Image from "next/image";
 import type React from "react";
 import { useState } from "react";

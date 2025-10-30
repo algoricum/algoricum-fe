@@ -6,11 +6,12 @@ import { resendOtp, verifyOtp } from "@/utils/supabase/auth-helper";
 import { createClinic, setClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { getUserData } from "@/utils/supabase/user-helper";
-import { Flex, Typography } from "antd";
+import { useMutation } from "@tanstack/react-query";
+import Flex from "antd/es/flex";
+import Typography from "antd/es/typography";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import OtpInput from "react-otp-input";
-import { useMutation } from "react-query";
 
 const { Title, Text } = Typography;
 
@@ -62,7 +63,8 @@ const VerifyOTPPage = () => {
     initializeUser();
   }, [emailParam, fromLogin, router]);
 
-  const { mutate: verifyOTP, isLoading: verifyLoading } = useMutation((data: VerifyOtpProps) => verifyOtp(data.email, data.otp), {
+  const { mutate: verifyOTP, isPending: verifyLoading } = useMutation({
+    mutationFn: (data: VerifyOtpProps) => verifyOtp(data.email, data.otp),
     onSuccess: async () => {
       SuccessToast("Email verified successfully");
 
@@ -77,11 +79,11 @@ const VerifyOTPPage = () => {
 
       try {
         await supabase
-          .from('user')
-          .upsert({ 
-            is_email_verified: true 
+          .from("user")
+          .upsert({
+            is_email_verified: true,
           })
-          .eq('id', user.id);
+          .eq("id", user.id);
       } catch (error) {
         console.error("Failed to update email verification status:", error);
       }
@@ -138,8 +140,6 @@ const VerifyOTPPage = () => {
         },
       };
 
-      console.log("VerifyOTPPage clinicData:", clinicData);
-
       try {
         const clinic = await createClinic(clinicData);
         setClinicData(clinic);
@@ -171,7 +171,8 @@ const VerifyOTPPage = () => {
     },
   });
 
-  const { mutate: resendOTP, isLoading: resendLoading } = useMutation((data: ResendOtpProps) => resendOtp(data.email), {
+  const { mutate: resendOTP, isPending: resendLoading } = useMutation({
+    mutationFn: (data: ResendOtpProps) => resendOtp(data.email),
     onSuccess: () => {
       SuccessToast("OTP resent successfully");
       setResendTimer(60);

@@ -1,5 +1,5 @@
 import { ChatIcon } from "@/icons";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 import { FC } from "react";
 
 interface Props {

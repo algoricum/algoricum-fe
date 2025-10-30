@@ -1,6 +1,6 @@
 import { Button } from "@/components/elements";
 import { CheckIcon } from "@/icons";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 import { FC } from "react";
 
 interface PricingProps {

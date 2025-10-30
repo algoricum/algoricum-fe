@@ -7,12 +7,13 @@ import { MailIcon, PasswordIcon, UserIcon } from "@/icons";
 import { SignupProps } from "@/interfaces/services_type";
 import { saveUser } from "@/redux/accessors/user.accessors";
 import { signUp } from "@/utils/supabase/auth-helper";
-// import { createClient } from "@/utils/supabase/config/client";
 import { setUserData } from "@/utils/supabase/user-helper";
-import { Flex, Form, Typography } from "antd";
+import { useMutation } from "@tanstack/react-query";
+import Flex from "antd/es/flex";
+import Form from "antd/es/form";
+import Typography from "antd/es/typography";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation } from "react-query";
 const { Text } = Typography;
 const SignupPage = () => {
   const { push } = useRouter();
@@ -25,7 +26,8 @@ const SignupPage = () => {
       },
     ]);
   };
-  const { mutate, isLoading } = useMutation((data: SignupProps) => signUp(data.name, data.email, data.password), {
+  const { mutate, isPending } = useMutation({
+    mutationFn: (data: SignupProps) => signUp(data.name, data.email, data.password),
     onSuccess: (data: any) => {
       if (!data?.user) return;
       saveUser(data.user);
@@ -152,7 +154,7 @@ const SignupPage = () => {
           </Flex>
           <Form.Item>
             <Button
-              loading={isLoading}
+              loading={isPending}
               className="w-full  bg-brand-primary hover:!bg-brand-secondary text-white"
               type="primary"
               htmlType="submit"

@@ -1,6 +1,6 @@
 "use client";
 import { BackArrowIcon } from "@/icons";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 import { useRouter } from "next/navigation";
 
 const BackArrow = () => {

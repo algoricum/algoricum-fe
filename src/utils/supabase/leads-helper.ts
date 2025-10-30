@@ -379,16 +379,20 @@ export async function updateLeadStatus(
     status?: string;
     interest_level?: string;
     urgency?: string;
+    notes?: string;
   },
 ): Promise<void> {
   try {
-    const { error } = await supabase
-      .from("lead")
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", leadId);
+    // Convert empty strings to null for fields with check constraints
+    const sanitizedUpdates = {
+      ...updates,
+      interest_level: updates.interest_level === "" ? null : updates.interest_level,
+      urgency: updates.urgency === "" ? null : updates.urgency,
+      notes: updates.notes === "" ? null : updates.notes,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from("lead").update(sanitizedUpdates).eq("id", leadId);
 
     if (error) {
       throw error;

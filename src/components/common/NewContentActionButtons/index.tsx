@@ -1,5 +1,5 @@
 import { Button } from "@/components/elements";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 import { useRouter } from "next/navigation";
 
 interface ContentHeaderProps {

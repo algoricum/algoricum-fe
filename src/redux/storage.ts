@@ -14,6 +14,7 @@ const createNoopStorage = () => {
   };
 };
 
+// Suppress redux-persist warning in server environment
 const storage = typeof window !== "undefined" ? createWebStorage("local") : createNoopStorage();
 
 export default storage;

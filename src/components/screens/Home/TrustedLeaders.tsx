@@ -1,5 +1,5 @@
 import { industriesLogos } from "@/constants/industriesLogos";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 import Image from "next/image";
 import { useState } from "react";
 import Slider from "react-infinite-logo-slider";

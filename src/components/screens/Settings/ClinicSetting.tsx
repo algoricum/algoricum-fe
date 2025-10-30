@@ -1,10 +1,8 @@
 "use client";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { CLINIC_FIELDS, DAYS, TIME_OPTIONS } from "@/constants";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import { getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
-import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
-import { createClient } from "@/utils/supabase/config/client";
+import { ErrorToast } from "@/helpers/toast";
+import { useClinicSettings, useTwilioPhoneNumber, useUpdateClinicComplete } from "@/hooks/useSettings";
 import { Button, Input, Select, Switch, Typography, Upload, message } from "antd";
 import { CopyOutlined } from "@ant-design/icons";
 import Image from "next/image";
@@ -13,13 +11,8 @@ import { useEffect, useState } from "react";
 const { Title } = Typography;
 const { Option } = Select;
 
-const supabase = createClient();
-
 const ClinicSetting = () => {
-  const [loading, setLoading] = useState(true);
-  const [clinic, setClinic] = useState<any>(null);
   const [fileList, setFileList] = useState<any[]>([]);
-  const [twilioPhoneNumber, setTwilioPhoneNumber] = useState<string>("");
   const [formData, setFormData] = useState<any>({
     legal_business_name: "",
     dba_name: "",
@@ -34,18 +27,20 @@ const ClinicSetting = () => {
     mailgun_email: "", // Non-editable field
   });
 
-  // Function to fetch Twilio phone number
-  const fetchTwilioPhoneNumber = async (clinicId: string) => {
-    try {
-      const { data, error } = await supabase.from("twilio_config").select("twilio_phone_number").eq("clinic_id", clinicId).single();
+  // React Query hooks
+  const { data: clinic, isLoading: clinicLoading, error: clinicError } = useClinicSettings();
+  const { data: twilioPhoneNumber = "", isLoading: twilioLoading } = useTwilioPhoneNumber(clinic?.id || "");
+  const updateClinicMutation = useUpdateClinicComplete();
 
-      if (data && !error) {
-        setTwilioPhoneNumber(data.twilio_phone_number || "");
-      }
-    } catch (error) {
-      console.error("Error fetching Twilio phone number:", error);
+  // Combined loading state
+  const loading = clinicLoading || twilioLoading || updateClinicMutation.isPending;
+
+  // Handle React Query errors
+  useEffect(() => {
+    if (clinicError) {
+      ErrorToast("Failed to load clinic data");
     }
-  };
+  }, [clinicError]);
 
   // Copy to clipboard function
   const copyToClipboard = async (text: string, fieldName: string) => {
@@ -65,59 +60,47 @@ const ClinicSetting = () => {
     }
   };
 
+  // Update form data when clinic data is loaded from React Query
   useEffect(() => {
-    const fetchClinic = async () => {
-      const data = await getClinicData();
-      if (data) {
-        let logoUrl = null;
-        if (data.logo && /^https?:\/\//.test(data.logo)) {
-          logoUrl = data.logo;
-        } else if (data.logo) {
-          const { data: publicUrlData } = supabase.storage.from("clinic-logos").getPublicUrl(data.logo);
-          logoUrl = publicUrlData?.publicUrl || null;
-        }
-
-        const normalizedHours = Object.fromEntries(
-          DAYS.map(day => {
-            const entry = data.business_hours?.[day];
-            return [
-              day,
-              entry
-                ? { enabled: entry.isOpen, start: entry.openTime, end: entry.closeTime }
-                : { enabled: day !== "Sunday", start: "9:00 AM", end: "5:00 PM" },
-            ];
-          }),
-        );
-
-        setClinic(data);
-        setFormData({
-          legal_business_name: data.legal_business_name || "",
-          dba_name: data.dba_name || "",
-          email: data.email || "",
-          phone: data.phone || "",
-          address: data.address || "",
-          domain: data.domain || "",
-          calendly_link: data.calendly_link || "",
-          clinic_type: data.clinic_type || "",
-          logo: logoUrl,
-          business_hours: normalizedHours,
-          mailgun_email: data.mailgun_email || "",
-        });
-
-        if (data.logo) {
-          setFileList([{ uid: "-1", name: "Clinic Logo", status: "done", url: logoUrl }]);
-        }
-
-        // Fetch Twilio phone number
-        if (data.id) {
-          await fetchTwilioPhoneNumber(data.id);
-        }
+    if (clinic) {
+      let logoUrl = null;
+      if (clinic.logo && /^https?:\/\//.test(clinic.logo)) {
+        logoUrl = clinic.logo;
+      } else if ("logoUrl" in clinic && clinic.logoUrl) {
+        logoUrl = clinic.logoUrl;
       }
-      setLoading(false);
-    };
 
-    fetchClinic();
-  }, []);
+      const normalizedHours = Object.fromEntries(
+        DAYS.map(day => {
+          const entry = clinic.business_hours?.[day];
+          return [
+            day,
+            entry
+              ? { enabled: entry.isOpen, start: entry.openTime, end: entry.closeTime }
+              : { enabled: day !== "Sunday", start: "9:00 AM", end: "5:00 PM" },
+          ];
+        }),
+      );
+
+      setFormData({
+        legal_business_name: clinic.legal_business_name || "",
+        dba_name: clinic.dba_name || "",
+        email: clinic.email || "",
+        phone: clinic.phone || "",
+        address: clinic.address || "",
+        domain: clinic.domain || "",
+        calendly_link: clinic.calendly_link || "",
+        clinic_type: clinic.clinic_type || "",
+        logo: logoUrl,
+        business_hours: normalizedHours,
+        mailgun_email: clinic.mailgun_email || "",
+      });
+
+      if (clinic.logo && logoUrl) {
+        setFileList([{ uid: "-1", name: "Clinic Logo", status: "done", url: logoUrl }]);
+      }
+    }
+  }, [clinic]);
 
   const handleChange = (field: string, value: any) => {
     setFormData((prev: typeof formData) => ({ ...prev, [field]: value }));
@@ -161,16 +144,7 @@ const ClinicSetting = () => {
   const handleSubmit = async () => {
     if (!clinic?.id) return;
 
-    let logoUrl = formData.logo;
     const file = fileList[0]?.originFileObj;
-    if (file instanceof File) {
-      try {
-        logoUrl = await uploadClinicLogo(clinic.created_by || clinic.id, file);
-      } catch (error) {
-        console.error("Upload failed", error);
-        return ErrorToast("Logo upload failed");
-      }
-    }
 
     const updatedHours = Object.fromEntries(
       DAYS.map(day => {
@@ -179,17 +153,21 @@ const ClinicSetting = () => {
       }),
     );
 
-    const result = await updateClinic({
+    const clinicUpdateData = {
       id: clinic.id,
       ...formData,
-      logo: logoUrl,
       business_hours: updatedHours,
-    });
+    };
 
-    if (result) {
-      SuccessToast("Clinic profile updated successfully");
-    } else {
-      ErrorToast("Update failed. Please try again.");
+    try {
+      await updateClinicMutation.mutateAsync({
+        clinicData: clinicUpdateData,
+        logoFile: file instanceof File ? file : undefined,
+        userId: clinic.owner_id,
+      });
+    } catch (error) {
+      // Error handling is done in the mutation hook
+      console.error("Update failed:", error);
     }
   };
 
@@ -237,16 +215,19 @@ const ClinicSetting = () => {
                   readOnly
                   className="mb-4 bg-gray-50 cursor-default"
                   suffix={
-                    formData.mailgun_email && (
-                      <Button
-                        type="text"
-                        icon={<CopyOutlined />}
-                        size="small"
-                        onClick={() => copyToClipboard(formData.mailgun_email, "Mailgun Email")}
-                        className="text-brand-primary hover:!text-brand-secondary"
-                        title="Copy Mailgun Email"
-                      />
-                    )
+                    <Button
+                      type="text"
+                      icon={<CopyOutlined />}
+                      size="small"
+                      onClick={() => copyToClipboard(formData.mailgun_email, "Mailgun Email")}
+                      className="text-brand-primary hover:!text-brand-secondary"
+                      title="Copy Mailgun Email"
+                      style={{
+                        visibility: formData.mailgun_email ? "visible" : "hidden",
+                        opacity: formData.mailgun_email ? 1 : 0,
+                      }}
+                      disabled={!formData.mailgun_email}
+                    />
                   }
                 />
               </div>
@@ -262,16 +243,19 @@ const ClinicSetting = () => {
                   readOnly
                   className="mb-4 bg-gray-50 cursor-default"
                   suffix={
-                    twilioPhoneNumber && (
-                      <Button
-                        type="text"
-                        icon={<CopyOutlined />}
-                        size="small"
-                        onClick={() => copyToClipboard(twilioPhoneNumber, "Twilio Phone Number")}
-                        className="text-brand-primary hover:!text-brand-secondary"
-                        title="Copy Twilio Phone Number"
-                      />
-                    )
+                    <Button
+                      type="text"
+                      icon={<CopyOutlined />}
+                      size="small"
+                      onClick={() => copyToClipboard(twilioPhoneNumber, "Twilio Phone Number")}
+                      className="text-brand-primary hover:!text-brand-secondary"
+                      title="Copy Twilio Phone Number"
+                      style={{
+                        visibility: twilioPhoneNumber ? "visible" : "hidden",
+                        opacity: twilioPhoneNumber ? 1 : 0,
+                      }}
+                      disabled={!twilioPhoneNumber}
+                    />
                   }
                 />
               </div>
@@ -287,7 +271,14 @@ const ClinicSetting = () => {
             <div className="flex flex-col items-center justify-center w-full h-full">
               <div className="relative w-full max-w-xs">
                 <div className="relative w-full h-[200px] mb-4">
-                  <Image src={formData.logo || "/placeholder.svg"} alt="Clinic Logo" fill className="object-contain rounded-lg shadow-sm" />
+                  <Image
+                    src={formData.logo || "/placeholder.svg"}
+                    alt="Clinic Logo"
+                    fill
+                    className="object-contain rounded-lg shadow-sm"
+                    sizes="(max-width: 768px) 100vw, 320px"
+                    loading="lazy" // Settings page loads after navigation
+                  />
                 </div>
 
                 <div className="text-center space-y-4">

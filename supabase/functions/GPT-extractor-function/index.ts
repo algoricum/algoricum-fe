@@ -22,7 +22,7 @@ async function callOpenAI(prompt, retries = 2) {
           },
         ],
         temperature: 0.1,
-        max_tokens: 1500,
+        max_tokens: 4000,
       }),
     });
     if (!openaiResponse.ok) {
@@ -72,6 +72,15 @@ async function callOpenAI(prompt, retries = 2) {
   }
   return [];
 }
+// Helper function to chunk array into smaller pieces
+function chunkArray(array, chunkSize) {
+  const chunks = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    chunks.push(array.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 serve(async req => {
   if (req.method === "OPTIONS") {
     return new Response("ok", {
@@ -80,7 +89,7 @@ serve(async req => {
   }
   try {
     const inputData = await req.json();
-    if (!inputData) {
+    if (!inputData || !inputData.data) {
       return new Response(
         JSON.stringify({
           error: "No data provided",
@@ -108,9 +117,19 @@ serve(async req => {
         },
       );
     }
-    const prompt = `
+    // Handle large datasets by chunking
+    const data = Array.isArray(inputData.data) ? inputData.data : [inputData.data];
+    const CHUNK_SIZE = 10; // Process 10 records at a time
+    const chunks = chunkArray(data, CHUNK_SIZE);
+
+    const allExtractedContacts = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`Processing chunk ${i + 1}/${chunks.length} with ${chunk.length} records`);
+
+      const prompt = `
 You are a data extraction specialist. I will provide you with JSON data of any structure, and you need to extract contact information from it.
-There can be multiple contacts in the data.
 
 Extract the following information and return it as a valid JSON array of objects:
 - email: Extract email address (skip if no or duplicate email)
@@ -118,6 +137,7 @@ Extract the following information and return it as a valid JSON array of objects
 - lastName: Extract last name (null if not found)
 - phone: Extract primary phone number (null if not found) e.g. (+54122222222/with country code)
 - createdDate: Extract the date when the contact was created (null if not found)
+- source_id: Extract the original source_id (preserve exactly as found, null if not found)
 
 Important rules:
 1. Only return valid JSON format
@@ -130,39 +150,31 @@ Important rules:
 8. Skip entries that don't have at least an email
 9. If multiple emails/phones, pick the first valid one
 10. If no country code in phone, send null
-11. skip if duplicate email
+11. Skip if duplicate email
 
 Here's the data to extract from:
-${JSON.stringify(inputData.data, null, 2)}
+${JSON.stringify(chunk, null, 2)}
 
 Return only the JSON array of extracted contacts.`;
-    let extractedContacts = [];
-    try {
-      extractedContacts = await callOpenAI(prompt, 2);
 
-      // Deduplicate by email
-      const seen = new Set<string>();
-      extractedContacts = extractedContacts.filter(contact => {
-        if (seen.has(contact.email)) return false;
-        seen.add(contact.email);
-        return true;
-      });
-    } catch (err) {
-      return new Response(
-        JSON.stringify({
-          error: "Failed to parse extracted data",
-          message: err.message,
-          fallback: [],
-        }),
-        {
-          status: 200,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        },
-      );
+      try {
+        const chunkResults = await callOpenAI(prompt, 2);
+        allExtractedContacts.push(...chunkResults);
+      } catch (err) {
+        console.error(`Error processing chunk ${i + 1}:`, err);
+        // Continue with other chunks even if one fails
+      }
     }
+
+    // Deduplicate by email across all chunks
+    const seen = new Set<string>();
+    const extractedContacts = allExtractedContacts.filter(contact => {
+      if (!contact.email || seen.has(contact.email)) return false;
+      seen.add(contact.email);
+      return true;
+    });
+
+    console.log(`Successfully processed ${chunks.length} chunks, extracted ${extractedContacts.length} unique contacts`);
     return new Response(
       JSON.stringify({
         success: true,

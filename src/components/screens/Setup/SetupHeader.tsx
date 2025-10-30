@@ -1,6 +1,7 @@
 import { Button } from "@/components/elements";
 import { PlusIcon } from "@/icons";
-import { Flex, Typography } from "antd";
+import Flex from "antd/es/flex";
+import Typography from "antd/es/typography";
 
 const { Text } = Typography;
 interface SetupHeaderProps {

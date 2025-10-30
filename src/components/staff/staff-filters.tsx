@@ -1,38 +1,22 @@
 "use client";
-import { Button, Select } from "antd";
+import type { StaffFiltersProps } from "@/types/staff";
+import Button from "antd/es/button";
+import Select from "antd/es/select";
 import { Plus, Search, X } from "lucide-react";
-import type React from "react";
 
-interface StaffFiltersProps {
-  searchTerm: string;
-  selectedRole: string;
-  selectedStatus: string;
-  availableRoles: Array<{ value: string; label: string }>;
-  totalStaff: number;
-  filteredStaff: number;
-
-  onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-
-  onRoleChange: (value: string) => void;
-
-  onStatusChange: (value: string) => void;
-  onClearSearch: () => void;
-  onClearFilters: () => void;
-  onAddStaff: () => void;
-}
-
-export function StaffFilters({
-  searchTerm,
-  selectedRole,
-  selectedStatus,
-  totalStaff,
-  filteredStaff,
-  onSearchChange,
-  onStatusChange,
-  onClearSearch,
-  onClearFilters,
-  onAddStaff,
-}: StaffFiltersProps) {
+export function StaffFilters(props: Readonly<StaffFiltersProps>) {
+  const {
+    searchTerm,
+    selectedRole,
+    selectedStatus,
+    totalStaff,
+    filteredStaff,
+    onSearchChange,
+    onStatusChange,
+    onClearSearch,
+    onClearFilters,
+    onAddStaff,
+  } = props;
   const hasFilters = searchTerm || selectedRole !== "all" || selectedStatus !== "all";
 
   return (
@@ -78,7 +62,7 @@ export function StaffFilters({
           {/* Status */}
           <Select
             value={selectedStatus}
-            onChange={value => onStatusChange(value as string)}
+            onChange={onStatusChange}
             className="w-full md:w-[160px]"
             size="large"
             style={{
