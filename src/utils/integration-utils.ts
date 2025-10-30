@@ -488,11 +488,10 @@ export const connectToNextHealth = async (apiKey: string, setButtonLoading: any)
   setButtonLoading(true);
   const clinicId = await getClinicId();
   try {
-    const res = await fetch("https://ozmytbghfvrfhbjvabor.supabase.co/functions/v1/NextHealth-integration", {
+    const res = await fetch(`${SUPABASE_URL}/NextHealth-integration`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        // same as your curl
         Authorization: apiKey,
       },
       body: JSON.stringify({
@@ -510,7 +509,6 @@ export const connectToNextHealth = async (apiKey: string, setButtonLoading: any)
     console.log("NextHealth response:", data);
     //redirect
     SuccessToast("NextHealth connected successfully");
-    window.location.href = window.location.href + "?next_health_status=success";
 
     return data;
   } catch (err) {
@@ -555,7 +553,6 @@ export const connnectToGravityForm = async (token: any, setButtonLoading: any) =
     }
 
     console.log("🚀 Redirecting to Gravity Form OAuth:", data.auth_url);
-    window.location.href = window.location.href + "?gravity_form_status=success";
   } catch (error) {
     setButtonLoading(false);
     console.error("Connection failed:", error);
