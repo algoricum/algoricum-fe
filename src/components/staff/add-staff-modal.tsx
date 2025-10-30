@@ -4,31 +4,17 @@ import { ErrorToast } from "@/helpers/toast";
 import Button from "antd/es/button";
 import { X } from "lucide-react";
 import type React from "react";
+import type { AddStaffModalProps } from "@/types/staff";
 
-interface NewStaff {
-  email: string;
-  name: string;
-}
-
-interface AddStaffModalProps {
-  isOpen: boolean;
-  isSubmitting: boolean;
-  newStaff: NewStaff;
-  onClose: () => void;
-
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-
-  onInputChange: (field: keyof NewStaff, value: string) => void;
-}
-
-export function AddStaffModal({ isOpen, isSubmitting, newStaff, onClose, onSubmit, onInputChange }: AddStaffModalProps) {
+export function AddStaffModal(props: Readonly<AddStaffModalProps>) {
+  const { isOpen, isSubmitting, newStaff, onClose, onSubmit, onInputChange } = props;
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     try {
-      await onSubmit(e);
+      onSubmit(e);
       onClose();
     } catch (error) {
       console.error("Error creating staff member:", error);
@@ -54,8 +40,11 @@ export function AddStaffModal({ isOpen, isSubmitting, newStaff, onClose, onSubmi
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Full Name</label>
+            <label htmlFor="staff-name" className="mb-1 block text-sm font-medium text-gray-700">
+              Full Name
+            </label>
             <input
+              id="staff-name"
               type="text"
               required
               value={newStaff.name}
@@ -66,8 +55,11 @@ export function AddStaffModal({ isOpen, isSubmitting, newStaff, onClose, onSubmi
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+            <label htmlFor="staff-email" className="mb-1 block text-sm font-medium text-gray-700">
+              Email
+            </label>
             <input
+              id="staff-email"
               type="email"
               required
               value={newStaff.email}

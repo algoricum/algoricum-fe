@@ -3,28 +3,10 @@ import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { ErrorToast } from "@/helpers/toast";
 import Button from "antd/es/button";
 import { AlertTriangle } from "lucide-react";
+import type { DeleteConfirmModalProps } from "@/types/staff";
 
-interface Staff {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  createdBy: string;
-  password: string;
-  avatar: string;
-  joinedDate: string;
-  status?: string;
-}
-
-interface DeleteConfirmModalProps {
-  isOpen: boolean;
-  isDeleting: boolean;
-  selectedStaff: Staff | null;
-  onClose: () => void;
-  onConfirm: () => Promise<void>; // Changed to async function
-}
-
-export function DeleteConfirmModal({ isOpen, isDeleting, selectedStaff, onClose, onConfirm }: DeleteConfirmModalProps) {
+export function DeleteConfirmModal(props: Readonly<DeleteConfirmModalProps>) {
+  const { isOpen, isDeleting, selectedStaff, onClose, onConfirm } = props;
   if (!isOpen || !selectedStaff) return null;
 
   const handleConfirm = async () => {

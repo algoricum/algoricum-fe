@@ -46,6 +46,13 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
   useEffect(() => {
     if (open && status === "connected") {
       initializeGooglePicker();
+    } else if (open && status === "disconnected") {
+      // Reset states when disconnected
+      setPickerLoaded(false);
+      setSelectedFiles([]);
+      setPickerTreeData([]);
+      setAccessToken(null);
+      setInitializationState("idle");
     }
   }, [open, status, accountInfo?.connection_id]);
 
@@ -147,11 +154,11 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
             if (latestConnection?.connection_id) {
               connectionId = latestConnection.connection_id;
             } else {
-              reject(new Error("No Google Form connections found"));
+              reject(new Error("No Google Form connections found - please reconnect"));
               return;
             }
           } catch (error) {
-            reject(error);
+            reject(new Error(`No Google Form connections found - please reconnect ${error}`));
             return;
           }
         }
@@ -183,8 +190,11 @@ export const GoogleFormModal: React.FC<ModalProps> = ({
               throw new Error("No access token in response");
             }
           } else {
-            await response.text();
-            throw new Error(`Token fetch failed: ${response.status} ${response.statusText}`);
+            const errorText = await response.text();
+            if (response.status === 404) {
+              throw new Error("Connection not found - please reconnect to Google Forms");
+            }
+            throw new Error(`Token fetch failed: ${response.status} ${response.statusText} - ${errorText}`);
           }
         } catch (error: any) {
           reject(error);

@@ -201,7 +201,7 @@ export const deleteIntegrationConnections = async (clinicId: string, integration
 
     switch (integrationName) {
       case "Hubspot": {
-        error = await deleteIntegrationConnectionByName(clinicId, "HubSpot");
+        error = await deleteIntegrationConnectionByName(clinicId, "Hubspot");
         break;
       }
 

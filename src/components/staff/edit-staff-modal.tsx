@@ -5,38 +5,10 @@ import Button from "antd/es/button";
 import Select from "antd/es/select";
 import { X } from "lucide-react";
 import type React from "react";
+import type { EditStaffModalProps } from "@/types/staff";
 
-interface Staff {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  createdBy: string;
-  password: string;
-  avatar: string;
-  joinedDate: string;
-  status?: string;
-}
-
-interface EditStaff {
-  id: string;
-  name: string;
-  status: string;
-}
-
-interface EditStaffModalProps {
-  isOpen: boolean;
-  isSubmitting: boolean;
-  selectedStaff: Staff | null;
-  editStaff: EditStaff;
-  onClose: () => void;
-
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>; // Changed to async
-
-  onInputChange: (field: keyof EditStaff, value: string) => void;
-}
-
-export function EditStaffModal({ isOpen, isSubmitting, selectedStaff, editStaff, onClose, onSubmit, onInputChange }: EditStaffModalProps) {
+export function EditStaffModal(props: Readonly<EditStaffModalProps>) {
+  const { isOpen, isSubmitting, selectedStaff, editStaff, onClose, onSubmit, onInputChange } = props;
   if (!isOpen || !selectedStaff) return null;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -71,8 +43,11 @@ export function EditStaffModal({ isOpen, isSubmitting, selectedStaff, editStaff,
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Full Name</label>
+            <label htmlFor="edit-staff-name" className="mb-1 block text-sm font-medium text-gray-700">
+              Full Name
+            </label>
             <input
+              id="edit-staff-name"
               type="text"
               required
               value={editStaff.name}
@@ -83,8 +58,11 @@ export function EditStaffModal({ isOpen, isSubmitting, selectedStaff, editStaff,
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
+            <label htmlFor="edit-staff-status" className="mb-1 block text-sm font-medium text-gray-700">
+              Status
+            </label>
             <Select
+              id="edit-staff-status"
               value={editStaff.status}
               onChange={value => onInputChange("status", value)}
               className="w-full"

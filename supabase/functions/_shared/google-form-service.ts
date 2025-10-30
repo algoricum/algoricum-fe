@@ -871,16 +871,38 @@ export async function getSpreadsheetSheets(spreadsheetId, accessToken) {
   const spreadsheetData = await response.json();
   return spreadsheetData.sheets || [];
 }
-// Refresh Google Token
+// Refresh Google Token with Enhanced Error Handling
 export async function refreshGoogleToken(connection, supabase) {
+  const connectionId = connection.id;
+  const requestId = `refresh-${connectionId}-${Date.now()}`;
+
+  console.log(`[${requestId}] 🔄 Starting token refresh for connection: ${connectionId}`);
+  console.log(`[${requestId}] 📊 Current token expiry: ${connection.auth_data?.token_expiry}`);
+
   try {
+    // Validate prerequisites
+    if (!googleClientId || !googleClientSecret) {
+      console.error(`[${requestId}] ❌ Missing OAuth credentials`);
+      throw new Error("Google OAuth credentials not configured");
+    }
+
+    const refreshToken = connection.auth_data?.refresh_token;
+    if (!refreshToken) {
+      console.error(`[${requestId}] ❌ No refresh token available in connection`);
+      throw new Error("No refresh token available - user needs to re-authenticate");
+    }
+
+    console.log(`[${requestId}] 🔑 Refresh token available, attempting refresh...`);
+
     const tokenUrl = "https://oauth2.googleapis.com/token";
     const tokenParams = new URLSearchParams({
       client_id: googleClientId,
       client_secret: googleClientSecret,
-      refresh_token: connection.auth_data.refresh_token,
+      refresh_token: refreshToken,
       grant_type: "refresh_token",
     });
+
+    console.log(`[${requestId}] 📤 Sending refresh request to Google OAuth`);
     const tokenResponse = await fetch(tokenUrl, {
       method: "POST",
       headers: {
@@ -888,31 +910,91 @@ export async function refreshGoogleToken(connection, supabase) {
       },
       body: tokenParams.toString(),
     });
+
+    console.log(`[${requestId}] 📥 Google OAuth response status: ${tokenResponse.status}`);
+
     if (!tokenResponse.ok) {
-      throw new Error(`Token refresh failed: ${tokenResponse.statusText}`);
+      const errorText = await tokenResponse.text();
+      console.error(`[${requestId}] ❌ Token refresh failed:`, {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        error: errorText,
+      });
+
+      // Handle specific error cases
+      if (tokenResponse.status === 400) {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error === "invalid_grant") {
+          console.error(`[${requestId}] ❌ Refresh token is invalid or expired - user needs to re-authenticate`);
+          throw new Error("Refresh token invalid - re-authentication required");
+        }
+      }
+
+      throw new Error(`Token refresh failed: ${tokenResponse.status} ${tokenResponse.statusText} - ${errorText}`);
     }
+
     const tokenData = await tokenResponse.json();
+    console.log(`[${requestId}] ✅ Token refresh successful:`, {
+      access_token: tokenData.access_token ? "present" : "missing",
+      refresh_token: tokenData.refresh_token ? "present" : "using existing",
+      expires_in: tokenData.expires_in,
+    });
+
+    const newExpiry = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
     const updatedAuthData = {
       ...connection.auth_data,
       access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token || connection.auth_data.refresh_token,
-      token_expiry: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+      refresh_token: tokenData.refresh_token || connection.auth_data.refresh_token, // Google may not return new refresh token
+      token_expiry: newExpiry,
+      last_token_refresh: new Date().toISOString(),
     };
 
+    console.log(`[${requestId}] 💾 Updating connection with new token data, expires: ${newExpiry}`);
     const { error: updateError } = await updateIntegrationConnection(supabase, connection.id, {
       auth_data: updatedAuthData,
     });
+
     if (updateError) {
-      throw new Error("Failed to update token");
+      console.error(`[${requestId}] ❌ Failed to update connection:`, updateError);
+      throw new Error(`Failed to update token in database: ${updateError.message}`);
     }
+
+    console.log(`[${requestId}] ✅ Token refresh completed successfully`);
     return {
       ...connection,
       auth_data: updatedAuthData,
     };
   } catch (error) {
-    await updateIntegrationConnection(supabase, connection.id, {
-      status: "inactive",
-    });
+    console.error(`[${requestId}] ❌ Token refresh failed:`, error.message);
+
+    // Only mark as inactive for certain types of errors
+    const shouldDeactivate =
+      error.message.includes("invalid_grant") ||
+      error.message.includes("re-authentication required") ||
+      error.message.includes("OAuth credentials not configured");
+
+    if (shouldDeactivate) {
+      console.log(`[${requestId}] 🔒 Marking connection as inactive due to unrecoverable error`);
+      await updateIntegrationConnection(supabase, connection.id, {
+        status: "inactive",
+        auth_data: {
+          ...connection.auth_data,
+          last_refresh_error: error.message,
+          last_refresh_attempt: new Date().toISOString(),
+        },
+      });
+    } else {
+      console.log(`[${requestId}] ⚠️ Temporary error, keeping connection active for retry`);
+      // Log the error but don't deactivate - might be temporary network issue
+      await updateIntegrationConnection(supabase, connection.id, {
+        auth_data: {
+          ...connection.auth_data,
+          last_refresh_error: error.message,
+          last_refresh_attempt: new Date().toISOString(),
+        },
+      });
+    }
+
     throw error;
   }
 }

@@ -4,8 +4,8 @@ import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { Button } from "@/components/elements";
 import { ErrorToast } from "@/helpers/toast";
-import { getPreviewText } from "@/utils/getPreviewChatbot";
 import { useChatbotSettings, useUpdateClinicComplete } from "@/hooks/useSettings";
+import { getPreviewText } from "@/utils/getPreviewChatbot";
 import { InfoCircleOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons";
 import { Flex, Form, Input, Select, Tooltip, Upload } from "antd";
 import { useEffect, useState } from "react";
@@ -395,21 +395,23 @@ const ChatbotSettings = () => {
               name="toneSelector"
               rules={[{ required: true, message: "Please select a tone" }]}
             >
-              <div className="mb-2">
-                <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
+              <div>
+                <div className="mb-2">
+                  <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
+                </div>
+                <Select
+                  placeholder="Select Tone"
+                  className="w-full"
+                  onChange={handleToneChange}
+                  value={toneSelector} // Explicitly set value
+                  options={[
+                    { value: "friendly", label: "Friendly - Warm and welcoming" },
+                    { value: "professional", label: "Professional - Competent and reliable" },
+                    { value: "casual", label: "Casual - Relaxed and conversational" },
+                    { value: "formal", label: "Formal - Respectful and structured" },
+                  ]}
+                />
               </div>
-              <Select
-                placeholder="Select Tone"
-                className="w-full"
-                onChange={handleToneChange}
-                value={toneSelector} // Explicitly set value
-                options={[
-                  { value: "friendly", label: "Friendly - Warm and welcoming" },
-                  { value: "professional", label: "Professional - Competent and reliable" },
-                  { value: "casual", label: "Casual - Relaxed and conversational" },
-                  { value: "formal", label: "Formal - Respectful and structured" },
-                ]}
-              />
             </Form.Item>
 
             <Form.Item
@@ -424,20 +426,22 @@ const ChatbotSettings = () => {
               name="sentenceLength"
               rules={[{ required: true, message: "Please select a sentence length" }]}
             >
-              <div className="mb-2">
-                <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
+              <div>
+                <div className="mb-2">
+                  <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
+                </div>
+                <Select
+                  placeholder="Select Sentence Length"
+                  className="w-full"
+                  onChange={handleSentenceLengthChange}
+                  value={sentenceLength} // Explicitly set value
+                  options={[
+                    { value: "short", label: "Short - Quick and concise" },
+                    { value: "medium", label: "Medium - Balanced detail" },
+                    { value: "long", label: "Long - Comprehensive explanations" },
+                  ]}
+                />
               </div>
-              <Select
-                placeholder="Select Sentence Length"
-                className="w-full"
-                onChange={handleSentenceLengthChange}
-                value={sentenceLength} // Explicitly set value
-                options={[
-                  { value: "short", label: "Short - Quick and concise" },
-                  { value: "medium", label: "Medium - Balanced detail" },
-                  { value: "long", label: "Long - Comprehensive explanations" },
-                ]}
-              />
             </Form.Item>
 
             <Form.Item

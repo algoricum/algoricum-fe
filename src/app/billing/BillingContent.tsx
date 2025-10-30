@@ -21,8 +21,29 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import utc from "dayjs/plugin/utc";
 import { AlertTriangle, CheckCircle, Download, ExternalLink, XCircle } from "lucide-react";
 import { useState } from "react";
+import type { Plan, Invoice, SubscriptionEvent } from "@/types/billing";
 dayjs.extend(utc);
 dayjs.extend(relativeTime);
+
+// Constants for commonly used styles
+const COLORS = {
+  primary: "#A200E6",
+  primaryHover: "#7a00b3",
+} as const;
+
+const TabButton = ({ isActive, onClick, label }: { isActive: boolean; onClick: () => void; label: string }) => {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 py-3 px-8 text-center transition-all rounded-[48px] font-medium ${
+        isActive ? "text-white shadow-lg" : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-md"
+      }`}
+      style={isActive ? { backgroundColor: COLORS.primary } : undefined}
+    >
+      {label}
+    </button>
+  );
+};
 
 export default function BillingContent() {
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
@@ -44,7 +65,7 @@ export default function BillingContent() {
   const currentPlan =
     subscription && plans.length > 0
       ? {
-          ...plans.find(plan => plan.price_id === subscription.stripe_price_id),
+          ...plans.find((plan: Plan) => plan.price_id === subscription.stripe_price_id),
           current_period_end: subscription.current_period_end,
         }
       : null;
@@ -62,9 +83,17 @@ export default function BillingContent() {
   };
 
   const trialDaysLeft = subscription?.trial_end
-    ? Math.ceil((new Date(subscription.trial_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    ? Math.max(0, Math.ceil((new Date(subscription.trial_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null;
-  const billingDate = currentPlan?.current_period_end ? new Date(currentPlan.current_period_end).toLocaleDateString() : null;
+  const billingDate = currentPlan?.current_period_end
+    ? (() => {
+        try {
+          return new Date(currentPlan.current_period_end).toLocaleDateString();
+        } catch {
+          return null;
+        }
+      })()
+    : null;
 
   const tabItems = [
     {
@@ -84,7 +113,7 @@ export default function BillingContent() {
             />
           )}
 
-          {!loading && hasActiveSubscription && (
+          {hasActiveSubscription && !loading && (
             <div className="px-4 md:px-0">
               <Row gutter={[24, 24]} className="mb-8">
                 <Col xs={24} lg={14}>
@@ -107,7 +136,7 @@ export default function BillingContent() {
                         </p>
                         {trialDaysLeft !== null && trialDaysLeft >= 0 && (
                           <p className="text-sm text-blue-600">
-                            {trialDaysLeft} day{trialDaysLeft !== 1 ? "s" : ""} remaining
+                            {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} remaining
                           </p>
                         )}
                       </div>
@@ -142,7 +171,7 @@ export default function BillingContent() {
                       onClick={() => subscription?.stripe_price_id && handleSubscribe(subscription.stripe_price_id)}
                       disabled={!subscription?.stripe_price_id}
                       className="w-full md:w-auto px-8"
-                      style={{ backgroundColor: "#A200E6" }}
+                      style={{ backgroundColor: COLORS.primary }}
                     >
                       {subscribingPlanId === subscription?.stripe_price_id ? "Redirecting..." : "Manage Subscription"}
                     </Button>
@@ -183,22 +212,30 @@ export default function BillingContent() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-6">Recent Events</h3>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {subscriptionEvents.map(event => {
+                  {subscriptionEvents.map((event: SubscriptionEvent) => {
                     const { id, type, received_at, summary } = event;
-                    const icon =
-                      type.includes("payment_failed") || type.includes("subscription.deleted") ? (
-                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                          <XCircle className="text-red-600 w-5 h-5" />
-                        </div>
-                      ) : type.includes("trial_will_end") || type.includes("upcoming") ? (
-                        <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                          <AlertTriangle className="text-yellow-600 w-5 h-5" />
-                        </div>
-                      ) : (
+                    const getEventIcon = (eventType: string) => {
+                      if (eventType.includes("payment_failed") || eventType.includes("subscription.deleted")) {
+                        return (
+                          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                            <XCircle className="text-red-600 w-5 h-5" />
+                          </div>
+                        );
+                      }
+                      if (eventType.includes("trial_will_end") || eventType.includes("upcoming")) {
+                        return (
+                          <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                            <AlertTriangle className="text-yellow-600 w-5 h-5" />
+                          </div>
+                        );
+                      }
+                      return (
                         <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
                           <CheckCircle className="text-green-600 w-5 h-5" />
                         </div>
                       );
+                    };
+                    const icon = getEventIcon(type);
 
                     return (
                       <div
@@ -238,14 +275,15 @@ export default function BillingContent() {
             </div>
           ) : (
             <div className="space-y-4">
-              {invoices.map((inv: any) => (
+              {invoices.map((inv: Invoice) => (
                 <div
                   key={inv.id}
                   className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-md hover:shadow-lg transition-all duration-200"
                 >
                   <div className="flex-1">
                     <p className="text-base font-semibold text-gray-800 mb-1">
-                      {inv.status.toUpperCase()} — {inv.currency.toUpperCase()} ${(inv.amount_paid / 100).toFixed(2)}
+                      {inv.status?.toUpperCase() || "UNKNOWN"} — {inv.currency?.toUpperCase() || "USD"} $
+                      {((inv.amount_paid || 0) / 100).toFixed(2)}
                     </p>
                     <p className="text-sm text-gray-500">{dayjs.unix(inv.created).format("MMMM DD, YYYY • hh:mm A")}</p>
                   </div>
@@ -254,7 +292,10 @@ export default function BillingContent() {
                       <Button
                         icon={<ExternalLink size={16} />}
                         type="default"
-                        className="w-full bg-[#A200E6] text-white rounded-xl shadow-md hover:bg-[#7a00b3]"
+                        className="w-full text-white rounded-xl shadow-md"
+                        style={{ backgroundColor: COLORS.primary }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = COLORS.primaryHover)}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = COLORS.primary)}
                       >
                         View
                       </Button>
@@ -264,7 +305,10 @@ export default function BillingContent() {
                       <Button
                         icon={<Download size={16} />}
                         type="default"
-                        className="w-full bg-[#A200E6] text-white rounded-xl shadow-md hover:bg-[#7a00b3]"
+                        className="w-full text-white rounded-xl shadow-md"
+                        style={{ backgroundColor: COLORS.primary }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = COLORS.primaryHover)}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = COLORS.primary)}
                       >
                         Download
                       </Button>
@@ -278,19 +322,6 @@ export default function BillingContent() {
       ),
     },
   ];
-
-  const TabButton = ({ isActive, onClick, label }: { isActive: boolean; onClick: () => void; label: string }) => {
-    return (
-      <button
-        onClick={onClick}
-        className={`flex-1 py-3 px-8 text-center transition-all rounded-[48px] font-medium ${
-          isActive ? "bg-[#A200E6] text-white shadow-lg" : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:shadow-md"
-        }`}
-      >
-        {label}
-      </button>
-    );
-  };
 
   return (
     <DashboardLayout

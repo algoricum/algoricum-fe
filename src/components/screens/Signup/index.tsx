@@ -7,14 +7,13 @@ import { MailIcon, PasswordIcon, UserIcon } from "@/icons";
 import { SignupProps } from "@/interfaces/services_type";
 import { saveUser } from "@/redux/accessors/user.accessors";
 import { signUp } from "@/utils/supabase/auth-helper";
-// import { createClient } from "@/utils/supabase/config/client";
 import { setUserData } from "@/utils/supabase/user-helper";
+import { useMutation } from "@tanstack/react-query";
 import Flex from "antd/es/flex";
 import Form from "antd/es/form";
 import Typography from "antd/es/typography";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
 const { Text } = Typography;
 const SignupPage = () => {
   const { push } = useRouter();

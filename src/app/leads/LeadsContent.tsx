@@ -18,21 +18,35 @@ import { Edit, MoreVertical, SearchIcon, Trash2, MessageCircle } from "lucide-re
 import React, { useState, useMemo } from "react";
 import { leadsStatsConfig } from "./statsUtil";
 import LeadPage from "@/components/screens/Leads/LeadPage";
+import type { Lead } from "@/types/leads";
 
-interface Lead {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  status: string;
-  interest_level: string | null;
-  urgency: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
+const ErrorBlock = ({ error }: { error: Error | null }) => (
+  <div className="flex h-64 flex-col items-center justify-center">
+    <div className="max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+        <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <h3 className="mb-2 text-lg font-semibold text-red-800">Something went wrong</h3>
+      <p className="mb-4 text-red-600">{error?.message || "An error occurred"}</p>
+      <button
+        onClick={() => globalThis.location.reload()}
+        className="mx-auto flex items-center rounded-lg bg-red-600 px-6 py-2 text-white transition-colors duration-200 hover:bg-red-700"
+      >
+        <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+          />
+        </svg>
+        Try Again
+      </button>
+    </div>
+  </div>
+);
 
 export default function LeadsContent() {
   // Modal and form state management
@@ -83,8 +97,6 @@ export default function LeadsContent() {
 
   const handleClose = () => {
     setShowLeadForm(false);
-    // React Query will automatically refresh the leads list when a new lead is created
-    // No need to manually update local state
   };
 
   const handleEditLead = (lead: Lead) => {
@@ -111,42 +123,12 @@ export default function LeadsContent() {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         return (
-          lead.name.toLowerCase().includes(query) ||
-          (lead.email && lead.email.toLowerCase().includes(query)) ||
-          (lead.phone && lead.phone.toLowerCase().includes(query))
+          lead.name.toLowerCase().includes(query) || lead.email?.toLowerCase().includes(query) || lead.phone?.toLowerCase().includes(query)
         );
       }
       return true;
     });
   }, [leadsData, selectedLeadStatus, searchQuery]);
-
-  const ErrorBlock = () => (
-    <div className="flex h-64 flex-col items-center justify-center">
-      <div className="max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-          <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <h3 className="mb-2 text-lg font-semibold text-red-800">Something went wrong</h3>
-        <p className="mb-4 text-red-600">{error?.message || "An error occurred"}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mx-auto flex items-center rounded-lg bg-red-600 px-6 py-2 text-white transition-colors duration-200 hover:bg-red-700"
-        >
-          <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          Try Again
-        </button>
-      </div>
-    </div>
-  );
 
   if (loading || statsLoading) {
     return (
@@ -171,7 +153,7 @@ export default function LeadsContent() {
           <Header title="Lead Management" description="Manage and track your leads through the conversion process." showHamburgerMenu />
         }
       >
-        <ErrorBlock />
+        <ErrorBlock error={error} />
       </DashboardLayout>
     );
   }
@@ -213,9 +195,14 @@ export default function LeadsContent() {
                 style={{
                   borderRadius: "12px",
                 }}
-                dropdownStyle={{
-                  borderRadius: "12px",
-                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                popupMatchSelectWidth={false}
+                styles={{
+                  popup: {
+                    root: {
+                      borderRadius: "12px",
+                      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                    },
+                  },
                 }}
                 options={[
                   { value: "all", label: "All Status" },
@@ -319,11 +306,18 @@ export default function LeadsContent() {
                   key={lead.id}
                   ref={dropdownRef}
                   className="absolute w-48 rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5"
+                  role="menu"
+                  tabIndex={-1}
                   style={{
                     top: dropdownPosition.top,
                     left: dropdownPosition.left,
                   }}
                   onClick={e => e.stopPropagation()}
+                  onKeyDown={e => {
+                    if (e.key === "Escape") {
+                      closeDropdown();
+                    }
+                  }}
                 >
                   <div className="py-1">
                     <button
@@ -402,9 +396,8 @@ export default function LeadsContent() {
           footer={null}
           width={900}
           centered
-          destroyOnClose
+          destroyOnHidden
           className="conversation-history-modal"
-          bodyStyle={{ padding: 0, height: "70vh", overflow: "hidden" }}
           styles={{
             body: {
               padding: 0,
@@ -414,7 +407,7 @@ export default function LeadsContent() {
           }}
         >
           <div className="h-full w-full overflow-hidden">
-            <LeadPage lead={selectedLead} clinicId={clinicId!} />
+            <LeadPage lead={selectedLead} clinicId={clinicId} />
           </div>
         </Modal>
       </div>

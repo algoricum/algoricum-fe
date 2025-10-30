@@ -215,16 +215,19 @@ const ClinicSetting = () => {
                   readOnly
                   className="mb-4 bg-gray-50 cursor-default"
                   suffix={
-                    formData.mailgun_email && (
-                      <Button
-                        type="text"
-                        icon={<CopyOutlined />}
-                        size="small"
-                        onClick={() => copyToClipboard(formData.mailgun_email, "Mailgun Email")}
-                        className="text-brand-primary hover:!text-brand-secondary"
-                        title="Copy Mailgun Email"
-                      />
-                    )
+                    <Button
+                      type="text"
+                      icon={<CopyOutlined />}
+                      size="small"
+                      onClick={() => copyToClipboard(formData.mailgun_email, "Mailgun Email")}
+                      className="text-brand-primary hover:!text-brand-secondary"
+                      title="Copy Mailgun Email"
+                      style={{
+                        visibility: formData.mailgun_email ? "visible" : "hidden",
+                        opacity: formData.mailgun_email ? 1 : 0,
+                      }}
+                      disabled={!formData.mailgun_email}
+                    />
                   }
                 />
               </div>
@@ -240,16 +243,19 @@ const ClinicSetting = () => {
                   readOnly
                   className="mb-4 bg-gray-50 cursor-default"
                   suffix={
-                    twilioPhoneNumber && (
-                      <Button
-                        type="text"
-                        icon={<CopyOutlined />}
-                        size="small"
-                        onClick={() => copyToClipboard(twilioPhoneNumber, "Twilio Phone Number")}
-                        className="text-brand-primary hover:!text-brand-secondary"
-                        title="Copy Twilio Phone Number"
-                      />
-                    )
+                    <Button
+                      type="text"
+                      icon={<CopyOutlined />}
+                      size="small"
+                      onClick={() => copyToClipboard(twilioPhoneNumber, "Twilio Phone Number")}
+                      className="text-brand-primary hover:!text-brand-secondary"
+                      title="Copy Twilio Phone Number"
+                      style={{
+                        visibility: twilioPhoneNumber ? "visible" : "hidden",
+                        opacity: twilioPhoneNumber ? 1 : 0,
+                      }}
+                      disabled={!twilioPhoneNumber}
+                    />
                   }
                 />
               </div>

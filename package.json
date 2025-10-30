@@ -25,7 +25,7 @@
     "@types/node-fetch": "^2.6.13",
     "@types/twilio": "^3.19.2",
     "antd": "^5.22.2",
-    "axios": "^1.11.0",
+    "axios": "^1.13.0",
     "cookies-next": "^5.1.0",
     "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
@@ -40,7 +40,7 @@
     "lucide-react": "^0.525.0",
     "mailgun": "^0.5.0",
     "mailgun.js": "^12.0.3",
-    "next": "15.3.2",
+    "next": "^15.5.6",
     "node-fetch": "^3.3.2",
     "papaparse": "^5.5.3",
     "react": "^18",
@@ -63,8 +63,8 @@
     "@types/lodash": "^4.17.13",
     "@types/node": "^20",
     "@types/papaparse": "^5.3.16",
-    "@types/react": "19.1.4",
-    "@types/react-dom": "19.1.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.5",
     "eslint": "^9.34.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -78,8 +78,8 @@
     "typescript-eslint": "^8.42.0"
   },
   "overrides": {
-    "@types/react": "19.1.4",
-    "@types/react-dom": "19.1.5"
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.5"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css,md,html}": [

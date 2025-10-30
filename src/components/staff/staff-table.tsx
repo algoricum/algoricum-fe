@@ -2,31 +2,10 @@
 import { Edit, Mail, MoreVertical, SearchIcon, Trash2, User } from "lucide-react";
 import type React from "react";
 import { useDropdown } from "@/hooks/useDropdown";
-interface Staff {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  createdBy: string;
-  password: string;
-  avatar: string;
-  joinedDate: string;
-  status?: string;
-}
+import type { StaffTableProps } from "@/types/staff";
 
-interface StaffTableProps {
-  staffData: Staff[];
-  searchTerm: string;
-  selectedRole: string;
-  selectedStatus: string;
-
-  onEdit: (staff: Staff) => void;
-
-  onDelete: (staff: Staff) => void;
-  onClearFilters: () => void;
-}
-
-export function StaffTable({ staffData, searchTerm, selectedRole, selectedStatus, onEdit, onDelete, onClearFilters }: StaffTableProps) {
+export function StaffTable(props: Readonly<StaffTableProps>) {
+  const { staffData, searchTerm, selectedRole, selectedStatus, onEdit, onDelete, onClearFilters } = props;
   const { activeDropdown, dropdownPosition, dropdownRef, toggleDropdown, closeDropdown } = useDropdown({
     dropdownWidth: 192,
     dropdownHeight: 120,

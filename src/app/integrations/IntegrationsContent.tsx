@@ -79,7 +79,7 @@ export default function IntegrationsContent() {
   // React Query hooks
   const { data: clinicData, isLoading: clinicLoading } = useCurrentUserClinic();
   const clinicId = typeof clinicData === "string" ? clinicData : clinicData?.id || "";
-  const { data: integrationsData, isLoading: integrationsLoading } = useIntegrationsWithStatus(clinicId);
+  const { data: integrationsData, isLoading: integrationsLoading, refetch: refetchIntegrations } = useIntegrationsWithStatus(clinicId);
 
   // Extract integrations and initial statuses from React Query data
   const integrations = integrationsData?.integrations || [];
@@ -159,6 +159,37 @@ export default function IntegrationsContent() {
       ...prev,
       statuses: { ...prev.statuses, [name]: status },
     }));
+
+    // Clear localStorage when disconnecting
+    if (status === "disconnected") {
+      const localStorageKey = getLocalStorageKeyForIntegration(name);
+      if (localStorageKey) {
+        localStorage.removeItem(localStorageKey);
+        localStorage.removeItem(`${localStorageKey.replace("_status", "_account_info")}`); // Also clear account info
+      }
+    }
+  };
+
+  // Helper function to get localStorage key for each integration
+  const getLocalStorageKeyForIntegration = (name: IntegrationName): string | null => {
+    switch (name) {
+      case "Google Forms":
+        return "google_form_oauth_status";
+      case "Google Lead Forms":
+        return "google_lead_form_oauth_status";
+      case "Facebook Lead Forms":
+        return "facebook_lead_form_oauth_status";
+      case "Typeform":
+        return "typeform_oauth_status";
+      case "Hubspot":
+        return "hubspot_oauth_status";
+      case "Pipedrive":
+        return "pipedrive_oauth_status";
+      case "Gravity Form":
+        return "gravity_form_oauth_status";
+      default:
+        return null;
+    }
   };
 
   const toggleModal = (name: IntegrationName, isOpen?: boolean) => {
@@ -198,10 +229,15 @@ export default function IntegrationsContent() {
   ) => {
     try {
       if (!options?.skipConnectionDeletion) {
-        deleteIntegrationConnections(clinicId, name);
+        await deleteIntegrationConnections(clinicId, name);
       }
 
       updateIntegrationStatus(name, "disconnected");
+
+      // Refetch integration statuses from database to ensure UI is in sync
+      if (refetchIntegrations) {
+        await refetchIntegrations();
+      }
 
       // Close modal if requested
       if (options?.closeModal) {

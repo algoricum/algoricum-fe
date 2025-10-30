@@ -6,13 +6,12 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import React, { useMemo, useState } from "react";
 import type { JSX } from "react/jsx-runtime";
 import { type TransformedStaffMember } from "../../utils/supabase/clinic-staff-helper";
-// Component imports
+import type { Staff, NewStaff, EditStaff, StaffRole } from "@/types/staff";
 
+// Component imports
 import { StaffFilters } from "@/components/staff/staff-filters";
 import { StatCard } from "@/components/staff/staff-stats";
 import { StaffTable } from "@/components/staff/staff-table";
-
-// Component imports
 import { AddStaffModal } from "@/components/staff/add-staff-modal";
 import { DeleteConfirmModal } from "@/components/staff/delete-confirm-modal";
 import { EditStaffModal } from "@/components/staff/edit-staff-modal";
@@ -21,29 +20,6 @@ import { staffStatsConfig } from "@/components/staff/statCardUtils";
 import { usePagination } from "@/hooks/usePagination";
 import { useCurrentUserClinic, useStaffList, useStaffStats, useCreateStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useStaff";
 import { Pagination } from "antd";
-
-interface Staff {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  createdBy: string;
-  password: string;
-  avatar: string;
-  joinedDate: string;
-  status?: string;
-}
-
-interface NewStaff {
-  email: string;
-  name: string;
-}
-
-interface EditStaff {
-  id: string;
-  name: string;
-  status: string;
-}
 
 export default function StaffPage(): JSX.Element {
   // Modal and form state management
@@ -141,7 +117,7 @@ export default function StaffPage(): JSX.Element {
     });
   }, [transformedStaffData, searchTerm, selectedRole, selectedStatus]);
 
-  const availableRoles = useMemo(() => {
+  const availableRoles = useMemo((): StaffRole[] => {
     const roles = [...new Set(transformedStaffData.map(s => s.role))];
     return roles.map(role => ({
       value: role.toLowerCase(),

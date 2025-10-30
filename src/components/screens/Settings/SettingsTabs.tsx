@@ -34,7 +34,6 @@ const SettingsTabs = () => {
       </Flex>
 
       <div className="bg-white rounded-xl py-6">
-        {/* {activeTab === "lead" && <LeadCapturingForm />} */}
         {activeTab === "chatbot" && <ChatbotSettings />}
         {activeTab === "clinic-setting" && <ClinicSetting />}
       </div>
