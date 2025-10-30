@@ -1,4 +1,5 @@
 import { Providers } from "@/redux/providers";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { ReactNode } from "react";
 import "react-toastify/dist/ReactToastify.css";
@@ -16,7 +17,9 @@ export default function RootLayout({ children }: { children: ReactNode[] | React
         <link rel="icon" href="/favicon.png" type="image/png" />
       </head>
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children} <SpeedInsights />
+        </Providers>
       </body>
     </html>
   );

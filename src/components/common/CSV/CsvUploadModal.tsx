@@ -216,7 +216,7 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
       }}
       width={700}
       centered
-      bodyStyle={{ maxHeight: "80vh", overflowY: "auto" }}
+      styles={{ body: { maxHeight: "80vh", overflowY: "auto" } }}
     >
       <div className="py-4">
         <div className="text-center space-y-4">

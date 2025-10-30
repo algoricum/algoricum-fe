@@ -202,8 +202,9 @@ async function processAllLeads(supabase: any, communicationType?: "sms" | "email
       try {
         logInfo(`Processing clinic: ${clinic.name} (${clinic.id})`);
 
-        // Get leads for this clinic
-        const leads = await getLeadsForClinic(clinic.id, supabase, communicationType);
+        // Get leads for this clinic with rule-based filtering
+        const initialRule = followUpRules && followUpRules.length > 0 ? followUpRules[0] : undefined;
+        const leads = await getLeadsForClinic(clinic.id, supabase, communicationType, initialRule);
 
         if (leads.length === 0) {
           logInfo(`No leads found for clinic ${clinic.name}`);
@@ -437,9 +438,23 @@ async function processScheduledFollowUps(
 }
 
 // Get leads for a specific clinic
-async function getLeadsForClinic(clinicId: string, supabase: any, communicationType?: "sms" | "email"): Promise<Lead[]> {
+async function getLeadsForClinic(
+  clinicId: string,
+  supabase: any,
+  communicationType?: "sms" | "email",
+  filterRule?: FollowUpRule,
+): Promise<Lead[]> {
   try {
     let leadQuery = supabase.from("lead").select("*").eq("clinic_id", clinicId);
+
+    // Filter by lead status if rule specifies it (for initial nurturing)
+    if (filterRule?.leadStatus && filterRule.leadStatus.length > 0) {
+      if (filterRule.leadStatus.length === 1) {
+        leadQuery = leadQuery.eq("status", filterRule.leadStatus[0]);
+      } else {
+        leadQuery = leadQuery.in("status", filterRule.leadStatus);
+      }
+    }
 
     // Filter by communication requirements
     if (communicationType === "sms") {
@@ -591,20 +606,11 @@ async function processRuleForLead(lead: Lead, clinic: Clinic, rule: FollowUpRule
       // Save to history
       await saveMessageToHistory(threadId, messageContent, rule.name, supabase);
 
-      // Update lead status from "New" to "Engaged" for the first SMS rule only
-      if (rule.name === "sms_5min_initial" && lead.status === "New") {
-        try {
-          await supabase
-            .from("lead")
-            .update({
-              status: "Engaged",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", lead.id);
-
-          logInfo(`Updated lead ${lead.id} status from "New" to "Engaged" after first SMS`);
-        } catch (statusError) {
-          logError(`Failed to update lead ${lead.id} status to "Engaged"`, statusError);
+      // Update lead status from "Processing" to "Engaged" for the first SMS rule only
+      if (rule.name === "sms_5min_initial" && lead.status === "Processing") {
+        const updateSuccess = await updateLeadStatus(lead.id, "Engaged", supabase);
+        if (updateSuccess) {
+          logInfo(`Updated lead ${lead.id} status from "Processing" to "Engaged" after first SMS`);
         }
       }
 
@@ -642,8 +648,34 @@ async function determineFollowUpsForLead(lead: Lead, supabase: any, followUpRule
     return [];
   }
 
+  // For initial nurturing: only process "New" leads and immediately mark as "Processing"
+  if (lead.status === "New") {
+    try {
+      // Atomically update status to prevent race conditions
+      const { error: updateError } = await supabase
+        .from("lead")
+        .update({
+          status: "Processing",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", lead.id)
+        .eq("status", "New"); // Only update if still "New"
+
+      if (updateError) {
+        logError(`Failed to update lead ${lead.id} to Processing status`, updateError);
+        return []; // Skip this lead if we can't lock it
+      }
+
+      logInfo(`Lead ${lead.id}: Status updated from "New" to "Processing"`);
+    } catch (error) {
+      logError(`Error updating lead ${lead.id} status to Processing`, error);
+      return [];
+    }
+  }
+
+  // Skip leads that are not in valid states for follow-ups
   if (lead.status === "Booked" || lead.status === "Cold" || lead.status === "Converted") {
-    logInfo(`Lead ${lead.id}: Skipping follow-ups - status is "${lead.status}", only "Engaged" leads are valid for follow-ups`);
+    logInfo(`Lead ${lead.id}: Skipping follow-ups - status is "${lead.status}"`);
     return [];
   }
 
@@ -707,12 +739,45 @@ async function determineFollowUpsForLead(lead: Lead, supabase: any, followUpRule
   return [];
 }
 
+// Helper function to get thread ID for a lead
+async function getThreadIdForLead(leadId: string, supabase: any): Promise<string | null> {
+  try {
+    const { data: thread } = await supabase.from("threads").select("id").eq("lead_id", leadId).single();
+    return thread?.id || null;
+  } catch (error) {
+    logError(`Error getting thread for lead ${leadId}`, error);
+    return null;
+  }
+}
+
+// Helper function to update lead status
+async function updateLeadStatus(leadId: string, status: string, supabase: any): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("lead")
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", leadId);
+
+    if (error) {
+      logError(`Failed to update lead ${leadId} to ${status} status`, error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    logError(`Error updating lead ${leadId} status to ${status}`, error);
+    return false;
+  }
+}
+
 async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabase: any): Promise<boolean> {
   try {
     // Get thread for this lead
-    const { data: thread } = await supabase.from("threads").select("id").eq("lead_id", leadId).single();
+    const threadId = await getThreadIdForLead(leadId, supabase);
 
-    if (!thread) return false;
+    if (!threadId) return false;
 
     const searchPatterns = [`%${followUpName}%`, `%${followUpName.toUpperCase()}%`, `%${followUpName.toLowerCase()}%`];
 
@@ -720,7 +785,7 @@ async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabas
       const { data: conversations } = await supabase
         .from("conversation")
         .select("id, message")
-        .eq("thread_id", thread.id)
+        .eq("thread_id", threadId)
         .eq("is_from_user", false)
         .eq("sender_type", "assistant")
         .ilike("message", pattern);
@@ -740,15 +805,15 @@ async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabas
 
 async function hasUserRepliedToLastAssistantMessage(leadId: string, supabase: any): Promise<boolean> {
   try {
-    const { data: thread } = await supabase.from("threads").select("id").eq("lead_id", leadId).single();
+    const threadId = await getThreadIdForLead(leadId, supabase);
 
-    if (!thread) return false;
+    if (!threadId) return false;
 
     // Get last assistant message
     const { data: lastAssistantMessage } = await supabase
       .from("conversation")
       .select("created_at")
-      .eq("thread_id", thread.id)
+      .eq("thread_id", threadId)
       .eq("is_from_user", false)
       .eq("sender_type", "assistant")
       .order("created_at", { ascending: false })
@@ -761,7 +826,7 @@ async function hasUserRepliedToLastAssistantMessage(leadId: string, supabase: an
     const { data: userReplies } = await supabase
       .from("conversation")
       .select("id")
-      .eq("thread_id", thread.id)
+      .eq("thread_id", threadId)
       .eq("is_from_user", true)
       .eq("sender_type", "user")
       .gt("created_at", lastAssistantMessage.created_at);

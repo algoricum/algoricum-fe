@@ -3,7 +3,14 @@
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
 import { createClient } from "@/utils/supabase/config/client";
-import { Alert, Badge, Button, Divider, Modal, Select, Spin, Typography } from "antd";
+import Alert from "antd/es/alert";
+import Badge from "antd/es/badge";
+import Button from "antd/es/button";
+import Divider from "antd/es/divider";
+import Modal from "antd/es/modal";
+import Select from "antd/es/select";
+import Spin from "antd/es/spin";
+import Typography from "antd/es/typography";
 import Image from "next/image";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -70,8 +77,6 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
       return;
     }
 
-    console.log("Checking pending setup for clinic:", clinicId);
-
     try {
       const { data, error } = await supabase
         .from("facebook_lead_form_connections")
@@ -80,14 +85,14 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
         .eq("lead_form_id", "pending_selection")
         .limit(1);
 
-      console.log("Pending setup query result:", { data, error });
+      if (error) {
+        console.error("Error querying pending setup:", error);
+        return;
+      }
 
       if (data && data.length > 0) {
-        console.log("Found pending setup, showing form selection");
         setShowFormSelection(true);
         await fetchPages();
-      } else {
-        console.log("No pending setup found");
       }
     } catch (error) {
       console.error("Error checking pending setup:", error);
@@ -365,7 +370,14 @@ export const FacebookLeadFormModal: React.FC<FacebookModalProps> = ({
                           <div className="flex items-center">
                             <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
                               {page.picture?.data?.url ? (
-                                <img src={page.picture.data.url} alt={page.name} className="w-8 h-8 rounded-full" />
+                                <Image
+                                  src={page.picture.data.url}
+                                  alt={page.name}
+                                  width={32}
+                                  height={32}
+                                  className="w-8 h-8 rounded-full"
+                                  unoptimized // External URLs need this
+                                />
                               ) : (
                                 <span className="text-gray-500 text-sm">📄</span>
                               )}

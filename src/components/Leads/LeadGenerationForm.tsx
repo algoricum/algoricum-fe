@@ -1,8 +1,7 @@
 "use client";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
-import getLeadSourceId from "@/utils/lead_source";
-import { createClient } from "@/utils/supabase/config/client";
+import { useCreateLead } from "@/hooks/useLeads";
 import { usePhoneValidation } from "@/hooks/usePhoneValidation";
+import getLeadSourceId from "@/utils/lead_source";
 import { Calendar, Mail, Phone, Stethoscope, User, Users } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
@@ -71,11 +70,10 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
 
   const [formData, setFormData] = useState<FormData>({});
   const { phoneNumber, phoneError, handlePhoneChange, handlePhoneBlur, resetPhone } = usePhoneValidation();
-
-  const [submitting, setSubmitting] = useState(false);
-
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const supabase = createClient();
+
+  // React Query hook
+  const createLeadMutation = useCreateLead();
 
   const handleInputChange = (id: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [id]: value }));
@@ -112,47 +110,38 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("form validity", validateForm());
     if (!validateForm()) return;
-    setSubmitting(true);
+
     const source_id = await getLeadSourceId("Others");
 
-    try {
-      const submissionData = {
-        clinic_id: clinicId,
-        source_id: source_id,
-        first_name: formData.first_name || null,
-        last_name: formData.last_name || null,
-        email: formData.email || null,
-        phone: phoneNumber || null,
-        form_data: {
-          service_interest: formData.services_interest || null,
-          visit_reason: formData.visit_reason || null,
-          consultation_type: formData.consultation_type || null,
-        },
-        interest_level: "medium",
-        urgency: "curious",
-        status: "New",
-      };
+    const submissionData = {
+      clinic_id: clinicId,
+      source_id: source_id,
+      first_name: (formData.first_name as string) || null,
+      last_name: (formData.last_name as string) || null,
+      email: (formData.email as string) || null,
+      phone: phoneNumber || null,
+      form_data: {
+        service_interest: (formData.services_interest as string) || null,
+        visit_reason: (formData.visit_reason as string) || null,
+        consultation_type: (formData.consultation_type as string) || null,
+      },
+      interest_level: "medium" as const,
+      urgency: "curious" as const,
+      status: "New" as const,
+    };
 
-      const { data, error: insertError } = await supabase.from("lead").insert([submissionData]).select().single();
+    createLeadMutation.mutate(submissionData, {
+      onSuccess: data => {
+        // Reset form
+        setFormData({});
+        setErrors({});
+        resetPhone();
 
-      if (insertError?.code === "23505") {
-        throw new Error("Lead with this email already registered in this clinic");
-      }
-
-      SuccessToast(" Lead created successfully ");
-
-      onSuccess?.(data);
-    } catch (err) {
-      const error = err as Error;
-      ErrorToast(`${error}`);
-    } finally {
-      setSubmitting(false);
-      setFormData({});
-      setErrors({});
-      resetPhone();
-    }
+        // Call success callback
+        onSuccess?.(data);
+      },
+    });
   };
 
   const getFieldIcon = (fieldId: string) => {
@@ -310,10 +299,10 @@ const LeadGenerationForm: React.FC<Props> = ({ clinicId, onSuccess }) => {
           <div className="flex justify-center pt-4">
             <button
               type="submit"
-              disabled={submitting}
+              disabled={createLeadMutation.isPending}
               className="w-full max-w-sm bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-300 font-semibold disabled:opacity-50 shadow-md hover:shadow-lg"
             >
-              {submitting ? "Submitting..." : "Submit Lead"}
+              {createLeadMutation.isPending ? "Submitting..." : "Submit Lead"}
             </button>
           </div>
         </form>

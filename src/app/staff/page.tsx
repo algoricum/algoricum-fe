@@ -1,5 +1,5 @@
-import StaffPage from "@/components/staff/staff-page";
+import StaffContent from "./StaffContent";
 
-export default function Page() {
-  return <StaffPage />;
+export default function StaffPage() {
+  return <StaffContent />;
 }

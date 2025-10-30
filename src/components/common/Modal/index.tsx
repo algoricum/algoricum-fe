@@ -1,4 +1,6 @@
-import { Modal as AntdModal, ModalProps, Typography } from "antd";
+import AntdModal from "antd/es/modal";
+import type { ModalProps } from "antd/es/modal";
+import Typography from "antd/es/typography";
 
 const { Text } = Typography;
 

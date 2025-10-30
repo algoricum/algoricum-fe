@@ -1,7 +1,12 @@
 "use client";
 
 import { BookingLinkComponent } from "@/components/modals/BookingLinkComponent";
-import { Alert, Button, Modal, Spin, TreeSelect, Typography } from "antd";
+import Alert from "antd/es/alert";
+import Button from "antd/es/button";
+import Modal from "antd/es/modal";
+import Spin from "antd/es/spin";
+import TreeSelect from "antd/es/tree-select";
+import Typography from "antd/es/typography";
 import Image from "next/image";
 import type React from "react";
 import { useEffect } from "react";
@@ -45,7 +50,6 @@ export const JotformModal: React.FC<ModalProps> = ({
       () => {
         const token = window.JF.getAPIKey();
         window.JF.getUser(() => {
-          console.log("Jotform auth successful", token);
           onConnect?.(token);
         });
       },

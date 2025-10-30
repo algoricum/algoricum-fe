@@ -1,5 +1,6 @@
 import { Logo } from "@/components/common";
-import { Flex, type LayoutProps } from "antd";
+import Flex from "antd/es/flex";
+import type { LayoutProps } from "antd/es/layout";
 
 interface Props extends LayoutProps {
   isBack?: boolean;

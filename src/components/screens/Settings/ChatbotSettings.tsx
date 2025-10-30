@@ -3,11 +3,9 @@ import { ColorConfigurator } from "@/components/common";
 import ChatbotConnectModal from "@/components/common/ChatbotConnectModal.jsx";
 import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { Button } from "@/components/elements";
-import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { ErrorToast } from "@/helpers/toast";
+import { useChatbotSettings, useUpdateClinicComplete } from "@/hooks/useSettings";
 import { getPreviewText } from "@/utils/getPreviewChatbot";
-import { getClincApiKey, getClinicData, updateClinic } from "@/utils/supabase/clinic-helper";
-import { uploadClinicLogo } from "@/utils/supabase/clinic-uploads";
-import { getUserData } from "@/utils/supabase/user-helper";
 import { InfoCircleOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons";
 import { Flex, Form, Input, Select, Tooltip, Upload } from "antd";
 import { useEffect, useState } from "react";
@@ -16,21 +14,29 @@ const { TextArea } = Input;
 
 const ChatbotSettings = () => {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [apiKey, setApiKey] = useState<string>("");
-  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false); // Declare the variable
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
 
+  // React Query hooks
+  const { data: chatbotData, isLoading: chatbotLoading, error: chatbotError } = useChatbotSettings();
+  const updateClinicMutation = useUpdateClinicComplete();
+
+  // Extract data from React Query response
+  const clinic = chatbotData?.clinic;
+  const user = chatbotData?.user;
+  const apiKey = chatbotData?.apiKey || "";
+
+  // Data loaded state
+  const dataLoaded = !!clinic;
+
+  // Form watchers
   const primaryColor = Form.useWatch("primary_color", form);
   const fontColor = Form.useWatch("font_color", form);
   const toneSelector = Form.useWatch("toneSelector", form);
   const sentenceLength = Form.useWatch("sentenceLength", form);
   const formalityLevel = Form.useWatch("formalityLevel", form);
-  // const chatbotName = Form.useWatch("chatbotName", form);
-  // const logo = Form.useWatch("logo", form);
-  // const chatbotAvatar = Form.useWatch("chatbotAvatar", form);
 
-  const [clinicData, setClinicData] = useState<any>();
-  const [dataLoaded, setDataLoaded] = useState(false);
+  // Combined loading state
+  const loading = chatbotLoading || updateClinicMutation.isPending;
 
   const normalizeValue = (value: string | null | undefined, validOptions: string[]) => {
     if (!value) return validOptions[0]; // Return first option as default
@@ -47,177 +53,99 @@ const ChatbotSettings = () => {
     return match || validOptions[0]; // Return match or default to first option
   };
 
+  // Handle React Query errors
   useEffect(() => {
-    const fetchChatbotSettings = async () => {
-      try {
-        setLoading(true);
-        setDataLoaded(false); // Reset data loaded state
+    if (chatbotError) {
+      ErrorToast("Failed to load chatbot settings");
+    }
+  }, [chatbotError]);
 
-        const clinic = await getClinicData();
-        setClinicData(clinic);
+  // Update form when chatbot data is loaded
+  useEffect(() => {
+    if (clinic) {
+      // Define valid options for each dropdown
+      const validTones = ["friendly", "professional", "casual", "formal"];
+      const validLengths = ["short", "medium", "long"];
+      const validFormalities = ["very_casual", "casual", "neutral", "formal", "very_formal"];
 
-        if (clinic) {
-          const clinicApiKey = await getClincApiKey(clinic.id);
+      // Normalize the values to ensure they match dropdown options
+      const normalizedTone = normalizeValue(clinic.tone_selector, validTones);
+      const normalizedLength = normalizeValue(clinic.sentence_length, validLengths);
+      const normalizedFormality = normalizeValue(clinic.formality_level, validFormalities);
 
-          // Define valid options for each dropdown
-          const validTones = ["friendly", "professional", "casual", "formal"];
-          const validLengths = ["short", "medium", "long"];
-          const validFormalities = ["very_casual", "casual", "neutral", "formal", "very_formal"];
+      // Get colors from clinic data
+      const primaryColor = clinic.widget_theme?.primary_color || "#2563EB";
+      const fontColor = clinic.widget_theme?.font_color || "#000000";
 
-          // Normalize the values to ensure they match dropdown options
-          const normalizedTone = normalizeValue(clinic.tone_selector, validTones);
-          const normalizedLength = normalizeValue(clinic.sentence_length, validLengths);
-          const normalizedFormality = normalizeValue(clinic.formality_level, validFormalities);
+      // Set form values with normalized data
+      const formValues = {
+        greeting: clinic.assistant_prompt || "",
+        primary_color: primaryColor,
+        font_color: fontColor,
+        toneSelector: normalizedTone,
+        sentenceLength: normalizedLength,
+        formalityLevel: normalizedFormality,
+        chatbotName: clinic.chatbot_name || "",
+        chatbotAvatar: [], // Initialize as empty array
+        logo: [], // Initialize as empty array
+      };
 
-          // Get colors from clinic data
-          const primaryColor = clinic.widget_theme?.primary_color || "#2563EB";
-          const fontColor = clinic.widget_theme?.font_color || "#000000";
-
-          // Set form values with normalized data
-          const formValues = {
-            greeting: clinic.assistant_prompt || "",
-            primary_color: primaryColor,
-            font_color: fontColor,
-            toneSelector: normalizedTone,
-            sentenceLength: normalizedLength,
-            formalityLevel: normalizedFormality,
-            chatbotName: clinic.chatbot_name || "",
-            chatbotAvatar: [], // Initialize as empty array
-            logo: [], // Initialize as empty array
-            // servicesDocument: [], // Initialize as empty array
-          };
-
-          console.log("Setting form values:", formValues); // Debug log
-
-          // Set the form values
-          form.setFieldsValue(formValues);
-
-          // Force re-render to ensure dropdowns show the values
-          setTimeout(() => {
-            form.setFieldsValue(formValues);
-            setDataLoaded(true); // Mark data as loaded
-          }, 100);
-
-          if (clinicApiKey) {
-            setApiKey(String(clinicApiKey));
-          }
-        }
-      } catch (error: any) {
-        console.error("Error fetching chatbot settings:", error.message);
-        ErrorToast("Failed to load chatbot settings");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchChatbotSettings();
-  }, [form]);
+      // Set the form values
+      form.setFieldsValue(formValues);
+    }
+  }, [clinic, form]);
 
   const handleSave = async (values: any) => {
+    if (!user || !clinic) {
+      ErrorToast("Required data not loaded. Please refresh and try again.");
+      return;
+    }
+
     try {
-      setLoading(true);
-      const user = await getUserData();
-      if (!user) {
-        ErrorToast("User not found. Please logout and log in again.");
-        setLoading(false);
-        return;
-      }
-      // const assistantData = await getAssistantByClinicId(clinicData.id);
-      let logoUrl;
-      let avatarUrl;
+      // Determine which files need to be uploaded
+      const logoFile =
+        values.logo && Array.isArray(values.logo) && values.logo.length > 0 && values.logo[0].originFileObj
+          ? values.logo[0].originFileObj
+          : undefined;
 
-      // Safe check for logo upload
-      if (values.logo && Array.isArray(values.logo) && values.logo.length > 0 && values.logo[0].originFileObj) {
-        logoUrl = await uploadClinicLogo(user.id, values.logo[0].originFileObj);
-      }
-
-      // Safe check for avatar upload
-      if (
+      const avatarFile =
         values.chatbotAvatar &&
         Array.isArray(values.chatbotAvatar) &&
         values.chatbotAvatar.length > 0 &&
         values.chatbotAvatar[0].originFileObj
-      ) {
-        avatarUrl = await uploadClinicLogo(user.id, values.chatbotAvatar[0].originFileObj);
-      }
+          ? values.chatbotAvatar[0].originFileObj
+          : undefined;
 
-      // Fix: Properly construct the widget_theme object with actual color values
+      // Prepare the widget theme object
       const widgetTheme = {
-        primary_color: values.primary_color || "#2563EB", // Fallback to default if not set
-        font_color: values.font_color || "#000000", // Fallback to default if not set
+        primary_color: values.primary_color || "#2563EB",
+        font_color: values.font_color || "#000000",
       };
 
-      const clinic = await updateClinic({
-        id: clinicData.id,
+      // Prepare clinic update data
+      const clinicUpdateData = {
+        id: clinic.id,
         assistant_prompt: values.greeting,
-        widget_logo: logoUrl,
         chatbot_name: values.chatbotName,
-        chatbot_avatar: avatarUrl,
-        widget_theme: widgetTheme, // Use the properly constructed object
+        widget_theme: widgetTheme,
         tone_selector: values.toneSelector,
         sentence_length: values.sentenceLength,
         formality_level: values.formalityLevel,
+      };
+
+      // Use React Query mutation to handle logo upload and clinic update
+      await updateClinicMutation.mutateAsync({
+        clinicData: clinicUpdateData,
+        logoFile: logoFile || avatarFile, // Use either logo or avatar file for upload
+        userId: user.id,
       });
 
-      // Below comment code is for assistant file upload.
-
-      // const clinicInstructions = generateClinicInstructions({
-      //   name: clinic.legal_business_name || "",
-      //   address: clinic.address,
-      //   phone: clinic.phone,
-      //   email: clinic.email || user.email,
-      //   business_hours: clinic.business_hours,
-      //   calendly_link: clinic.calendly_link,
-      //   tone_selector: values.toneSelector,
-      //   sentence_length: values.sentenceLength,
-      //   formality_level: values.formalityLevel,
-      //   // has_uploaded_document: true,
-      // });
-
-      // const formDataToSend = new FormData();
-      // const session = await getSupabaseSession();
-      // formDataToSend.append("clinic_id", clinic.id);
-      // formDataToSend.append("name", clinic.legal_business_name || "");
-      // formDataToSend.append("instructions", clinicInstructions);
-      // formDataToSend.append("assistant_id", assistantData.id);
-
-      // // Add the services document file directly to form data for OpenAI processing
-      // if (
-      //   values.servicesDocument &&
-      //   Array.isArray(values.servicesDocument) &&
-      //   values.servicesDocument.length > 0 &&
-      //   values.servicesDocument[0].originFileObj
-      // ) {
-      //   formDataToSend.append("clinic_document", values.servicesDocument[0].originFileObj);
-      // }
-
-      // try {
-      //   // Call the combined edge function
-      //   const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
-      //     method: "POST",
-      //     headers: {
-      //       Authorization: `Bearer ${session.access_token}`,
-      //     },
-      //     body: formDataToSend,
-      //   });
-
-      //   const result = await response.json();
-
-      //   if (!response.ok) {
-      //     console.error("Assistant creation error:", result.error);
-      //     // We'll still continue with the onboarding process even if assistant creation fails
-      //   }
-      // } catch (assistantError) {
-      //   console.error("Failed to create assistant:", assistantError);
-      //   // Continue with onboarding even if assistant creation fails
-      // }
-
-      if (!clinic) throw { message: "Failed to save chatbot settings" };
-      SuccessToast("Chatbot settings saved successfully");
+      // Note: The current mutation only handles one file upload at a time
+      // If you need separate logo and avatar handling, you'd need to extend the mutation
+      // or call it twice with different data
     } catch (error: any) {
-      ErrorToast(error.message || "Failed to save chatbot settings");
-    } finally {
-      setLoading(false);
+      // Error handling is managed by the React Query mutation
+      console.error("Save failed:", error);
     }
   };
 
@@ -467,21 +395,23 @@ const ChatbotSettings = () => {
               name="toneSelector"
               rules={[{ required: true, message: "Please select a tone" }]}
             >
-              <div className="mb-2">
-                <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
+              <div>
+                <div className="mb-2">
+                  <p className="text-xs text-gray-500 mb-2">How warm and approachable should your assistant sound?</p>
+                </div>
+                <Select
+                  placeholder="Select Tone"
+                  className="w-full"
+                  onChange={handleToneChange}
+                  value={toneSelector} // Explicitly set value
+                  options={[
+                    { value: "friendly", label: "Friendly - Warm and welcoming" },
+                    { value: "professional", label: "Professional - Competent and reliable" },
+                    { value: "casual", label: "Casual - Relaxed and conversational" },
+                    { value: "formal", label: "Formal - Respectful and structured" },
+                  ]}
+                />
               </div>
-              <Select
-                placeholder="Select Tone"
-                className="w-full"
-                onChange={handleToneChange}
-                value={toneSelector} // Explicitly set value
-                options={[
-                  { value: "friendly", label: "Friendly - Warm and welcoming" },
-                  { value: "professional", label: "Professional - Competent and reliable" },
-                  { value: "casual", label: "Casual - Relaxed and conversational" },
-                  { value: "formal", label: "Formal - Respectful and structured" },
-                ]}
-              />
             </Form.Item>
 
             <Form.Item
@@ -496,20 +426,22 @@ const ChatbotSettings = () => {
               name="sentenceLength"
               rules={[{ required: true, message: "Please select a sentence length" }]}
             >
-              <div className="mb-2">
-                <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
+              <div>
+                <div className="mb-2">
+                  <p className="text-xs text-gray-500 mb-2">How detailed should responses be?</p>
+                </div>
+                <Select
+                  placeholder="Select Sentence Length"
+                  className="w-full"
+                  onChange={handleSentenceLengthChange}
+                  value={sentenceLength} // Explicitly set value
+                  options={[
+                    { value: "short", label: "Short - Quick and concise" },
+                    { value: "medium", label: "Medium - Balanced detail" },
+                    { value: "long", label: "Long - Comprehensive explanations" },
+                  ]}
+                />
               </div>
-              <Select
-                placeholder="Select Sentence Length"
-                className="w-full"
-                onChange={handleSentenceLengthChange}
-                value={sentenceLength} // Explicitly set value
-                options={[
-                  { value: "short", label: "Short - Quick and concise" },
-                  { value: "medium", label: "Medium - Balanced detail" },
-                  { value: "long", label: "Long - Comprehensive explanations" },
-                ]}
-              />
             </Form.Item>
 
             <Form.Item

@@ -1,7 +1,9 @@
 import CustomerRatingCard from "@/components/common/CustomerRatingCard";
 import CustomerReviewCard from "@/components/common/CustomerReviewCard";
 import { reviews } from "@/constants/home";
-import { Col, Flex, Row } from "antd";
+import Col from "antd/es/col";
+import Flex from "antd/es/flex";
+import Row from "antd/es/row";
 
 const OurCustomersSaying = () => {
   return (

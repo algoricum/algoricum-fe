@@ -4,7 +4,7 @@ import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getAssistantByClinicId, getClincApiKey, getClinicData } from "@/utils/supabase/clinic-helper";
 import { getUserData } from "@/utils/supabase/user-helper";
-import { Modal } from "antd";
+import Modal from "antd/es/modal";
 import { Bot, DollarSign, FileText, Star, Upload, X } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";

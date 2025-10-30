@@ -1,5 +1,5 @@
 import { ColorPicker } from "@/components/elements";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 
 interface ColorConfiguratorProps {
   description?: string;

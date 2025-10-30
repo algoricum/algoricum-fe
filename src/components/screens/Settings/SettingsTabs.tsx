@@ -1,5 +1,5 @@
 "use client";
-import { Flex } from "antd";
+import Flex from "antd/es/flex";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import ChatbotSettings from "./ChatbotSettings";
@@ -34,7 +34,6 @@ const SettingsTabs = () => {
       </Flex>
 
       <div className="bg-white rounded-xl py-6">
-        {/* {activeTab === "lead" && <LeadCapturingForm />} */}
         {activeTab === "chatbot" && <ChatbotSettings />}
         {activeTab === "clinic-setting" && <ClinicSetting />}
       </div>

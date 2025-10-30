@@ -1,5 +1,6 @@
 import MobileFooter from "@/components/common/MobileFooter";
-import { Flex, LayoutProps } from "antd";
+import Flex from "antd/es/flex";
+import type { LayoutProps } from "antd/es/layout";
 
 const ContentLayout = ({ children }: LayoutProps) => {
   return (

@@ -1,16 +1,15 @@
 "use client";
-import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner"; // Import your LoadingSpinner
+import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import footerItems from "@/constants/footerItems";
 import menuItems from "@/constants/menuItems";
 import { ErrorToast, SuccessToast } from "@/helpers/toast";
+import { useCurrentUser } from "@/hooks/useUser";
 import { signOut } from "@/utils/supabase/auth-helper";
-import { createClient } from "@/utils/supabase/config/client";
-import type { User } from "@supabase/supabase-js";
 import { X } from "lucide-react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 interface SidebarProps {
   sidebarOpen: boolean;
 
@@ -18,29 +17,12 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
-  const supabase = createClient();
   const { push } = useRouter();
   const pathname = usePathname();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [isUserLoading, setIsUserLoading] = useState(true); // Add loading state
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const { data, error } = await supabase.auth.getUser();
-        if (!error && data?.user) {
-          setUser(data.user);
-        }
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      } finally {
-        setIsUserLoading(false); // Set loading to false after fetch completes
-      }
-    };
-
-    fetchUser();
-  }, [supabase.auth]);
+  // React Query hooks
+  const { data: user, isLoading: isUserLoading } = useCurrentUser();
 
   const menuHandler = async (key: string) => {
     switch (key) {
@@ -120,7 +102,13 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen }) => {
       <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
         <div className="flex items-center">
           <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
-            <Image src="/logo.svg" alt="Logo" width={48} height={48} />
+            <Image
+              src="/logo.svg"
+              alt="Algoricum Logo"
+              width={48}
+              height={48}
+              priority // Sidebar is above the fold
+            />
           </div>
           <div className="ml-3">
             <div className="text-lg font-semibold text-gray-900">Algoricum</div>

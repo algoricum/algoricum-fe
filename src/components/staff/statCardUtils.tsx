@@ -1,14 +1,5 @@
-import type React from "react";
 import { CheckCircle, Clock, Calendar } from "lucide-react";
-import type { StatusStats } from "@/utils/supabase/leads-helper";
-
-export interface StatConfig {
-  key: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  title: string;
-  getValue: (statusStats: StatusStats[]) => number;
-}
+import type { StatConfig } from "@/types/staff";
 
 export const staffStatsConfig: StatConfig[] = [
   {

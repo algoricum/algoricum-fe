@@ -6,11 +6,13 @@ import { MailIcon, PasswordIcon } from "@/icons";
 import { ForgotProps } from "@/interfaces/services_type";
 import { resetPasswordRequest } from "@/utils/supabase/auth-helper";
 import { createClient } from "@/utils/supabase/config/client";
-import { Flex, Form, Typography } from "antd";
+import { useMutation } from "@tanstack/react-query";
+import Flex from "antd/es/flex";
+import Form from "antd/es/form";
+import Typography from "antd/es/typography";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useMutation } from "react-query";
 
 const { Title, Text } = Typography;
 
@@ -36,10 +38,6 @@ const ForgotPasswordPage = () => {
     const tokenFromQuery = searchParams.get("token");
     const typeFromQuery = searchParams.get("type");
     const codeFromQuery = searchParams.get("code");
-
-    // Log parameters for debugging
-    console.log("Hash:", { accessToken: accessTokenFromHash, type: typeFromHash });
-    console.log("Query:", { token: tokenFromQuery, type: typeFromQuery, code: codeFromQuery });
 
     if (
       (typeFromHash === "recovery" && accessTokenFromHash) ||
@@ -79,7 +77,8 @@ const ForgotPasswordPage = () => {
   }, [searchParams, supabase.auth]);
 
   // Mutation for forgot password request
-  const forgotPasswordMutation = useMutation((data: ForgotProps) => resetPasswordRequest(data.email), {
+  const forgotPasswordMutation = useMutation({
+    mutationFn: (data: ForgotProps) => resetPasswordRequest(data.email),
     onSuccess: () => {
       SuccessToast("Password reset instructions sent to your email");
       push("/login");
@@ -90,22 +89,20 @@ const ForgotPasswordPage = () => {
   });
 
   // Mutation for password reset
-  const resetPasswordMutation = useMutation(
-    async (password: string) => {
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (password: string) => {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       return true;
     },
-    {
-      onSuccess: () => {
-        SuccessToast("Password updated successfully");
-        push("/login");
-      },
-      onError: (error: any) => {
-        ErrorToast(error?.message || "Failed to update password");
-      },
+    onSuccess: () => {
+      SuccessToast("Password updated successfully");
+      push("/login");
     },
-  );
+    onError: (error: any) => {
+      ErrorToast(error?.message || "Failed to update password");
+    },
+  });
 
   const handleFieldFocus = (fieldName: string) => {
     form.setFields([
@@ -175,7 +172,7 @@ const ForgotPasswordPage = () => {
 
               <Form.Item>
                 <Button
-                  loading={forgotPasswordMutation.isLoading}
+                  loading={forgotPasswordMutation.isPending}
                   className="bg-brand-primary hover:!bg-brand-secondary text-white w-full"
                   type="primary"
                   htmlType="submit"
@@ -232,7 +229,7 @@ const ForgotPasswordPage = () => {
               </Form.Item>
 
               <Form.Item>
-                <Button loading={resetPasswordMutation.isLoading} className="w-full" type="primary" htmlType="submit">
+                <Button loading={resetPasswordMutation.isPending} className="w-full" type="primary" htmlType="submit">
                   Save Password
                 </Button>
               </Form.Item>

@@ -1,5 +1,7 @@
 // supabase/functions/_shared/hubspot-service.ts
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { chunkArray, enqueueLead } from "./Lead-enqueue.ts";
+import { cleanHubSpotContacts } from "./gpt-extractor-service.ts";
 
 // Environment variables at top level
 const HUBSPOT_CLIENT_ID = Deno.env.get("HUBSPOT_CLIENT_ID");
@@ -8,6 +10,116 @@ const HUBSPOT_REDIRECT_URI = Deno.env.get("HUBSPOT_REDIRECT_URI");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const FRONTEND_URL = Deno.env.get("FRONTEND_URL");
+
+// Helper function to get HubSpot integration ID
+async function getHubSpotIntegrationId(supabase: any): Promise<string> {
+  const { data: integration, error } = await supabase.from("integrations").select("id").eq("name", "Hubspot").single();
+
+  if (error || !integration) {
+    throw new Error("HubSpot integration not found in integrations table");
+  }
+
+  return integration.id;
+}
+
+async function getHubSpotConnection(supabase: any, clinic_id: string, integrationId: string) {
+  const { data: connection, error } = await supabase
+    .from("integration_connections")
+    .select("auth_data, expires_at, updated_at, clinic_id")
+    .eq("clinic_id", clinic_id)
+    .eq("integration_id", integrationId)
+    .eq("status", "active")
+    .limit(1)
+    .single();
+
+  return { connection, error };
+}
+
+async function getHubSpotAuthData(supabase: any, clinic_id: string, integrationId: string) {
+  const { data: connection, error } = await supabase
+    .from("integration_connections")
+    .select("auth_data")
+    .eq("clinic_id", clinic_id)
+    .eq("integration_id", integrationId)
+    .single();
+
+  return { authData: connection?.auth_data || {}, error };
+}
+
+async function updateHubSpotConnection(supabase: any, clinic_id: string, integrationId: string, updates: any) {
+  const { error } = await supabase
+    .from("integration_connections")
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("clinic_id", clinic_id)
+    .eq("integration_id", integrationId);
+
+  return { error };
+}
+
+async function getAllConnectedClinics(supabase: any, integrationId: string) {
+  const { data: connections, error } = await supabase
+    .from("integration_connections")
+    .select("clinic_id")
+    .eq("integration_id", integrationId)
+    .eq("status", "active");
+
+  return { connections, error };
+}
+
+async function processHubSpotContacts(contacts: any[], clinic_id: string, supabase: any, requestId: string) {
+  if (contacts.length === 0) {
+    console.log(`[${requestId}] No contacts to process for clinic ${clinic_id}`);
+    return { success: true, processedCount: 0 };
+  }
+
+  const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Hubspot").single();
+
+  if (sourceError || !sourceData) {
+    console.error(`[${requestId}] Error fetching lead source for clinic ${clinic_id}:`, sourceError);
+    throw new Error("Could not find HubSpot in lead_source table");
+  }
+
+  const source_id = sourceData.id;
+
+  // Clean contacts with GPT before processing
+  const cleanedContacts = await cleanHubSpotContacts(contacts, requestId);
+
+  const leadsToInsert = cleanedContacts
+    .map(contact => ({
+      clinic_id,
+      first_name: contact.firstName,
+      last_name: contact.lastName,
+      email: contact.email,
+      phone: contact.phone,
+      status: "New",
+      source_id,
+    }))
+    .filter(lead => lead.email || lead.phone);
+
+  if (leadsToInsert.length === 0) {
+    console.warn(`[${requestId}] No valid leads to insert for clinic ${clinic_id}`);
+    return { success: true, processedCount: 0 };
+  }
+
+  try {
+    // Use the queue system to process leads
+    const chunks = chunkArray(leadsToInsert, 50); // Process in chunks of 50
+    console.log(`[${requestId}] Enqueuing ${leadsToInsert.length} leads in ${chunks.length} chunks for clinic ${clinic_id}`);
+
+    for (const chunk of chunks) {
+      await enqueueLead(chunk, clinic_id);
+    }
+
+    console.log(`[${requestId}] Successfully enqueued ${leadsToInsert.length} leads for clinic ${clinic_id}`);
+    return { success: true, processedCount: leadsToInsert.length };
+  } catch (err) {
+    console.error(`[${requestId}] Lead enqueue failed for clinic ${clinic_id}`, { error: err.message });
+    throw new Error(`Lead enqueue failed for clinic ${clinic_id}: ${err.message}`);
+  }
+}
 
 // Property mapping configuration
 export function getHubSpotPropertiesToFetch() {
@@ -56,44 +168,6 @@ export async function discoverHubSpotProperties(accessToken: string, requestId: 
   return [];
 }
 
-export function mapHubSpotContactToLead(contact: any, clinic_id: string, source_id: string) {
-  const props = contact.properties || {};
-  const propertyMappings = {
-    first_name: [props.firstname, props.first_name, props.custom_first_name],
-    last_name: [props.lastname, props.last_name, props.custom_last_name],
-    email: [props.email, props.email_address, props.primary_email, props.work_email, props.custom_email],
-    phone: [props.phone, props.phone_number, props.mobilephone, props.custom_phone],
-  };
-
-  const getFirstValidValue = (values: any[]) => {
-    for (const value of values) {
-      if (value && typeof value === "string" && value.trim() !== "") {
-        return value.trim();
-      }
-    }
-    return null;
-  };
-
-  const mappedLead = {
-    clinic_id,
-    first_name: getFirstValidValue(propertyMappings.first_name),
-    last_name: getFirstValidValue(propertyMappings.last_name),
-    email: getFirstValidValue(propertyMappings.email),
-    phone: getFirstValidValue(propertyMappings.phone),
-    status: "New",
-    source_id,
-  };
-
-  if (!mappedLead.email && !mappedLead.phone) {
-    console.warn(`Contact ${contact.id} has no valid email or phone`, {
-      availableProps: Object.keys(props),
-      contactId: contact.id,
-    });
-    return null;
-  }
-  return mappedLead;
-}
-
 export async function refreshHubSpotToken(refreshToken: string, supabase: any, clinic_id: string, requestId: string) {
   console.log(`[${requestId}] Refreshing HubSpot token for clinic ${clinic_id}`);
   const tokenResponse = await fetch("https://api.hubapi.com/oauth/v1/token", {
@@ -114,14 +188,22 @@ export async function refreshHubSpotToken(refreshToken: string, supabase: any, c
   }
 
   const tokenData = await tokenResponse.json();
-  const { error: updateError } = await supabase
-    .from("hubspot_connections")
-    .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-    })
-    .eq("clinic_id", clinic_id);
+  const integrationId = await getHubSpotIntegrationId(supabase);
+
+  // Get current auth_data to preserve other fields
+  const { authData: currentAuthData } = await getHubSpotAuthData(supabase, clinic_id, integrationId);
+
+  const updatedAuthData = {
+    ...currentAuthData,
+    access_token: tokenData.access_token,
+    refresh_token: tokenData.refresh_token,
+    token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+  };
+
+  const { error: updateError } = await updateHubSpotConnection(supabase, clinic_id, integrationId, {
+    auth_data: updatedAuthData,
+    expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
+  });
 
   if (updateError) {
     console.error(`[${requestId}] Failed to update tokens for clinic ${clinic_id}`, updateError);
@@ -171,12 +253,15 @@ export async function syncAllConnections(requestId: string) {
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const integrationId = await getHubSpotIntegrationId(supabase);
+
   const { data: connections, error: connError } = await supabase
-    .from("hubspot_connections")
-    .select("clinic_id, access_token, refresh_token, token_expires_at, last_sync_at")
-    .eq("connection_status", "connected")
-    .not("access_token", "is", null)
-    .not("refresh_token", "is", null);
+    .from("integration_connections")
+    .select("clinic_id, auth_data, expires_at, updated_at")
+    .eq("integration_id", integrationId)
+    .eq("status", "active")
+    .not("auth_data->access_token", "is", null)
+    .not("auth_data->refresh_token", "is", null);
 
   if (connError) {
     console.error(`[${requestId}] Failed to fetch connections:`, connError);
@@ -372,69 +457,30 @@ export async function processOAuthCallback(code: string, state: string, error?: 
     console.log(`[${reqId}] Fetched ${contacts.length} contacts from last 120 days`);
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    if (contacts.length > 0) {
-      const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Hubspot").single();
+    console.log(`[${reqId}] Using clinic_id from state: ${clinic_id}`);
 
-      if (sourceError || !sourceData) {
-        console.error(`[${reqId}] Error fetching lead source:`, sourceError);
-        throw new Error("Could not find HubSpot in lead_source table");
-      }
-
-      const source_id = sourceData.id;
-      console.log(`[${reqId}] Using clinic_id from state: ${clinic_id}`);
-      const leadsToInsert = contacts
-        .map(contact => {
-          if (!contact.id) {
-            console.warn(`[${reqId}] Contact missing ID`, { contact });
-            return null;
-          }
-          return mapHubSpotContactToLead(contact, clinic_id, source_id);
-        })
-        .filter(lead => lead !== null);
-
-      if (leadsToInsert.length === 0) {
-        console.warn(`[${reqId}] No valid leads to insert`);
-      } else {
-        let retries = 3;
-        let leadError = null;
-        while (retries > 0) {
-          try {
-            const { error } = await supabase.from("lead").upsert(leadsToInsert);
-            if (error) {
-              console.error(`[${reqId}] Lead save error`, { error: JSON.stringify(error), leadSample: leadsToInsert[0] });
-              leadError = error;
-              retries--;
-              if (retries === 0) throw new Error(`Lead save failed after retries: ${JSON.stringify(error)}`);
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              continue;
-            }
-            console.log(`[${reqId}] Successfully saved ${leadsToInsert.length} leads`);
-            break;
-          } catch (err) {
-            console.error(`[${reqId}] Lead save attempt failed`, { error: err.message });
-            leadError = err;
-            retries--;
-            if (retries === 0) throw new Error(`Lead save failed after retries: ${err.message}`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        }
-        if (leadError) throw leadError;
-      }
-    }
+    // Process contacts using shared function
+    await processHubSpotContacts(contacts, clinic_id, supabase, reqId);
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
-    const { error: dbError } = await supabase.from("hubspot_connections").upsert({
-      clinic_id,
+    const integrationId = await getHubSpotIntegrationId(supabase);
+
+    const authData = {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
-      token_expires_at: expiresAt.toISOString(),
       account_name: accountData.companyName || `Hub ${accountData.portalId}`,
       contact_count: contacts.length,
       hub_id: accountData.portalId?.toString(),
       scope: ["crm.objects.contacts.read"].join(" "),
-      connection_status: "connected",
-      last_sync_at: new Date().toISOString(),
-      error_message: null,
+    };
+
+    const { error: dbError } = await supabase.from("integration_connections").upsert({
+      clinic_id,
+      integration_id: integrationId,
+      auth_data: authData,
+      expires_at: expiresAt.toISOString(),
+      status: "active",
+      updated_at: new Date().toISOString(),
     });
 
     if (dbError) {
@@ -502,17 +548,10 @@ export async function syncContactsForClinic(body: any, requestId: string) {
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const integrationId = await getHubSpotIntegrationId(supabase);
 
   // Fetch connection details including clinic_id
-  const { data: connection, error: connError } = await supabase
-    .from("hubspot_connections")
-    .select("access_token, refresh_token, hub_id, last_sync_at, token_expires_at, clinic_id")
-    .eq("clinic_id", clinic_id)
-    .eq("connection_status", "connected")
-    .not("access_token", "is", null)
-    .not("refresh_token", "is", null)
-    .limit(1)
-    .single();
+  const { connection, error: connError } = await getHubSpotConnection(supabase, clinic_id, integrationId);
 
   if (connError || !connection) {
     console.error(`[${requestId}] Connection fetch error for clinic ${clinic_id}`, connError);
@@ -522,8 +561,8 @@ export async function syncContactsForClinic(body: any, requestId: string) {
     };
   }
 
-  let accessToken = connection.access_token;
-  const refreshToken = connection.refresh_token;
+  let accessToken = connection.auth_data?.access_token;
+  const refreshToken = connection.auth_data?.refresh_token;
   if (!refreshToken) {
     return {
       success: false,
@@ -531,7 +570,7 @@ export async function syncContactsForClinic(body: any, requestId: string) {
     };
   }
 
-  const expiresAt = connection.token_expires_at ? new Date(connection.token_expires_at) : null;
+  const expiresAt = connection.expires_at ? new Date(connection.expires_at) : null;
   const now = new Date();
   const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
 
@@ -603,65 +642,17 @@ export async function syncContactsForClinic(body: any, requestId: string) {
 
   console.log(`[${requestId}] Fetched ${contacts.length} contacts modified in last 15 minutes for clinic ${clinic_id}`);
 
-  if (contacts.length > 0) {
-    const { data: sourceData, error: sourceError } = await supabase.from("lead_source").select("id").eq("name", "Hubspot").single();
+  // Process contacts using shared function
+  await processHubSpotContacts(contacts, clinic_id, supabase, requestId);
 
-    if (sourceError || !sourceData) {
-      console.error(`[${requestId}] Error fetching lead source for clinic ${clinic_id}:`, sourceError);
-      return {
-        success: false,
-        error: "Could not find HubSpot in lead_source table",
-      };
-    }
+  const updatedAuthData = {
+    ...connection.auth_data,
+    contact_count: contacts.length,
+  };
 
-    const source_id = sourceData.id;
-    const leadsToInsert = contacts
-      .map(contact => {
-        if (!contact.id) {
-          console.warn(`[${requestId}] Contact missing ID for clinic ${clinic_id}`, { contact });
-          return null;
-        }
-        return mapHubSpotContactToLead(contact, clinic_id, source_id);
-      })
-      .filter(lead => lead !== null);
-
-    if (leadsToInsert.length === 0) {
-      console.warn(`[${requestId}] No valid leads to insert for clinic ${clinic_id}`);
-    } else {
-      let retries = 3;
-      let leadError = null;
-      while (retries > 0) {
-        try {
-          const { error } = await supabase.from("lead").upsert(leadsToInsert);
-          if (error) {
-            console.error(`[${requestId}] Lead save error for clinic ${clinic_id}`, {
-              error: JSON.stringify(error),
-              leadSample: leadsToInsert[0],
-            });
-            leadError = error;
-            retries--;
-            if (retries === 0) throw new Error(`Lead save failed after retries: ${JSON.stringify(error)}`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            continue;
-          }
-          console.log(`[${requestId}] Successfully saved ${leadsToInsert.length} leads for clinic ${clinic_id}`);
-          break;
-        } catch (err) {
-          console.error(`[${requestId}] Lead save attempt failed for clinic ${clinic_id}`, { error: err.message });
-          leadError = err;
-          retries--;
-          if (retries === 0) throw new Error(`Lead save failed after retries: ${err.message}`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-      if (leadError) throw leadError;
-    }
-  }
-
-  const { error: updateError } = await supabase
-    .from("hubspot_connections")
-    .update({ last_sync_at: new Date().toISOString(), contact_count: contacts.length })
-    .eq("clinic_id", clinic_id);
+  const { error: updateError } = await updateHubSpotConnection(supabase, clinic_id, integrationId, {
+    auth_data: updatedAuthData,
+  });
 
   if (updateError) {
     console.error(`[${requestId}] Update last_sync_at error for clinic ${clinic_id}`, updateError);
@@ -685,14 +676,10 @@ export async function syncAllClinicContacts(authHeader: string, requestId: strin
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const integrationId = await getHubSpotIntegrationId(supabase);
 
   // Get all connected clinic IDs
-  const { data: connections, error: connError } = await supabase
-    .from("hubspot_connections")
-    .select("clinic_id")
-    .eq("connection_status", "connected")
-    .not("access_token", "is", null)
-    .not("refresh_token", "is", null);
+  const { connections, error: connError } = await getAllConnectedClinics(supabase, integrationId);
 
   if (connError || !connections || connections.length === 0) {
     return {
@@ -793,11 +780,14 @@ export async function initializeOAuth(redirectUrl: string, clinic_id: string, re
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const integrationId = await getHubSpotIntegrationId(supabase);
 
-  await supabase.from("hubspot_connections").upsert({
+  await supabase.from("integration_connections").upsert({
     clinic_id,
-    connection_status: "connecting",
-    error_message: null,
+    integration_id: integrationId,
+    status: "pending",
+    auth_data: {},
+    updated_at: new Date().toISOString(),
   });
 
   const state = btoa(JSON.stringify({ redirectUrl, clinic_id, timestamp: Date.now() }));
@@ -833,16 +823,13 @@ export async function disconnectConnection(clinic_id: string, requestId: string)
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const integrationId = await getHubSpotIntegrationId(supabase);
 
-  await supabase
-    .from("hubspot_connections")
-    .update({
-      connection_status: "disconnected",
-      access_token: null,
-      refresh_token: null,
-      token_expires_at: null,
-    })
-    .eq("clinic_id", clinic_id);
+  await updateHubSpotConnection(supabase, clinic_id, integrationId, {
+    status: "inactive",
+    auth_data: {},
+    expires_at: null,
+  });
 
   return {
     success: true,

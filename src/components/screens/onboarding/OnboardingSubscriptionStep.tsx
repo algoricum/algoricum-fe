@@ -50,7 +50,6 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
     const fetchClinic = async () => {
       try {
         const clinic = await getClinicData();
-        console.log(".......Clinic data:.....", clinic);
         if (clinic) {
           setClinicId(clinic.id);
         } else {

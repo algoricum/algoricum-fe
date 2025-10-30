@@ -1,13 +1,7 @@
-import type React from "react";
+import type { StatCardProps } from "@/types/staff";
 
-interface StatCardProps {
-  icon: React.ReactNode;
-  iconBg: string;
-  title: string;
-  value: number;
-}
-
-export function StatCard({ icon, iconBg, title, value }: StatCardProps) {
+export function StatCard(props: Readonly<StatCardProps>) {
+  const { icon, iconBg, title, value } = props;
   return (
     <div className="border-2 border-gray-200 rounded-xl p-6 bg-gray-50 shadow-sm hover:shadow-md transition-all duration-200 hover:border-gray-300 mt-4">
       <div className="flex items-center justify-start gap-2 whitespace-nowrap md:justify-between md:gap-3">
