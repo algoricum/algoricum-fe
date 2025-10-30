@@ -24,6 +24,7 @@
     "@tanstack/react-query-devtools": "^5.90.2",
     "@types/node-fetch": "^2.6.13",
     "@types/twilio": "^3.19.2",
+    "@vercel/speed-insights": "^1.2.0",
     "antd": "^5.22.2",
     "axios": "^1.13.0",
     "cookies-next": "^5.1.0",
