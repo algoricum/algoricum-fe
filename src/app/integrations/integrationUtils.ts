@@ -187,7 +187,12 @@ export const deleteIntegrationConnections = async (clinicId: string, integration
       }
 
       case "Google Lead Forms": {
-        const { error: deleteError } = await supabase.from("google_lead_form_connections").delete().eq("clinic_id", clinicId);
+        const { data: integration } = await supabase.from("integrations").select("*").eq("name", "Google Lead Forms").single();
+        const { error: deleteError } = await supabase
+          .from("integration_connections")
+          .delete()
+          .eq("clinic_id", clinicId)
+          .eq("integration_id", integration.id);
         error = deleteError;
         break;
       }
