@@ -87,8 +87,6 @@ export async function importLeads(clinic_id: string) {
   }
 
   const contacts = await contactsRes.json();
-  console.warn("contacts", contacts);
-  console.warn("data123456", contacts);
   const { data: integration } = await supabase.from("integrations").select("id").eq("name", "GoHighLevel").single();
   const { data: integration_connection } = await supabase
     .from("integration_connections")
@@ -99,7 +97,7 @@ export async function importLeads(clinic_id: string) {
 
   if (!integration) throw new Error("Integration not configured");
 
-  const { error: error } = await supabase.from("integration_connections").upsert(
+  await supabase.from("integration_connections").upsert(
     {
       clinic_id,
       integration_id: integration.id,
@@ -109,7 +107,6 @@ export async function importLeads(clinic_id: string) {
     },
     { onConflict: ["clinic_id", "integration_id"] },
   );
-  console.error("error", error);
   const newPatients = contacts.contacts.filter((p: any) => {
     const updatedAt = integration_connection?.updated_at ? new Date(integration_connection.updated_at) : null;
 
@@ -122,7 +119,6 @@ export async function importLeads(clinic_id: string) {
     }
   });
 
-  console.error("newPatients", newPatients);
   if (contacts.contacts && Array.isArray(newPatients)) {
     const chunks = chunkArray(newPatients, 10);
     for (const chunk of chunks) {

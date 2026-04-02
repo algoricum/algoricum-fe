@@ -36,12 +36,6 @@ serve(async req => {
 
     // Get and log request data
     const { clinic_id, phone_number, name, twilio_config_id } = await req.json();
-    console.log("Received request payload", {
-      clinic_id,
-      phone_number,
-      name,
-      twilio_config_id,
-    });
 
     if (!clinic_id || !phone_number || !name) {
       console.log("Validation failed: Missing required fields", {
@@ -56,7 +50,6 @@ serve(async req => {
     }
 
     // Check if clinic already has an active Twilio configuration
-    console.log("Checking for existing twilio_config record", { clinic_id, phone_number });
     const { data: existingRecord } = await supabaseClient
       .from("twilio_config")
       .select("*")
@@ -97,13 +90,6 @@ serve(async req => {
 
     // SMS Processor webhook URL with clinic_id parameter - Update this to your actual Supabase project URL
     const smsWebhookUrl = `${supabaseUrl}/functions/v1/sms-processor?clinic_id=${clinic_id}`;
-
-    console.log("Twilio environment variables", {
-      twilioAccountSid: twilioAccountSid ? "set" : "not set",
-      twilioAuthToken: twilioAuthToken ? "set" : "not set",
-      twilioMessagingServiceSid: twilioMessagingServiceSid ? "set" : "not set",
-      smsWebhookUrl,
-    });
 
     if (!twilioAccountSid || !twilioAuthToken) {
       console.log("Twilio credentials missing, updating twilio_config to failed if exists", { twilio_config_id });
@@ -196,19 +182,7 @@ serve(async req => {
         selectedAreaCode: selectedNumber.phone_number.replace(/\D/g, "").slice(-10, -7),
         requestedAreaCode: inputAreaCode,
       });
-    } else {
-      console.log("Found number with matching area code", {
-        selectedNumber: selectedNumber.phone_number,
-        matchingAreaCode: inputAreaCode,
-      });
     }
-
-    console.log("Selected Twilio phone number", {
-      selectedNumber: selectedNumber.phone_number,
-      sid: selectedNumber.sid,
-      currentSmsUrl: selectedNumber.sms_url || "none",
-      areaCodeMatch: selectedNumber.phone_number.replace(/\D/g, "").slice(-10, -7) === inputAreaCode,
-    });
 
     // Step 2: Update the existing number with SMS processor webhook (including clinic_id)
     const updateUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers/${selectedNumber.sid}.json`;
@@ -218,13 +192,6 @@ serve(async req => {
       // Optional: Add status callback URL for delivery receipts (also with clinic_id)
       SmsStatusCallback: `${supabaseUrl}/functions/v1/sms-processor/status?clinic_id=${clinic_id}`,
     });
-    console.log("Updating Twilio phone number with webhook", {
-      updateUrl,
-      phoneNumber: selectedNumber.phone_number,
-      sid: selectedNumber.sid,
-      smsUrl: smsWebhookUrl,
-    });
-
     const updateResponse = await fetch(updateUrl, {
       method: "POST",
       headers: {
@@ -272,10 +239,6 @@ serve(async req => {
 
     if (twilioMessagingServiceSid) {
       // First check if number is already in the messaging service
-      console.log("Checking if phone number is already in A2P messaging service", {
-        phoneNumber: assignedNumberData.phone_number,
-        messagingServiceSid: twilioMessagingServiceSid,
-      });
 
       const checkServiceUrl = `https://messaging.twilio.com/v1/Services/${twilioMessagingServiceSid}/PhoneNumbers`;
 
@@ -292,18 +255,10 @@ serve(async req => {
           const isAlreadyRegistered = existingNumbers.phone_numbers?.some(num => num.sid === assignedNumberData.sid);
 
           if (isAlreadyRegistered) {
-            console.log("Phone number is already registered in messaging service", {
-              phoneNumber: assignedNumberData.phone_number,
-              messagingServiceSid: twilioMessagingServiceSid,
-            });
             alreadyInCampaign = true;
             messagingServiceRegistrationSuccess = true;
           } else {
             // Number not in campaign, proceed with registration
-            console.log("Registering phone number with A2P messaging service", {
-              phoneNumber: assignedNumberData.phone_number,
-              messagingServiceSid: twilioMessagingServiceSid,
-            });
 
             const messagingServiceUrl = `https://messaging.twilio.com/v1/Services/${twilioMessagingServiceSid}/PhoneNumbers`;
             const messagingServiceBody = new URLSearchParams({
@@ -319,30 +274,12 @@ serve(async req => {
               body: messagingServiceBody,
             });
 
-            const messagingServiceData = await messagingServiceResponse.json();
-            console.log("Messaging service registration response", {
-              status: messagingServiceResponse.status,
-              ok: messagingServiceResponse.ok,
-              data: messagingServiceData,
-            });
-
             if (!messagingServiceResponse.ok) {
-              console.log("Warning: Failed to register phone number with messaging service", {
-                error: messagingServiceData,
-                phoneNumber: assignedNumberData.phone_number,
-                messagingServiceSid: twilioMessagingServiceSid,
-              });
+              console.error("Warning: Failed to register phone number with messaging service");
               messagingServiceRegistrationSuccess = false;
-            } else {
-              console.log("Successfully registered phone number with messaging service", {
-                phoneNumber: assignedNumberData.phone_number,
-                messagingServiceSid: twilioMessagingServiceSid,
-              });
             }
           }
         } else {
-          console.log("Failed to check existing numbers in messaging service, proceeding with registration attempt");
-
           // Proceed with registration attempt anyway
           const messagingServiceUrl = `https://messaging.twilio.com/v1/Services/${twilioMessagingServiceSid}/PhoneNumbers`;
           const messagingServiceBody = new URLSearchParams({
@@ -363,33 +300,16 @@ serve(async req => {
           if (!messagingServiceResponse.ok) {
             // Check if error is because number is already registered
             if (messagingServiceData.code === 21710 || messagingServiceData.message?.includes("already")) {
-              console.log("Phone number is already registered in messaging service (detected from error)", {
-                phoneNumber: assignedNumberData.phone_number,
-                messagingServiceSid: twilioMessagingServiceSid,
-              });
               alreadyInCampaign = true;
               messagingServiceRegistrationSuccess = true;
             } else {
-              console.log("Warning: Failed to register phone number with messaging service", {
-                error: messagingServiceData,
-                phoneNumber: assignedNumberData.phone_number,
-                messagingServiceSid: twilioMessagingServiceSid,
-              });
+              console.error("Warning: Failed to register phone number with messaging service");
               messagingServiceRegistrationSuccess = false;
             }
-          } else {
-            console.log("Successfully registered phone number with messaging service", {
-              phoneNumber: assignedNumberData.phone_number,
-              messagingServiceSid: twilioMessagingServiceSid,
-            });
           }
         }
-      } catch (error) {
-        console.error("Error during messaging service check/registration", {
-          error: error.message,
-          phoneNumber: assignedNumberData.phone_number,
-          messagingServiceSid: twilioMessagingServiceSid,
-        });
+      } catch {
+        console.error("Error during messaging service check/registration");
         messagingServiceRegistrationSuccess = false;
       }
     } else {
@@ -405,7 +325,6 @@ serve(async req => {
       twilio_phone_number: assignedNumberData.phone_number,
       status: "active",
     };
-    console.log("Preparing to upsert twilio_config", { twilioConfigData, twilio_config_id });
 
     let upsertResult;
     if (twilio_config_id) {
@@ -528,10 +447,8 @@ serve(async req => {
 
 // Helper function to format phone number
 function formatPhoneNumber(phoneNumber: string): string {
-  console.log("Formatting phone number", { phoneNumber });
   // Remove +1 and format as (XXX) XXX-XXXX
   const cleaned = phoneNumber.replace("+1", "");
   const formatted = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-  console.log("Formatted phone number", { formatted });
   return formatted;
 }
