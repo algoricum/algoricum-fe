@@ -5,7 +5,7 @@ import type { FollowUpRule } from "./nurturing-types.ts";
 const FOLLOW_UP_RULES_PAID: FollowUpRule[] = [
   {
     name: "sms_5min_initial",
-    timeFromCreated: 30 * 1000, // 5 minutes
+    timeFromCreated: 5 * 60 * 1000, // 5 minutes
     leadStatus: ["New"],
     communicationType: "sms",
     onlyOnce: true,
@@ -581,7 +581,7 @@ const FOLLOW_UP_RULES_DEMO_FREE: FollowUpRule[] = [
     toleranceWindow: 1 * 60 * 1000,
   },
   {
-    name: "email_50day_followup",
+    name: "email_55day_followup",
     timeFromCreated: 50 * 60 * 1000, // 30 minutes
     communicationType: "email",
     onlyOnce: true,

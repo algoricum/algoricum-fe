@@ -117,12 +117,22 @@ async function processNurturingInitial(supabase: any) {
 serve(async req => {
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Authenticate: require service role key
+  const authHeader = req.headers.get("Authorization");
+  const expectedKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!authHeader || authHeader !== `Bearer ${expectedKey}`) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   logInfo("=== Initial Nurturing Function Called ===");
@@ -147,16 +157,6 @@ serve(async req => {
       sent: result.summary?.sent || 0,
       skipped: result.summary?.skipped || 0,
       errors: result.summary?.errors || 0,
-    });
-
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-
-    logInfo("Initial contact processing completed", {
-      processed: result.processed,
-      errors: result.errors,
     });
 
     return new Response(JSON.stringify(result), {
