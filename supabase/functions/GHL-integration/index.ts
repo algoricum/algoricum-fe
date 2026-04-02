@@ -64,7 +64,6 @@ serve(async req => {
       }
 
       const tokenData = await tokenRes.json();
-      console.log("test", tokenData);
       await saveTokens(clinic_id, tokenData);
 
       // Immediately import leads once connected

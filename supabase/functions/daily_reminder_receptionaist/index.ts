@@ -72,7 +72,6 @@ function generateReminderEmail(clinicName: string, clinic: any, clinic_id: strin
 serve(async () => {
   // 1. Fetch receptionists whose local time = 3PM (with owner emails)
   const { data: users, error } = await supabase.rpc("get_receptionists_at_3pm");
-  console.warn(users);
 
   if (error) {
     console.error("DB error:", error);
@@ -86,7 +85,7 @@ serve(async () => {
 
   // 2. Send mail via Mailgun
   for (const row of users) {
-    const { user_email, clinic_name, from_email, clinic_id, owner_email } = row;
+    const { user_email, clinic_name, clinic_id, owner_email } = row;
 
     // Fetch clinic details for dynamic footer
     const { data: clinic } = await supabase.from("clinics").select("id, name, address, phone, email").eq("id", clinic_id).single();
@@ -126,7 +125,7 @@ Algoricum`,
     if (!res.ok) {
       console.error("Mailgun error:", await res.text());
     } else {
-      console.log(`Sent mail to ${user_email}${emailParams.cc ? ` (CC: ${emailParams.cc})` : ""} from ${from_email}`);
+      console.log(`Sent daily reminder for clinic ${clinic_id}`);
     }
 
     // --- insert a task ---

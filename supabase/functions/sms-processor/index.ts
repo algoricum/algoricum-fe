@@ -93,8 +93,6 @@ serve(async req => {
       ApiVersion: formData.get("ApiVersion") as string,
     };
 
-    console.log(`📱 SMS from ${webhookData.From} to ${webhookData.To}`);
-
     // Validate required fields
     if (!webhookData.From || !webhookData.To || !webhookData.Body) {
       console.error("❌ Missing required webhook data");
@@ -116,8 +114,6 @@ serve(async req => {
 
         if (result.success && result.data?.ai_response && result.data?.sender) {
           console.log("📱 Sending SMS via Twilio API...");
-          console.log("SMS Response Length:", result.data.ai_response.length);
-          console.log("SMS Content:", JSON.stringify(result.data.ai_response));
 
           // Send the actual SMS using Twilio API
           const smsResult = await sendSMS(
@@ -164,13 +160,7 @@ async function processSMSMessage(
     const messageBody = webhookData.Body || "";
     const messageSid = webhookData.MessageSid;
 
-    console.log(`📱 === PROCESSING SMS MESSAGE ===`);
-    console.log(`📞 From: ${senderPhone} | To: ${recipientPhone} | Clinic: ${clinicId}`);
-    console.log(`💬 Message: "${messageBody}" | MessageSID: ${messageSid}`);
-    console.log(`Processing SMS from: ${senderPhone} to: ${recipientPhone}`);
-
     // Find the clinic by matching recipient phone to twilio_phone_number and clinic_id
-    console.log(`🔍 Looking up Twilio config for clinic_id: ${clinicId}`);
 
     const { data: twilioConfig, error: configError } = await supabaseClient
       .from("twilio_config")
@@ -195,12 +185,6 @@ async function processSMSMessage(
       .limit(1)
       .single();
 
-    console.log(`🏥 Twilio config query result:`, {
-      hasData: !!twilioConfig,
-      error: configError?.message,
-      configId: twilioConfig?.id,
-    });
-
     if (configError || !twilioConfig) {
       console.error("❌ Error finding Twilio config:", configError);
       return {
@@ -216,10 +200,7 @@ async function processSMSMessage(
       phone_number: twilioConfig.phone_number,
       calendly_link: twilioConfig.clinic.calendly_link,
     };
-    console.log(`✅ Found clinic: ${clinicData.id} - ${clinicData.name}`);
-
     // Check if sender phone exists in lead table for this clinic with improved matching
-    console.log(`👤 Looking up lead for phone: ${senderPhone} in clinic: ${clinicData.id}`);
 
     const { data: existingLead, error: leadError } = await supabaseClient
       .from("lead")
@@ -228,13 +209,6 @@ async function processSMSMessage(
       .eq("phone", senderPhone)
       .limit(1)
       .single();
-
-    console.log(`👤 Lead query result:`, {
-      hasData: !!existingLead,
-      error: leadError?.message,
-      errorCode: leadError?.code,
-      leadId: existingLead?.id,
-    });
 
     let leadData = existingLead;
 
@@ -247,9 +221,6 @@ async function processSMSMessage(
     }
 
     if (!leadData) {
-      console.log(`⚠️ No lead found for phone: ${senderPhone}`);
-      console.log("🆕 Creating new lead for incoming SMS...");
-
       // Find or create default source for SMS leads
       let defaultSourceId: string;
 
@@ -327,19 +298,13 @@ async function processSMSMessage(
     // Check for stop keywords and mark lead as Cold if found
     const stopKeywords = ["stop", "unsubscribe", "opt out", "optout", "quit", "cancel", "end", "remove"];
     const messageBodyLower = messageBody.toLowerCase().trim();
-    console.log(`🔍 Checking message for stop keywords: "${messageBody}" -> "${messageBodyLower}"`);
-
     const isStopKeyword = stopKeywords.some(keyword => {
       // Check if the keyword appears as a standalone word (not part of another word)
       const wordRegex = new RegExp(`\\b${keyword.toLowerCase()}\\b`, "i");
       return wordRegex.test(messageBodyLower) && messageBodyLower.trim().length <= 20; // Only for short messages
     });
 
-    console.log(`📝 Stop keyword check result: ${isStopKeyword}`);
-
     if (isStopKeyword) {
-      console.log(`📴 Stop keyword detected in message: "${messageBody}". Marking lead as Cold.`);
-
       // Update lead status to Cold
       const { error: statusUpdateError } = await supabaseClient
         .from("lead")
@@ -383,9 +348,6 @@ async function processSMSMessage(
 
     // Check for booking/appointment keywords and create meeting_schedule if detected using shared service
     if (!isStopKeyword) {
-      console.log(`🔍 Checking for booking request in message: "${messageBody}"`);
-      console.log(`📱 Lead data: ${leadData.id} - ${leadData.first_name} ${leadData.last_name} - ${leadData.phone}`);
-
       try {
         const bookingOptions: BookingDetectionOptions = {
           messageBody: messageBody,
@@ -406,22 +368,10 @@ async function processSMSMessage(
           senderPhone: senderPhone,
         };
 
-        console.log(`🎯 Calling booking detection service...`);
         const bookingResult = await detectBookingRequestAndCreateSchedule(bookingOptions, supabaseClient);
 
-        console.log(`📅 Booking detection result:`, {
-          isBookingRequest: bookingResult.isBookingRequest,
-          meetingScheduleCreated: bookingResult.meetingScheduleCreated,
-          meetingScheduleId: bookingResult.meetingScheduleId,
-          error: bookingResult.error,
-        });
-
-        if (bookingResult.meetingScheduleCreated) {
-          console.log(`✅ Booking service created meeting schedule: ${bookingResult.meetingScheduleId}`);
-        } else if (bookingResult.error) {
-          console.error(`❌ Booking service error: ${bookingResult.error}`);
-        } else if (!bookingResult.isBookingRequest) {
-          console.log(`ℹ️ No booking keywords detected in message: "${messageBody}"`);
+        if (bookingResult.error) {
+          console.error("❌ Booking service error");
         }
       } catch (bookingError) {
         console.error(`❌ Error in booking detection:`, bookingError);
@@ -524,10 +474,6 @@ async function processSMSMessage(
 
       if (aiResponse.success && aiResponse.response) {
         aiResponseText = aiResponse.response;
-        console.log("AI Response Length:", aiResponseText.length);
-        console.log("AI Response Content:", JSON.stringify(aiResponseText));
-
-        console.log("💾 Saving AI response to conversation...");
         await saveAIResponseToConversation(threadId, aiResponseText, messageSid, supabaseClient);
       }
     }

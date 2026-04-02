@@ -15,9 +15,6 @@ import { supabase } from "../_shared/supabaseClient.ts";
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 serve(async req => {
-  console.log(`[GOOGLE_LEADS] Incoming request: ${req.method} ${req.url}`);
-  console.log(`[GOOGLE_LEADS] Request headers:`, Object.fromEntries(req.headers.entries()));
-
   const optionsResponse = handleOptions(req);
   if (optionsResponse) {
     console.log(`[GOOGLE_LEADS] Handling CORS preflight request`);
@@ -40,8 +37,6 @@ serve(async req => {
       const clinicId = url.searchParams.get("clinic_id");
       const redirectTo = url.searchParams.get("redirect_to");
 
-      console.log(`[GOOGLE_LEADS] OAuth start request:`, { clinicId, redirectTo });
-
       if (!clinicId) {
         console.error(`[GOOGLE_LEADS] Missing clinic_id parameter`);
         return new Response("Missing clinic_id parameter", {
@@ -53,7 +48,6 @@ serve(async req => {
       try {
         console.log(`[GOOGLE_LEADS] Starting OAuth for clinic: ${clinicId}`);
         const authUrl = await startAuth(clinicId, redirectTo, supabaseAdmin);
-        console.log(`[GOOGLE_LEADS] Redirecting to OAuth URL: ${authUrl}`);
 
         return new Response(null, {
           status: 302,
@@ -81,7 +75,6 @@ serve(async req => {
       let requestBody;
       try {
         requestBody = await req.json();
-        console.log(`[GOOGLE_LEADS] Request body:`, requestBody);
       } catch (error) {
         console.error(`[GOOGLE_LEADS] Failed to parse request body:`, error);
         return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
@@ -94,7 +87,6 @@ serve(async req => {
       console.log(`[GOOGLE_LEADS] Starting OAuth for clinic: ${clinic_id}, redirect: ${redirectTo}`);
 
       const result = await startAuth(clinic_id, redirectTo);
-      console.log(`[GOOGLE_LEADS] OAuth start result:`, result);
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders() } });
     }
 
@@ -105,12 +97,6 @@ serve(async req => {
       const code = url.searchParams.get("code");
       const stateRaw = url.searchParams.get("state") || "";
       const error = url.searchParams.get("error");
-
-      console.log(`[GOOGLE_LEADS] OAuth callback parameters:`, {
-        hasCode: !!code,
-        state: stateRaw,
-        error: error,
-      });
 
       if (error) {
         console.error(`[GOOGLE_LEADS] OAuth error received:`, error);
@@ -129,25 +115,15 @@ serve(async req => {
       }
 
       // parse state -> clinic_id|redirect_to
-      console.log(`[GOOGLE_LEADS] Parsing state parameter: ${stateRaw}`);
       const decodedState = decodeURIComponent(stateRaw);
       const [clinic_id, redirectToEncoded] = decodedState.split("|");
       const redirectTo = redirectToEncoded ? decodeURIComponent(redirectToEncoded) : null;
 
-      console.log(`[GOOGLE_LEADS] Parsed state:`, {
-        clinic_id,
-        redirectTo,
-        decodedState,
-      });
-
-      console.log(`[GOOGLE_LEADS] Handling OAuth callback...`);
       const tokens = await handleOAuthCallback(code, clinic_id, redirectTo);
-      console.log(`[GOOGLE_LEADS] OAuth callback completed, redirect URL: ${tokens}`);
 
       const redirectURL = new URL(tokens);
       redirectURL.searchParams.set("google_lead_form_status", "success");
 
-      console.log(`[GOOGLE_LEADS] Final redirect URL: ${redirectURL.toString()}`);
       return new Response(null, {
         status: 302,
         headers: {
@@ -173,7 +149,6 @@ serve(async req => {
       let webhookBody;
       try {
         webhookBody = await req.json();
-        console.log(`[GOOGLE_LEADS] Webhook body received:`, JSON.stringify(webhookBody, null, 2));
       } catch (error) {
         console.error(`[GOOGLE_LEADS] Failed to parse webhook body:`, error);
         return new Response(JSON.stringify({ error: "Invalid JSON in webhook body" }), {
@@ -187,8 +162,6 @@ serve(async req => {
 
         let dataForAI = webhookBody;
 
-        console.log("webhook body response:", webhookBody);
-
         // If it’s a Google Lead Form payload:
         if (dataForAI.user_column_data && Array.isArray(dataForAI.user_column_data)) {
           // Convert user_column_data to a simple key-value object
@@ -199,8 +172,6 @@ serve(async req => {
           }
           dataForAI = flattened;
         }
-
-        console.log("updated sanatized response:", dataForAI);
 
         const response = await fetch(`${supabaseUrl}/functions/v1/GPT-extractor-function`, {
           method: "POST",
@@ -222,7 +193,6 @@ serve(async req => {
         }
 
         const sanatizedData = await response.json();
-        console.log("Extractor response:", sanatizedData);
 
         const leadRecords = (sanatizedData?.data || []).map(contact => ({
           first_name: contact.firstName,
@@ -233,8 +203,6 @@ serve(async req => {
           source_id: leadSource.id,
           status: "New",
         }));
-
-        console.log("Prepared lead records:", leadRecords);
 
         const { data, error } = await supabase.from("lead").insert(leadRecords);
 
@@ -264,7 +232,6 @@ serve(async req => {
       let requestBody;
       try {
         requestBody = await req.json();
-        console.log(`[GOOGLE_LEADS] Fetch accounts request:`, requestBody);
       } catch (error) {
         console.error(`[GOOGLE_LEADS] Failed to parse request body:`, error);
         return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
@@ -313,7 +280,6 @@ serve(async req => {
       let requestBody;
       try {
         requestBody = await req.json();
-        console.log(`[GOOGLE_LEADS] Set customer ID request:`, requestBody);
       } catch (error) {
         console.error(`[GOOGLE_LEADS] Failed to parse request body:`, error);
         return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
@@ -362,7 +328,6 @@ serve(async req => {
       let requestBody;
       try {
         requestBody = await req.json();
-        console.log(`[GOOGLE_LEADS] Select customer request:`, requestBody);
       } catch (error) {
         console.error(`[GOOGLE_LEADS] Failed to parse request body:`, error);
         return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
@@ -411,7 +376,6 @@ serve(async req => {
       let requestBody;
       try {
         requestBody = await req.json();
-        console.log(`[GOOGLE_LEADS] Fetch forms request:`, requestBody);
       } catch (error) {
         console.error(`[GOOGLE_LEADS] Failed to parse request body:`, error);
         return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
@@ -460,7 +424,6 @@ serve(async req => {
       let requestBody;
       try {
         requestBody = await req.json();
-        console.log(`[GOOGLE_LEADS] Save forms request:`, requestBody);
       } catch (error) {
         console.error(`[GOOGLE_LEADS] Failed to parse request body:`, error);
         return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
@@ -517,7 +480,6 @@ serve(async req => {
       let requestBody;
       try {
         requestBody = await req.json();
-        console.log(`[GOOGLE_LEADS] Sync request:`, requestBody);
       } catch (error) {
         console.error(`[GOOGLE_LEADS] Failed to parse request body:`, error);
         return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
