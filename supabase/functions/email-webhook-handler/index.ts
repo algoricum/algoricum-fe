@@ -96,12 +96,6 @@ serve(async req => {
       );
     }
 
-    console.log("📧 Received email webhook:", {
-      sender: webhookData.sender,
-      recipient: webhookData.recipient,
-      subject: webhookData.subject?.substring(0, 50) + "...",
-    });
-
     // Basic validation
     if (!webhookData.sender || !webhookData.recipient) {
       console.log("❌ Invalid webhook data - missing sender and recipient");

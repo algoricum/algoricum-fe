@@ -180,8 +180,6 @@ async function processEmailJob(queueMessage: any, supabaseClient: any): Promise<
     const jobData = queueMessage.message as QueueMessage;
     const webhookData = jobData.webhookData;
 
-    console.log(`🔧 Processing email from ${webhookData.sender} to ${webhookData.recipient}`);
-
     // Use your existing processEmailReply function
     const result = await processEmailReply(webhookData, supabaseClient);
 
@@ -215,8 +213,6 @@ async function processEmailReply(webhookData: any, supabaseClient: any): Promise
       };
     }
 
-    console.log(`Processing reply from: ${senderEmail} to: ${recipientEmail}`);
-
     // Find the clinic by matching recipient email to mailgun_email
     const { data: clinicData, error: clinicError } = await supabaseClient
       .from("clinic")
@@ -232,8 +228,6 @@ async function processEmailReply(webhookData: any, supabaseClient: any): Promise
         message: `No clinic found for recipient email: ${recipientEmail}`,
       };
     }
-
-    console.log(`✅ Found clinic: ${clinicData.id} - ${clinicData.name}`);
 
     // Check if sender email exists in lead table for this clinic
     const { data: existingLead, error: leadError } = await supabaseClient
@@ -254,9 +248,6 @@ async function processEmailReply(webhookData: any, supabaseClient: any): Promise
     }
 
     if (!leadData) {
-      console.log(`⚠️ No lead found for email: ${senderEmail}`);
-      console.log("🆕 Creating new lead for incoming email...");
-
       // Find or create default source for email leads
       let defaultSourceId: string;
 

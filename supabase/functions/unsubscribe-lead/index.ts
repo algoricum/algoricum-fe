@@ -7,12 +7,6 @@ const corsHeaders = {
 };
 
 serve(async req => {
-  console.log("Request:", {
-    method: req.method,
-    url: req.url,
-    headers: Object.fromEntries(req.headers),
-  });
-
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders, status: 204 });
@@ -37,9 +31,19 @@ serve(async req => {
     if (pathname.includes("unsubscribe-daily-remainder")) {
       let clinic_id;
 
+      let user_id: string | undefined;
+
       if (req.method === "POST") {
         const body = await req.json();
         clinic_id = body.clinic_id;
+        user_id = body.user_id;
+
+        if (!user_id) {
+          return new Response(JSON.stringify({ error: "user_id is required" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       } else if (req.method === "GET") {
         clinic_id = url.searchParams.get("clinic_id");
       }
@@ -60,14 +64,20 @@ serve(async req => {
         });
       }
 
-      // Update is_subscribed to false for all users in the clinic
-      const { error: updateError } = await supabaseClient
+      // Update is_subscribed — POST scoped to specific user, GET applies to all clinic users
+      let query = supabaseClient
         .from("user_clinic")
         .update({
           is_subscribed: false,
           updated_at: new Date().toISOString(),
         })
         .eq("clinic_id", clinic_id);
+
+      if (user_id) {
+        query = query.eq("user_id", user_id);
+      }
+
+      const { error: updateError } = await query;
 
       if (updateError) {
         console.error("Daily reminder unsubscribe error:", updateError);
@@ -106,8 +116,17 @@ serve(async req => {
       );
     }
 
-    // Handle POST request for clinic-wide unsubscribe (original functionality)
+    // Handle POST request for clinic-wide unsubscribe (requires service role key)
     if (req.method === "POST") {
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader || authHeader !== `Bearer ${serviceRoleKey}`) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { clinic_id } = await req.json();
 
       if (!clinic_id) {

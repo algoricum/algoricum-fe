@@ -779,21 +779,32 @@ async function hasFollowUpBeenSent(leadId: string, followUpName: string, supabas
 
     if (!threadId) return false;
 
-    const searchPatterns = [`%${followUpName}%`, `%${followUpName.toUpperCase()}%`, `%${followUpName.toLowerCase()}%`];
+    // Check using the dedicated follow_up_name column (exact match, no text pattern matching)
+    const { data: conversations } = await supabase
+      .from("conversation")
+      .select("id")
+      .eq("thread_id", threadId)
+      .eq("follow_up_name", followUpName)
+      .limit(1);
 
-    for (const pattern of searchPatterns) {
-      const { data: conversations } = await supabase
-        .from("conversation")
-        .select("id, message")
-        .eq("thread_id", threadId)
-        .eq("is_from_user", false)
-        .eq("sender_type", "assistant")
-        .ilike("message", pattern);
+    if (conversations && conversations.length > 0) {
+      logInfo(`Follow-up ${followUpName} already sent for lead ${leadId}`);
+      return true;
+    }
 
-      if (conversations && conversations.length > 0) {
-        logInfo(`Follow-up ${followUpName} already sent for lead ${leadId}`);
-        return true;
-      }
+    // Fallback: check old-style messages that used text pattern (for pre-migration data)
+    const { data: legacyConversations } = await supabase
+      .from("conversation")
+      .select("id")
+      .eq("thread_id", threadId)
+      .eq("is_from_user", false)
+      .eq("sender_type", "assistant")
+      .ilike("message", `${followUpName.toUpperCase()}%`)
+      .limit(1);
+
+    if (legacyConversations && legacyConversations.length > 0) {
+      logInfo(`Follow-up ${followUpName} already sent for lead ${leadId} (legacy match)`);
+      return true;
     }
 
     return false;
@@ -938,8 +949,6 @@ async function generateIntelligentResponse(
   }
 
   try {
-    console.log("Clinics data:", JSON.stringify(clinic, null, 2));
-
     const conversationContext = conversationHistory
       .map(
         msg =>
@@ -1594,6 +1603,7 @@ async function saveMessageToHistory(
       timestamp: now,
       is_from_user: false,
       sender_type: "assistant",
+      follow_up_name: followUpType,
     });
 
     logInfo(`Saved message to history for thread ${threadId}`);

@@ -199,8 +199,7 @@ export async function handleAuthCallback(req, url, supabaseAdmin) {
   tokenExchangeUrl.searchParams.set("code", code || "");
   const tokenRes = await fetch(tokenExchangeUrl.toString());
   if (!tokenRes.ok) {
-    const txt = await tokenRes.text();
-    console.error("Token exchange failed:", txt);
+    await tokenRes.text();
     if (redirectTo) {
       try {
         const redirectUrl = new URL(redirectTo);
@@ -244,8 +243,7 @@ export async function handleAuthCallback(req, url, supabaseAdmin) {
   longUrl.searchParams.set("fb_exchange_token", shortLivedAccessToken);
   const longRes = await fetch(longUrl.toString());
   if (!longRes.ok) {
-    const txt = await longRes.text();
-    console.error("Long token exchange failed:", txt);
+    await longRes.text();
     if (redirectTo) {
       try {
         const redirectUrl = new URL(redirectTo);
@@ -270,11 +268,9 @@ export async function handleAuthCallback(req, url, supabaseAdmin) {
   const accountsUrl = new URL(`https://graph.facebook.com/${FACEBOOK_API_VERSION}/me/accounts`);
   accountsUrl.searchParams.set("access_token", userAccessToken);
   accountsUrl.searchParams.set("fields", "id,name,access_token,tasks");
-  console.log("accesstoken", userAccessToken);
   const accountsRes = await fetch(accountsUrl.toString());
   if (!accountsRes.ok) {
-    const txt = await accountsRes.text();
-    console.error("Failed to fetch pages:", txt);
+    await accountsRes.text();
     if (redirectTo) {
       try {
         const redirectUrl = new URL(redirectTo);
@@ -293,7 +289,6 @@ export async function handleAuthCallback(req, url, supabaseAdmin) {
   }
   const accountsJson = await accountsRes.json();
   const pages = Array.isArray(accountsJson.data) ? accountsJson.data : [];
-  console.log("Fetched pages:", accountsJson);
   if (!pages.length) {
     if (redirectTo) {
       try {
@@ -480,7 +475,6 @@ export async function handleFacebookWebhook(req, supabaseAdmin, clinicId) {
   try {
     console.log(`🎯 Facebook webhook received for clinic: ${clinicId}`);
     const body = await req.json();
-    console.log(`📦 Webhook payload:`, JSON.stringify(body, null, 2));
     if (!body) {
       console.error("❌ No payload received");
       return new Response("No payload", {

@@ -25,7 +25,6 @@ serve(async req => {
     if (!form_ids || !Array.isArray(form_ids)) {
       return new Response(JSON.stringify({ error: "form_ids array required" }), { status: 400, headers: { ...corsHeaders() } });
     }
-    console.log(clinic_id, consmerSecret, consumerKey, baseURL, form_ids);
     const { data: integration } = await supabase.from("integrations").select("id").eq("name", "Gravity Form").single();
 
     if (!integration) throw new Error("Integration not configured");
