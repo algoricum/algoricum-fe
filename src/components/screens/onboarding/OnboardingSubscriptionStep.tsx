@@ -5,7 +5,7 @@ import { handleSubscribe } from "@/utils/stripe";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { Button, Card, Skeleton, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 const supabase = createClient();
 
 interface OnboardingSubscriptionStepProps {
@@ -30,6 +30,8 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [subscribingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollCountRef = useRef(0);
 
   // Fetch plans immediately (no dependencies)
   useEffect(() => {
@@ -67,8 +69,12 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
   }, []);
 
   // Check subscription when clinic ID is available
+  // If returning from Stripe payment, poll until subscription is active
   useEffect(() => {
     if (!clinicId) return;
+
+    const isPaymentReturn = typeof window !== "undefined" &&
+      window.location.search.includes("payment=success");
 
     const checkSubscription = async () => {
       try {
@@ -81,17 +87,44 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
           .maybeSingle();
 
         if (sub?.status === "active" || sub?.status === "trialing") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
           onNext();
+          return;
+        }
+
+        // If returning from payment and subscription not active yet, keep polling
+        if (isPaymentReturn) {
+          pollCountRef.current += 1;
+          // Stop polling after 10 attempts (30 seconds)
+          if (pollCountRef.current >= 10) {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            setLoading(false);
+          }
+          return;
         }
       } catch (error) {
         console.error("Error checking subscription:", error);
         ErrorToast("Failed to check subscription status.");
+        if (pollingRef.current) clearInterval(pollingRef.current);
       } finally {
-        setLoading(false);
+        if (!isPaymentReturn) setLoading(false);
       }
     };
 
     checkSubscription();
+
+    // If returning from Stripe payment, start polling every 3 seconds
+    const isPaymentReturnForPolling = typeof window !== "undefined" &&
+      window.location.search.includes("payment=success");
+
+    if (isPaymentReturnForPolling) {
+      setLoading(true);
+      pollingRef.current = setInterval(checkSubscription, 3000);
+    }
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, [clinicId, onNext]);
 
   const PricingSelector = ({ plans, subscribingId, handleSubscribe }: PricingSelectorProps) => {
@@ -99,8 +132,8 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
       <div className="mt-10 flex flex-col items-center">
         <div className={`mt-6 mx-auto ${plans.length === 1 ? "flex justify-center" : "grid grid-cols-1 md:grid-cols-2 gap-10"}`}>
           {plans.map(plan => {
-            const isPopular = plan.name.toLowerCase().includes("conversion"); // Highlight "Most Popular" plan
-            const notAvailble = plan.name.toLowerCase().includes("nurturing"); // Highlight "Not Available" plan
+            const isPopular = plan.name.toLowerCase().includes("conversion");
+            const notAvailble = plan.name.toLowerCase().includes("nurturing");
 
             return (
               <Card
