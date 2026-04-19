@@ -90,27 +90,25 @@ export async function middleware(request: NextRequest) {
       user = null;
       userError = error;
     }
-    // Detect OAuth callbacks - used in multiple places below
-    const oauthCallbackParams = [
-      "google_lead_form_status",
-      "google_form_status",
-      "hubspot_status",
-      "pipedrive_status",
-      "typeform_status",
-      "facebook_lead_form_status",
-      "go_high_level_status",
-      "next_health_status",
-      "gravity_form_status",
-    ];
-    const isOAuthCallback = isOnboardingRoute && oauthCallbackParams.some(param =>
-      request.nextUrl.searchParams.has(param)
-    );
-    const isPaymentCallback = isOnboardingRoute && request.nextUrl.searchParams.has("payment");
-
     // CASE 1: User is not logged in (homepage already handled above)
     if (!user || userError) {
       // Allow OAuth callbacks through even if session is not yet restored
       // This happens when Google, HubSpot, Facebook etc redirect back after OAuth
+      const oauthCallbackParams = [
+        "google_lead_form_status",
+        "google_form_status",
+        "hubspot_status",
+        "pipedrive_status",
+        "typeform_status",
+        "facebook_lead_form_status",
+        "go_high_level_status",
+        "next_health_status",
+        "gravity_form_status",
+      ];
+      const isOAuthCallback = isOnboardingRoute && oauthCallbackParams.some(param =>
+        request.nextUrl.searchParams.has(param)
+      );
+      const isPaymentCallback = isOnboardingRoute && request.nextUrl.searchParams.has("payment");
       if (isOAuthCallback || isPaymentCallback) {
         return response;
       }
@@ -177,7 +175,22 @@ export async function middleware(request: NextRequest) {
       }
       // Handle onboarding logic
       // Don't redirect to dashboard if this is an OAuth callback - let the page handle it
-      if (isOnboardingRoute && hasClinic && !isOAuthCallback && !isPaymentCallback) {
+      const oauthReturnParams = [
+        "google_lead_form_status",
+        "google_form_status",
+        "hubspot_status",
+        "pipedrive_status",
+        "typeform_status",
+        "facebook_lead_form_status",
+        "go_high_level_status",
+        "next_health_status",
+        "gravity_form_status",
+      ];
+      const isOAuthReturn = isOnboardingRoute && oauthReturnParams.some(param =>
+        request.nextUrl.searchParams.has(param)
+      );
+      const isPaymentReturn = isOnboardingRoute && request.nextUrl.searchParams.has("payment");
+      if (isOnboardingRoute && hasClinic && !isOAuthReturn && !isPaymentReturn) {
         return redirect("/dashboard");
       }
       // If no clinic associated, redirect to onboarding (except for onboarding page and staff first-time)
