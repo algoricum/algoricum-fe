@@ -310,6 +310,33 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     initializeClinicId();
   }, []);
 
+  // Reset buttonsLoading when user returns to the page after OAuth flow
+  // This handles the case where user navigates away without completing OAuth
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // Small delay to allow OAuth callback to process first if it succeeded
+        setTimeout(() => {
+          setButtonsLoading(false);
+        }, 1000);
+      }
+    };
+
+    const handleFocus = () => {
+      setTimeout(() => {
+        setButtonsLoading(false);
+      }, 1000);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
+
   useEffect(() => {
     const handleOAuthRedirect = () => {
       const urlParams = new URLSearchParams(window.location.search);
