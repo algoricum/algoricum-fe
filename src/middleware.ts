@@ -94,19 +94,9 @@ export async function middleware(request: NextRequest) {
     if (!user || userError) {
       // Allow OAuth callbacks through even if session is not yet restored
       // This happens when Google, HubSpot, Facebook etc redirect back after OAuth
-      const oauthCallbackParams = [
-        "google_lead_form_status",
-        "google_form_status",
-        "hubspot_status",
-        "pipedrive_status",
-        "typeform_status",
-        "facebook_lead_form_status",
-        "go_high_level_status",
-        "next_health_status",
-        "gravity_form_status",
-      ];
-      const isOAuthCallback = isOnboardingRoute && oauthCallbackParams.some(param =>
-        request.nextUrl.searchParams.has(param)
+      // Detect any OAuth callback by checking for any param ending in _status
+      const isOAuthCallback = isOnboardingRoute && [...request.nextUrl.searchParams.keys()].some(key =>
+        key.endsWith("_status")
       );
       const isPaymentCallback = isOnboardingRoute && request.nextUrl.searchParams.has("payment");
       if (isOAuthCallback || isPaymentCallback) {
@@ -175,19 +165,9 @@ export async function middleware(request: NextRequest) {
       }
       // Handle onboarding logic
       // Don't redirect to dashboard if this is an OAuth callback - let the page handle it
-      const oauthReturnParams = [
-        "google_lead_form_status",
-        "google_form_status",
-        "hubspot_status",
-        "pipedrive_status",
-        "typeform_status",
-        "facebook_lead_form_status",
-        "go_high_level_status",
-        "next_health_status",
-        "gravity_form_status",
-      ];
-      const isOAuthReturn = isOnboardingRoute && oauthReturnParams.some(param =>
-        request.nextUrl.searchParams.has(param)
+      // Detect any OAuth return by checking for any param ending in _status
+      const isOAuthReturn = isOnboardingRoute && [...request.nextUrl.searchParams.keys()].some(key =>
+        key.endsWith("_status")
       );
       const isPaymentReturn = isOnboardingRoute && request.nextUrl.searchParams.has("payment");
       if (isOnboardingRoute && hasClinic && !isOAuthReturn && !isPaymentReturn) {
