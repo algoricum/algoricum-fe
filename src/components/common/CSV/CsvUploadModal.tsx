@@ -147,20 +147,9 @@ const CsvUploadModal: React.FC<CsvUploadModalProps> = ({ open, onOk, onCancel, o
           }
         }
 
-        // Check phone is not missing
-        if (!row.phone || row.phone.toString().trim() === "") {
-          requiredFieldErrors.push(`Row ${rowNum}: Phone is required and cannot be empty`);
-        }
-
-        // Validate interest_level values if present
-        if (row.interest_level && !["high", "medium", "low"].includes(row.interest_level.toLowerCase())) {
-          requiredFieldErrors.push(`Row ${rowNum}: Interest level must be 'high', 'medium', or 'low' (found: ${row.interest_level})`);
-        }
-
-        // Validate urgency values if present
-        if (row.urgency && !["asap", "this_month", "curious"].includes(row.urgency.toLowerCase())) {
-          requiredFieldErrors.push(`Row ${rowNum}: Urgency must be 'asap', 'this_month', or 'curious' (found: ${row.urgency})`);
-        }
+        // Phone is optional - only warn if both email and phone are missing
+        // interest_level and urgency values are accepted as-is or ignored if invalid
+        // This allows importing leads from any source without strict formatting requirements
       });
 
       if (requiredFieldErrors.length > 0) {
