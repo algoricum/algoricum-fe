@@ -47,8 +47,13 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
     fetchPlans();
   }, []);
 
-  // Fetch clinic data
+  // Fetch clinic data with timeout safety net
   useEffect(() => {
+    // Safety net - always show plans after 5 seconds regardless of loading state
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
     const fetchClinic = async () => {
       try {
         const clinic = await getClinicData();
@@ -56,16 +61,16 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
         if (clinic) {
           setClinicId(clinic.id);
         } else {
-          ErrorToast("Clinic data not found.");
           setLoading(false);
         }
       } catch (error) {
         console.error("Error fetching clinic data:", error);
-        ErrorToast("Failed to load clinic data.");
         setLoading(false);
       }
     };
     fetchClinic();
+
+    return () => clearTimeout(safetyTimeout);
   }, []);
 
   // Check subscription when clinic ID is available
@@ -132,8 +137,8 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
       <div className="mt-10 flex flex-col items-center">
         <div className={`mt-6 mx-auto ${plans.length === 1 ? "flex justify-center" : "grid grid-cols-1 md:grid-cols-2 gap-10"}`}>
           {plans.map(plan => {
-            const isPopular = plan.name.toLowerCase().includes("conversion");
-            const notAvailble = plan.name.toLowerCase().includes("nurturing");
+            const isPopular = plan.name.toLowerCase().includes("conversion"); // Highlight "Most Popular" plan
+            const notAvailble = plan.name.toLowerCase().includes("nurturing"); // Highlight "Not Available" plan
 
             return (
               <Card
