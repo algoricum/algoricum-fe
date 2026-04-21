@@ -131,14 +131,17 @@ export default function AiAssistantStep({ onNext, onPrev, initialData = {} }: Ai
       fileList: uploadedFiles[currentQuestion.id as keyof typeof uploadedFiles] || [],
       onChange: (info: any) => handleFileUpload(info, currentQuestion.id),
       beforeUpload: (file: any) => {
-        const isValidType = currentQuestion.acceptedFormats?.includes(file.type);
+        // Check by MIME type OR file extension to handle browser differences
+        const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
+        const validExtensions = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".svg"];
+        const isValidType = currentQuestion.acceptedFormats?.includes(file.type) || validExtensions.includes(fileExtension);
         if (!isValidType) {
-          message.error(`You can only upload files!`);
+          message.error(`Please upload a PDF, DOC, DOCX, JPG, PNG, or SVG file.`);
           return false;
         }
         const isValidSize = file.size / 1024 / 1024 < 60;
         if (!isValidSize) {
-          message.error("File must be smaller than 10MB!");
+          message.error("File must be smaller than 60MB!");
           return false;
         }
         return false;
