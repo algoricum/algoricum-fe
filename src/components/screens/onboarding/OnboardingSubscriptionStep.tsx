@@ -189,7 +189,26 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
                       borderColor: notAvailble ? undefined : "#A268F1",
                     }}
                     className={`${notAvailble ? "hover:!bg-gray-200" : "hover:!bg-purple-600"} ${notAvailble ? "!text-gray" : "!text-white"} rounded-lg mt-4`}
-                    onClick={() => handleSubscribe(plan.price_id)}
+                    onClick={async () => {
+                      // If clinicId is null retry fetching it before subscribing
+                      let activeClinicId = clinicId;
+                      if (!activeClinicId) {
+                        try {
+                          const clinic = await getClinicData();
+                          if (clinic) {
+                            setClinicId(clinic.id);
+                            activeClinicId = clinic.id;
+                          }
+                        } catch (e) {
+                          console.error("Failed to get clinic on retry:", e);
+                        }
+                      }
+                      if (activeClinicId) {
+                        handleSubscribe(plan.price_id, activeClinicId);
+                      } else {
+                        ErrorToast("Unable to load clinic data. Please refresh the page and try again.");
+                      }
+                    }}
                     loading={subscribingId === plan.price_id}
                   >
                     {subscribingId === plan.price_id ? "Redirecting..." : "Subscribe"}
