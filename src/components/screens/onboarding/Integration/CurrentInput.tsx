@@ -1,9 +1,45 @@
 import { CurrentInputProps } from "@/app/types/types";
-import { CheckCircleOutlined } from "@ant-design/icons";
-import { Card, Radio, Select, Space, Typography } from "antd";
-import React from "react";
+import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { checkClinicSubscription } from "@/utils/subscription-utils";
+import { CheckCircleOutlined, LockOutlined } from "@ant-design/icons";
+import { Button, Card, Radio, Select, Space, Typography } from "antd";
+import { useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
 
 const { Text } = Typography;
+
+// Options that require Business plan
+const BUSINESS_ONLY_CRM = ["HubSpot", "Pipedrive", "GoHighLevel", "NextHealth"];
+const BUSINESS_ONLY_ADS = ["Facebook Lead Ads", "Google Ads Lead Forms"];
+const BUSINESS_ONLY_FORMS = ["Google Forms", "Typeform", "Jotform", "Gravity Forms"];
+
+const UpgradeCard: React.FC<{ feature: string }> = ({ feature }) => {
+  const router = useRouter();
+  return (
+    <Card
+      className="rounded-xl bg-purple-50 border-2 border-purple-400 mt-6"
+      styles={{ body: { padding: "20px" } }}
+    >
+      <div className="flex items-center mb-3">
+        <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center mr-3">
+          <LockOutlined style={{ color: "white", fontSize: 16 }} />
+        </div>
+        <Text className="text-lg font-semibold text-purple-900">Business Plan Required</Text>
+      </div>
+      <Text className="text-purple-900 text-base leading-6 block mb-4">
+        <strong>{feature}</strong> is available on the Business plan. Upgrade to unlock full CRM and integration support, unlimited follow-ups, and SMS automation.
+      </Text>
+      <Button
+        type="primary"
+        size="large"
+        className="!bg-purple-600 !border-purple-600 hover:!bg-purple-700 font-semibold"
+        onClick={() => router.push("/billing")}
+      >
+        Upgrade to Business — $249/month
+      </Button>
+    </Card>
+  );
+};
 
 const CurrentInput: React.FC<CurrentInputProps> = ({
   currentQuestion,
@@ -23,9 +59,25 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
   facebookLeadFormStatus,
   facebookLeadFormAccountInfo,
 }) => {
+  const [isPaid, setIsPaid] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkPlan = async () => {
+      try {
+        const clinic = await getClinicData();
+        if (!clinic) return;
+        const info = await checkClinicSubscription(clinic.id);
+        setIsPaid(info.isPaid);
+      } catch {
+        setIsPaid(false);
+      }
+    };
+    checkPlan();
+  }, []);
+
   if (!currentQuestion) return null;
 
-  // Check if any integration is connected and show only the connected status
+  // ----- Connected states (show regardless of plan) -----
   if (currentQuestion.id === "selectedCrm") {
     if (hubspotStatus === "connected") {
       return (
@@ -142,6 +194,11 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
 
   // ----- Select Questions -----
   if (currentQuestion.type === "select") {
+    const isBusinessOnlyCrm = currentQuestion.id === "selectedCrm" && BUSINESS_ONLY_CRM.includes(currentValue);
+    const isBusinessOnlyAds = currentQuestion.id === "adsConnections" && BUSINESS_ONLY_ADS.includes(currentValue);
+    const isBusinessOnlyForm = currentQuestion.id === "leadCaptureForms" && BUSINESS_ONLY_FORMS.includes(currentValue);
+    const needsUpgrade = (isBusinessOnlyCrm || isBusinessOnlyAds || isBusinessOnlyForm) && isPaid === false;
+
     return (
       <div className="mb-6">
         <Select
@@ -159,8 +216,11 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
           ))}
         </Select>
 
-        {/* CRM Connection Cards (when not connected) */}
-        {currentQuestion.id === "selectedCrm" && currentValue === "Pipedrive" && pipedriveStatus !== "connected" && (
+        {/* Upgrade wall for free users selecting Business-only options */}
+        {needsUpgrade && <UpgradeCard feature={currentValue} />}
+
+        {/* CRM Connection Cards (paid users only) */}
+        {!needsUpgrade && currentQuestion.id === "selectedCrm" && currentValue === "Pipedrive" && pipedriveStatus !== "connected" && (
           <ConnectionCard
             color="green"
             letter="P"
@@ -169,7 +229,7 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
           />
         )}
 
-        {currentQuestion.id === "selectedCrm" && currentValue === "HubSpot" && hubspotStatus !== "connected" && (
+        {!needsUpgrade && currentQuestion.id === "selectedCrm" && currentValue === "HubSpot" && hubspotStatus !== "connected" && (
           <ConnectionCard
             color="red"
             letter="H"
@@ -178,7 +238,7 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
           />
         )}
 
-        {currentQuestion.id === "selectedCrm" && currentValue === "GoHighLevel" && goHighLevelStatus !== "connected" && (
+        {!needsUpgrade && currentQuestion.id === "selectedCrm" && currentValue === "GoHighLevel" && goHighLevelStatus !== "connected" && (
           <ConnectionCard
             color="blue"
             letter="H"
@@ -187,8 +247,8 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
           />
         )}
 
-        {/* Ads Connection Cards (when not connected) */}
-        {currentQuestion.id === "adsConnections" && currentValue === "Facebook Lead Ads" && facebookLeadFormStatus !== "connected" && (
+        {/* Ads Connection Cards (paid users only) */}
+        {!needsUpgrade && currentQuestion.id === "adsConnections" && currentValue === "Facebook Lead Ads" && facebookLeadFormStatus !== "connected" && (
           <ConnectionCard
             color="blue"
             letter="F"
@@ -197,7 +257,7 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
           />
         )}
 
-        {currentQuestion.id === "adsConnections" && currentValue === "Google Ads Lead Forms" && googleLeadFormStatus !== "connected" && (
+        {!needsUpgrade && currentQuestion.id === "adsConnections" && currentValue === "Google Ads Lead Forms" && googleLeadFormStatus !== "connected" && (
           <ConnectionCard
             color="yellow"
             letter="G"
@@ -206,8 +266,8 @@ const CurrentInput: React.FC<CurrentInputProps> = ({
           />
         )}
 
-        {/* Lead Capture Forms Connection Cards (when not connected) */}
-        {currentQuestion.id === "leadCaptureForms" && currentValue === "Google Forms" && googleFormStatus !== "connected" && (
+        {/* Lead Capture Forms Connection Cards (paid users only) */}
+        {!needsUpgrade && currentQuestion.id === "leadCaptureForms" && currentValue === "Google Forms" && googleFormStatus !== "connected" && (
           <ConnectionCard
             color="yellow"
             letter="G"
