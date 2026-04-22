@@ -147,6 +147,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const autoProgressToNext = useCallback(() => {
     if (autoProgressing) return;
     setAutoProgressing(true);
+    // Safety reset - ensure autoProgressing never gets permanently stuck
+    setTimeout(() => setAutoProgressing(false), 5000);
     setTimeout(() => {
       if (currentQuestionIndex < filteredQuestions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
@@ -870,6 +872,8 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               .filter(Boolean);
             syncGoogleFormLeads(selectedSheetsObjects);
             setGoogleFormLeadsSynced(true);
+            // Update formData state so currentValue is set and Continue button enables
+            setFormData(prev => ({ ...prev, leadCaptureForms: "Google Forms" }));
             localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Google Forms" }));
             setShowGoogleFormModal(false);
             autoProgressToNext();
