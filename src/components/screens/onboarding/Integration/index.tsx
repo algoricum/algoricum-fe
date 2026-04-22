@@ -258,10 +258,16 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     if (savedFormData) {
       try {
         const parsedFormData = JSON.parse(savedFormData);
+        if (savedGoogleFormStatus === "connected") {
+          parsedFormData.leadCaptureForms = "Google Forms";
+        }
         setFormData(parsedFormData);
       } catch (error) {
         console.error("Error parsing saved form data:", error);
       }
+    } else if (savedGoogleFormStatus === "connected") {
+      // No savedFormData but Google Forms connected — set it directly
+      setFormData(prev => ({ ...prev, leadCaptureForms: "Google Forms" }));
     }
     if (savedHubspotAccountInfo) {
       try {
@@ -439,6 +445,22 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // Persist to localStorage
         localStorage.setItem("google_form_oauth_status", "connected");
         localStorage.setItem("google_form_oauth_account_info", JSON.stringify(accountInfo));
+        localStorage.setItem("oauth_question_index", "2");
+        localStorage.setItem("oauth_form_data", JSON.stringify({
+          selectedCrm: "None of these",
+          adsConnections: "None of these",
+          leadCaptureForms: "Google Forms",
+          uploadLeads: "",
+        }));
+
+        // Set state to match question index 2
+        setCurrentQuestionIndex(2);
+        setFormData(prev => ({
+          ...prev,
+          selectedCrm: prev.selectedCrm || "None of these",
+          adsConnections: prev.adsConnections || "None of these",
+          leadCaptureForms: "Google Forms",
+        }));
 
         clearTemporaryOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -551,7 +573,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     };
 
     handleOAuthRedirect();
-  }, [autoProgressToNext, currentQuestionIndex, filteredQuestions.length, formData]);
+  }, [autoProgressToNext, currentQuestionIndex, filteredQuestions.length]);
 
   const handleInputChange = (value: any) => {
     // Check if a CRM is already connected and prevent changing selection
