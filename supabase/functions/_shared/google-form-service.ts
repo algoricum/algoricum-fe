@@ -281,7 +281,7 @@ export async function handleOAuthCallback(req, supabase) {
     const redirectUrl = new URL(`${redirectUri}`);
     redirectUrl.searchParams.set("google_form_status", "success");
     redirectUrl.searchParams.set("connection_id", connection.id);
-    redirectUrl.searchParams.set("account_name", "Google Forms Connected");
+    redirectUrl.searchParams.set("account_name", "Google Forms");
 
     console.log("🔀 Redirecting to success page:", redirectUrl.toString());
 
