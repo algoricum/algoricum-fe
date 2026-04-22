@@ -245,7 +245,13 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setFormData(prev => ({ ...prev, selectedCrm: "Pipedrive" }));
       }
     }
-    if (savedGoogleFormStatus) setGoogleFormStatus(savedGoogleFormStatus as "disconnected" | "connecting" | "connected");
+    if (savedGoogleFormStatus) {
+      setGoogleFormStatus(savedGoogleFormStatus as "disconnected" | "connecting" | "connected");
+      if (savedGoogleFormStatus === "connected") {
+        setShowCompletionButtons(true);
+        setFormData(prev => ({ ...prev, leadCaptureForms: "Google Forms" }));
+      }
+    }
     if (savedGoogleLeadFormStatus) setGoogleLeadFormStatus(savedGoogleLeadFormStatus as "disconnected" | "connecting" | "connected");
     if (savedFacebookLeadFormStatus) setFacebookLeadFormStatus(savedFacebookLeadFormStatus as "disconnected" | "connecting" | "connected");
     if (savedQuestionIndex && !isNaN(Number.parseInt(savedQuestionIndex))) setCurrentQuestionIndex(Number.parseInt(savedQuestionIndex));
@@ -276,6 +282,10 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     if (savedGoogleFormAccountInfo) {
       try {
         const parsedAccountInfo = JSON.parse(savedGoogleFormAccountInfo);
+        // Sanitize legacy bad account name
+        if (parsedAccountInfo.accountName === "Google Forms Connected") {
+          parsedAccountInfo.accountName = "Google Forms";
+        }
         setGoogleFormAccountInfo(parsedAccountInfo);
       } catch (error) {
         console.error("Error parsing saved google form account info:", error);
@@ -419,7 +429,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       } else if (googleFormStatus === "success") {
         console.log("✅ Google Form OAuth success detected from URL");
         const accountInfo = {
-          accountName: accountName || "Connected Account",
+          accountName: "Google Forms",
           contactCount: parseInt(contactCount || "0"),
           dealCount: 0,
         };
