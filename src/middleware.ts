@@ -19,6 +19,7 @@ const publicRoutes = [
   "/redirect-form", // OAuth redirect handler
   "/redirect-lead", // Lead form redirect handler
   "/hubspot-setup", // Hubspot setup guide page
+  "/onboarding", // Allow OAuth returns during onboarding without session race condition
 ];
 // Paths that should redirect to dashboard if already authenticated
 const authRoutes = ["/login", "/signup", "/forgot-password"];
@@ -95,8 +96,9 @@ export async function middleware(request: NextRequest) {
       // Allow OAuth callbacks through even if session is not yet restored
       // This happens when Google, HubSpot, Facebook etc redirect back after OAuth
       // Detect any OAuth callback by checking for any param ending in _status
-      const isOAuthCallback = isOnboardingRoute && [...request.nextUrl.searchParams.keys()].some(key =>
-        key.endsWith("_status")
+      const isOAuthCallback = isOnboardingRoute && (
+        [...request.nextUrl.searchParams.keys()].some(key => key.endsWith("_status")) ||
+        request.nextUrl.searchParams.has("connection_id")
       );
       const isPaymentCallback = isOnboardingRoute && request.nextUrl.searchParams.has("payment");
       if (isOAuthCallback || isPaymentCallback) {
