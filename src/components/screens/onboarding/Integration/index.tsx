@@ -749,7 +749,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 onClick={handleNext}
                 disabled={
                   ((filteredQuestions?.length > 1 && currentQuestion.type === "radio") || currentQuestion.type === "select"
-                    ? !currentValue
+                    ? !currentValue && googleFormStatus !== "connected" && googleLeadFormStatus !== "connected" && facebookLeadFormStatus !== "connected"
                     : false) || isSubmitting
                 }
                 loading={isSubmitting && currentQuestionIndex === filteredQuestions?.length - 1}
