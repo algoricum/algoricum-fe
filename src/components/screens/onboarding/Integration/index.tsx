@@ -850,10 +850,20 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           selectedGoogleFormWorksheets={selectedGoogleFormWorksheets}
           onSelectGoogleFormWorksheets={setSelectedGoogleFormWorksheets}
           onGoogleFormConnect={() => connectToGoogleForm(setButtonsLoading)}
-          onGoogleFormOk={() => {
-            if (googleFormStatus === "connected" && selectedGoogleFormWorksheets.length > 0 && googleFormLeadsSynced) {
+          onGoogleFormOk={async () => {
+            if (googleFormStatus === "connected") {
+              // If leads not yet synced but files selected, sync now
+              if (!googleFormLeadsSynced && selectedGoogleFormWorksheets.length > 0) {
+                const selectedSheetsObjects = await selectedGoogleFormWorksheets
+                  .map(value => findSheetDetails(googleFormTreeData, value))
+                  .filter(Boolean);
+                syncGoogleFormLeads(selectedSheetsObjects);
+                setGoogleFormLeadsSynced(true);
+              }
+              setFormData(prev => ({ ...prev, leadCaptureForms: "Google Forms" }));
+              localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Google Forms" }));
               setShowGoogleFormModal(false);
-              autoProgressToNext();
+              setShowCompletionButtons(true);
             } else {
               setShowGoogleFormModal(false);
               setShowCompletionButtons(false);
