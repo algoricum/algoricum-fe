@@ -876,11 +876,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             setFormData(prev => ({ ...prev, leadCaptureForms: "Google Forms" }));
             localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Google Forms" }));
             setShowGoogleFormModal(false);
-            // Use setTimeout to allow React to re-render with updated formData before advancing
-            setTimeout(() => {
-              setAutoProgressing(false);
-              setCurrentQuestionIndex(prev => prev + 1);
-            }, 500);
+            setShowCompletionButtons(true);
           }}
           onGoogleFormDisconnect={() => {
             setGoogleFormStatus("disconnected");
