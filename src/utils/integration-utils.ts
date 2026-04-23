@@ -434,7 +434,7 @@ export const connectToGoogleForm = async (setButtonLoading: any) => {
       body: JSON.stringify({
         userId: await getCurrentUserId(),
         clinic_id: await getClinicId(),
-        redirectTo: window.location.href,
+        redirectTo: window.location.origin + window.location.pathname,
       }),
     });
 
