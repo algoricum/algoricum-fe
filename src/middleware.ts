@@ -157,12 +157,13 @@ export async function middleware(request: NextRequest) {
       let hasClinic = false;
       try {
         const clinicPromise = checkIfUserHasClinic(supabase, user.id);
-        const clinicTimeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Clinic check timeout")), 3000));
+        const clinicTimeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Clinic check timeout")), 8000));
         hasClinic = (await Promise.race([clinicPromise, clinicTimeoutPromise])) as boolean;
       } catch (error) {
         console.error("Clinic check timeout or error:", error);
-        // If clinic check fails, allow to continue but log the error
-        hasClinic = false;
+        // If clinic check times out on a protected route, default to true to avoid
+        // incorrectly redirecting users who have completed onboarding
+        hasClinic = pathname === "/onboarding" ? false : true;
       }
       // Handle onboarding logic
       // Don't redirect to dashboard if this is an OAuth callback - let the page handle it
