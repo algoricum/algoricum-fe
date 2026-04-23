@@ -826,8 +826,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           onGoogleFormOk={async () => {
             if (googleFormStatus === "connected") {
               if (!googleFormLeadsSynced && selectedGoogleFormWorksheets.length > 0) {
-                const selectedSheetsObjects = await selectedGoogleFormWorksheets
-                  .map(value => findSheetDetails(googleFormTreeData, value))
+                // Try findSheetDetails first (old flow), fall back to raw values (picker flow)
+                const selectedSheetsObjects = selectedGoogleFormWorksheets
+                  .map(value => findSheetDetails(googleFormTreeData, value) || value)
                   .filter(Boolean);
                 syncGoogleFormLeads(selectedSheetsObjects);
                 setGoogleFormLeadsSynced(true);
@@ -849,8 +850,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "" }));
           }}
           onGoogleFormSyncLeads={async () => {
-            const selectedSheetsObjects = await selectedGoogleFormWorksheets
-              .map(value => findSheetDetails(googleFormTreeData, value))
+            // Try findSheetDetails first (old flow), fall back to raw values (picker flow)
+            const selectedSheetsObjects = selectedGoogleFormWorksheets
+              .map(value => findSheetDetails(googleFormTreeData, value) || value)
               .filter(Boolean);
             syncGoogleFormLeads(selectedSheetsObjects);
             setGoogleFormLeadsSynced(true);
