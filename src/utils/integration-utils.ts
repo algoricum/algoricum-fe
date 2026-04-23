@@ -989,7 +989,9 @@ export const handle_Next = ({
     }
   } else if (currentQuestion.id === "leadCaptureForms") {
     if (currentValue === "Google Forms") {
-      setShowGoogleFormModal(true);
+      if (googleFormStatus !== "connected") {
+        setShowGoogleFormModal(true);
+      }
       setShowCompletionButtons(true);
     } else if (currentValue === "Typeform") {
       setShowTypeformModal(true);
