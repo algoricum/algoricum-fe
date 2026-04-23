@@ -147,8 +147,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   const autoProgressToNext = useCallback(() => {
     if (autoProgressing) return;
     setAutoProgressing(true);
-    // Safety reset - ensure autoProgressing never gets permanently stuck
-    setTimeout(() => setAutoProgressing(false), 5000);
     setTimeout(() => {
       if (currentQuestionIndex < filteredQuestions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
@@ -245,29 +243,17 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         setFormData(prev => ({ ...prev, selectedCrm: "Pipedrive" }));
       }
     }
-    if (savedGoogleFormStatus) {
-      setGoogleFormStatus(savedGoogleFormStatus as "disconnected" | "connecting" | "connected");
-      if (savedGoogleFormStatus === "connected") {
-        setShowCompletionButtons(true);
-        setFormData(prev => ({ ...prev, leadCaptureForms: "Google Forms" }));
-      }
-    }
+    if (savedGoogleFormStatus) setGoogleFormStatus(savedGoogleFormStatus as "disconnected" | "connecting" | "connected");
     if (savedGoogleLeadFormStatus) setGoogleLeadFormStatus(savedGoogleLeadFormStatus as "disconnected" | "connecting" | "connected");
     if (savedFacebookLeadFormStatus) setFacebookLeadFormStatus(savedFacebookLeadFormStatus as "disconnected" | "connecting" | "connected");
     if (savedQuestionIndex && !isNaN(Number.parseInt(savedQuestionIndex))) setCurrentQuestionIndex(Number.parseInt(savedQuestionIndex));
     if (savedFormData) {
       try {
         const parsedFormData = JSON.parse(savedFormData);
-        if (savedGoogleFormStatus === "connected") {
-          parsedFormData.leadCaptureForms = "Google Forms";
-        }
         setFormData(parsedFormData);
       } catch (error) {
         console.error("Error parsing saved form data:", error);
       }
-    } else if (savedGoogleFormStatus === "connected") {
-      // No savedFormData but Google Forms connected — set it directly
-      setFormData(prev => ({ ...prev, leadCaptureForms: "Google Forms" }));
     }
     if (savedHubspotAccountInfo) {
       try {
@@ -288,10 +274,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     if (savedGoogleFormAccountInfo) {
       try {
         const parsedAccountInfo = JSON.parse(savedGoogleFormAccountInfo);
-        // Sanitize legacy bad account name
-        if (parsedAccountInfo.accountName === "Google Forms Connected") {
-          parsedAccountInfo.accountName = "Google Forms";
-        }
         setGoogleFormAccountInfo(parsedAccountInfo);
       } catch (error) {
         console.error("Error parsing saved google form account info:", error);
@@ -326,33 +308,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       }
     };
     initializeClinicId();
-  }, []);
-
-  // Reset buttonsLoading when user returns to the page after OAuth flow
-  // This handles the case where user navigates away without completing OAuth
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        // Small delay to allow OAuth callback to process first if it succeeded
-        setTimeout(() => {
-          setButtonsLoading(false);
-        }, 1000);
-      }
-    };
-
-    const handleFocus = () => {
-      setTimeout(() => {
-        setButtonsLoading(false);
-      }, 1000);
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
-    };
   }, []);
 
   useEffect(() => {
@@ -435,7 +390,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       } else if (googleFormStatus === "success") {
         console.log("✅ Google Form OAuth success detected from URL");
         const accountInfo = {
-          accountName: "Google Forms",
+          accountName: accountName || "Connected Account",
           contactCount: parseInt(contactCount || "0"),
           dealCount: 0,
         };
@@ -445,22 +400,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
         // Persist to localStorage
         localStorage.setItem("google_form_oauth_status", "connected");
         localStorage.setItem("google_form_oauth_account_info", JSON.stringify(accountInfo));
-        localStorage.setItem("oauth_question_index", "2");
-        localStorage.setItem("oauth_form_data", JSON.stringify({
-          selectedCrm: "None of these",
-          adsConnections: "None of these",
-          leadCaptureForms: "Google Forms",
-          uploadLeads: "",
-        }));
-
-        // Set state to match question index 2
-        setCurrentQuestionIndex(2);
-        setFormData(prev => ({
-          ...prev,
-          selectedCrm: prev.selectedCrm || "None of these",
-          adsConnections: prev.adsConnections || "None of these",
-          leadCaptureForms: "Google Forms",
-        }));
 
         clearTemporaryOAuthState();
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -573,7 +512,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     };
 
     handleOAuthRedirect();
-  }, [autoProgressToNext, currentQuestionIndex, filteredQuestions.length]);
+  }, [autoProgressToNext, currentQuestionIndex, filteredQuestions.length, formData]);
 
   const handleInputChange = (value: any) => {
     // Check if a CRM is already connected and prevent changing selection
@@ -781,7 +720,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 onClick={handleNext}
                 disabled={
                   ((filteredQuestions?.length > 1 && currentQuestion.type === "radio") || currentQuestion.type === "select"
-                    ? !currentValue && googleFormStatus !== "connected" && googleLeadFormStatus !== "connected" && facebookLeadFormStatus !== "connected"
+                    ? !currentValue
                     : false) || isSubmitting
                 }
                 loading={isSubmitting && currentQuestionIndex === filteredQuestions?.length - 1}
@@ -884,7 +823,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           onGoogleFormConnect={() => connectToGoogleForm(setButtonsLoading)}
           onGoogleFormOk={async () => {
             if (googleFormStatus === "connected") {
-              // If leads not yet synced but files selected, sync now
+              // If Sync Leads was clicked, already synced. If not, sync now.
               if (!googleFormLeadsSynced && selectedGoogleFormWorksheets.length > 0) {
                 const selectedSheetsObjects = await selectedGoogleFormWorksheets
                   .map(value => findSheetDetails(googleFormTreeData, value))
@@ -914,11 +853,9 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
               .filter(Boolean);
             syncGoogleFormLeads(selectedSheetsObjects);
             setGoogleFormLeadsSynced(true);
-            // Update formData state so currentValue is set and Continue button enables
-            setFormData(prev => ({ ...prev, leadCaptureForms: "Google Forms" }));
             localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Google Forms" }));
             setShowGoogleFormModal(false);
-            setShowCompletionButtons(true);
+            autoProgressToNext();
           }}
           onGoogleFormDisconnect={() => {
             setGoogleFormStatus("disconnected");
