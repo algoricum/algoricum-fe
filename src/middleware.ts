@@ -19,7 +19,6 @@ const publicRoutes = [
   "/redirect-form", // OAuth redirect handler
   "/redirect-lead", // Lead form redirect handler
   "/hubspot-setup", // Hubspot setup guide page
-  "/onboarding", // Allow OAuth returns during onboarding without session race condition
 ];
 // Paths that should redirect to dashboard if already authenticated
 const authRoutes = ["/login", "/signup", "/forgot-password"];
