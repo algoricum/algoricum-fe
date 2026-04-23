@@ -91,7 +91,7 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
           .limit(1)
           .maybeSingle();
 
-        if (sub?.status === "active" || sub?.status === "trialing") {
+        if (sub?.status === "active" || sub?.status === "trialing" || sub?.status === "incomplete") {
           if (pollingRef.current) clearInterval(pollingRef.current);
           onNext();
           return;
