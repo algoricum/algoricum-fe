@@ -28,10 +28,15 @@ function generateReminderEmail(clinicName: string, clinic: any, clinic_id: strin
                         <tr>
                             <td style="padding: 40px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 16px; color: #334155;">
                                 <p style="margin: 0 0 20px 0; line-height: 1.6;">Hi ${clinicName},</p>
-                                <p style="margin: 0 0 20px 0; line-height: 1.6;">To keep your pipeline accurate, remember to enter any new inquiries from today - calls, walk-ins, or manual uploads.</p>
-                                <p style="margin: 0 0 20px 0; line-height: 1.6;">Also, please review today's appointments and update patient statuses accordingly.</p>
+                                <p style="margin: 0 0 20px 0; line-height: 1.6;">Just a quick check-in from your Algoricum AI assistant.</p>
+                                <p style="margin: 0 0 20px 0; line-height: 1.6;">Any new inquiries that came in today — calls, walk-ins, or form submissions — need to be in your pipeline so we can follow up right away. The faster a lead hears from you, the better your chances of booking them.</p>
+                                <p style="margin: 0 0 8px 0; line-height: 1.6;"><strong>Here's what to do before end of day:</strong></p>
+                                <p style="margin: 0 0 6px 0; line-height: 1.6;">- Add any new leads you received manually</p>
+                                <p style="margin: 0 0 6px 0; line-height: 1.6;">- Review leads the AI has been following up on</p>
+                                <p style="margin: 0 0 20px 0; line-height: 1.6;">- Update statuses for anyone who booked or went cold</p>
+                                <p style="margin: 0 0 20px 0; line-height: 1.6;">Your AI assistant is working in the background — but it needs your leads to work with.</p>
                                 <div style="text-align: center; margin: 30px 0;">
-                                    <a href="https://app.algoricum.com" style="display: inline-block; background: #800080; color: white; padding: 15px 35px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; border: none; cursor: pointer;">Manage Leads & Appointments</a>
+                                    <a href="https://app.algoricum.com" style="display: inline-block; background: #800080; color: white; padding: 15px 35px; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; border: none; cursor: pointer;">Review Today's Leads →</a>
                                 </div>
                             </td>
                         </tr>
@@ -94,7 +99,7 @@ serve(async () => {
     const emailParams: Record<string, string> = {
       from: `Algoricum <no-reply@algoricum.com>`,
       to: user_email,
-      subject: `Stay on top of today's patient leads`,
+      subject: `Your leads from today — don't let them go cold`,
       text: `Hi ${clinic_name},
 To keep your pipeline accurate, remember to enter any new inquiries from today - calls, walk-ins, or manual uploads.
 
