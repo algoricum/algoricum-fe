@@ -465,8 +465,8 @@ export default function MainOnboarding() {
       await handleCsvLeadsUpload(clinic.id);
       clearStoredProgress();
 
-      SuccessToast("You're all set!");
-      await fetch("/api/sendConfiramtionMail", {
+      // Send confirmation email in background - don't await
+      fetch("/api/sendConfiramtionMail", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -475,7 +475,8 @@ export default function MainOnboarding() {
           name: clinicData.legal_business_name,
           email: clinicData.email || user.email || "",
         }),
-      });
+      }).catch(err => console.error("Confirmation email failed:", err));
+
       setIsOnboardingComplete(true);
     } catch (error: any) {
       ErrorToast(error.message || "Failed to update clinic");
@@ -660,7 +661,7 @@ export default function MainOnboarding() {
               <p className="text-md text-gray-600 mt-4">
                 <strong>Check your inbox</strong> for next steps and tips to get the most out of Algoricum.
               </p>
-              <Button type="primary" className="mt-6" onClick={() => router.push("/dashboard?onboarding=success")}>
+              <Button type="primary" className="mt-6" onClick={() => { window.location.href = "/dashboard"; }}>
                 Go to Dashboard
               </Button>
             </div>
