@@ -326,6 +326,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       const accountName = urlParams.get("account_name");
       const contactCount = urlParams.get("contact_count");
       const dealCount = urlParams.get("deal_count");
+      const connectionId = urlParams.get("connection_id");
 
       if (hubspotStatus === "success") {
         console.log("✅ HubSpot OAuth success detected from URL");
@@ -393,6 +394,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           accountName: accountName || "Connected Account",
           contactCount: parseInt(contactCount || "0"),
           dealCount: 0,
+          connection_id: connectionId || null,
         };
         setGoogleFormStatus("connected");
         setGoogleFormAccountInfo(accountInfo);
@@ -823,7 +825,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
           onGoogleFormConnect={() => connectToGoogleForm(setButtonsLoading)}
           onGoogleFormOk={async () => {
             if (googleFormStatus === "connected") {
-              // If Sync Leads was clicked, already synced. If not, sync now.
               if (!googleFormLeadsSynced && selectedGoogleFormWorksheets.length > 0) {
                 const selectedSheetsObjects = await selectedGoogleFormWorksheets
                   .map(value => findSheetDetails(googleFormTreeData, value))
