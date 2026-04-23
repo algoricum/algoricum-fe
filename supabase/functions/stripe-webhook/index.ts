@@ -24,20 +24,12 @@ function extractStripeSubscriptionId(type, object) {
 }
 function formatInvoiceAmount(payload) {
   if (!Array.isArray(payload.lines?.data))
-    return {
-      amount: "unknown amount",
-      isCredit: false,
-    };
-  const totalCents = payload.lines.data.reduce((sum, line) => {
-    return sum + (line.amount || 0);
-  }, 0);
+    return { amount: "unknown amount", isCredit: false };
+  const totalCents = payload.lines.data.reduce((sum, line) => sum + (line.amount || 0), 0);
   const currency = payload.currency?.toUpperCase() || "USD";
   const formattedAmount = `$${(Math.abs(totalCents) / 100).toFixed(2)} ${currency}`;
   const isCredit = totalCents < 0;
-  return {
-    amount: formattedAmount,
-    isCredit,
-  };
+  return { amount: formattedAmount, isCredit };
 }
 async function formatEventSummary(event, supabase) {
   const { type, data } = event;
@@ -83,64 +75,59 @@ async function formatEventSummary(event, supabase) {
 }
 serve(async req => {
   if (req.method === "OPTIONS")
-    return new Response("OK", {
-      headers: corsHeaders,
-    });
+    return new Response("OK", { headers: corsHeaders });
   if (req.method !== "POST")
-    return new Response("Method Not Allowed", {
-      status: 405,
-      headers: corsHeaders,
-    });
+    return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
+
   const signature = req.headers.get("stripe-signature");
   const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
   if (!signature || !webhookSecret) {
-    return new Response("Missing Stripe Signature or Secret", {
-      status: 400,
-      headers: corsHeaders,
-    });
+    return new Response("Missing Stripe Signature or Secret", { status: 400, headers: corsHeaders });
   }
+
   const body = await req.text();
   let event;
   try {
     event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
   } catch (err) {
-    console.error("Webhook Error:", err);
-    return new Response("Invalid signature", {
-      status: 400,
-      headers: corsHeaders,
-    });
+    console.error("Webhook signature error:", err);
+    return new Response("Invalid signature", { status: 400, headers: corsHeaders });
   }
+
   const { type, data } = event;
   const object = data.object;
   const stripe_subscription_id = extractStripeSubscriptionId(type, object);
   let clinic_id = object.metadata?.clinic_id ?? null;
+
   if (!clinic_id && object.customer) {
     const customer = await stripe.customers.retrieve(object.customer);
     clinic_id = customer.metadata?.clinic_id ?? null;
   }
-  // --- Handle subscription changes first ---
+
+  console.log(`[${type}] clinic_id: ${clinic_id}, status: ${object.status ?? 'n/a'}`);
+
+  // --- Handle subscription changes ---
   if (type.startsWith("customer.subscription.")) {
     if (!clinic_id) {
-      console.warn("No clinic_id in metadata");
-      return new Response("No clinic_id", {
-        status: 200,
-        headers: corsHeaders,
-      });
+      console.warn("No clinic_id in metadata, skipping");
+      return new Response("No clinic_id", { status: 200, headers: corsHeaders });
     }
+
     const status = object.status;
     const trial_end = object.trial_end ? new Date(object.trial_end * 1000).toISOString() : null;
     const current_period_end = object.current_period_end ? new Date(object.current_period_end * 1000).toISOString() : null;
     const price_id = object.items?.data?.[0]?.price?.id ?? null;
+
     let cardholder_name = null;
     let last4 = null;
     let exp_month = null;
     let exp_year = null;
     let brand = null;
-    // 🔍 Fetch default payment method details from Stripe
+
     try {
       if (object.default_payment_method) {
         const paymentMethod = await stripe.paymentMethods.retrieve(object.default_payment_method);
-        if (paymentMethod && paymentMethod.card) {
+        if (paymentMethod?.card) {
           cardholder_name = paymentMethod.billing_details?.name || null;
           last4 = paymentMethod.card.last4;
           exp_month = paymentMethod.card.exp_month;
@@ -149,45 +136,23 @@ serve(async req => {
         }
       }
     } catch (err) {
-      console.warn("Failed to fetch payment method info", err);
+      console.warn("Failed to fetch payment method:", err);
     }
-    if (type === "customer.subscription.deleted") {
-      await supabase
-        .from("stripe_subscriptions")
-        .update({
-          status: "paused",
-        })
-        .eq("clinic_id", clinic_id);
-    } else {
-      // Try update first, then insert if no existing record
-      const { data: existing } = await supabase
-        .from("stripe_subscriptions")
-        .select("id")
-        .eq("clinic_id", clinic_id)
-        .maybeSingle();
 
-      if (existing) {
-        await supabase
-          .from("stripe_subscriptions")
-          .update({
-            stripe_subscription_id,
-            stripe_price_id: price_id,
-            status,
-            trial_end,
-            current_period_end,
-            cardholder_name,
-            last4,
-            exp_month,
-            exp_year,
-            brand,
-          })
-          .eq("clinic_id", clinic_id);
-      } else {
-        await supabase
-          .from("stripe_subscriptions")
-          .insert({
-            stripe_subscription_id,
+    if (type === "customer.subscription.deleted") {
+      const { error } = await supabase
+        .from("stripe_subscriptions")
+        .update({ status: "paused" })
+        .eq("clinic_id", clinic_id);
+      if (error) console.error("Error pausing subscription:", error);
+    } else {
+      // Always upsert using the unique clinic constraint
+      const { error } = await supabase
+        .from("stripe_subscriptions")
+        .upsert(
+          {
             clinic_id,
+            stripe_subscription_id,
             stripe_price_id: price_id,
             status,
             trial_end,
@@ -197,84 +162,75 @@ serve(async req => {
             exp_month,
             exp_year,
             brand,
-          });
+          },
+          {
+            onConflict: "clinic_id",
+            ignoreDuplicates: false,
+          }
+        );
+      if (error) {
+        console.error("Error upserting subscription:", JSON.stringify(error));
+      } else {
+        console.log(`Successfully upserted subscription for clinic ${clinic_id} with status ${status}`);
       }
     }
   }
+
   // --- Handle payment method updates ---
   if (type === "payment_method.updated") {
     const paymentMethod = object;
     if (!paymentMethod.customer)
-      return new Response("No customer", {
-        status: 200,
-        headers: corsHeaders,
-      });
+      return new Response("No customer", { status: 200, headers: corsHeaders });
     const customer = await stripe.customers.retrieve(paymentMethod.customer);
-    const clinic_id = customer.metadata?.clinic_id ?? null;
-    if (!clinic_id || !paymentMethod.card)
-      return new Response("Missing data", {
-        status: 200,
-        headers: corsHeaders,
-      });
+    const pm_clinic_id = customer.metadata?.clinic_id ?? null;
+    if (!pm_clinic_id || !paymentMethod.card)
+      return new Response("Missing data", { status: 200, headers: corsHeaders });
     const { last4, exp_month, exp_year, brand } = paymentMethod.card;
     const cardholder_name = paymentMethod.billing_details?.name ?? null;
-    await supabase
+    const { error } = await supabase
       .from("stripe_subscriptions")
-      .update({
-        last4,
-        exp_month,
-        exp_year,
-        brand,
-        cardholder_name,
-      })
-      .eq("clinic_id", clinic_id)
-      .throwOnError();
+      .update({ last4, exp_month, exp_year, brand, cardholder_name })
+      .eq("clinic_id", pm_clinic_id);
+    if (error) console.error("Error updating payment method:", error);
   }
 
   if (type === "customer.updated") {
     const customer = object;
-    const clinic_id = customer.metadata?.clinic_id ?? null;
+    const cu_clinic_id = customer.metadata?.clinic_id ?? null;
     const defaultPaymentMethodId = customer.invoice_settings?.default_payment_method;
-
-    if (!clinic_id || !defaultPaymentMethodId) {
-      console.warn("Missing clinic_id or default payment method");
+    if (!cu_clinic_id || !defaultPaymentMethodId) {
       return new Response("Missing data", { status: 200, headers: corsHeaders });
     }
-
     try {
       const paymentMethod = await stripe.paymentMethods.retrieve(defaultPaymentMethodId);
-
-      if (!paymentMethod?.card) return new Response("No card info", { status: 200, headers: corsHeaders });
-
+      if (!paymentMethod?.card)
+        return new Response("No card info", { status: 200, headers: corsHeaders });
       const { last4, exp_month, exp_year, brand } = paymentMethod.card;
       const cardholder_name = paymentMethod.billing_details?.name ?? null;
-
-      await supabase
+      const { error } = await supabase
         .from("stripe_subscriptions")
-        .update({
-          last4,
-          exp_month,
-          exp_year,
-          brand,
-          cardholder_name,
-        })
-        .eq("clinic_id", clinic_id)
-        .throwOnError();
+        .update({ last4, exp_month, exp_year, brand, cardholder_name })
+        .eq("clinic_id", cu_clinic_id);
+      if (error) console.error("Error updating customer payment method:", error);
     } catch (err) {
       console.error("Failed to retrieve payment method:", err);
       return new Response("Failed to retrieve payment method", { status: 500, headers: corsHeaders });
     }
   }
 
-  // --- Fetch internal subscription ID AFTER upserting ---
+  // --- Log event ---
   let internal_subscription_id = null;
   if (clinic_id) {
-    const { data: subRecord } = await supabase.from("stripe_subscriptions").select("id").eq("clinic_id", clinic_id).maybeSingle();
+    const { data: subRecord } = await supabase
+      .from("stripe_subscriptions")
+      .select("id")
+      .eq("clinic_id", clinic_id)
+      .maybeSingle();
     internal_subscription_id = subRecord?.id ?? null;
   }
-  // --- Format and log event ---
+
   const summary = await formatEventSummary(event, supabase);
-  await supabase.from("stripe_events").insert({
+  const { error: insertError } = await supabase.from("stripe_events").insert({
     event_id: event.id,
     type,
     payload: data,
@@ -282,8 +238,7 @@ serve(async req => {
     subscription_id: internal_subscription_id,
     summary,
   });
-  return new Response("Webhook processed", {
-    status: 200,
-    headers: corsHeaders,
-  });
+  if (insertError) console.error("Error inserting stripe event:", insertError);
+
+  return new Response("Webhook processed", { status: 200, headers: corsHeaders });
 });
