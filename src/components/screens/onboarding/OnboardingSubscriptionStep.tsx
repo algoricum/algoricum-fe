@@ -204,7 +204,7 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
                         }
                       }
                       if (activeClinicId) {
-                        handleSubscribe(plan.price_id, activeClinicId);
+                        handleSubscribe(plan.price_id);
                       } else {
                         ErrorToast("Unable to load clinic data. Please refresh the page and try again.");
                       }
