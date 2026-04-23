@@ -4,23 +4,32 @@ import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { SUPABASE_URL } from "@/constants/integration-constants";
 import { useEffect } from "react";
 
-export default function RedirectFormPage() {
+export default function DashboardPage() {
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    console.log("🔄 Redirect-form page loaded!");
+    console.log("Current URL:", window.location.href);
+    console.log("Current search params:", window.location.search);
 
-    if ([...params].length === 0) {
-      return;
-    }
+    const run = async () => {
+      const params = new URLSearchParams(window.location.search);
+      console.log("Redirect-form params:", [...params]);
+      console.log("SUPABASE_URL:", SUPABASE_URL);
 
-    // Immediately clear the URL to prevent Supabase auth client from
-    // intercepting the OAuth `code` param and attempting a PKCE exchange
-    const paramsString = params.toString();
-    window.history.replaceState({}, document.title, window.location.pathname);
+      if ([...params].length === 0) {
+        console.log("No params found, not redirecting");
+        return;
+      }
 
-    // Now navigate to the Edge Function callback with the original params
-    const callbackUrl = `${SUPABASE_URL}/functions/v1/google-form-integration/oauth/callback?${paramsString}`;
-    window.location.href = callbackUrl;
+      const callbackUrl = `${SUPABASE_URL}/functions/v1/google-form-integration/oauth/callback?${params.toString()}`;
+      console.log("Redirecting to:", callbackUrl);
+
+      // allow event loop to complete fetch before navigation
+      window.location.href = callbackUrl;
+    };
+    run();
   }, []);
+
+  // Loading/UI state
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
