@@ -159,24 +159,46 @@ serve(async req => {
         })
         .eq("clinic_id", clinic_id);
     } else {
-      await supabase.from("stripe_subscriptions").upsert(
-        {
-          stripe_subscription_id,
-          clinic_id,
-          stripe_price_id: price_id,
-          status,
-          trial_end,
-          current_period_end,
-          cardholder_name,
-          last4,
-          exp_month,
-          exp_year,
-          brand,
-        },
-        {
-          onConflict: "clinic_id",
-        },
-      );
+      // Try update first, then insert if no existing record
+      const { data: existing } = await supabase
+        .from("stripe_subscriptions")
+        .select("id")
+        .eq("clinic_id", clinic_id)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from("stripe_subscriptions")
+          .update({
+            stripe_subscription_id,
+            stripe_price_id: price_id,
+            status,
+            trial_end,
+            current_period_end,
+            cardholder_name,
+            last4,
+            exp_month,
+            exp_year,
+            brand,
+          })
+          .eq("clinic_id", clinic_id);
+      } else {
+        await supabase
+          .from("stripe_subscriptions")
+          .insert({
+            stripe_subscription_id,
+            clinic_id,
+            stripe_price_id: price_id,
+            status,
+            trial_end,
+            current_period_end,
+            cardholder_name,
+            last4,
+            exp_month,
+            exp_year,
+            brand,
+          });
+      }
     }
   }
   // --- Handle payment method updates ---
