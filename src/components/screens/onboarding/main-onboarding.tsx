@@ -15,7 +15,6 @@ import { handleCsvLeadsUpload } from "@/utils/csvUtils";
 import generateClinicInstructions from "@/utils/generateClinicInstructions";
 import { checkClinicSubscription, shouldAllowTwilioSetup } from "@/utils/subscription-utils";
 // import { handleSubscribe } from "@/utils/stripe";
-import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getClinicData, updateClinic, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { getUserData } from "@/utils/supabase/user-helper";
