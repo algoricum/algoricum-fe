@@ -146,11 +146,38 @@ serve(async req => {
         .eq("clinic_id", clinic_id);
       if (error) console.error("Error pausing subscription:", error);
     } else {
-      // Always upsert using the unique clinic constraint
-      const { error } = await supabase
+      // Update existing record first, insert if not found
+      const { data: existing } = await supabase
         .from("stripe_subscriptions")
-        .upsert(
-          {
+        .select("id")
+        .eq("clinic_id", clinic_id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("stripe_subscriptions")
+          .update({
+            stripe_subscription_id,
+            stripe_price_id: price_id,
+            status,
+            trial_end,
+            current_period_end,
+            cardholder_name,
+            last4,
+            exp_month,
+            exp_year,
+            brand,
+          })
+          .eq("clinic_id", clinic_id);
+        if (error) {
+          console.error("Error updating subscription:", JSON.stringify(error));
+        } else {
+          console.log(`Successfully updated subscription for clinic ${clinic_id} with status ${status}`);
+        }
+      } else {
+        const { error } = await supabase
+          .from("stripe_subscriptions")
+          .insert({
             clinic_id,
             stripe_subscription_id,
             stripe_price_id: price_id,
@@ -162,16 +189,12 @@ serve(async req => {
             exp_month,
             exp_year,
             brand,
-          },
-          {
-            onConflict: "clinic_id",
-            ignoreDuplicates: false,
-          }
-        );
-      if (error) {
-        console.error("Error upserting subscription:", JSON.stringify(error));
-      } else {
-        console.log(`Successfully upserted subscription for clinic ${clinic_id} with status ${status}`);
+          });
+        if (error) {
+          console.error("Error inserting subscription:", JSON.stringify(error));
+        } else {
+          console.log(`Successfully inserted subscription for clinic ${clinic_id} with status ${status}`);
+        }
       }
     }
   }
