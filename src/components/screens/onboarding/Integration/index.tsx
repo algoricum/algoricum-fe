@@ -327,6 +327,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       const contactCount = urlParams.get("contact_count");
       const dealCount = urlParams.get("deal_count");
       const connectionId = urlParams.get("connection_id");
+      const connectionId = urlParams.get("connection_id");
 
       if (hubspotStatus === "success") {
         console.log("✅ HubSpot OAuth success detected from URL");
@@ -602,29 +603,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       onPrev();
     }
   };
-  const checkSubscription = async (id: string) => {
-    const { data: sub } = await supabase
-      .from("stripe_subscriptions")
-      .select("id,status")
-      .eq("clinic_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (sub?.status === "active" || sub?.status === "trialing") {
-      setLoading(false);
-    }
-  };
   useEffect(() => {
     const fetchInitialData = async () => {
       const clinic = await getClinicData();
-      console.log(".......Clinic data:.....", clinic);
       if (!clinic) {
         ErrorToast("Clinic data not found.");
-        return;
       }
-
-      await checkSubscription(clinic.id);
+      // Always show the page regardless of subscription status
+      setLoading(false);
     };
 
     fetchInitialData();
