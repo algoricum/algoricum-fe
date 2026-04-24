@@ -74,15 +74,19 @@ export async function middleware(request: NextRequest) {
     const isUnauthorizedRoute = pathname === "/unauthorized";
     // Create Supabase client with proper error handling
     const { supabase, response } = createClient(request);
-    // Use getSession() which reads from cookie directly - no network call, no timeout issues
-    let user = null;
-    let userError = null;
+    // Add timeout to prevent hanging
+    const userPromise = supabase.auth.getUser();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Auth timeout")), 5000));
+    let user, userError;
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      user = session?.user ?? null;
-      userError = error;
+      const result = await Promise.race([userPromise, timeoutPromise]);
+      ({
+        data: { user },
+        error: userError,
+      } = result as any);
     } catch (error) {
-      console.error("Auth session error:", error);
+      console.error("Auth timeout or error:", error);
+      // If auth check fails, treat as unauthenticated
       user = null;
       userError = error;
     }
