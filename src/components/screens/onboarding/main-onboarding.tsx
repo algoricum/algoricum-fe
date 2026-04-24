@@ -661,7 +661,16 @@ export default function MainOnboarding() {
               <p className="text-md text-gray-600 mt-4">
                 <strong>Check your inbox</strong> for next steps and tips to get the most out of Algoricum.
               </p>
-              <Button type="primary" className="mt-6" onClick={() => { window.location.href = "/dashboard"; }}>
+              <Button type="primary" className="mt-6" onClick={async () => {
+                // Refresh session before navigating to ensure it's still valid
+                try {
+                  const supabaseClient = createClient();
+                  await supabaseClient.auth.refreshSession();
+                } catch (e) {
+                  console.error("Session refresh failed:", e);
+                }
+                window.location.href = "/dashboard";
+              }}>
                 Go to Dashboard
               </Button>
             </div>
