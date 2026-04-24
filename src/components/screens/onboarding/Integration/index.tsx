@@ -3,7 +3,6 @@ import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { questions } from "@/constants";
 import { handleCsvUpload } from "@/utils/csvUtils";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
-import { createClient } from "@/utils/supabase/config/client";
 import { Button, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { ConnectionStatus, FormData, IntegrationsStepProps } from "../../../../app/types/types";
@@ -42,7 +41,6 @@ const { Title } = Typography;
 
 export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isSubmitting = false }: IntegrationsStepProps) {
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showHubspotModal, setShowHubspotModal] = useState(false);
   const [buttonsLoading, setButtonsLoading] = useState(false);
