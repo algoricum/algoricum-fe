@@ -19,7 +19,7 @@ import { getSupabaseSession } from "@/utils/supabase/auth-helper";
 import { getClinicData, updateClinic, updateMailgunDomainSettings } from "@/utils/supabase/clinic-helper";
 import { createClient } from "@/utils/supabase/config/client";
 import { getUserData } from "@/utils/supabase/user-helper";
-import { Button, Typography } from "antd";
+import { Typography } from "antd";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
