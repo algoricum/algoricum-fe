@@ -458,9 +458,16 @@ export default function MainOnboarding() {
         if (shouldAllowTwilioSetup(subscriptionInfo)) {
           console.log("✅ Clinic has paid subscription - proceeding with Twilio setup");
 
-          const session = await getSupabaseSession();
-          if (!session.access_token) {
-            throw new Error("Not authenticated");
+          let session;
+          try {
+            session = await getSupabaseSession();
+          } catch (e) {
+            console.warn("Session unavailable for Twilio setup, skipping:", e);
+            session = null;
+          }
+          if (!session?.access_token) {
+            console.warn("No session for Twilio setup, skipping");
+            return;
           }
 
           const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
@@ -505,12 +512,13 @@ export default function MainOnboarding() {
         }),
       }).catch(err => console.error("Confirmation email failed:", err));
 
-      setIsOnboardingComplete(true);
-      // Clear progress AFTER showing success screen to prevent middleware redirect
       clearStoredProgress();
     } catch (error: any) {
+      console.error("Onboarding error:", error);
       ErrorToast(error.message || "Failed to update clinic");
     } finally {
+      // Always mark onboarding complete and redirect - even if non-critical steps failed
+      setIsOnboardingComplete(true);
       setIsSubmitting(false);
     }
   };
