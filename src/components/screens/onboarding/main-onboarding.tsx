@@ -463,7 +463,6 @@ export default function MainOnboarding() {
       }
 
       await handleCsvLeadsUpload(clinic.id);
-      clearStoredProgress();
 
       // Send confirmation email in background - don't await
       fetch("/api/sendConfiramtionMail", {
@@ -478,6 +477,8 @@ export default function MainOnboarding() {
       }).catch(err => console.error("Confirmation email failed:", err));
 
       setIsOnboardingComplete(true);
+      // Clear progress AFTER showing success screen to prevent middleware redirect
+      clearStoredProgress();
     } catch (error: any) {
       ErrorToast(error.message || "Failed to update clinic");
     } finally {
