@@ -56,6 +56,12 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
 
     const fetchClinic = async () => {
       try {
+        // If returning from Stripe, session cookie may be lost - force a refresh first
+        const isPaymentReturn = typeof window !== "undefined" &&
+          window.location.search.includes("payment=success");
+        if (isPaymentReturn) {
+          await supabase.auth.getSession();
+        }
         const clinic = await getClinicData();
         console.log(".......Clinic data:.....", clinic);
         if (clinic) {
