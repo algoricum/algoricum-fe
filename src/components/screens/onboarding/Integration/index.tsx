@@ -327,7 +327,6 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
       const contactCount = urlParams.get("contact_count");
       const dealCount = urlParams.get("deal_count");
       const connectionId = urlParams.get("connection_id");
-      const connectionId = urlParams.get("connection_id");
 
       if (hubspotStatus === "success") {
         console.log("✅ HubSpot OAuth success detected from URL");
