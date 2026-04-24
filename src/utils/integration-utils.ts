@@ -76,16 +76,28 @@ export const syncPipedriveLeads = async () => {
   }
 };
 
-export const syncGoogleFormLeads = async (worksheets: any) => {
+export const syncGoogleFormLeads = async (worksheets: any, fallbackConnectionId?: string) => {
   try {
     const clinicId = await getClinicId();
+    
+    // Try to get connection_id from database
     const { data: connection } = await createClient()
       .from("google_form_connections")
       .select("id")
       .eq("clinic_id", clinicId)
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
+
+    const connectionId = connection?.id || fallbackConnectionId;
+    
+    if (!connectionId) {
+      console.error("No connection_id found for clinic:", clinicId);
+      ErrorToast("Google Forms connection not found. Please reconnect.");
+      return false;
+    }
+
+    console.log("Syncing sheets:", { clinicId, connectionId, worksheets });
 
     const response = await fetch(`${SUPABASE_URL}/functions/v1/google-form-integration/save-selected-sheets`, {
       method: "POST",
@@ -96,12 +108,18 @@ export const syncGoogleFormLeads = async (worksheets: any) => {
       },
       body: JSON.stringify({
         clinic_id: clinicId,
-        connection_id: connection?.id,
+        connection_id: connectionId,
         selected_sheets: worksheets,
       }),
     });
-    console.log("response");
-    if (!response.ok) throw new Error("Failed to sync Google Form leads");
+    
+    const responseData = await response.json();
+    console.log("Sync response:", responseData);
+    
+    if (!response.ok) {
+      console.error("Sync failed:", responseData);
+      throw new Error(responseData.details || responseData.error || "Failed to sync Google Form leads");
+    }
     SuccessToast("Google Form leads sync in progress");
     return true;
   } catch (error) {
