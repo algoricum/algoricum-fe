@@ -815,7 +815,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
                 const selectedSheetsObjects = selectedGoogleFormWorksheets
                   .map(value => findSheetDetails(googleFormTreeData, value) || value)
                   .filter(Boolean);
-                syncGoogleFormLeads(selectedSheetsObjects);
+                syncGoogleFormLeads(selectedSheetsObjects, googleFormAccountInfo?.connection_id);
                 setGoogleFormLeadsSynced(true);
               }
               setFormData(prev => ({ ...prev, leadCaptureForms: "Google Forms" }));
@@ -839,7 +839,7 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
             const selectedSheetsObjects = selectedGoogleFormWorksheets
               .map(value => findSheetDetails(googleFormTreeData, value) || value)
               .filter(Boolean);
-            syncGoogleFormLeads(selectedSheetsObjects);
+            syncGoogleFormLeads(selectedSheetsObjects, googleFormAccountInfo?.connection_id);
             setGoogleFormLeadsSynced(true);
             localStorage.setItem("oauth_form_data", JSON.stringify({ ...formData, leadCaptureForms: "Google Forms" }));
             setShowGoogleFormModal(false);
