@@ -76,7 +76,7 @@ export async function middleware(request: NextRequest) {
     const { supabase, response } = createClient(request);
     // Add timeout to prevent hanging
     const userPromise = supabase.auth.getUser();
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Auth timeout")), 5000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Auth timeout")), 15000));
     let user, userError;
     try {
       const result = await Promise.race([userPromise, timeoutPromise]);
@@ -86,7 +86,6 @@ export async function middleware(request: NextRequest) {
       } = result as any);
     } catch (error) {
       console.error("Auth timeout or error:", error);
-      // If auth check fails, treat as unauthenticated
       user = null;
       userError = error;
     }
