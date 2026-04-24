@@ -22,7 +22,7 @@ interface PricingSelectorProps {
     features?: string[];
   }[];
   subscribingId: string | null;
-  handleSubscribe: (priceId: string) => void;
+  handleSubscribe: (priceId: string, successUrl?: string) => void;
 }
 
 export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscriptionStepProps) {
@@ -204,7 +204,8 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
                         }
                       }
                       if (activeClinicId) {
-                        handleSubscribe(plan.price_id);
+                        const onboardingReturnUrl = `${window.location.origin}/onboarding?payment=success`;
+                        handleSubscribe(plan.price_id, onboardingReturnUrl);
                       } else {
                         ErrorToast("Unable to load clinic data. Please refresh the page and try again.");
                       }
@@ -232,7 +233,7 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
         <Skeleton active />
       ) : (
         <div className="mt-6">
-          <PricingSelector plans={plans} subscribingId={subscribingId} handleSubscribe={priceId => handleSubscribe(priceId, clinicId)} />
+          <PricingSelector plans={plans} subscribingId={subscribingId} handleSubscribe={(priceId, successUrl) => handleSubscribe(priceId, clinicId, successUrl)} />
         </div>
       )}
     </div>
