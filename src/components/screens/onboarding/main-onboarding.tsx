@@ -42,6 +42,21 @@ const generateSlug = (name: string): string => {
     .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
 };
 
+function OnboardingComplete() {
+  useEffect(() => {
+    // Redirect immediately - session is still fresh from handleCompleteOnboarding
+    window.location.replace("/dashboard");
+  }, []);
+
+  return (
+    <div className="max-w-xl mx-auto text-center mt-32">
+      <h1 className="text-2xl font-semibold mb-4">You&apos;re all set! 🎉</h1>
+      <p className="text-lg text-gray-700">Algoricum is now live and following up with your leads.</p>
+      <p className="text-md text-gray-600 mt-4">Redirecting you to your dashboard...</p>
+    </div>
+  );
+}
+
 export default function MainOnboarding() {
   const router = useRouter();
   const { logout } = useAuth();
@@ -670,31 +685,7 @@ export default function MainOnboarding() {
         {/* <div className="h-full overflow-y-auto py-11 px-8">{renderCurrentStep()}</div> */}
         <div className="h-full overflow-y-auto py-11 px-8">
           {isOnboardingComplete ? (
-            <div className="max-w-xl mx-auto text-center mt-32">
-              <h1 className="text-2xl font-semibold mb-4">You&apos;re all set! 🎉</h1>
-              <p className="text-lg text-gray-700">Algoricum is now live and following up with your leads.</p>
-              <p className="text-md text-gray-600 mt-4">
-                <strong>Check your inbox</strong> for next steps and tips to get the most out of Algoricum.
-              </p>
-              <Button type="primary" className="mt-6" onClick={async () => {
-                try {
-                  const supabaseClient = createClient();
-                  // getSession restores the session from cookie/storage
-                  const { data: sessionData } = await supabaseClient.auth.getSession();
-                  if (!sessionData.session) {
-                    // Try a full refresh as fallback
-                    await supabaseClient.auth.refreshSession();
-                  }
-                } catch (e) {
-                  console.error("Session restore failed:", e);
-                }
-                // Small delay to ensure session cookie is written before middleware reads it
-                await new Promise(resolve => setTimeout(resolve, 500));
-                window.location.replace("/dashboard");
-              }}>
-                Go to Dashboard
-              </Button>
-            </div>
+            <OnboardingComplete />
           ) : (
             renderCurrentStep()
           )}
