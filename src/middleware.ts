@@ -266,11 +266,11 @@ async function checkIfUserHasClinic(supabase: SupabaseClient<any, "public", any>
     // Fetch the clinic data
     const { data: clinicData, error: clinicError } = await supabase
       .from("clinic")
-      .select("id")
+      .select("id, email")
       .eq("id", userClinicData.clinic_id)
       .maybeSingle();
-    // Return false only if clinic row does not exist
-    if (clinicError || !clinicData) {
+    // Return false if clinic does not exist or has no email (stub clinic from OTP, not yet onboarded)
+    if (clinicError || !clinicData || !clinicData.email || clinicData.email.trim() === "") {
       return false;
     }
     return true;
