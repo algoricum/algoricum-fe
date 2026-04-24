@@ -234,6 +234,13 @@ export default function MainOnboarding() {
     try {
       setIsSubmitting(true);
 
+      // Refresh session at the start to prevent auth failures mid-onboarding
+      try {
+        await supabase.auth.refreshSession();
+      } catch (e) {
+        console.warn("Session refresh failed, continuing:", e);
+      }
+
       const finalData = dataToUse || allData;
 
       // Map the new flow data to the old structure
@@ -346,7 +353,14 @@ export default function MainOnboarding() {
       if (hasDocuments) {
         try {
           const formDataToSend = new FormData();
-          const session = await getSupabaseSession();
+          let session;
+          try {
+            session = await getSupabaseSession();
+          } catch (e) {
+            console.warn("Session unavailable for assistant creation, skipping:", e);
+            session = null;
+          }
+          if (!session) throw new Error("No session for assistant creation");
 
           // Add basic fields
           formDataToSend.append("clinic_id", updatedClinic.id);
