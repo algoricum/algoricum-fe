@@ -663,14 +663,21 @@ export default function MainOnboarding() {
                 <strong>Check your inbox</strong> for next steps and tips to get the most out of Algoricum.
               </p>
               <Button type="primary" className="mt-6" onClick={async () => {
-                // Refresh session before navigating to ensure it's still valid
+                // Force a full session refresh and wait for cookie to be written
                 try {
                   const supabaseClient = createClient();
-                  await supabaseClient.auth.refreshSession();
+                  const { data, error } = await supabaseClient.auth.refreshSession();
+                  if (error || !data.session) {
+                    // Session truly expired - re-authenticate via hard redirect to login
+                    window.location.replace("/login?redirectUrl=/dashboard");
+                    return;
+                  }
                 } catch (e) {
                   console.error("Session refresh failed:", e);
                 }
-                window.location.href = "/dashboard";
+                // Small delay to ensure refreshed session cookie is flushed to browser
+                await new Promise(resolve => setTimeout(resolve, 300));
+                window.location.replace("/dashboard");
               }}>
                 Go to Dashboard
               </Button>
