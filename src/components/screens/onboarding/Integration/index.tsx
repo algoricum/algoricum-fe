@@ -3,6 +3,7 @@ import { LoadingSpinner } from "@/components/common/Loaders/loading-spinner";
 import { questions } from "@/constants";
 import { handleCsvUpload } from "@/utils/csvUtils";
 import { getClinicData } from "@/utils/supabase/clinic-helper";
+import { createClient } from "@/utils/supabase/config/client";
 import { Button, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { ConnectionStatus, FormData, IntegrationsStepProps } from "../../../../app/types/types";
@@ -309,6 +310,14 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
   }, []);
 
   useEffect(() => {
+    // Restore session after OAuth round-trip - session cookie may be lost
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasOAuthReturn = [...urlParams.keys()].some(key => key.endsWith("_status")) || urlParams.has("connection_id");
+    if (hasOAuthReturn) {
+      const supabase = createClient();
+      supabase.auth.getSession().catch(e => console.warn("Session restore after OAuth failed:", e));
+    }
+
     const handleOAuthRedirect = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const hubspotStatus = urlParams.get("hubspot_status");
