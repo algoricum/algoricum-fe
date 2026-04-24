@@ -23,7 +23,7 @@ serve(async req => {
     });
   }
   try {
-    const { clinic_id, price_id } = await req.json();
+    const { clinic_id, price_id, success_url: customSuccessUrl } = await req.json();
     if (!clinic_id || !price_id) {
       return new Response("Missing clinic_id or price_id", {
         status: 400,
@@ -142,7 +142,7 @@ serve(async req => {
           name: "never",
           shipping: "never",
         },
-        success_url: `${APP_URL}/billing`,
+        success_url: customSuccessUrl || `${APP_URL}/billing`,
         cancel_url: `${APP_URL}/billing`,
       };
     } else {
@@ -165,7 +165,7 @@ serve(async req => {
           },
         },
         payment_method_collection: "always",
-        success_url: `${APP_URL}/billing`,
+        success_url: customSuccessUrl || `${APP_URL}/billing`,
         cancel_url: `${APP_URL}/billing`,
       };
     }
