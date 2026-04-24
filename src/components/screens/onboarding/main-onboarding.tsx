@@ -44,8 +44,17 @@ const generateSlug = (name: string): string => {
 
 function OnboardingComplete() {
   useEffect(() => {
-    // Redirect immediately - session is still fresh from handleCompleteOnboarding
-    window.location.replace("/dashboard");
+    const redirect = async () => {
+      try {
+        // Re-authenticate before redirecting - session may have expired during onboarding
+        const supabase = createClient();
+        await supabase.auth.refreshSession();
+      } catch (e) {
+        console.warn("Session refresh before redirect failed:", e);
+      }
+      window.location.replace("/dashboard");
+    };
+    redirect();
   }, []);
 
   return (
@@ -249,9 +258,16 @@ export default function MainOnboarding() {
     try {
       setIsSubmitting(true);
 
-      // Refresh session at the start to prevent auth failures mid-onboarding
+      // Refresh session at the start and store access token for all subsequent calls
+      let accessToken: string | null = null;
       try {
-        await supabase.auth.refreshSession();
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        accessToken = refreshData?.session?.access_token ?? null;
+        if (!accessToken) {
+          // Try getSession as fallback
+          const { data: sessionData } = await supabase.auth.getSession();
+          accessToken = sessionData?.session?.access_token ?? null;
+        }
       } catch (e) {
         console.warn("Session refresh failed, continuing:", e);
       }
@@ -368,14 +384,7 @@ export default function MainOnboarding() {
       if (hasDocuments) {
         try {
           const formDataToSend = new FormData();
-          let session;
-          try {
-            session = await getSupabaseSession();
-          } catch (e) {
-            console.warn("Session unavailable for assistant creation, skipping:", e);
-            session = null;
-          }
-          if (!session) throw new Error("No session for assistant creation");
+          if (!accessToken) throw new Error("No session for assistant creation");
 
           // Add basic fields
           formDataToSend.append("clinic_id", updatedClinic.id);
@@ -423,7 +432,7 @@ export default function MainOnboarding() {
           const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-assistant-with-file`, {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${session.access_token}`,
+              Authorization: `Bearer ${accessToken}`,
             },
             body: formDataToSend,
           });
@@ -458,37 +467,29 @@ export default function MainOnboarding() {
         if (shouldAllowTwilioSetup(subscriptionInfo)) {
           console.log("✅ Clinic has paid subscription - proceeding with Twilio setup");
 
-          let session;
-          try {
-            session = await getSupabaseSession();
-          } catch (e) {
-            console.warn("Session unavailable for Twilio setup, skipping:", e);
-            session = null;
-          }
-          if (!session?.access_token) {
+          if (!accessToken) {
             console.warn("No session for Twilio setup, skipping");
-            return;
-          }
-
-          const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              clinic_id: updatedClinic.id,
-              phone_number: mappedData.phoneNumber,
-              name: mappedData.legalBusinessName,
-            }),
-          });
-
-          const twilioResult = await twilioResponse.json();
-
-          if (!twilioResponse.ok) {
-            console.error("Twilio setup error:", twilioResult.error);
           } else {
-            console.log("✅ Twilio setup completed successfully");
+            const twilioResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/twillio-setup`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                clinic_id: updatedClinic.id,
+                phone_number: mappedData.phoneNumber,
+                name: mappedData.legalBusinessName,
+              }),
+            });
+
+            const twilioResult = await twilioResponse.json();
+
+            if (!twilioResponse.ok) {
+              console.error("Twilio setup error:", twilioResult.error);
+            } else {
+              console.log("✅ Twilio setup completed successfully");
+            }
           }
         } else {
           console.log("❌ Clinic has free subscription - skipping Twilio setup");
