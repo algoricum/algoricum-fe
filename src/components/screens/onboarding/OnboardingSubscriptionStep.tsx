@@ -100,8 +100,8 @@ export default function OnboardingSubscriptionStep({ onNext }: OnboardingSubscri
         // If returning from payment and subscription not active yet, keep polling
         if (isPaymentReturn) {
           pollCountRef.current += 1;
-          // Stop polling after 10 attempts (30 seconds)
-          if (pollCountRef.current >= 10) {
+          // Stop polling after 20 attempts (60 seconds)
+          if (pollCountRef.current >= 20) {
             if (pollingRef.current) clearInterval(pollingRef.current);
             setLoading(false);
           }
