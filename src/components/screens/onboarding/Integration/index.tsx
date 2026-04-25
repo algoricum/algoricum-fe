@@ -315,7 +315,22 @@ export default function IntegrationsStep({ onNext, onPrev, initialData = {}, isS
     const hasOAuthReturn = [...urlParams.keys()].some(key => key.endsWith("_status")) || urlParams.has("connection_id");
     if (hasOAuthReturn) {
       const supabase = createClient();
-      supabase.auth.getSession().catch(e => console.warn("Session restore after OAuth failed:", e));
+      // Try to restore session using saved tokens from before OAuth redirect
+      const savedAccessToken = localStorage.getItem("pre_oauth_access_token");
+      const savedRefreshToken = localStorage.getItem("pre_oauth_refresh_token");
+      if (savedAccessToken && savedRefreshToken) {
+        supabase.auth.setSession({
+          access_token: savedAccessToken,
+          refresh_token: savedRefreshToken,
+        }).then(() => {
+          localStorage.removeItem("pre_oauth_access_token");
+          localStorage.removeItem("pre_oauth_refresh_token");
+          console.log("✅ Session restored after OAuth redirect");
+        }).catch(e => console.warn("Session restore failed:", e));
+      } else {
+        supabase.auth.refreshSession()
+          .catch(e => console.warn("Session refresh after OAuth failed:", e));
+      }
     }
 
     const handleOAuthRedirect = () => {
