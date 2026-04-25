@@ -20,6 +20,21 @@ export default function DashboardPage() {
         return;
       }
 
+      // Save session to localStorage before leaving app domain
+      // so it can be restored when we come back from Supabase domain
+      try {
+        const { createClient } = await import("@/utils/supabase/config/client");
+        const supabase = createClient();
+        const { data } = await supabase.auth.getSession();
+        if (data?.session) {
+          localStorage.setItem("pre_oauth_access_token", data.session.access_token);
+          localStorage.setItem("pre_oauth_refresh_token", data.session.refresh_token);
+          console.log("✅ Session saved before OAuth redirect");
+        }
+      } catch (e) {
+        console.warn("Could not save session before OAuth redirect:", e);
+      }
+
       const callbackUrl = `${SUPABASE_URL}/functions/v1/google-form-integration/oauth/callback?${params.toString()}`;
       console.log("Redirecting to:", callbackUrl);
 
